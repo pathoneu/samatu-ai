@@ -76,6 +76,11 @@ export default function PatikraQuestions() {
   const [drawing, setDrawing] = useState(false);
   const [splitFirst, setSplitFirst] = useState(null);
   const [pickNotice, setPickNotice] = useState(null);         // why the last click on the drawing did not work
+  // a click in a NEIGHBOUR's room from a room whose walls close only a pocket (2026-09-23): the server proposes
+  // the boundary through the two rooms' joined space — `join` is that answer (+ the click), shown until „Tinka"
+  // or a line he draws himself (`joinDrawing`)
+  const [join, setJoin] = useState(null);
+  const [joinDrawing, setJoinDrawing] = useState(false);
 
   const skippedRef = useRef(skipped);
   skippedRef.current = skipped;
@@ -171,7 +176,7 @@ export default function PatikraQuestions() {
   }, [id, focusNr, current?.answer, factsNonce]);
 
   // ── a shared space: ask the program for its boundary as soon as the question is in front of him ────
-  useEffect(() => { setPickNotice(null); }, [currentId, focusNr]);
+  useEffect(() => { setPickNotice(null); setJoin(null); setJoinDrawing(false); setSplitFirst(null); }, [currentId, focusNr]);
 
   useEffect(() => {
     setDrawing(false);
@@ -228,26 +233,67 @@ export default function PatikraQuestions() {
   // „Parodyti patalpą": one click inside the room → its wall-exact outline, walls read again
   // an outline the server found for a click (or for „Tinka" on the proposed one) lands on the project — or, when
   // the click may not become an outline, the reason is said at the drawing
-  const landOutline = useCallback(async (nr, found, { accepted = false } = {}) => {
-    const rooms = roomsWithOutline(project, nr, found);
+  const landOutline = useCallback(async (nr, found, { accepted = false, point = null } = {}) => {
+    if (found?.status === 'shared') {
+      // the place is a neighbour's, and this room's pocket joins it: the boundary is proposed, not landed
+      setPickNotice(null);
+      setJoin({ ...found, point });
+      setJoinDrawing(false);
+      return;
+    }
+    const joined = Boolean(found?.rooms && !found?.room);      // „Tinka" on a joined space: BOTH rooms come back
+    const rooms = joined ? roomsWithSplit(project, found) : roomsWithOutline(project, nr, found);
     if (!rooms) {
       const { key, params } = outlineFailureKey(found);
       setPickNotice(t(`project.roomSheet.${key}`, params));
       return;
     }
     setPickNotice(null);
+    setJoin(null);
     pilot('question_answer', { kind: 'question', id: current.kind });
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
+    const touched = joined ? Object.keys(found.rooms || {}) : [nr];
     await land(await saveRoomEdit(project, rooms), {
-      fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: [nr], accepted }, t),
+      fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched, accepted, joined }, t),
     });
   }, [project, current, questions, land, pilot, t]);
 
   const pickOutline = useCallback((point) => run(async () => {
     if (!point || !current || !outlineItem) return;
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point));
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point), { point });
   }), [run, current, outlineItem, id, landOutline]);
+
+  // „Tinka" on the boundary proposed after a click in the neighbour's room: the same click, labelled
+  const acceptJoin = useCallback(() => run(async () => {
+    if (!current || !outlineItem || !join?.point) return;
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, join.point, { pritarta: true }), { accepted: true });
+  }), [run, current, outlineItem, id, join, landOutline]);
+
+  // „Nubrėšiu pats" after such a click: two clicks cut the JOINED space along his line
+  const pickJoinSplit = useCallback((point) => {
+    const { first, request } = nextSplitClick(splitFirst, point);
+    setSplitFirst(first);
+    if (!request || !current || !outlineItem || !join?.su) return;
+    run(async () => {
+      const found = await fetchSplitSpace(id, outlineItem.room_nr, { ...request, su: join.su });
+      const rooms = roomsWithSplit(project, found);
+      if (!rooms) {
+        const { key, params } = splitFailureKey(found);
+        setPickNotice(t(`project.roomSheet.${key}`, params));
+        return;
+      }
+      setPickNotice(null);
+      setJoin(null);
+      setJoinDrawing(false);
+      pilot('question_answer', { kind: 'question', id: current.kind });
+      standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
+      setAnswered((n) => n + 1);
+      await land(await saveRoomEdit(project, rooms), {
+        fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: Object.keys(found.rooms || {}), joined: true }, t),
+      });
+    });
+  }, [splitFirst, current, outlineItem, join, run, id, project, questions, land, pilot, t]);
 
   // „Tinka" on the outline the program proposed (2026-09-23): the same click, at a point inside that outline
   const acceptOutline = useCallback(() => run(async () => {
@@ -304,9 +350,15 @@ export default function PatikraQuestions() {
   const factList = orderFacts(roomFacts?.facts);
   const showDrawing = Boolean(current && WITH_DRAWING.has(current.answer) && roomFacts?.room && String(roomFacts.room.nr) === String(focusNr));
   const proposed = proposal && proposal !== 'loading' && proposal.status === 'ok' ? proposal : null;
-  const pick = current?.answer === 'outline'
+  const pick = current?.answer === 'outline' && join && joinDrawing
     ? {
-      active: Boolean(outlineItem), mode: 'outline', first: null, busy, notice: pickNotice,
+      active: true, mode: 'split', first: splitFirst, busy, notice: pickNotice,
+      text: { hint: t(splitFirst ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: [outlineItem?.room_nr, join.su].filter(Boolean).join(', ') }), why: t('project.roomSheet.splitHintWhy') },
+      onStart: () => {}, onCancel: () => { setSplitFirst(null); setJoinDrawing(false); }, onPoint: pickJoinSplit,
+    }
+    : current?.answer === 'outline'
+    ? {
+      active: Boolean(outlineItem) && !join, mode: 'outline', first: null, busy, notice: pickNotice,
       // with a proposal on the drawing the banner says so — „Tinka" is on the left, a click elsewhere replaces it
       text: outlineItem?.proposed_outline
         ? { hint: t('project.roomSheet.outlinePickHintProposal', { room: outlineItem.room_nr }), why: t('project.roomSheet.outlinePickWhyProposal') }
@@ -448,8 +500,39 @@ export default function PatikraQuestions() {
                   {current.answer === 'choices' && <ChoicesBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} />}
                   {current.answer === 'openings' && <OpeningsBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onOpenRoom={openRoom} />}
 
-                  {current.answer === 'outline' && (
+                  {current.answer === 'outline' && !join && (
                     <OutlineBody question={current} item={outlineItem} busy={busy} onAccept={acceptOutline} onTypeLength={typeOutlineLength} />
+                  )}
+                  {current.answer === 'outline' && join && outlineItem && (
+                    <div className="flex flex-col gap-3" data-testid="outline-join">
+                      <p className="text-[15px] font-semibold">
+                        <span className="font-mono text-muted-foreground">{outlineItem.room_nr}</span> {outlineItem.room_name}
+                      </p>
+                      <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+                        {t('project.questions.outlineSharedWith', {
+                          nr: outlineItem.room_nr, su: join.su,
+                          a: ltNumber(Number(join.rooms?.[outlineItem.room_nr]?.plotas_m2), 2), tableA: ltNumber(Number(join.rooms?.[outlineItem.room_nr]?.plotas_uzrasas_m2), 2),
+                          b: ltNumber(Number(join.rooms?.[join.su]?.plotas_m2), 2), tableB: ltNumber(Number(join.rooms?.[join.su]?.plotas_uzrasas_m2), 2),
+                        })}
+                      </p>
+                      {!joinDrawing ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={acceptJoin}>
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                            {t('project.questions.accept')}
+                          </button>
+                          <button type="button" className={Q_PLAIN} disabled={busy} onClick={() => { setJoinDrawing(true); setSplitFirst(null); }}>
+                            <PenLine className="h-4 w-4" aria-hidden="true" />
+                            {t('project.questions.splitDraw')}
+                          </button>
+                          <button type="button" className={Q_PLAIN} disabled={busy} onClick={() => setJoin(null)}>
+                            {t('project.questions.outlineJoinBack')}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.splitDrawing')}</p>
+                      )}
+                    </div>
                   )}
 
                   {current.answer === 'split' && (
@@ -521,9 +604,11 @@ export default function PatikraQuestions() {
                       hidePickButtons
                       proposal={current.answer === 'split' && proposed && !drawing
                         ? { page: proposed.page, line_pct: proposed.line_pct, rooms: Object.fromEntries(Object.entries(proposed.rooms || {}).map(([nr, r]) => [nr, r.polygon_pct])) }
-                        : current.answer === 'outline' && outlineItem?.proposed_outline
-                          ? { page: outlineItem.proposed_outline.page, line_pct: null, rooms: { [outlineItem.room_nr]: outlineItem.proposed_outline.polygon_pct } }
-                          : null}
+                        : current.answer === 'outline' && join && !joinDrawing
+                          ? { page: join.page, line_pct: join.line_pct, rooms: Object.fromEntries(Object.entries(join.rooms || {}).map(([nr, r]) => [nr, r.polygon_pct])) }
+                          : current.answer === 'outline' && outlineItem?.proposed_outline && !join
+                            ? { page: outlineItem.proposed_outline.page, line_pct: null, rooms: { [outlineItem.room_nr]: outlineItem.proposed_outline.polygon_pct } }
+                            : null}
                       fallback={{ room: roomFacts.room, projectId: id, highlightCorners: false, facts: factList, wholeSheet: true, onToggleWhole: () => {}, activeFactKey: FACT_OF[current.kind] || null }}
                     />
                   ) : (

@@ -252,7 +252,9 @@ def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, 
         if len(seats) != 2 or min(table.values()) <= 0:
             meta["ribos_nepasiulytos"].append(members)
             continue
-        cut = propose_split(pdf_bytes, page, seats, table, m_per_pt, (W, H))
+        # a pocket joined to a neighbour's face (vector_rooms._match, `kisene`) is no single face at any door
+        # limit: the space is divided as the lane recorded it
+        cut = propose_split(pdf_bytes, page, seats, table, m_per_pt, (W, H), face_pct=g["polygon_pct"] if g.get("kisene") else None)
         if cut.get("status") != "ok" or any(m not in cut["rooms"] for m in members):
             meta["ribos_nepasiulytos"].append(members)
             continue
@@ -342,7 +344,10 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     sizes[p] = (W, H)
         for group in alignment["groups"]:
             located = [r for r in rooms if r.get("_vieta") and int(r["_vieta"]["page"]) in group]
-            todo = {_nr(r) for r in located if str(r.get("polygon_source") or "") not in KEEP_POLYGONS}
+            # the lane's OWN outlines are traced again every run (2026-09-23: a stored project gains what the lane
+            # learns — a pocket joined to a neighbour's face); a person's or the raster lane's outline is never replaced
+            todo = {_nr(r) for r in located
+                    if str(r.get("polygon_source") or "") not in KEEP_POLYGONS or str(r.get("polygon_source") or "") == VECTOR_SOURCE}
             if not todo:
                 continue
             # ONE sheet of the plan is traced: where most of the rooms still to do were found. Every located
@@ -365,7 +370,23 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     bx, by = to_base(alignment, q, float(v["cx"]) * sizes[q][0], float(v["cy"]) * sizes[q][1])
                     x, y = from_base(alignment, page, bx, by)
                     everyone[_nr(r)] = {**v, "page": page, "cx": x / W, "cy": y / H}
-            res = trace_vector_rooms(pdf_bytes, page, everyone, areas, scale[page], (W, H))
+            # what already stands — a person's or the raster lane's outline — is handed to the trace as solved: its
+            # faces are owned, it is never proposed, joined or divided, and a neighbour standing in it shares it
+            standing: dict[str, list] = {}
+            for r in located:
+                if _nr(r) in todo or not isinstance(r.get("polygon_pct"), list) or len(r["polygon_pct"]) < 3:
+                    continue
+                src = int((r.get("_konturas") or {}).get("page") or r.get("puslapio_nr") or page)
+                if src == page:
+                    standing[_nr(r)] = [[float(x), float(y)] for x, y in r["polygon_pct"]]
+                elif src in sizes:
+                    ring = []
+                    for x, y in r["polygon_pct"]:
+                        bx, by = to_base(alignment, src, float(x) * sizes[src][0], float(y) * sizes[src][1])
+                        qx, qy = from_base(alignment, page, bx, by)
+                        ring.append([qx / W, qy / H])
+                    standing[_nr(r)] = ring
+            res = trace_vector_rooms(pdf_bytes, page, everyone, areas, scale[page], (W, H), solved_pct=standing)
             meta["lapai"].append(page)
             for r in rooms:
                 nr = _nr(r)

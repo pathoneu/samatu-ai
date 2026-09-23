@@ -99,5 +99,35 @@ eval nepakito, išskyrus vieną H skaičių: bendra H suma 463,52 → 462,35 m²
 ranka brėžta riba ir parodytas tambūras nepaliesti; `demo-objektas_g` — be pokyčių. Bandomoji kopija
 `test-klausimai2-h` ištrinta.
 
+**5 dalis — paspaudimas kaimyno patalpoje (po pirmo rato, tą pačią dieną).** Steigėjas: „jei patalpa
+didesnė — spustelėkite kitur" nieko neduoda, tik pažymi 03. Pamatuota: tambūro kišenė 2,86 m² per 1,0 m angą
+be durų jungiasi su koridoriaus 03 kontūru (10,76 m², lentelėje 10,12) — riba menama. Padaryta: (a)
+`_propose_cut` (ribos paieška ant BET KOKIO veido), `propose_split` / `split_space` / `_space_to_divide` su
+`face_pct`; (b) `_match`: kišenė + kaimyno veidas per angą → viena erdvė (`groups` su `kisene`), kai abi dalys
+±8 % nuo lentelės — H: 01 4,31 m² / 03 9,73 m² („plotai"), klausimas „Parodykite patalpą 01" dingsta (šviežias H:
+5 → 3 klausimai: aukštis, 5 sienų ilgiai su siūlymais, 6 angos); (c) `trace_vector_rooms(solved_pct=…)` —
+žmogaus / rastrinės juostos kontūrai perduodami kaip `solved` (niekada nesiūlomi, nejungiami, nedalijami; testas),
+juostos SAVI kontūrai perskaitomi kiekvieną kartą; (d) `joined_space` + `outline-at` → `status: "shared"`
+(abu kontūrai, punktyras, `su`), `pritarta` → `_divided`, `split-space` su `su`; ekrane — kortelė „Čia patalpa
+03 — sienos jos nuo 01 neskiria… Siūlau ribą pagal lentelės plotus" su „Tinka" / „Nubrėšiu pats" / „Atgal",
+patalpos lape — pranešimas (`outlineShared`). Sintetinis planas `pocket_and_room` (1×3 m kišenė, 5×3 m
+kambarys, 1,0 m anga, 7 matmenų eilutės — mažiau nei 5 eilutės lapui mastelio neduoda). Klaida, rasta vartuose:
+sweep'o nutraukimas skaičiavo `solved` dvigubai → A prarado 101 (antras durų limitas nebevykdytas) — pataisyta,
+A vėl 11 kontūrų. Vartų JSON H: `ribos` [[01, 03], [04, 05]], `angu_nera` []. Demo perskaityti dar kartą: jo
+h-senas ir demo-objektas_h (01 „pasiulyta" / „parodyta", 03 jo skaičius) nepaliesti; G 03 kontūras persiskaitė
+(8,3 → 7,96 m įvertis). Vartai: geometrijos 3 passed, backend 3728 passed / 3 skipped, frontend 769 / 769, eslint
+švarus, eval nepakito, išskyrus H bendrą sumą 462,35 → 454,09 m² (paklaida 11,98 → 9,98 %) — koridoriaus sienos be tambūro juostos; in-sample 9,83 %, OOS 7,06 %, eilutės nepakito.
+
+**Sąmatos palyginimas su jo sąmata (H, `demo-objektas_h-senas` po jo atsakymų; `row_scorecard`):** jo 35
+eilutės, 24 su kiekiu; ±10 % — 6, ±25 % — 2, toli — 7, nėra — 9. Sutampa: GKP lubos 136,37 / 137,71 m²,
+LED nišos 30,37 / 33,19 m, WC rėmai 2 / 2, praustuvų potinkinės 2 / 2, dėžutės 2 / 2. Toli: Rotband 94 /
+169 m², beapvadinių durų angos 18,2 / 40,9 m, angokraščiai 100,3 / 63,2 m (prieš jo 6 pridėtas duris buvo
+70,0), šviestuvai 35 / 20, difuzoriai 10 / 9 (+2 plyšiniai), apdirbimas 40 / 27, potinkinės dušo/vonios 3 / 2.
+Arti: dažymas 457 / 413 m² (+11 %), kampai 466 / 413 m (+13 %). Nėra: pertvaros, magnetinių profilių karkasas,
+bortelis LED nišoje, nišos pertvarose, langų sandarinimas, betonavimas prie langų. Hipotezė iš skaičių:
+jo angokraščiai (63,2) = langai + lauko durys + kelios vidaus durys su apvadais, o beapvadinės vidaus durys
+eina į atskirą eilutę (40,9 m = ~8 × (2 × 2,1 + 0,8)); mes visas angas dedame į angokraščius — tai jo
+sprendimas (vidaus durų angokraščių konvencija), ne mano.
+
 **Kas nepadaryta sąmoningai:** naujos angų rūšies („anga be durų") variklyje nėra — nuimta varnelė arba
 pataisytas plotis; H 04 (5 angos sienose vs 2 langai + paslėptos durys) ir 09 lieka „pažiūrėkite patys".

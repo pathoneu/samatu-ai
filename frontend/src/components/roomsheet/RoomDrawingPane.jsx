@@ -218,7 +218,7 @@ export default function RoomDrawingPane({
                 {pick.busy
                   ? t('project.roomSheet.outlineReading')
                   : pick.mode === 'split'
-                    ? t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') })
+                    ? (pick.text?.hint || t(pick.first ? 'project.roomSheet.splitHintSecond' : 'project.roomSheet.splitHintFirst', { rooms: others.join(', ') }))
                     : (pick.text?.hint || t('project.roomSheet.outlinePickHint', { room: roomKey ?? '' }))}
               </p>
               {!pick.busy && (

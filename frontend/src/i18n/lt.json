@@ -1471,6 +1471,8 @@
       "openRoom": "Atidaryti patalpą",
       "outlineReason": "Kodėl neradau pats: {{reason}}.",
       "outlineAccept": "Tinka — šis kontūras",
+      "outlineSharedWith": "Čia patalpa {{su}} — sienos jos nuo {{nr}} neskiria: abi viena erdvė su menama riba. Siūlau ribą pagal lentelės plotus — punktyras brėžinyje: {{nr}} {{a}} m² (lentelėje {{tableA}}), {{su}} {{b}} m² (lentelėje {{tableB}}). Sienų sumai riba įtakos neturi.",
+      "outlineJoinBack": "Atgal",
       "outlineElsewhere": "Jei patalpa didesnė — spustelėkite kitoje jos vietoje brėžinyje.",
       "outlineTypeLength": "Arba be brėžinio — įrašykite sienų ilgį ranka:",
       "outlineLengthLabel": "Sienų ilgis, m",
@@ -1496,7 +1498,8 @@
       "answeredSplit": "Atsakyta: erdvė padalinta — patalpos {{rooms}} turi savo kontūrus, riba tarp jų nėra siena.",
       "answeredOutline": "Atsakyta: patalpa {{rooms}} parodyta — kontūras nubrėžtas pagal sienas, sienų ilgiai perskaityti iš naujo.",
       "answeredOutlineAccepted": "Atsakyta: patalpos {{rooms}} kontūras priimtas — sienų ilgiai perskaityti pagal jį.",
-      "answeredPerimeterTyped": "Atsakyta: patalpos {{rooms}} sienų ilgis įrašytas ranka — {{value}} m."
+      "answeredPerimeterTyped": "Atsakyta: patalpos {{rooms}} sienų ilgis įrašytas ranka — {{value}} m.",
+      "answeredJoin": "Atsakyta: patalpos {{rooms}} pasidalijo bendrą erdvę — kiekviena turi savo kontūrą, riba tarp jų nėra siena."
     },
     "roomSheet": {
       "yourRowsTitle": "Šablono eilutės",
@@ -1598,6 +1601,7 @@
       "outlineOpenWith": "Čia sienos šios patalpos neatskiria nuo patalpos {{rooms}} (erdvė {{area}} m²) — atskiro kontūro nubrėžti negaliu. Įrašykite sienų ilgį ranka.",
       "outlineOpen": "Čia sienos uždaro {{area}} m² — gerokai daugiau, nei patalpai užrašyta: arba lauko pusė, arba erdvė, bendra su kita patalpa. Spustelėkite kitoje vietoje arba įrašykite sienų ilgį ranka.",
       "outlineOutside": "Čia nėra sienomis uždarytos erdvės. Spustelėkite patalpos viduje, ne ant sienos.",
+      "outlineShared": "Čia patalpa {{rooms}} — sienos jos nuo šios patalpos neskiria. Ribą tarp jų pasiūlysiu klausimų ekrane (mygtukas „Klausimai“).",
       "outlineNoWalls": "Šiame lape sienų perskaityti negaliu. Atverskite planą su sienomis ir spustelėkite ten.",
       "outlineFailed": "Kontūro nubrėžti nepavyko. Pabandykite kitoje patalpos vietoje.",
       "splitPick": "Padalinti erdvę",

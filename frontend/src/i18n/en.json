@@ -1457,6 +1457,8 @@
       "openRoom": "Open the room",
       "outlineReason": "Why I could not find it myself: {{reason}}.",
       "outlineAccept": "Accept this outline",
+      "outlineSharedWith": "This is room {{su}} — no wall separates it from {{nr}}: one space with an imaginary boundary. I propose the boundary by the table's areas — dashed on the drawing: {{nr}} {{a}} m² (table {{tableA}}), {{su}} {{b}} m² (table {{tableB}}). The wall total does not depend on it.",
+      "outlineJoinBack": "Back",
       "outlineElsewhere": "If the room is larger, click elsewhere inside it on the drawing.",
       "outlineTypeLength": "Or without the drawing: type the wall length by hand:",
       "outlineLengthLabel": "Wall length, m",
@@ -1482,7 +1484,8 @@
       "answeredSplit": "Answered: the space is divided — rooms {{rooms}} have their own outlines; the boundary between them is not a wall.",
       "answeredOutline": "Answered: room {{rooms}} shown — outline traced along the walls, wall lengths read again.",
       "answeredOutlineAccepted": "Answered: room {{rooms}} — the proposed outline accepted, wall lengths read from it.",
-      "answeredPerimeterTyped": "Answered: room {{rooms}} — wall length typed by hand, {{value}} m."
+      "answeredPerimeterTyped": "Answered: room {{rooms}} — wall length typed by hand, {{value}} m.",
+      "answeredJoin": "Answered: rooms {{rooms}} divided their shared space — each has its own outline, the boundary between them is not a wall."
     },
     "roomSheet": {
       "yourRowsTitle": "Template rows",
@@ -1583,6 +1586,7 @@
       "outlineOpenWith": "The walls here do not separate this room from room {{rooms}} (a space of {{area}} m²) — I cannot draw a separate outline. Enter the perimeter by hand.",
       "outlineOpen": "The walls here close {{area}} m² — far more than this room is given. The space looks shared with another room; enter the perimeter by hand.",
       "outlineOutside": "There is no space closed by walls here. Click inside the room, not on a wall.",
+      "outlineShared": "This is room {{rooms}} — no wall separates it from this one. I will propose the boundary on the question screen (the „Klausimai“ button).",
       "outlineNoWalls": "I cannot read walls on this sheet. Open the plan that draws the walls and click there.",
       "outlineFailed": "The outline could not be drawn. Try another place inside the room.",
       "splitPick": "Divide the space",

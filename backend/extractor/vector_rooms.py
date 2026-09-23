@@ -349,6 +349,41 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
             groups.append({"nariai": sharing, "polygon_pct": _to_pct(poly, W, H), "plotas_m2": round(poly.area * m2, 2),
                            "perimetras_m": round(outline.exterior.length * m_per_pt, 2),
                            "lenteles_suma_m2": round(sum(float(table_areas.get(o) or 0) for o in sharing), 2), "page": page})
+    # 2026-09-23 (objektas_h tambūras): a room whose walls close LESS than the table gives, standing beside a
+    # room whose face the table agrees with, across a doorless opening — the designer drew the two as one space
+    # with an imaginary boundary between them. The pocket and the neighbour's face become ONE shared space (a
+    # group, which the lane divides by its proposed boundary) when a boundary leaves BOTH within AREA_TOL of the
+    # table; otherwise the pocket stays a proposal and the neighbour keeps its face.
+    for nr in sorted(proposals):
+        want = float(table_areas.get(nr) or 0)
+        if want <= 0 or proposals[nr]["plotas_m2"] >= want or len(seat[nr]) != 1:
+            continue
+        k = seat[nr][0]
+        for b, near in zip(bridges, near_bridge):
+            if k not in near or len(near) != 2:
+                continue
+            k2 = next(x for x in near if x != k)
+            owner = owners.get(k2) or []
+            if len(owner) != 1 or owner[0] not in rooms or owner[0] not in polygons:
+                continue
+            o = owner[0]
+            union = _fuse([faces[k], b, polygons[o]])
+            if union is None or union.geom_type != "Polygon" or union.is_empty:
+                continue
+            cut = _propose_cut(union, {nr: pts[nr], o: pts[o]}, table_areas, m_per_pt, W, H, page)
+            if cut is None or any((r["paklaida"] or 0) > AREA_TOL for r in cut["rooms"].values()):
+                continue
+            outline = union.simplify(SIMPLIFY_PT, preserve_topology=True)
+            groups.append({"nariai": sorted([nr, o]), "polygon_pct": _to_pct(union, W, H),
+                           "plotas_m2": round(union.area * m2, 2), "perimetras_m": round(outline.exterior.length * m_per_pt, 2),
+                           "lenteles_suma_m2": round(want + float(table_areas.get(o) or 0), 2), "page": page,
+                           "kisene": nr})                       # which room's pocket was joined to the other's face
+            del rooms[o]
+            polygons.pop(o, None)
+            reasons[nr] = f"atvira erdvė su {o}: sienos šių patalpų neskiria"
+            reasons[o] = f"atvira erdvė su {nr}: sienos šių patalpų neskiria"
+            del proposals[nr]
+            break
     for nr in sorted(set(pts) - strong - set(solved)):
         ks = seat[nr]
         if not ks:
@@ -367,7 +402,8 @@ def _match(solid, bridges: Sequence[Polygon], pts: dict[str, Point], strong: set
 
 
 def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], table_areas: dict[str, float],
-                       m_per_pt: float, page_size: tuple[float, float] | None = None) -> dict:
+                       m_per_pt: float, page_size: tuple[float, float] | None = None,
+                       solved_pct: dict[str, Sequence[Sequence[float]]] | None = None) -> dict:
     """{rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa, sujungta, durys_m, page,
                      angos: [{plotis_m, storis_m, line_pct, i}]}},
         reasons: {nr: str},
@@ -376,6 +412,9 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
     `siulymai` (2026-09-23): the face the walls close around a room's number when its area is too far from the
     table's to be taken on its own — proposed to the person instead of refused in silence (the smallest
     disagreement over the door limits).
+    `solved_pct` (2026-09-23): outlines that already stand — a person's, the raster lane's — as page fractions.
+    They own their faces: such a room is never proposed, joined to a neighbour or divided, and a room standing
+    inside one is said to share it.
 
     Door limits are swept narrow to wide (one limit does not fit every
     drawing): a room solved at a narrower limit keeps that outline; the wider
@@ -393,12 +432,13 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
     strong = {nr for nr, loc in here.items() if loc.get("saltinis") in STRONG}
     edges = _edges(solid)
     rooms: dict[str, dict] = {}
-    solved: dict[str, Polygon] = {}
+    solved: dict[str, Polygon] = dict(_outlines(solved_pct, W, H))
     reasons: dict[str, str] = {}
     groups: list[dict] = []
     siulymai: dict[str, dict] = {}
+    given = set(solved_pct or {})
     for door_m in DOOR_SWEEP_M:
-        if len(rooms) == len(pts):
+        if len(rooms) + len(given & set(pts)) >= len(pts):
             break
         found, polygons, reasons, groups, offered = _match(solid, _bridges(solid, edges, m_per_pt, door_m), pts, strong,
                                                            table_areas, m_per_pt, W, H, page, door_m, solved)
@@ -412,8 +452,9 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
             rooms[nr]["angos"] = angos
     for nr in rooms:
         rooms[nr].setdefault("angos", [])
-    return {"rooms": rooms, "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms}, "groups": groups,
-            "siulymai": {nr: cand for nr, cand in siulymai.items() if nr not in rooms}}
+    return {"rooms": {nr: r for nr, r in rooms.items() if nr not in given},
+            "reasons": {nr: why for nr, why in reasons.items() if nr not in rooms and nr not in given}, "groups": groups,
+            "siulymai": {nr: cand for nr, cand in siulymai.items() if nr not in rooms and nr not in given}}
 
 
 def _outlines(outlines_pct: dict[str, Sequence[Sequence[float]]] | None, W: float, H: float) -> dict[str, Polygon]:
@@ -597,22 +638,36 @@ def _cut_rooms(face, a: Sequence[float], b: Sequence[float], seats: dict[str, Po
 
 
 def _space_to_divide(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[float]], table_areas: dict[str, float],
-                     m_per_pt: float, page_size: tuple[float, float] | None):
-    """What dividing a shared space starts from → (status | None, W, H, seats in page points, the shared face)."""
+                     m_per_pt: float, page_size: tuple[float, float] | None,
+                     face_pct: Sequence[Sequence[float]] | None = None):
+    """What dividing a shared space starts from → (status | None, W, H, seats in page points, the shared face).
+    `face_pct` (2026-09-23): the space as the lane recorded it (`_atvira_erdve.polygon_pct`) — needed when the
+    space is a room's pocket joined to a neighbour's face through a doorless opening, which no single face at
+    any door limit is; without it the face holding both numbers is looked up afresh."""
     if page_size is None:
         W, H, _ = page_geometry(pdf_bytes, page)
     else:
         W, H = page_size
     if W <= 0 or H <= 0 or not m_per_pt:
         return "no_walls", W, H, {}, None
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
-    if solid is None or n_walls < MIN_WALLS:
-        return "no_walls", W, H, {}, None
     seats = {str(nr): Point(float(xy[0]) * W, float(xy[1]) * H) for nr, xy in (seats_pct or {}).items()}
     if len(seats) > 2:
         return "too_many", W, H, seats, None
     if len(seats) < 2:
         return "not_shared", W, H, seats, None
+    if face_pct is not None:
+        try:
+            face = Polygon([(float(x) * W, float(y) * H) for x, y in face_pct])
+        except (TypeError, ValueError):
+            face = None
+        if face is not None and not face.is_valid:
+            face = face.buffer(0)
+        if face is None or face.is_empty or face.geom_type != "Polygon" or not all(face.contains(pt) for pt in seats.values()):
+            return "not_shared", W, H, seats, None
+        return None, W, H, seats, face
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    if solid is None or n_walls < MIN_WALLS:
+        return "no_walls", W, H, {}, None
     want_both = sum(float((table_areas or {}).get(nr) or 0) for nr in seats)
     face = _shared_face(solid, _edges(solid), seats, want_both, m_per_pt)
     return (None if face is not None else "not_shared"), W, H, seats, face
@@ -620,7 +675,7 @@ def _space_to_divide(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[
 
 def split_space(pdf_bytes: bytes, page: int, a_pct: Sequence[float], b_pct: Sequence[float],
                 seats_pct: dict[str, Sequence[float]], table_areas: dict[str, float], m_per_pt: float,
-                page_size: tuple[float, float] | None = None) -> dict:
+                page_size: tuple[float, float] | None = None, face_pct: Sequence[Sequence[float]] | None = None) -> dict:
     """Two rooms no wall separates, divided by ONE line a person draws through `a` and `b` (extended to
     the walls). {status: "ok", rooms: {nr: {polygon_pct, plotas_m2, perimetras_m, paklaida, plotas_nesutampa,
     menamos, page}}} — `menamos` are the outline's edges that lie on the drawn boundary: there is NO wall
@@ -628,27 +683,21 @@ def split_space(pdf_bytes: bytes, page: int, a_pct: Sequence[float], b_pct: Sequ
     compared. Otherwise: "no_walls"; "too_many" (more than two rooms in the space — not supported);
     "not_shared" (the two numbers do not stand in one space); "bad_line" (the line does not cut the space
     in two with one number on each side)."""
-    status, W, H, seats, face = _space_to_divide(pdf_bytes, page, seats_pct, table_areas, m_per_pt, page_size)
+    status, W, H, seats, face = _space_to_divide(pdf_bytes, page, seats_pct, table_areas, m_per_pt, page_size, face_pct)
     if status:
         return {"status": status}
     return _cut_rooms(face, (float(a_pct[0]) * W, float(a_pct[1]) * H), (float(b_pct[0]) * W, float(b_pct[1]) * H),
                       seats, table_areas, m_per_pt, W, H, page)
 
 
-def propose_split(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[float]], table_areas: dict[str, float],
-                  m_per_pt: float, page_size: tuple[float, float] | None = None) -> dict:
-    """The boundary the PROGRAM proposes for two rooms no wall separates (2026-09-21) — so that a person only
-    says „Tinka". Nobody can know where a boundary with no wall „should" be; what IS known is the two areas
-    the table gives. Upright and level lines between the two numbers are tried:
-      • through every CORNER of the space between them (a wall end, a column, a jog — where a designer ends
-        a room) — taken when both parts then agree with the table within AREA_TOL, the best agreement first;
-      • otherwise where the two parts stand in the table's ratio (an even split when the table is silent).
-    Every candidate is cut by the very `_cut_rooms` a person's own line goes through. → the `split_space`
-    answer + `line_pct` (the boundary inside the space) + `pagal` ("kampas" | "plotai"); "no_proposal" when no
-    such line leaves one number on each side."""
-    status, W, H, seats, face = _space_to_divide(pdf_bytes, page, seats_pct, table_areas, m_per_pt, page_size)
-    if status:
-        return {"status": status}
+def _propose_cut(face, seats: dict[str, Point], table_areas: dict[str, float], m_per_pt: float, W: float, H: float,
+                 page: int) -> dict | None:
+    """The boundary the PROGRAM proposes through `face` for the two rooms whose numbers stand in it (`seats`) —
+    the `split_space` answer + `line_pct` + `pagal`, or None when no upright or level line leaves one number on
+    each side. Upright and level lines are tried through every CORNER of the face (a wall end, a column, a jog —
+    where a designer ends a room), taken when both parts then agree with the table within AREA_TOL, the best
+    agreement first; otherwise where the two parts stand in the table's ratio (an even split when the table is
+    silent). Every candidate is cut by the very `_cut_rooms` a person's own line goes through."""
     (na, pa), (nb, pb) = sorted(seats.items())
     ta, tb = (float((table_areas or {}).get(nr) or 0) for nr in (na, nb))
     share = ta / (ta + tb) if ta > 0 and tb > 0 else 0.5
@@ -696,9 +745,63 @@ def propose_split(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[flo
         if best is None or rank < best[0]:
             best = (rank, kind, cut, [list(ends[0]), list(ends[-1])])
     if best is None:
-        return {"status": "no_proposal"}
+        return None
     _, kind, cut, line = best
     return {**cut, "line_pct": line, "pagal": kind}
+
+
+def propose_split(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[float]], table_areas: dict[str, float],
+                  m_per_pt: float, page_size: tuple[float, float] | None = None,
+                  face_pct: Sequence[Sequence[float]] | None = None) -> dict:
+    """The boundary the PROGRAM proposes for two rooms no wall separates (2026-09-21) — so that a person only
+    says „Tinka". Nobody can know where a boundary with no wall „should" be; what IS known is the two areas
+    the table gives (`_propose_cut`). → the `split_space` answer + `line_pct` (the boundary inside the space) +
+    `pagal` ("kampas" | "plotai"); "no_proposal" when no such line leaves one number on each side. `face_pct`:
+    the space as the lane recorded it (a pocket joined to a neighbour's face — `_space_to_divide`)."""
+    status, W, H, seats, face = _space_to_divide(pdf_bytes, page, seats_pct, table_areas, m_per_pt, page_size, face_pct)
+    if status:
+        return {"status": status}
+    best = _propose_cut(face, seats, table_areas, m_per_pt, W, H, page)
+    return best if best is not None else {"status": "no_proposal"}
+
+
+def joined_space(pdf_bytes: bytes, page: int, own_seat_pct: Sequence[float], other_outline_pct: Sequence[Sequence[float]],
+                 m_per_pt: float, page_size: tuple[float, float] | None = None) -> list[list[float]] | None:
+    """The space a room's POCKET (the face the walls close around its number) and a neighbour's outline make
+    together across the doorless opening between them (2026-09-23, objektas_h tambūras) — as one outline in
+    page fractions, or None when they do not meet at an opening. What „Nubrėšiu pats" and „Tinka" after a
+    click in the neighbour's room start from; the server recomputes it, never stores it."""
+    if page_size is None:
+        W, H, _ = page_geometry(pdf_bytes, page)
+    else:
+        W, H = page_size
+    if W <= 0 or H <= 0 or not m_per_pt:
+        return None
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    if solid is None or n_walls < MIN_WALLS:
+        return None
+    try:
+        other = Polygon([(float(x) * W, float(y) * H) for x, y in other_outline_pct])
+        seat = Point(float(own_seat_pct[0]) * W, float(own_seat_pct[1]) * H)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if not other.is_valid:
+        other = other.buffer(0)
+    edges = _edges(solid)
+    for door_m in DOOR_SWEEP_M:
+        bridges = _bridges(solid, edges, m_per_pt, door_m)
+        faces = _faces(solid, bridges)
+        pocket = next((f for f in faces if f.contains(seat)), None)
+        if pocket is None or pocket.intersection(other).area > 0.5 * pocket.area:
+            continue
+        joint = [b for b in bridges if b.distance(pocket) <= 1.0 and b.distance(other) <= 1.0]
+        if not joint:
+            continue
+        union = _fuse([pocket, other] + joint)
+        if union is not None and union.geom_type == "Polygon" and not union.is_empty:
+            return _to_pct(union, W, H)
+    return None
+
 
 
 def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[Sequence[float]]], m_per_pt: float,

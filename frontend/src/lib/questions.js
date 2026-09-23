@@ -172,6 +172,7 @@ export function answerSummary(question, answer, t) {
   // proposed, and a wall length typed by hand instead of any click
   if (question?.kind === 'konturas' && answer?.accepted) key = 'answeredOutlineAccepted';
   if (question?.kind === 'konturas' && answer?.typed) key = 'answeredPerimeterTyped';
+  if (question?.kind === 'konturas' && answer?.joined) key = 'answeredJoin';
   // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
   const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
   const value = Number.isFinite(Number(answer?.value)) && answer?.value !== '' && answer?.value != null

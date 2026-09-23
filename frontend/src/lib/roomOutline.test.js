@@ -111,3 +111,9 @@ test('a split takes two clicks on ONE sheet', async () => {
   assert.deepEqual(nextSplitClick(a, { ...a }), { first: a, request: null });
   assert.deepEqual(nextSplitClick(a, null), { first: a, request: null });
 });
+
+test('a click in a neighbour the program outlined, from a pocket, is a proposal on the question screen and a notice on the room sheet', () => {
+  assert.deepEqual(outlineFailureKey({ status: 'shared', su: '03', rooms: {}, line_pct: [[0.4, 0.1], [0.4, 0.5]] }),
+    { key: 'outlineShared', params: { rooms: '03' } });
+  assert.equal(roomsWithOutline({ patalpos: [] }, '01', { status: 'shared', su: '03' }), null, 'nothing lands until he says „Tinka"');
+});

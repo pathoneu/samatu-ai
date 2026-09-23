@@ -35,7 +35,7 @@ from api.free_reread import NO_PDF, _project_for
 from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry
 from extractor.pdf_vectors import page_geometry
 from extractor.plan_dimensions import read_dimension_strings
-from extractor.vector_rooms import STRONG, outline_at, propose_split, split_space
+from extractor.vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, joined_space, outline_at, propose_split, split_space
 
 log = logging.getLogger("samatu.room_outline")
 
@@ -72,6 +72,7 @@ class SplitSpace(BaseModel):
     page: int = Field(ge=1)
     a: PagePoint
     b: PagePoint
+    su: str | None = Field(default=None, max_length=8)   # the neighbour whose face this room's pocket joins (2026-09-23)
 
 
 def _nr(room: dict) -> str:
@@ -154,6 +155,22 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
 
     hit = outline_at(pdf_bytes, body.page, body.x_pct, body.y_pct, room.get("plotas_m2"), float(scale), (W, H),
                      others_pct=others, other_seats_pct=seats)
+    if hit["status"] == "taken":
+        # 2026-09-23 (objektas_h tambūras: „jei patalpa didesnė — spustelėkite kitoje jos vietoje … bet paspaudus
+        # nieko negali padaryti"): the place belongs to a neighbour the LANE outlined, and this room's walls close a
+        # pocket beside it — the two are one space with an imaginary boundary. The boundary is proposed (both
+        # outlines + line, nothing saved); with `pritarta` it is applied to both rooms.
+        joined = _joined_with(pdf_bytes, page=body.page, rooms=rooms, room=room, other_nr=str(hit.get("nr") or ""),
+                              lay=lay, scale=scale, size=(W, H))
+        if joined is not None:
+            other, union, seats2, areas2 = joined
+            cut = propose_split(pdf_bytes, body.page, seats2, areas2, float(scale), (W, H), face_pct=union)
+            if cut.get("status") == "ok":
+                if body.pritarta:
+                    return _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut)
+                return {"status": "shared", "su": other, "page": body.page, "line_pct": cut["line_pct"], "pagal": cut["pagal"],
+                        "rooms": {nr: {**part, "plotas_uzrasas_m2": areas2.get(nr)} for nr, part in cut["rooms"].items()}}
+        return hit
     if hit["status"] != "ok":
         return hit
 
@@ -180,6 +197,33 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
     }
+
+
+def _joined_with(pdf_bytes: bytes, *, page: int, rooms: list[dict], room: dict, other_nr: str, lay, scale: float,
+                 size: tuple[float, float]):
+    """The space this room's pocket makes with `other_nr`'s lane-traced outline across a doorless opening
+    (vector_rooms.joined_space) → (other, union_pct, seats, table areas) — or None: no such neighbour, a person's
+    outline (never divided by the program), no printed numbers, or no opening between them."""
+    by_nr = {_nr(r): r for r in rooms}
+    other = by_nr.get(other_nr)
+    if other is None or str(other.get("polygon_source") or "") != VECTOR_SOURCE or not isinstance(other.get("polygon_pct"), list):
+        return None
+    seats: dict[str, tuple[float, float]] = {}
+    for r in (room, other):
+        v = r.get("_vieta")
+        pt = lay(int(v["page"]), float(v["cx"]), float(v["cy"])) if isinstance(v, dict) and v.get("saltinis") in STRONG else None
+        if pt is None:
+            return None
+        seats[_nr(r)] = pt
+    src = int((other.get("_konturas") or {}).get("page") or other.get("puslapio_nr") or page)
+    ring = [lay(src, float(x), float(y)) for x, y in other["polygon_pct"]]
+    if any(pt is None for pt in ring):
+        return None
+    union = joined_space(pdf_bytes, page, seats[_nr(room)], [list(pt) for pt in ring], float(scale), size)
+    if union is None:
+        return None
+    areas = {nr: float(by_nr[nr].get("plotas_m2") or 0) for nr in seats}
+    return other_nr, union, seats, areas
 
 
 def _shared_space(rooms: list[dict], room: dict, lay) -> tuple[str | None, list[str], dict[str, tuple[float, float]]]:
@@ -234,12 +278,26 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
     rooms come back with their own outlines — the boundary marked `menamos`, never a wall — and their walls
     read again. Saves nothing."""
     pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
-    status, members, seats = _shared_space(rooms, room, _laid_onto(body.page, geo.get("sutapdinimas") or {}))
-    if status:
-        return {"status": status}
+    lay = _laid_onto(body.page, geo.get("sutapdinimas") or {})
     by_nr = {_nr(r): r for r in rooms}
+    if body.su:
+        # „Nubrėšiu pats" after a click in the neighbour's room (2026-09-23): the line cuts the JOINED space
+        joined = _joined_with(pdf_bytes, page=body.page, rooms=rooms, room=room, other_nr=str(body.su).strip(), lay=lay,
+                              scale=scale, size=(W, H))
+        if joined is None:
+            return {"status": "not_shared"}
+        other, union, seats, areas = joined
+        members = [_nr(room), other]
+        face = union
+    else:
+        status, members, seats = _shared_space(rooms, room, lay)
+        if status:
+            return {"status": status}
+        areas = {nr: by_nr[nr].get("plotas_m2") for nr in members}
+        space = room.get("_atvira_erdve") if isinstance(room.get("_atvira_erdve"), dict) else {}
+        face = space.get("polygon_pct") if space.get("kisene") else None      # a joined space is no single face
     hit = split_space(pdf_bytes, body.page, (body.a.x_pct, body.a.y_pct), (body.b.x_pct, body.b.y_pct), seats,
-                      {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H))
+                      areas, scale, (W, H), face_pct=face)
     if hit["status"] != "ok":
         return hit
     return _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit)
@@ -262,7 +320,8 @@ def api_room_split_proposal(request: Request, project_id: str, room_nr: str):
     if status:
         return {"status": status}
     by_nr = {_nr(r): r for r in rooms}
-    hit = propose_split(pdf_bytes, page, seats, {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H))
+    hit = propose_split(pdf_bytes, page, seats, {nr: by_nr[nr].get("plotas_m2") for nr in members}, scale, (W, H),
+                        face_pct=space.get("polygon_pct") if space.get("kisene") else None)
     if hit["status"] != "ok":
         return {"status": hit["status"]}
     return {**_divided(parsed, pdf_bytes, dims, rooms, members, page, hit),

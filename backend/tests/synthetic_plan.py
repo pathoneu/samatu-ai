@@ -166,3 +166,30 @@ def two_rooms() -> Sheet:
     ]
     furniture = [(0.5, 0.5, 2.0, 1.4), (5.0, 2.0, 6.5, 2.9)]
     return Sheet(walls=walls, badges=badges, dims=dims, furniture=furniture)
+
+
+def pocket_and_room() -> Sheet:
+    """A 1×3 m pocket (room 1) beside a 5×3 m room (room 2), joined by a 1,0 m doorless opening in the partition
+    between them — the way objektas_h draws its tambūras against the corridor (2026-09-23). The table may give the
+    pocket MORE than its walls close (the designer's boundary is imaginary, somewhere inside the big room)."""
+    t = 0.2
+    walls = [
+        (0, 0, 6.6, t),                              # top
+        (0, 3 + t, 6.6, 3 + 2 * t),                  # bottom
+        (0, 0, t, 3 + 2 * t),                        # left
+        (6.4, 0, 6.6, 3 + 2 * t),                    # right
+        (1 + t, t, 1 + 2 * t, 1.0),                  # partition, upper piece (opening 1,0–2,0 m)
+        (1 + t, 2.0, 1 + 2 * t, 3 + t),              # partition, lower piece
+    ]
+    badges = [("1", 0.7, 1.5), ("2", 4.0, 1.5)]
+    o = 0.15
+    dims = [                                                             # enough line-backed strings for the sheet's scale
+        ("3000", t + o, t, t + o, 3 + t),                                # pocket left wall
+        ("1000", t, t + o, 1 + t, t + o),                                # pocket top
+        ("1000", t, 3 + t - o, 1 + t, 3 + t - o),                        # pocket bottom
+        ("5000", 1 + 2 * t, t + o, 6 + 2 * t, t + o),                    # room 2 top
+        ("5000", 1 + 2 * t, 3 + t - o, 6 + 2 * t, 3 + t - o),            # room 2 bottom
+        ("3000", 6 + 2 * t - o, t, 6 + 2 * t - o, 3 + t),                # room 2 right
+        ("3000", 1 + 2 * t + o, t, 1 + 2 * t + o, 3 + t),                # room 2 left (the partition)
+    ]
+    return Sheet(walls=walls, badges=badges, dims=dims)

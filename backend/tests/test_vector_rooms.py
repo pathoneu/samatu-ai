@@ -477,3 +477,44 @@ def test_no_table_areas_means_an_even_split_and_nothing_to_propose_is_said():
     assert vr.propose_split(build_plan([Sheet(walls=[])]), 1, _seats(), {}, SCALE) == {"status": "no_walls"}
     level = {"01": _pct(2.2, 1.5), "02": _pct(2.2, 1.5)}                          # both numbers in one place: no line separates them
     assert vr.propose_split(build_plan([_open_plan()]), 1, level, {"01": 12.0, "02": 9.0}, SCALE) == {"status": "no_proposal"}
+
+
+def test_a_pocket_that_the_table_gives_more_than_its_walls_close_joins_its_neighbours_face():
+    """objektas_h tambūras, 2026-09-23: the walls close 2,86 m² around the number, the table says 4,48 — the rest
+    is a strip of the corridor's face beyond a doorless opening, with an imaginary boundary. When a boundary leaves
+    BOTH rooms within the table's tolerance, the two are ONE shared space to divide (the pocket is no proposal any
+    more); when it cannot, the pocket stays a proposal and the neighbour keeps its face."""
+    from tests.synthetic_plan import pocket_and_room
+    where = {"01": _at(0.7, 1.5), "02": _at(4.0, 1.5)}
+    out = vr.trace_vector_rooms(build_plan([pocket_and_room()]), 1, where, {"01": 4.5, "02": 13.5}, SCALE)
+    assert "01" not in out["rooms"] and "02" not in out["rooms"] and out["siulymai"] == {}
+    assert "atvira erdvė su 02" in out["reasons"]["01"] and "atvira erdvė su 01" in out["reasons"]["02"]
+    (g,) = out["groups"]
+    assert g["nariai"] == ["01", "02"] and g["kisene"] == "01" and abs(g["plotas_m2"] - 18.2) < 0.3 and g["lenteles_suma_m2"] == 18.0
+    # the boundary the lane will divide it by: through the joined space, both parts within the table
+    cut = vr.propose_split(build_plan([pocket_and_room()]), 1, {nr: (v["cx"], v["cy"]) for nr, v in where.items()},
+                           {"01": 4.5, "02": 13.5}, SCALE, face_pct=g["polygon_pct"])
+    assert cut["status"] == "ok" and cut["pagal"] == "plotai"
+    assert abs(cut["rooms"]["01"]["plotas_m2"] - 4.5) / 4.5 <= 0.08 and abs(cut["rooms"]["02"]["plotas_m2"] - 13.5) / 13.5 <= 0.08
+    assert len(cut["rooms"]["01"]["menamos"]) == 1 and len(cut["rooms"]["02"]["menamos"]) == 1
+    # the table agrees with the walls: no joining, two ordinary rooms
+    plain = vr.trace_vector_rooms(build_plan([pocket_and_room()]), 1, where, {"01": 3.0, "02": 15.0}, SCALE)
+    assert set(plain["rooms"]) == {"01", "02"} and plain["groups"] == []
+    # the table gives the pocket far more than the neighbour can spare: the pocket stays a proposal
+    greedy = vr.trace_vector_rooms(build_plan([pocket_and_room()]), 1, where, {"01": 9.0, "02": 15.0}, SCALE)
+    assert "02" in greedy["rooms"] and "01" in greedy["siulymai"] and greedy["groups"] == []
+
+
+def test_the_joined_space_of_a_pocket_and_a_neighbours_outline_is_one_outline():
+    from tests.synthetic_plan import pocket_and_room
+    pdf = build_plan([pocket_and_room()])
+    where = {"01": _at(0.7, 1.5), "02": _at(4.0, 1.5)}
+    plain = vr.trace_vector_rooms(pdf, 1, where, {"01": 3.0, "02": 15.0}, SCALE)
+    union = vr.joined_space(pdf, 1, (where["01"]["cx"], where["01"]["cy"]), plain["rooms"]["02"]["polygon_pct"], SCALE)
+    from shapely.geometry import Point, Polygon
+    poly = Polygon(union)
+    assert poly.is_valid and 4 <= len(union) <= 20
+    for nr in ("01", "02"):
+        assert poly.contains(Point(where[nr]["cx"], where[nr]["cy"]))
+    # a seat that does not sit in a pocket beside that outline: nothing to join
+    assert vr.joined_space(pdf, 1, (where["02"]["cx"], where["02"]["cy"]), plain["rooms"]["02"]["polygon_pct"], SCALE) is None

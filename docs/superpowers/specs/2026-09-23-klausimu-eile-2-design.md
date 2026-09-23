@@ -91,6 +91,23 @@ durų, niša ar dvi durys." `openingsAnswer(project, items, picked, edits)` — 
 lentelės; riba reikalinga tik sienų ilgiams paskirstyti — sienų suma nuo jos nesikeičia."; kontūro
 nesutapimo priežastis — kaip B.
 
+
+### E. „Spustelėkite kitoje jos vietoje" — paspaudimas kaimyno patalpoje (antra pastaba po pirmo rato)
+
+Steigėjas: „paspaudus kitoje vietoje nieko negali padaryti, tik pasižymi kitas kambarys — kodėl negali papildyti?"
+Pamatuota H: tambūro kišenė 2,86 m² per 1,0 m angą be durų jungiasi su koridoriaus 03 kontūru (10,76 m²,
+lentelėje 10,12). Dizainerio riba tarp 01 ir 03 — menama. Sprendimas dviem lygiais:
+- **Juosta pati** (`vector_rooms._match`): kai patalpos sienos uždaro MAŽIAU nei lentelė, o už angos be durų
+  stovi kaimyno kontūras, su kuriuo lentelė sutinka, abi tampa viena erdve (`groups` su `kisene`), kurią juosta
+  padalija savo riba — tik jei abi dalys lieka ±8 % nuo lentelės; kitaip kišenė lieka pasiūlymu, kaimynas
+  nepaliestas. H: 01 → 4,31 m² (4,48), 03 → 9,73 (10,12), „plotai"; klausimas „Parodykite patalpą 01" dingsta.
+  Žmogaus (ar rastrinės juostos) kontūrai perduodami skaitymui kaip `solved` — jie niekada nesiūlomi, nejungiami
+  ir nedalijami; juostos SAVI kontūrai perskaitomi kiekvieną kartą (saugomas projektas gauna, ką juosta išmoko).
+- **Paspaudimu** (`outline-at` → `status: "shared"`): kai vieta priklauso juostos nubrėžtam kaimynui, o šios
+  patalpos sienos uždaro kišenę šalia — grąžinamas ribos pasiūlymas per sujungtą erdvę (`joined_space`), abu
+  kontūrai + punktyras; „Tinka" (`pritarta`) pritaiko abiem (`padalinta`), „Nubrėšiu pats" — `split-space` su
+  `su` pjauna sujungtą erdvę jo linija. Patalpos lape — pranešimas, kuris nukreipia į klausimų ekraną.
+
 ## Tikrinimas
 
 1. Vienetų testai: juosta (sintetinis planas be pertvaros → padalyta, `pagal`, sienų suma = bendro

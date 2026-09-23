@@ -19,7 +19,7 @@ from main import app  # noqa: E402
 import auth  # noqa: E402
 import db  # noqa: E402
 import storage  # noqa: E402
-from tests.synthetic_plan import PT_PER_M, build_plan, two_rooms  # noqa: E402
+from tests.synthetic_plan import PT_PER_M, build_plan, pocket_and_room, two_rooms  # noqa: E402
 
 _PW = "passw0rd123"
 
@@ -185,3 +185,61 @@ def test_an_accepted_proposal_is_said_to_be_the_programs_offer_that_he_confirmed
     assert f["sentence"].endswith("Kontūrą pasiūliau pagal sienas prie patalpos numerio — patvirtinote. Kontūro plotas 2,86 m², "
                                   "lentelėje užrašyta 4,48 m² — plotui imamas užrašas, kontūras tik sienoms.")
     assert _perimeter_fact(saltinis="pasiulyta", paklaida=0.02)["sentence"].endswith("prie patalpos numerio — patvirtinote.")
+
+
+# ── a click in the neighbour's room from a pocket: the joined space, proposed — „Tinka" or a drawn line ──
+
+def _pocket_blob():
+    """Room 01's walls close 3 m² (its number is printed there); the table gives it 9 — far more than the
+    neighbour can spare, so the lane leaves it a proposal and outlines 02 (15 m²) on its own."""
+    r1 = {"nr": "01", "pavadinimas": "A", "plotas_m2": 9.0, "plotas_saltinis": "eksplikacija", "puslapio_nr": 1, "perimetras_m": 12.0}
+    r2 = {"nr": "02", "pavadinimas": "B", "plotas_m2": 15.0, "plotas_saltinis": "eksplikacija", "puslapio_nr": 1, "perimetras_m": 16.0}
+    return {"name": "P", "tipas": "interjeras", "patalpos": [r1, r2], "puslapiai": [{"nr": 1, "tipas": "floor_plan"}], "_meta": {"model": "x"}}
+
+
+def _store_pocket(project_id="p1"):
+    db.upsert_project(project_id, _pocket_blob(), user_id=None)
+    storage.get_storage().put(storage.pdf_key(project_id), build_plan([pocket_and_room()]))
+
+
+def test_a_click_in_the_neighbours_room_from_a_pocket_proposes_the_boundary_between_them(tmp_path, monkeypatch):
+    """2026-09-23: „jei patalpa didesnė — spustelėkite kitoje jos vietoje … bet paspaudus nieko negali padaryti".
+    The place belongs to room 02 (the lane's outline); 01's walls close a pocket beside it: one space, proposed."""
+    _isolate(tmp_path, monkeypatch)
+    _store_pocket()
+    c = TestClient(app)
+    out = _click(c, 4.0, 2.5).json()                          # inside room 02, from room 01
+    assert out["status"] == "shared" and out["su"] == "02" and out["page"] == 1 and out["pagal"] == "plotai"
+    assert set(out["rooms"]) == {"01", "02"} and len(out["line_pct"]) == 2
+    assert out["rooms"]["01"]["plotas_uzrasas_m2"] == 9.0 and out["rooms"]["01"]["plotas_m2"] > 3.5
+    assert len(out["rooms"]["01"]["menamos"]) == 1
+    # „Tinka": the same click, labelled — both rooms come back divided, nothing saved
+    before = copy.deepcopy(db.get_project("p1"))
+    ok = _click(c, 4.0, 2.5, pritarta=True).json()
+    assert ok["status"] == "ok" and set(ok["rooms"]) == {"01", "02"}
+    for nr, other in (("01", "02"), ("02", "01")):
+        room = ok["rooms"][nr]
+        assert room["polygon_source"] == "corrected" and room["_konturas"]["saltinis"] == "padalinta" and room["_konturas"]["su"] == [other]
+    assert db.get_project("p1")["patalpos"] == before["patalpos"]
+    # a click in a room a PERSON outlined is never a proposal: the place is simply taken
+    blob = _pocket_blob()
+    blob["patalpos"][1].update({"polygon_pct": ok["rooms"]["02"]["polygon_pct"], "polygon_source": "corrected"})
+    db.upsert_project("p2", blob, user_id=None)
+    storage.get_storage().put(storage.pdf_key("p2"), build_plan([pocket_and_room()]))
+    assert _click(c, 5.5, 2.5, project_id="p2").json() == {"status": "taken", "nr": "02"}
+
+
+def test_nubresiu_pats_after_such_a_click_cuts_the_joined_space_along_his_line(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store_pocket()
+    ax, ay = _pct(2.0, -0.5)
+    bx, by = _pct(2.0, 4.0)
+    out = TestClient(app).post("/api/projects/p1/rooms/01/split-space",
+                               json={"page": 1, "a": {"x_pct": ax, "y_pct": ay}, "b": {"x_pct": bx, "y_pct": by}, "su": "02"}).json()
+    assert out["status"] == "ok" and set(out["rooms"]) == {"01", "02"}
+    assert abs(out["rooms"]["01"]["_konturas"]["plotas_m2"] - 5.0) < 0.4      # 3 m² pocket + 0,2 m² opening + a 0,6 m strip
+    assert out["rooms"]["01"]["_konturas"]["saltinis"] == "padalinta" and out["rooms"]["01"]["_konturas"]["menamos"]
+    # without the neighbour named, this room shares no space
+    out2 = TestClient(app).post("/api/projects/p1/rooms/01/split-space",
+                                json={"page": 1, "a": {"x_pct": ax, "y_pct": ay}, "b": {"x_pct": bx, "y_pct": by}}).json()
+    assert out2["status"] == "not_shared"

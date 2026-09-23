@@ -97,6 +97,7 @@ export function outlineFailureKey(answer) {
         ? { key: 'outlineOpenWith', params: { rooms: su.join(', '), area } }
         : { key: 'outlineOpen', params: { area } };
     }
+    case 'shared': return { key: 'outlineShared', params: { rooms: String(answer.su ?? '') } };
     case 'outside': return { key: 'outlineOutside', params: {} };
     case 'no_walls': return { key: 'outlineNoWalls', params: {} };
     default: return { key: 'outlineFailed', params: {} };

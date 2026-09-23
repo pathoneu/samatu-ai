@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from extractor import geometry_lane as gl  # noqa: E402
-from tests.synthetic_plan import build_plan, two_rooms  # noqa: E402
+from tests.synthetic_plan import build_plan, pocket_and_room, two_rooms  # noqa: E402
 
 
 def _parsed(**room1):
@@ -390,3 +390,44 @@ def test_a_room_whose_walls_close_a_different_area_than_the_table_gets_a_propose
     parsed["patalpos"][1]["plotas_m2"] = 9.0
     gl.apply_geometry(parsed, build_plan([two_rooms()]))
     assert "_konturo_siulymas" not in parsed["patalpos"][1] and parsed["patalpos"][1]["_konturas"]["plotas_nesutampa"] is False
+
+
+def test_a_pocket_the_table_gives_more_than_its_walls_close_is_joined_to_its_neighbour_and_divided():
+    """objektas_h tambūras (2026-09-23): 2,86 m² around the number, 4,48 in the table, the rest a strip of the
+    corridor beyond a doorless opening. The lane joins the two into one space and divides it by its own boundary."""
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    parsed["patalpos"][0].update({"plotas_m2": 4.5, "bbox_pct": {"x": 0.1, "y": 0.1, "w": 0.05, "h": 0.1},
+                                  "polygon_pct": [[0.1, 0.1], [0.15, 0.1], [0.15, 0.2], [0.1, 0.2]]})
+    parsed["patalpos"][1]["plotas_m2"] = 13.5
+    out = gl.apply_geometry(parsed, build_plan([pocket_and_room()]))
+    r1, r2 = parsed["patalpos"]
+    assert out["atviros_erdves"] == [["01", "02"]] and out["ribos"] == [{"nariai": ["01", "02"], "pagal": "plotai"}]
+    for r, other in ((r1, "02"), (r2, "01")):
+        assert r["_konturas"]["saltinis"] == "padalinta_programos" and r["_konturas"]["su"] == [other]
+        assert r["_atvira_erdve"]["kisene"] == "01" and "_konturo_siulymas" not in r
+    assert abs(r1["_konturas"]["plotas_m2"] - 4.5) / 4.5 <= 0.08 and abs(r2["_konturas"]["plotas_m2"] - 13.5) / 13.5 <= 0.08
+    # …and the second run, over its own outlines, lands on the same thing
+    again = gl.apply_geometry(parsed, build_plan([pocket_and_room()]))
+    assert again["ribos"] == out["ribos"] and parsed["patalpos"][0]["_konturas"]["plotas_m2"] == r1["_konturas"]["plotas_m2"]
+
+
+def test_a_pocket_beside_an_outline_a_person_owns_is_neither_joined_nor_divided():
+    """The neighbour's outline is his (corrected): the lane proposes the pocket, and leaves his outline alone."""
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    parsed["patalpos"][0].update({"plotas_m2": 4.5, "bbox_pct": {"x": 0.1, "y": 0.1, "w": 0.05, "h": 0.1},
+                                  "polygon_pct": [[0.1, 0.1], [0.15, 0.1], [0.15, 0.2], [0.1, 0.2]]})
+    parsed["patalpos"][1]["plotas_m2"] = 13.5
+    gl.apply_geometry(parsed, build_plan([pocket_and_room()]))          # the lane divides them once…
+    his = parsed["patalpos"][1]
+    his.update({"polygon_source": "corrected", "_konturas": {**his["_konturas"], "saltinis": "parodyta"}})
+    his.pop("_atvira_erdve", None)                                        # a pointed-at outline stands alone (api/room_outline.py)
+    kept = [list(pt) for pt in his["polygon_pct"]]
+    parsed["patalpos"][0].update({"polygon_source": "synthesized_from_bbox", "polygon_pct": [[0.1, 0.1], [0.15, 0.1], [0.15, 0.2], [0.1, 0.2]]})
+    for k in ("_konturas", "_atvira_erdve", "_angos_sienose", "_sienos", "_perimetras_suma"):
+        parsed["patalpos"][0].pop(k, None)
+    out = gl.apply_geometry(parsed, build_plan([pocket_and_room()]))      # …then room 02's outline became HIS
+    assert his["polygon_pct"] == kept and his["polygon_source"] == "corrected" and "_atvira_erdve" not in his
+    r1 = parsed["patalpos"][0]
+    assert out["atviros_erdves"] == [] and "_konturo_siulymas" in r1 and "_konturas" not in r1

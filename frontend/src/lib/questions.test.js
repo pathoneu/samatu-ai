@@ -171,6 +171,7 @@ test('the outline question has two more answers with their own sentence: the pro
   assert.equal(answerSummary(q, { touched: ['01'] }, t), 'project.questions.answeredOutline|01|');
   assert.equal(answerSummary(q, { touched: ['01'], accepted: true }, t), 'project.questions.answeredOutlineAccepted|01|');
   assert.equal(answerSummary(q, { touched: ['01'], typed: true, value: 8.6 }, t), 'project.questions.answeredPerimeterTyped|01|8,60');
+  assert.equal(answerSummary(q, { touched: ['03', '01'], joined: true }, t), 'project.questions.answeredJoin|01, 03|');
 });
 
 test('after an answer he stands on the question that slid into its place — or stays, when it still has rooms to show', () => {
