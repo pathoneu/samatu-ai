@@ -17,6 +17,9 @@ export function buildRecomputeContext(rawData) {
     detected_symbols_summary: d.detected_symbols_summary,
     _plyteliu_specs: d._plyteliu_specs,
     _symbol_legend: d._symbol_legend,
+    // 2026-09-23: the drawing's door schedule (extractor/door_schedule) — the frameless-door assumption and
+    // the door list's reconciliation with the table are settled from it on every recompute
+    _duru_ziniarastis: d._duru_ziniarastis,
     bendras_plotas_m2: d.bendras_plotas_m2,
     v9_meta: d.v9_meta,
     _overrides: d._overrides,
@@ -35,6 +38,6 @@ export function buildRecomputeContext(rawData) {
 
 /** Keys the context carries — exported so a test can pin the contract. */
 export const RECOMPUTE_CONTEXT_KEYS = Object.freeze([
-  '_door_types', 'detected_symbols_summary', '_plyteliu_specs', '_symbol_legend',
+  '_door_types', 'detected_symbols_summary', '_plyteliu_specs', '_symbol_legend', '_duru_ziniarastis',
   'bendras_plotas_m2', 'v9_meta', '_overrides', '_ceiling_anchor', '_walls_anchor', '_floor_anchors', '_meta', '_autoriaus_kiekiai',
 ]);

@@ -24,8 +24,9 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-CONTEXT_KEYS = ("_door_types", "detected_symbols_summary", "_plyteliu_specs", "_symbol_legend", "bendras_plotas_m2",
-                "v9_meta", "_overrides", "_ceiling_anchor", "_walls_anchor", "_floor_anchors", "_meta", "_autoriaus_kiekiai")
+CONTEXT_KEYS = ("_door_types", "detected_symbols_summary", "_plyteliu_specs", "_symbol_legend", "_duru_ziniarastis",
+                "bendras_plotas_m2", "v9_meta", "_overrides", "_ceiling_anchor", "_walls_anchor", "_floor_anchors", "_meta",
+                "_autoriaus_kiekiai")
 
 
 def main() -> int:
@@ -62,6 +63,10 @@ def main() -> int:
                     r.pop("grindu_danga_saltinis", None)
 
     out = apply_geometry(project, pdf)
+    # the drawing's door schedule (deterministic, €0) — the same scan a full extraction and the free re-read run
+    from extractor.door_schedule import scan_door_schedule
+    project["_duru_ziniarastis"] = scan_door_schedule(pdf)
+    print(f"durų žiniaraštis: {project['_duru_ziniarastis'].get('status')} — {project['_duru_ziniarastis'].get('sakinys')}")
     print(f"status {out['status']} in {out['seconds']} s | vietos {out['vietos']} | plano lapai {out['grupes']}")
     print(f"kontūrai {out['konturai']} | atviros erdvės {out['atviros_erdves']}")
     print(f"perimetrai sudėti {out['perimetrai_sudeti']} | tušti {out['perimetrai_tusti']}")
@@ -78,7 +83,9 @@ def main() -> int:
     body = {"patalpos": rooms, "rules_override": project.get("_overrides") or {},
             "per_room_overrides": project.get("_per_room_overrides") or {}, "archetipas": project.get("archetipas"),
             "bendras_plotas_m2": sum(float(r.get("plotas_m2") or 0) for r in rooms),
-            "_ceiling_anchor": project.get("_ceiling_anchor"), "context": {k: project.get(k) for k in CONTEXT_KEYS}}
+            "_ceiling_anchor": project.get("_ceiling_anchor"), "_door_types": project.get("_door_types"),
+            "_symbol_legend": project.get("_symbol_legend"), "_duru_ziniarastis": project.get("_duru_ziniarastis"),
+            "context": {k: project.get(k) for k in CONTEXT_KEYS}}
     req = urllib.request.Request(f"{args.api}/recompute-interior", data=json.dumps(body).encode("utf-8"),
                                  headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=120) as resp:

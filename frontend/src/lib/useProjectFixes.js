@@ -72,9 +72,11 @@ export function useProjectFixes({ project, setProject, t, afterLand, onUndo = nu
         patalpos: rebuilt || project.patalpos,
         v8_rooms: rebuilt || project.v8_rooms,
         pozicijos: result.pozicijos || project.pozicijos,
+        // `scopeChange` here too (2026-09-23): an answer that takes a row away on purpose — „vidaus durys
+        // su apvadais" removes the frameless-door row — must not see it carried back as an orphan
         darbu_sarasas: mergeDarbuSarasasEdits(
           result.darbu_sarasas, prior, notes,
-          (result._merge_notes || []).filter((n) => n.reason === 'relabeled')),
+          (result._merge_notes || []).filter((n) => n.reason === 'relabeled'), { scopeChange }),
         _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
       };
     setProject(next);

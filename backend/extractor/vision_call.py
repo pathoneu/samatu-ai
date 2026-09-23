@@ -1385,7 +1385,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
     # settled, cornice evidence — before any room is computed (the same pass the recomputes run)
     parsed["_paruosimas"] = prepare_rooms_for_calc(
         rooms, overrides={**(parsed.get("_overrides") or {}), **(rules_override or {})},
-        door_types=parsed.get("_door_types"), legend=parsed.get("_symbol_legend"))
+        door_types=parsed.get("_door_types"), legend=parsed.get("_symbol_legend"),
+        schedule=parsed.get("_duru_ziniarastis"))
     # Derive the išklotinė coverage signal BEFORE the per-room math: it is an
     # INPUT to resolve_wall_tile_read (evidence that a room has no tiled wall),
     # and it is re-derived from `_wall_elevations` on every recompute so cached
@@ -3432,7 +3433,16 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _dt = parsed.get("_door_types") or {}
     _door_conf = None
     _door_reason = None
-    if not _frameless_assumed and _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged:
+    # 2026-09-23: the raise applies only when the reader actually READ frameless doors in the text — a
+    # `count` that is nothing but the plan's own symbols (reader 0) is no evidence over the rooms' figure,
+    # and never over his choice or the drawing's schedule (universal_rules.settle_frameless_default)
+    _prep_src = str(((parsed.get("_paruosimas") or {}).get("frameless") or {}).get("source") or "")
+    try:
+        _dt_read = int(_dt.get("reader_beapvadines") or 0) > 0
+    except (TypeError, ValueError):
+        _dt_read = False
+    if (not _frameless_assumed and _dt_read and _prep_src not in ("jusu", "ziniarastis", "ziniarastis_misrus")
+            and _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged):
         avg_reveal = (reveal_sum / n_pasleptu_tagged) if n_pasleptu_tagged > 0 else 5.1
         pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
         _door_conf = _dt.get("confidence")
@@ -3456,11 +3466,28 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         _door_line = {
             "skyrius": SK_GD, "aprasymas": "Durų angų paruošimas beapvadinėms durims",
             "vnt": "m", "kiekis": pasleptu_duru_staktu_m, "saltinis": SAL,
+            # a row that exists only while the project has frameless interior doors: when his answer
+            # („su apvadais") takes it out of the rebuild, the merges DROP it instead of carrying it back as
+            # an orphan (the same rule as „Pastolių nuoma" above 3 m — api/recompute_quantities and
+            # frontend mergeDarbuSarasas honour `_only_while`)
+            "_only_while": "beapvadines_vidaus_durys",
         }
-        if _frameless_assumed:
+        # 2026-09-23: the row says WHERE the frame type comes from (the project-level pass: his choice, the
+        # drawing's door schedule / note / annotations / finish board, or only the plan's symbols) — and a
+        # frame type the drawing's text does not state is a yellow row until he confirms it
+        _prep = (parsed.get("_paruosimas") or {}).get("frameless") or {}
+        _prep_source = str(_prep.get("source") or "")
+        if _prep.get("sakinys"):
+            _door_line["_assumption"] = str(_prep["sakinys"])
+        elif _frameless_assumed:
             _door_line["_assumption"] = ("Vidaus durys laikomos beapvadinėmis — projekte yra paslėptų (beapvadinių) "
                                          "durų, todėl ir nepažymėtos vidaus durys skaičiuojamos taip pat. Jei dalis durų "
                                          "su apvadais, pakeiskite Prielaidose (vidaus durys beapvadinės: ne).")
+        if _prep_source in ("brezinys", "nera_pozymiu", "anotacija", "gaminiai"):
+            _door_line["confidence"] = "geltona"
+            _door_line["_confidence_reason"] = str(_prep.get("sakinys") or "")
+        elif _prep_source in ("jusu", "ziniarastis"):
+            _door_line["confidence"] = "zalia"
         if _door_conf:  # text-reconciled — carry the flag + reason
             _door_line["confidence"] = _door_conf
             if _door_reason:
@@ -5947,6 +5974,18 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] symbol legend scan failed (non-fatal): {exc}")
 
+    # Step 2.43: the drawing's DOOR SCHEDULE (deterministic, $0): codes, sizes, frame type, counts — or the
+    # openings annotated for frameless doors, a governing note, the door products on a finish board. The
+    # project-level pass (prepare_rooms_for_calc) settles the frameless-door assumption from it and matches
+    # the counted doors to the table. See extractor/door_schedule.py for the six-project check.
+    try:
+        from extractor.door_schedule import scan_door_schedule
+        parsed["_duru_ziniarastis"] = scan_door_schedule(pdf_bytes)
+        print(f"[extractor] door schedule scan: {parsed['_duru_ziniarastis'].get('status')} — "
+              f"{parsed['_duru_ziniarastis'].get('sakinys')}")
+    except Exception as exc:
+        print(f"[extractor] door schedule scan failed (non-fatal): {exc}")
+
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
     #
@@ -6376,6 +6415,12 @@ def extract_interior(
                     f" (skaitymai svyravo tarp paleidimų: {_vote.get('beapvadines_values')})"
             parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
                                      "plan_tagged": n_tagged, "pages": dt.get("pages"),
+                                     # 2026-09-23: what the reader said about the OTHER doors is kept too —
+                                     # „how many doors with casings" was unanswerable from a count of one kind
+                                     "reader_standartines": dt.get("standartines_count"),
+                                     "reader_stumdomos": dt.get("stumdomos_count"),
+                                     "bendras_tipas": dt.get("bendras_tipas"),
+                                     "doors": [d for d in (dt.get("doors") or []) if isinstance(d, dict)][:40],
                                      "_vote": _vote}
             parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
             _emit({"event": "door_types_completed", "frameless": rec.get("count"),

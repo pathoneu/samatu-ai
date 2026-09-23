@@ -7,8 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  answerSummary, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf, questionAfterAnswer,
-  wallsAnswer,
+  answerSummary, doorsAnswer, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
+  questionAfterAnswer, wallsAnswer,
 } from './questions.js';
 
 const Q = (id, extra = {}) => ({ id, kind: id.split(':')[0], items: [], manual: [], ...extra });
@@ -182,4 +182,16 @@ test('after an answer he stands on the question that slid into its place — or 
   assert.equal(questionAfterAnswer(after, new Set(['perimetras', 'angos']), 'konturas', 1).id, 'aukstis', 'wraps to what is open');
   assert.equal(questionAfterAnswer([], new Set(), 'angos', 3), null);
   assert.equal(questionAfterAnswer(after, new Set(['aukstis', 'perimetras', 'angos']), 'konturas', 1), null);
+});
+
+test('doors: one choice for the whole project — the proposal or his pick, said with its label', () => {
+  const items = [{ room_nr: '', room_name: 'Visos vidaus durys', proposed: 1,
+    choices: [{ value: 1, label: 'beapvadinės (paslėpta stakta)' }, { value: 0, label: 'su apvadais' }] }];
+  const proposal = doorsAnswer({ _overrides: {} }, items);
+  assert.deepEqual(proposal, { value: true, label: 'beapvadinės (paslėpta stakta)', touched: [], sameValue: false });
+  const his = doorsAnswer({ _overrides: { vidaus_durys_beapvadines: false } }, items, { '': 0 });
+  assert.deepEqual(his, { value: false, label: 'su apvadais', touched: [], sameValue: true });
+  assert.equal(doorsAnswer({}, []), null);
+  const t = (key, params) => `${key}|${params.value}`;
+  assert.equal(answerSummary({ kind: 'durys' }, his, t), 'project.questions.answeredDoors|su apvadais');
 });

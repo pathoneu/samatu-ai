@@ -160,9 +160,26 @@ export function openingsAnswer(project, items, picked, edits = {}) {
   return touched.length ? { rooms: patchedRooms(project, patches), touched, added, edited } : null;
 }
 
+/**
+ * Frameless or with casings — ONE choice for every interior door of the project (2026-09-23): the proposal
+ * (what the estimate computes with today) or what he picked, → `{value, label, touched: []}` for
+ * `saveAssumptionEdit(project, 'vidaus_durys_beapvadines', value)`, or null when the question has no item.
+ */
+export function doorsAnswer(project, items, values = {}) {
+  const item = (Array.isArray(items) ? items : [])[0];
+  if (!item) return null;
+  const nr = nrOf(item);
+  const raw = values?.[nr] ?? item?.proposed;
+  if (raw == null || raw === '') return null;
+  const value = Number(raw) === 1;
+  const label = (item.choices || []).find((c) => Number(c.value) === Number(value))?.label || (value ? 'beapvadinės' : 'su apvadais');
+  return { value, label, touched: [], sameValue: Boolean((project?._overrides || {}).vidaus_durys_beapvadines === value) };
+}
+
 const SUMMARY_KEY = {
   aukstis: 'answeredHeight', konturas: 'answeredOutline', erdve: 'answeredSplit', perimetras: 'answeredNumbers',
-  plotas: 'answeredNumbers', angos: 'answeredOpenings', grindys: 'answeredChoices', apdaila: 'answeredChoices',
+  plotas: 'answeredNumbers', angos: 'answeredOpenings', durys: 'answeredDoors', grindys: 'answeredChoices',
+  apdaila: 'answeredChoices',
 };
 
 /** What was just answered, in one plain sentence for the strip above the next question. */
@@ -175,8 +192,10 @@ export function answerSummary(question, answer, t) {
   if (question?.kind === 'konturas' && answer?.joined) key = 'answeredJoin';
   // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
   const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
-  const value = Number.isFinite(Number(answer?.value)) && answer?.value !== '' && answer?.value != null
-    ? ltNumber(Number(answer.value), 2) : answer?.value;
+  // the door question answers with a LABEL („beapvadinės" / „su apvadais"), not a number
+  const value = question?.kind === 'durys' ? (answer?.label || '')
+    : Number.isFinite(Number(answer?.value)) && answer?.value !== '' && answer?.value != null
+      ? ltNumber(Number(answer.value), 2) : answer?.value;
   return t(`project.questions.${key}`, {
     count: question?.kind === 'angos' ? Number(answer?.added) || 0 : rooms.length,
     rooms: rooms.join(', '),

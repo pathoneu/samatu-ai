@@ -99,6 +99,7 @@ export async function saveRoomEdit(project, nextRooms) {
       _ceiling_anchor: project?._ceiling_anchor,
       _door_types: project?._door_types,
       _symbol_legend: project?._symbol_legend,
+      _duru_ziniarastis: project?._duru_ziniarastis,
       context: buildRecomputeContext(project),
     }),
   });

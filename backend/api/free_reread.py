@@ -124,11 +124,20 @@ def api_free_reread(request: Request, project_id: str):
             return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
                     "_meta": project.get("_meta") or {}, "santrauka": None}
         floors = out.get("grindu_dangos") or {}
+        # the drawing's door schedule (deterministic, $0) rides along: a project read before it existed
+        # gets its frameless-door evidence with the same click (the browser's merge spreads project keys)
+        schedule = None
+        try:
+            from extractor.door_schedule import scan_door_schedule
+            schedule = scan_door_schedule(pdf_bytes)
+        except Exception as exc:  # noqa: BLE001 — never the lane's failure
+            log.warning("free-reread door schedule scan failed for %s: %r", project_id, exc)
         return {
             "status": "ok",
             "lane": out.get("status"),
             "patalpos": parsed.get("patalpos") or [],
             "_meta": parsed.get("_meta") or {},
+            **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
             "santrauka": {
                 "konturai": len(out.get("konturai") or []),
                 "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),

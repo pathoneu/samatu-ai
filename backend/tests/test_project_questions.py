@@ -30,8 +30,14 @@ def _q(out: dict, qid: str) -> dict:
     return next(q for q in out["questions"] if q["id"] == qid)
 
 
+# the drawing's door schedule names the frame type — such a project asks nothing about its doors
+_SCHEDULE = {"status": "lentele", "beapvadines": 1, "su_apvadais": 0, "lentele": {"page": 1, "eilutes": [
+    {"kodas": "D-1", "plotis_mm": 900, "aukstis_mm": 2100, "tipas": "beapvadines", "kiekis": 1}]},
+    "sakinys": "Durų žiniaraštyje (1 lapas): D-1 900×2100 beapvadinės ×1; su apvadais nėra."}
+
+
 def test_a_project_where_everything_was_read_asks_nothing():
-    out = build_questions({"patalpos": [_quiet("01"), _quiet("02")]})
+    out = build_questions({"patalpos": [_quiet("01"), _quiet("02")], "_duru_ziniarastis": _SCHEDULE})
     assert out["questions"] == []
     assert (out["asked"], out["read"], out["rooms"]) == (0, 12, 2)
 
@@ -43,7 +49,7 @@ def test_the_height_is_asked_once_for_every_room_that_assumes_it():
         _quiet("03", lubu_aukstis_saltinis="default_fallback", lubu_aukstis_m=2.7),
         _quiet("07", lubu_aukstis_m=2.82),                       # written beside the room — not asked
     ]
-    out = build_questions({"patalpos": rooms})
+    out = build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE})
     assert [q["id"] for q in out["questions"]] == ["aukstis"]
     q = _q(out, "aukstis")
     assert (q["kind"], q["answer"], q["unit"]) == ("aukstis", "number_all", "m")
@@ -96,7 +102,7 @@ def test_a_room_the_walls_gave_no_outline_is_pointed_at_and_a_shared_space_is_di
                perimetras_saltinis="atviros_erdves_ivertis", _perimetras_ivertis_m=21.69,
                _perimetras_ivertis_saltinis="atviros_erdves_konturas", _konturo_priezastis="atvira erdvė su 04"),
     ]
-    out = build_questions({"patalpos": rooms, "_meta": {"geometrija": {"lapai": [1]}}})
+    out = build_questions({"patalpos": rooms, "_meta": {"geometrija": {"lapai": [1]}}, "_duru_ziniarastis": _SCHEDULE})
     assert [q["id"] for q in out["questions"]] == ["konturas", "erdve:04+05", "perimetras"]
 
     k = _q(out, "konturas")
@@ -193,14 +199,15 @@ def test_a_room_left_out_of_the_estimate_asks_nothing():
 
 
 def test_questions_come_in_the_order_that_lets_one_answer_settle_the_next():
-    assert ORDER == ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "grindys", "apdaila")
+    assert ORDER == ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila")
     rooms = [
         _quiet("01", _tile_read_source="none", grindu_danga=None, grindu_danga_saltinis=None, elementai=[],
                lubu_aukstis_saltinis="default_fallback", perimetras_m=None, _perimetras_ivertis_m=9.0,
                plotas_saltinis=None, _konturo_priezastis="patalpos vieta plane nerasta tiksliai"),
+        _quiet("02", elementai=[{"tipas": "pasleptos_duris", "kiekis": 1}, {"tipas": "duris", "kiekis": 1}]),
     ]
     kinds = [q["kind"] for q in build_questions({"patalpos": rooms})["questions"]]
-    assert kinds == ["aukstis", "konturas", "perimetras", "plotas", "angos", "grindys", "apdaila"]
+    assert kinds == ["aukstis", "konturas", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila"]
 
 
 def test_the_rebuilt_rooms_are_the_ones_asked_about():
@@ -223,7 +230,7 @@ def test_no_pipeline_words_reach_a_person():
 def test_a_room_whose_perimeter_he_typed_himself_is_not_asked_to_be_pointed_at():
     rooms = [_quiet("01", _konturo_priezastis="nesutampa su lentele", polygon_source="synthesized_from_bbox",
                     perimetras_m=9.4, perimetras_saltinis="user_override")]
-    assert build_questions({"patalpos": rooms, "_meta": {"geometrija": {"lapai": [1]}}})["questions"] == []
+    assert build_questions({"patalpos": rooms, "_meta": {"geometrija": {"lapai": [1]}}, "_duru_ziniarastis": _SCHEDULE})["questions"] == []
 
 
 def test_a_room_with_a_proposed_outline_is_offered_it_with_the_reason_and_the_ways_round():
@@ -242,3 +249,29 @@ def test_a_room_with_a_proposed_outline_is_offered_it_with_the_reason_and_the_wa
                                 "pats nepriėmiau. Jei tai visa patalpa — „Tinka“. Jei patalpa didesnė, spustelėkite kitoje jos "
                                 "vietoje brėžinyje. Arba įrašykite sienų ilgį ranka.")
     assert item["perimetras_dabar"] == 8.6
+
+
+def test_the_door_type_is_asked_once_for_the_project_when_only_the_symbols_or_a_finish_board_say_it():
+    """2026-09-23, the founder: „kiek durų su apvadais žiniaraštis rodo?" — a frameless door draws like a framed
+    one, so the plan's symbols alone propose an answer and ask; the drawing's schedule or his choice settle it."""
+    rooms = [_quiet("01", elementai=[{"tipas": "pasleptos_duris", "kiekis": 1}, {"tipas": "duris", "kiekis": 1}]),
+             _quiet("02", elementai=[{"tipas": "duris", "kiekis": 2}])]
+    out = build_questions({"patalpos": rooms, "_duru_ziniarastis": {"status": "nera", "sakinys": "Durų žiniaraščio ar durų tipo užrašų brėžinyje nėra."}})
+    q = _q(out, "durys")
+    assert (q["kind"], q["answer"], q["title"]) == ("durys", "choices", "Vidaus durys — beapvadinės ar su apvadais?")
+    item = q["items"][0]
+    assert (item["room_nr"], item["field"], item["proposed"], item["count"]) == ("", "vidaus_durys_beapvadines", 1, 4)
+    assert [c["value"] for c in item["choices"]] == [1, 0] and "patvirtinkite" in item["sentence"]
+    assert "Lauko durys" in q["why"]
+    # a finish board naming the door products → framed proposed
+    board = build_questions({"patalpos": rooms, "_duru_ziniarastis": {"status": "gaminiai", "gaminiai": ["DECO-10 vidaus durys"],
+                                                                        "sakinys": "Durų žiniaraščio nėra; apdailos lape nurodyti vidaus durų gaminiai (DECO-10 vidaus durys), beapvadinių niekur neminima."}})
+    assert _q(board, "durys")["items"][0]["proposed"] == 0
+    # the schedule, a governing note or his own choice settle it — nothing is asked
+    assert all(q["kind"] != "durys" for q in build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE})["questions"])
+    assert all(q["kind"] != "durys" for q in build_questions({"patalpos": rooms, "_overrides": {"vidaus_durys_beapvadines": False}})["questions"])
+    # no interior doors — nothing to ask
+    assert all(q["kind"] != "durys" for q in build_questions({"patalpos": [_quiet("01", elementai=[])]})["questions"])
+    # exterior doors are not the question's doors
+    ext = [_quiet("01", elementai=[{"tipas": "duris", "kiekis": 1, "_exterior": True}])]
+    assert all(q["kind"] != "durys" for q in build_questions({"patalpos": ext})["questions"])

@@ -1494,6 +1494,7 @@
       "answeredHeight": "Atsakyta: lubų aukštis įrašytas {{count}} patalpoms ({{rooms}}).",
       "answeredNumbers": "Atsakyta: skaičiai įrašyti {{count}} patalpoms ({{rooms}}).",
       "answeredChoices": "Atsakyta: pasirinkta {{count}} patalpoms ({{rooms}}).",
+      "answeredDoors": "Atsakyta: vidaus durys — {{value}}.",
       "answeredOpenings": "Atsakyta: pridėta angų — {{count}} (patalpos {{rooms}}).",
       "answeredSplit": "Atsakyta: erdvė padalinta — patalpos {{rooms}} turi savo kontūrus, riba tarp jų nėra siena.",
       "answeredOutline": "Atsakyta: patalpa {{rooms}} parodyta — kontūras nubrėžtas pagal sienas, sienų ilgiai perskaityti iš naujo.",

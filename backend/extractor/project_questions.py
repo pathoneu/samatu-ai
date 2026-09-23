@@ -24,9 +24,13 @@ from typing import Any
 from .room_facts import _FLOOR_LT, _f, build_room_facts, lt_num
 from .scope import is_room_excluded, normalize_apimtis
 
-ORDER = ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "grindys", "apdaila")
+ORDER = ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila")
 
 _WALLS_CHOICES = [{"value": 1, "label": "dažomos"}, {"value": 0, "label": "nedažomos"}]
+_DOORS_CHOICES = [{"value": 1, "label": "beapvadinės (paslėpta stakta)"}, {"value": 0, "label": "su apvadais"}]
+# the frame-type sources that need no confirming: his own choice, the drawing's door schedule or a
+# governing note (universal_rules.settle_frameless_default)
+_DOORS_SETTLED = ("jusu", "ziniarastis", "ziniarastis_misrus", "pastaba")
 
 
 def _nr(room: dict) -> str:
@@ -206,6 +210,38 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
     return q
 
 
+def _ask_durys(project: dict, rooms: list[dict]) -> dict | None:
+    """ONE question for the whole project (2026-09-23): are the interior doors frameless (beapvadinės) or
+    with casings? A frameless door draws exactly like a framed one, so the plan's symbols cannot settle it —
+    only the drawing's TEXT (a door schedule, a note, the openings annotated for frameless doors, the door
+    products on a finish board) or the person can. Asked while the frame type rests on the symbols alone or
+    on nothing (universal_rules.settle_frameless_default: `brezinys`, `nera_pozymiu`), or on evidence that
+    names only some doors (`anotacija`, `gaminiai`); the proposal is what the estimate computes with now.
+    The answer lands as `_overrides.vidaus_durys_beapvadines`."""
+    from copy import deepcopy
+    from .universal_rules import settle_frameless_default, _is_interior_door
+    interior = [el for r in rooms for el in (r.get("elementai") or []) if _is_interior_door(el)]
+    if not interior:
+        return None
+    try:
+        settled = settle_frameless_default(deepcopy(rooms), overrides=project.get("_overrides") or {},
+                                           door_types=project.get("_door_types"), schedule=project.get("_duru_ziniarastis"))
+    except Exception:  # noqa: BLE001 — a malformed blob asks nothing rather than breaking the list
+        return None
+    if settled.get("source") in _DOORS_SETTLED:
+        return None
+    proposed = 1 if settled.get("value") else 0
+    n = sum(int(el.get("kiekis") or 1) for el in interior)
+    item = {"room_nr": "", "room_name": "Visos vidaus durys", "field": "vidaus_durys_beapvadines", "unit": None,
+            "sentence": str(settled.get("sakinys") or ""), "page": None, "proposed": proposed,
+            "proposed_label": _DOORS_CHOICES[0]["label"] if proposed else _DOORS_CHOICES[1]["label"],
+            "choices": _DOORS_CHOICES, "count": n}
+    why = ("Beapvadinės durys plane piešiamos taip pat kaip su apvadais, todėl iš simbolio to nustatyti negalima. "
+           "Nuo atsakymo priklauso eilutė „Durų angų paruošimas beapvadinėms durims“: su apvadais ji nereikalinga. "
+           "Lauko durys čia neįskaitomos.")
+    return _q("durys", "choices", "Vidaus durys — beapvadinės ar su apvadais?", why, [item])
+
+
 def _ask_grindys(rows: list[tuple[dict, dict]]) -> dict | None:
     asked = [(r, f) for r, f in rows if f["key"] == "grindys"]
     if not asked:
@@ -267,6 +303,7 @@ def build_questions(project: dict) -> dict:
         _ask_numbers("plotas", waiting, "Patalpos {room} ploto plane neradau", "{n} patalpų ploto plane neradau",
                      "Skaičiuoju su plotu, kurį pavyko nustatyti iš plano vaizdo. Patikrinkite ir, jei reikia, įrašykite tikrą."),
         _ask_angos(waiting),
+        _ask_durys(project, rooms),
         _ask_grindys(waiting),
         _ask_apdaila(waiting),
     ):

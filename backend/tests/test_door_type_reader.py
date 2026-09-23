@@ -122,7 +122,8 @@ def test_find_door_pages_prefers_tag_and_annotation_pages(monkeypatch):
 
     pages = [_Page("TITULINIS LAPAS"),
              _Page("AUKŠTO PLANAS ... skirta beapvadinėms durims"),  # annotation
-             _Page("IŠKLOTINĖS LD-1 LD-1 LD-2 LD-3")]                # tags
+             _Page("PERTVARŲ PLANAS D-1 D-1 D-2 D-3"),               # door tags
+             _Page("LUBŲ PLANAS LD-1 LD-1 LD-2 LD-3 +2800")]         # curtain-niche details — NOT door tags (2026-09-23)
     # Seam moved 2026-08-03: _find_door_pages reads the shared parse in
     # extractor.pdf_page_cache instead of opening its own document (it used to
     # re-parse the whole PDF once per voting round). Same texts in, same
@@ -130,7 +131,7 @@ def test_find_door_pages_prefers_tag_and_annotation_pages(monkeypatch):
     monkeypatch.setattr("extractor.pdf_page_cache.page_texts",
                         lambda *_a, **_k: [p.extract_text() for p in pages])
     pp = _find_door_pages(b"x")
-    assert 2 in pp and 3 in pp and 1 not in pp
+    assert 2 in pp and 3 in pp and 1 not in pp and 4 not in pp
 
 
 def test_build_user_text_lists_rooms():
@@ -150,7 +151,9 @@ def test_door_types_raises_and_flags_pozicija():
     room.update(calc_room_quantities(room))
     # reader/reconciliation says 7 frameless → durų angų should scale 2→7
     parsed = {"patalpos": [room], "santrauka": {},
-              "_door_types": {"count": 7, "confidence": "geltona",
+              # the count is one the reader READ in the text (2026-09-23: a count made of the plan's own
+              # symbols, reader 0, no longer raises anything)
+              "_door_types": {"count": 7, "reader_beapvadines": 7, "confidence": "geltona",
                               "reason": "Anotacijose rasta 7, pradinis rado 2 — patikrink"}}
     out = _build_pozicijos_from_rooms(parsed)
     line = [p for p in out["pozicijos"] if "beapvadinėms durims" in p["aprasymas"]]

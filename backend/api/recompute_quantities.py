@@ -82,6 +82,10 @@ _ASSUMPTION_FIELDS = {
     # {"praustuve"|"dusas"|"vonia"|"bide": bool}; both shapes land in
     # `_overrides` verbatim and are read by `_resolve_san_concealment`.
     "santechnika_potinkinis",
+    # 2026-09-23: are the interior doors nobody tagged frameless (beapvadinės)? True / False — his answer
+    # to the door-type question (or the Prielaidos switch); read by
+    # universal_rules.settle_frameless_default ahead of anything the drawing says.
+    "vidaus_durys_beapvadines",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -416,8 +420,10 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                 openings, wall_thickness_m=wall_thickness, window_sides=window_sides,
             )
             _frameless = bool(room.get("_beapvadines_vidaus"))
-            room["pasleptu_duru_kompl"] = hidden_door_count(openings, frameless_default=_frameless)
-            room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings, frameless_default=_frameless)
+            # his „su apvadais" (universal_rules.FRAMELESS_CHOSEN_KEY) covers the plan's hidden-door symbols too
+            _chosen_framed = bool(room.get("_beapvadines_jusu")) and not _frameless
+            room["pasleptu_duru_kompl"] = hidden_door_count(openings, frameless_default=_frameless, chosen_framed=_chosen_framed)
+            room["pasleptu_duru_staktu_m"] = hidden_door_frame_lm(openings, frameless_default=_frameless, chosen_framed=_chosen_framed)
         except Exception as exc:  # noqa: BLE001
             # Don't block the recompute on a helper hiccup — but record it.
             _degrade(degradations, nr, "angokrasciai", "recompute_failed",
@@ -1116,16 +1122,35 @@ def recompute(
     # rejected override / swallowed failure so the 200 response is honest about
     # what was silently ignored (2026-07-27 audit findings 2/3/4).
     degradations: list = []
+    _paruosimas: dict = {}
     rooms = _apply_assumption_edits(list(req.rooms), assumptions, degradations)
     # 2026-09-23: the same project-level pass the extraction runs — doors two rooms list paired, the
     # frameless-door assumption settled (his Prielaidos choice first), cornice evidence
     try:
         from extractor.universal_rules import prepare_rooms_for_calc
         _ctx = req.context if isinstance(req.context, dict) else {}
-        prepare_rooms_for_calc(rooms, overrides={**(_ctx.get("_overrides") or {}), **assumptions},
-                               door_types=_ctx.get("_door_types"), legend=_ctx.get("_symbol_legend"))
+        _paruosimas = prepare_rooms_for_calc(rooms, overrides={**(_ctx.get("_overrides") or {}), **assumptions},
+                                             door_types=_ctx.get("_door_types"), legend=_ctx.get("_symbol_legend"),
+                                             schedule=_ctx.get("_duru_ziniarastis"))
     except Exception as exc:  # noqa: BLE001 — degrade, never 500
         _degrade(degradations, None, "paruosimas", "prepare_failed", error=str(exc)[:120])
+    # 2026-09-23: the per-opening fields FOLLOW that pass — his answer to „beapvadinės ar su apvadais?"
+    # (vidaus_durys_beapvadines) must move the frameless-door row and the reveals, and the height/paint
+    # blocks above never touch those fields. Every room's are recomputed from its marked elements.
+    try:
+        from extractor.universal_rules import calc_room_quantities, translate_user_prefs_to_room_rules
+        _rules = translate_user_prefs_to_room_rules(assumptions) or None
+        for room in rooms:
+            # a legacy payload lists its doors under `openings` (line_items helpers above), not `elementai`
+            if not any(isinstance(e, dict) and "dur" in str(e.get("tipas") or "") for e in room.get("elementai") or []):
+                continue
+            own_h = _num(room.get("lubu_aukstis_m"), 0) or 2.82
+            recalc = calc_room_quantities(_calc_input(room), ceiling_height_m=own_h, rules=_rules)
+            for k in ("pasleptu_duru_staktu_m", "pasleptu_duru_kompl", "_pasleptu_duru_pagal", "angokrasciu_gkp_m"):
+                if k in recalc:
+                    room[k] = recalc[k]
+    except Exception as exc:  # noqa: BLE001 — degrade, never 500
+        _degrade(degradations, None, "durys", "recompute_failed", error=str(exc)[:120])
 
     # 4. Apply gesture edits (Sprint 2)
     rooms, pozicijos = _apply_gesture_edits(rooms, list(req.pozicijos), req.edits)
@@ -1151,6 +1176,7 @@ def recompute(
                 **req.context,
                 "patalpos": rooms,
                 "_overrides": overrides,
+                "_paruosimas": _paruosimas,           # the pass's verdicts for the rows (2026-09-23)
             }
             # Apimtis (2026-09-06): the contractor's „ką skaičiuoti" rides in
             # `_overrides.apimtis`; enforced exactly as in /recompute-interior

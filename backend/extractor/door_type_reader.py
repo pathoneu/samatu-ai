@@ -49,7 +49,10 @@ from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1
 from .response_text import response_text
 MAX_DOOR_PAGES = 6
 
-_TAG_RE = re.compile(r"\b(?:LD|D)-?\d\b", re.IGNORECASE)
+# A door TAG: D-1, D1, VD-2. Case-sensitive and without „LD" (2026-09-23, checked on the corpus): the LD-1 /
+# LD-2 / LD-3 the earlier pattern took for door tags on objektas_a are the CURTAIN-NICHE details of the
+# ceiling plan, and the lowercase d1 … d4 it matched on two more sheets are fragments of running text.
+_TAG_RE = re.compile(r"\b(?:D|VD|ID)-?\d{1,2}\b")
 _PREMIUM = {"premium"}
 
 
@@ -110,13 +113,16 @@ def _find_door_pages(pdf_bytes: bytes, pages_meta=None) -> list[int]:
         # (read_door_types_voted runs the whole function n times), so before
         # the cache a 3-round vote re-parsed the document three times.
         from .pdf_page_cache import page_texts
+        from .door_schedule import _HEADING_RE
         for i, raw in enumerate(page_texts(pdf_bytes)):
             t = raw or ""
             tl = t.lower()
             has_tag = bool(_TAG_RE.search(t))
             has_anno = ("beapvad" in tl or "stumdom" in tl or "durų anga" in tl
                         or "duru anga" in tl)
-            if has_tag and has_anno:
+            if _HEADING_RE.search(t):
+                hits.append((-1, i + 1))                       # the door schedule itself comes first
+            elif has_tag and has_anno:
                 hits.append((0, i + 1))
             elif has_tag or has_anno:
                 hits.append((1, i + 1))
@@ -294,8 +300,15 @@ def reconcile_frameless(plan_frameless: int, reader_frameless: int,
         # conflict — keep the plan count, surface both, never silently lower
         return {"count": plan, "confidence": "geltona",
                 "reason": f"Plane matyti {plan} beapvadinių durų, o žymėse — {reader}: skaičiai nesutampa, patikrinkite pagal durų specifikaciją"}
-    # agree (or reader gave nothing): trust the plan count
+    # agree: the text confirms the plan count
     if reader == plan and reader > 0:
         return {"count": plan, "confidence": "zalia", "reason": ""}
-    return {"count": plan, "confidence": "zalia" if plan else "geltona",
-            "reason": "" if plan else "Durų tipo teksto nerasta — beapvadinių durų skaičius nepatikrintas"}
+    # the reader found no door-type text at all: the plan's symbols stand alone — and a frameless door draws
+    # the same as a framed one, so this is NOT confirmed (2026-09-23: it was called green on two projects
+    # whose drawings say nothing about door types)
+    if plan:
+        return {"count": plan, "confidence": "geltona",
+                "reason": (f"Durų tipo užrašų brėžinyje neradau — {plan} beapvadinės pažymėtos tik pagal "
+                           "simbolį plane; patikrinkite pagal durų žiniaraštį")}
+    return {"count": 0, "confidence": "geltona",
+            "reason": "Durų tipo teksto nerasta — beapvadinių durų skaičius nepatikrintas"}

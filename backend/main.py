@@ -6464,6 +6464,9 @@ class RecomputePayload(BaseModel):
     # decide differently from the first run.
     door_types: dict | None = Field(default=None, alias="_door_types")
     symbol_legend: dict | None = Field(default=None, alias="_symbol_legend")
+    # The drawing's door schedule (extractor/door_schedule, 2026-09-23): frame type and the door list's
+    # reconciliation with the table are settled from it in the same project-level pass.
+    duru_ziniarastis: dict | None = Field(default=None, alias="_duru_ziniarastis")
     # The drawing's stated painted-wall area (sienų apdailos plano legenda),
     # same contract as the ceiling anchor (2026-09-13).
     walls_anchor: dict | None = Field(default=None, alias="_walls_anchor")
@@ -6508,10 +6511,12 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     _scope.mark_rooms(payload.patalpos, apimtis)
     # 2026-09-23: the project-level pass every calc path shares (doors two rooms list paired, the
     # frameless-door assumption, cornice evidence) — before any room is recomputed
+    _paruosimas: dict = {}
     try:
         from extractor.universal_rules import prepare_rooms_for_calc
-        prepare_rooms_for_calc(payload.patalpos, overrides=payload.rules_override or {},
-                               door_types=payload.door_types, legend=payload.symbol_legend)
+        _paruosimas = prepare_rooms_for_calc(payload.patalpos, overrides=payload.rules_override or {},
+                                             door_types=payload.door_types, legend=payload.symbol_legend,
+                                             schedule=payload.duru_ziniarastis or (payload.context or {}).get("_duru_ziniarastis"))
     except Exception as exc:  # noqa: BLE001
         log.warning("[recompute-interior] prepare_rooms_for_calc failed: %s", exc)
 
@@ -6657,6 +6662,9 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         "patalpos": out_rooms,
         "pozicijos": [],  # rebuilt below by _build_pozicijos_from_rooms() from the recomputed rooms
         "_overrides": payload.rules_override,
+        # the project-level pass's verdicts (frameless-door evidence sentence, schedule reconciliation) — the
+        # row builder writes them on the rows (2026-09-23)
+        "_paruosimas": _paruosimas,
     }
     if apimtis:
         parsed["_apimtis"] = apimtis

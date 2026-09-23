@@ -881,8 +881,17 @@ _DOOR_KINDS = ("duris", "pasleptos_duris")
 SHARED_DOOR_KEY = "_bendra_su"          # this door element is the same opening as one listed in room <nr>; counted THERE
 SHARED_DOOR_N_KEY = "_bendra_su_n"      # …how many of its `kiekis` units
 FRAMELESS_DEFAULT_KEY = "_beapvadines_vidaus"   # room flag: untagged interior doors are frameless (project-level assumption)
+FRAMELESS_CHOSEN_KEY = "_beapvadines_jusu"      # room flag: the assumption is HIS choice (a „su apvadais" covers the symbols too)
 KARNIZAS_KEY = "_karnizas"              # room flag: the drawing mentions a cornice (symbol_legend) — else none is billed
+EXTERIOR_KEY = "_exterior"              # door element: leads outside (Vision recount, the walls, the entrance room)
+EXTERIOR_MARKED_KEY = "_lauko_pagal"    # …set by mark_exterior_doors (its own marks are cleared before a re-run)
+SCHEDULE_TYPE_KEY = "_duru_tipas"       # door element: frame type the drawing's door schedule gives it
+SCHEDULE_CODE_KEY = "_ziniarascio_kodas"
+SCHEDULE_UNITS_KEY = "_ziniarascio_n"   # …how many of its units the schedule lists
+BEYOND_SCHEDULE_KEY = "_be_ziniarascio" # door element: an interior door the schedule does not have — no per-opening row
+_ENTRANCE_NAMES = ("tambūr", "tambur", "įėjim", "iejim", "prieškambar", "prieskambar")
 DOOR_WIDTH_TOL_M = 0.16
+FRAMELESS_MAX_W_M = 1.3                 # wider than this an interior „door" is a passage or a double leaf, not a frame
 STANDARD_DOOR_W_M = 0.9
 STANDARD_DOOR_H_M = 2.1
 STANDARD_WINDOW_W_M = 1.2
@@ -1047,40 +1056,247 @@ def _mirror_opening(b: dict, b_nr: str, a_nr: str, width: float | None) -> tuple
     return best[1] if best else (b_nr, a_nr, -1)
 
 
-def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None) -> dict:
+def _is_entrance_room(room: dict) -> bool:
+    """A room whose one door to the outside is the ENTRANCE: a tambūras, an „įėjimo" corridor, a garage."""
+    pask = str(room.get("paskirtis") or "").strip().lower()
+    name = str(room.get("pavadinimas") or "").strip().lower()
+    return pask in ("tamburas", "tambūras", "garazas", "garažas") or any(k in name for k in _ENTRANCE_NAMES)
+
+
+def _closest_opening(widths: list[float], width: float | None) -> int | None:
+    """Index of the opening this door or window takes: the closest within the tolerance; a door or window
+    without a readable size takes the first one left."""
+    best = None
+    for k, w in enumerate(widths):
+        if not _widths_match(width, w):
+            continue
+        d = 0.0 if width is None else abs(width - w)
+        if best is None or d < best[0]:
+            best = (d, k)
+        if width is None:
+            break
+    return None if best is None else best[1]
+
+
+def mark_exterior_doors(rooms: list[dict]) -> int:
+    """Mark the doors that lead OUTSIDE (`_exterior`) — the ones a frameless-door row never counts and the
+    reveals always do. The Vision recount's own flag stays. A door whose wall opening the geometry lane read
+    as leading to „laukas" is exterior — the room's windows claim the openings of their width first, so a
+    terrace door among windows is told apart by width; a door added from such an opening carries the tag.
+    Where no walls were read, the entrance room's first door is the entrance. Idempotent for its own marks;
+    a door element of several units gets its exterior unit SPLIT off, so one element is one kind of door.
+    Returns the number of units marked here."""
+    n = 0
+    for r in rooms:
+        if not isinstance(r, dict):
+            continue
+        els = [e for e in (r.get("elementai") or []) if isinstance(e, dict)]
+        for e in els:
+            if e.pop(EXTERIOR_MARKED_KEY, None):
+                e.pop(EXTERIOR_KEY, None)
+        doors = [e for e in els if (e.get("tipas") or "").lower() in _DOOR_KINDS]
+        if not doors:
+            continue
+
+        def mark(el: dict) -> None:
+            nonlocal n
+            units = _el_units(el)
+            if units > 1:
+                rest = dict(el)
+                rest["kiekis"] = units - 1
+                el["kiekis"] = 1
+                r["elementai"].insert(r["elementai"].index(el) + 1, rest)
+            el[EXTERIOR_KEY] = True
+            el[EXTERIOR_MARKED_KEY] = True
+            n += 1
+
+        rec = r.get("_angos_sienose") if isinstance(r.get("_angos_sienose"), dict) else None
+        if rec is not None and isinstance(rec.get("angos"), list):
+            outside: list[float] = []
+            for a in rec["angos"]:
+                if isinstance(a, dict) and str(a.get("i") or "").strip() == "laukas":
+                    try:
+                        w = float(a.get("plotis_m") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if w > 0:
+                        outside.append(w)
+            for e in els:                                      # windows first — they own their openings
+                if (e.get("tipas") or "").lower() in ("langas", "stoglangis"):
+                    w = _el_width_m(e)
+                    for _ in range(_el_units(e)):
+                        k = _closest_opening(outside, w) if w is not None else None
+                        if k is not None:
+                            outside.pop(k)
+            for e in list(doors):
+                if e.get(EXTERIOR_KEY):
+                    continue
+                if str(e.get("_is_sienu_angos") or "").strip() == "laukas":
+                    mark(e)
+            for e in list(doors):
+                if e.get(EXTERIOR_KEY) or not outside:
+                    continue
+                for _ in range(_el_units(e)):
+                    k = _closest_opening(outside, _el_width_m(e))
+                    if k is None:
+                        break
+                    outside.pop(k)
+                    mark(e)
+                    if e.get(EXTERIOR_KEY) and _el_units(e) == 1:
+                        break
+        elif _is_entrance_room(r) and not any(e.get(EXTERIOR_KEY) for e in doors):
+            # the entrance is a plain door — a hidden (frameless) door is an interior one by definition
+            plain = [e for e in doors if (e.get("tipas") or "").lower() == "duris"]
+            if plain:
+                mark(plain[0])
+    return n
+
+
+def reconcile_doors_with_schedule(rooms: list[dict], schedule: dict | None) -> dict:
+    """When the drawing's own door schedule lists the interior doors (extractor/door_schedule: codes, sizes,
+    frame type, counts), the counted list is matched to it: each listed unit takes ONE interior door — the
+    closest readable width, else a door without a size — and that door gets the schedule's size and type;
+    an interior door the schedule does not have is marked `_be_ziniarascio` and counts for no per-opening
+    row (objektas_d: three doors counted in the entrance corridor, the schedule has two — 15 m became his
+    10,22 m). Idempotent. Returns {units, matched, beyond}."""
+    for r in rooms:
+        for e in (r.get("elementai") or []) if isinstance(r, dict) else []:
+            if isinstance(e, dict):
+                for k in (SCHEDULE_TYPE_KEY, SCHEDULE_CODE_KEY, SCHEDULE_UNITS_KEY, BEYOND_SCHEDULE_KEY):
+                    e.pop(k, None)
+    rows = [row for row in (((schedule or {}).get("lentele") or {}).get("eilutes") or []) if isinstance(row, dict)]
+    out = {"units": 0, "matched": 0, "beyond": 0}
+    if not rows:
+        return out
+    units: list[dict] = []
+    for row in rows:
+        try:
+            k = max(1, int(row.get("kiekis") or 1))
+        except (TypeError, ValueError):
+            k = 1
+        units.extend([row] * k)
+    out["units"] = len(units)
+    cands: list[list] = []                                     # [room, el, units left]
+    for r in rooms:
+        if not isinstance(r, dict):
+            continue
+        for e in r.get("elementai") or []:
+            if _is_interior_door(e) and door_units_counted(e) > 0:
+                cands.append([r, e, door_units_counted(e)])
+    for row in units:
+        try:
+            w = float(row.get("plotis_mm") or 0) / 1000.0 or None
+        except (TypeError, ValueError):
+            w = None
+        best = None
+        for c in cands:
+            if c[2] <= 0:
+                continue
+            cw = _el_width_m(c[1])
+            if not _widths_match(w, cw):
+                continue
+            rank = (1 if cw is None else 0, abs((w or 0) - (cw or w or 0)))
+            if best is None or rank < best[0]:
+                best = (rank, c)
+        if best is None:
+            continue
+        c = best[1]
+        c[2] -= 1
+        el = c[1]
+        el[SCHEDULE_UNITS_KEY] = int(el.get(SCHEDULE_UNITS_KEY) or 0) + 1
+        el[SCHEDULE_CODE_KEY] = str(row.get("kodas") or "")
+        el[SCHEDULE_TYPE_KEY] = str(row.get("tipas") or "nezinoma")
+        for key, val in (("plotis_mm", row.get("plotis_mm")), ("aukstis_mm", row.get("aukstis_mm"))):
+            if val and not el.get("_dydis_user"):
+                el[key] = int(val)
+        out["matched"] += 1
+    for c in cands:
+        if not c[1].get(SCHEDULE_UNITS_KEY):
+            c[1][BEYOND_SCHEDULE_KEY] = True
+            out["beyond"] += door_units_counted(c[1])
+    return out
+
+
+def _frameless_sentence(source: str, schedule: dict | None) -> str:
+    said = str((schedule or {}).get("sakinys") or "").strip()
+    if source == "jusu":
+        return "Jūsų pasirinkimas Prielaidose."
+    if source in ("ziniarastis", "ziniarastis_misrus"):
+        return said
+    if source in ("pastaba", "anotacija"):
+        return f"{said} Nepažymėtos vidaus durys laikomos tokiomis pat."
+    if source == "gaminiai":
+        return f"{said} Vidaus durys laikomos su apvadais."
+    if source == "brezinys":
+        return ("Durų žiniaraščio ar užrašų apie beapvadines duris brėžinyje nėra; plane matyti paslėptų durų "
+                "žymėjimas, todėl visos vidaus durys laikomos beapvadinėmis — patvirtinkite.")
+    return (said or "Durų žiniaraščio ar durų tipo užrašų brėžinyje nėra.") + " Vidaus durys laikomos su apvadais — patvirtinkite."
+
+
+def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None,
+                             schedule: dict | None = None) -> dict:
     """Whether the interior doors nobody tagged are frameless (beapvadinės): his choice
-    (`_overrides.vidaus_durys_beapvadines`) when he made one; otherwise inferred from the drawing — a project
-    whose plan or door schedule shows ANY hidden/frameless door is a designer working with frameless doors.
-    Written on every room as `_beapvadines_vidaus`; returned with its source for the assumptions panel."""
+    (`_overrides.vidaus_durys_beapvadines`) when he made one; else what the drawing's TEXT says (the door
+    schedule, a governing note, the openings annotated for frameless doors, the door products on a finish
+    board — extractor/door_schedule); else the plan's own hidden-door symbols (weak: the symbol is the same
+    for a framed door, so this is said to need confirming). Written on every room as `_beapvadines_vidaus`;
+    returned with its source and a sentence for the assumptions panel and the questions."""
     chosen = (overrides or {}).get("vidaus_durys_beapvadines") if isinstance(overrides, dict) else None
+    sch = schedule if isinstance(schedule, dict) else {}
+    tagged = any((el.get("tipas") or "").lower() == "pasleptos_duris"
+                 for r in rooms if isinstance(r, dict) for el in (r.get("elementai") or []) if isinstance(el, dict))
+    try:
+        read = int((door_types or {}).get("count") or 0) > 0
+    except (TypeError, ValueError):
+        read = False
+    beap, framed = int(sch.get("beapvadines") or 0), int(sch.get("su_apvadais") or 0)
     if chosen is not None:
         value, source = bool(chosen), "jusu"
+    elif beap and not framed:
+        value, source = True, "ziniarastis"
+    elif framed and not beap:
+        value, source = False, "ziniarastis"
+    elif beap and framed:
+        value, source = False, "ziniarastis_misrus"
+    elif sch.get("pastaba_visos"):
+        value, source = True, "pastaba"
+    elif sch.get("anotacijos_beapvadines") or sch.get("pastaba_beapvadines"):
+        value, source = True, "anotacija"
+    elif sch.get("gaminiai"):
+        value, source = False, "gaminiai"
     else:
-        tagged = any((el.get("tipas") or "").lower() == "pasleptos_duris"
-                     for r in rooms if isinstance(r, dict) for el in (r.get("elementai") or []) if isinstance(el, dict))
-        try:
-            read = int((door_types or {}).get("count") or 0) > 0
-        except (TypeError, ValueError):
-            read = False
         value, source = bool(tagged or read), ("brezinys" if (tagged or read) else "nera_pozymiu")
     for r in rooms:
         if isinstance(r, dict):
             r[FRAMELESS_DEFAULT_KEY] = value
-    return {"value": value, "source": source}
+            # his „su apvadais" is about EVERY interior door — the plan's hidden-door symbols too (they are
+            # the same symbol as a framed door's); only a door the drawing's schedule names frameless stays
+            r[FRAMELESS_CHOSEN_KEY] = bool(chosen is not None)
+    return {"value": value, "source": source, "sakinys": _frameless_sentence(source, sch)}
 
 
 def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None,
-                           legend: dict | None = None) -> dict:
+                           legend: dict | None = None, schedule: dict | None = None) -> dict:
     """The project-level pass every calc path runs BEFORE `calc_room_quantities` (extraction, the assumptions
-    recompute, the room-sheet recompute): doors listed from both sides are paired, the frameless-door
-    assumption is settled, and the cornice gets its evidence flag. Never raises."""
-    out = {"shared_doors": 0, "frameless": {"value": False, "source": "nera_pozymiu"}, "karnizas": False}
+    recompute, the room-sheet recompute): the doors to the outside are marked, doors listed from both sides
+    are paired, the frameless-door assumption is settled, the list is reconciled with the drawing's door
+    schedule, and the cornice gets its evidence flag. Never raises."""
+    out = {"shared_doors": 0, "exterior_doors": 0, "frameless": {"value": False, "source": "nera_pozymiu", "sakinys": ""},
+           "ziniarastis": {"units": 0, "matched": 0, "beyond": 0}, "karnizas": False}
     try:
-        out["shared_doors"] = mark_shared_doors(rooms)
+        out["exterior_doors"] = mark_exterior_doors(rooms)
     except Exception:  # noqa: BLE001 — a malformed element must not sink a recompute
         pass
     try:
-        out["frameless"] = settle_frameless_default(rooms, overrides, door_types)
+        out["shared_doors"] = mark_shared_doors(rooms)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        out["frameless"] = settle_frameless_default(rooms, overrides, door_types, schedule)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        out["ziniarastis"] = reconcile_doors_with_schedule(rooms, schedule)
     except Exception:  # noqa: BLE001
         pass
     karnizas = bool(((legend or {}).get("karnizas") or {}).get("defined")) if isinstance(legend, dict) else False
@@ -2274,6 +2490,8 @@ def calc_room_quantities(room: dict,
         if not isinstance(el, dict):
             continue
         tipas = (el.get("tipas") or "").lower()
+        # the English kinds of the line-items contract (`door` / `hidden_door`) are the same doors
+        tipas = {"door": "duris", "hidden_door": "pasleptos_duris", "window": "langas"}.get(tipas, tipas)
         is_exterior = bool(el.get("_exterior"))
         w_mm = float(el.get("plotis_mm") or 0)
         h_mm = float(el.get("aukstis_mm") or 0)
@@ -2285,7 +2503,20 @@ def calc_room_quantities(room: dict,
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_DOOR_H_M
             if is_exterior:
                 angokrasciu_m += kiekis * (w_m + 2 * h_m)
-            elif tipas == "pasleptos_duris" or frameless_default:
+            elif el.get(BEYOND_SCHEDULE_KEY):
+                pass                                           # the drawing's door schedule has no such door
+            elif w_m > FRAMELESS_MAX_W_M and not el.get(SCHEDULE_TYPE_KEY):
+                # a „door" this wide inside a flat is an open passage or a double leaf, not a frameless
+                # door frame — the founder, 2026-09-23: „durys 1,40 pločio nebus tikrai" (objektas_h: a
+                # 2,0 m opening between the corridor and the kitchen was read as a hidden door)
+                pass
+            elif el.get(SCHEDULE_TYPE_KEY):
+                # the schedule names the frame: a frameless door is prepared, a framed or sliding one is not
+                if el.get(SCHEDULE_TYPE_KEY) == "beapvadines":
+                    pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
+                    pasleptu_duru_n += kiekis
+            elif frameless_default or (tipas == "pasleptos_duris" and not room.get(FRAMELESS_CHOSEN_KEY)):
+                # a hidden-door symbol counts unless he said the interior doors are framed
                 pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
                 pasleptu_duru_n += kiekis
         elif tipas in ("langas", "stoglangis"):

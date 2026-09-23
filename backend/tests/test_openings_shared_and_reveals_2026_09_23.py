@@ -72,13 +72,15 @@ def test_a_tagged_hidden_door_is_prepared_and_the_project_assumption_makes_the_u
     plain = _room("09", [door(800)])
     rooms = [tagged, plain]
     settled = ur.settle_frameless_default(rooms)
-    assert settled == {"value": True, "source": "brezinys"} and all(r[ur.FRAMELESS_DEFAULT_KEY] for r in rooms)
+    assert (settled["value"], settled["source"]) == (True, "brezinys") and all(r[ur.FRAMELESS_DEFAULT_KEY] for r in rooms)
+    assert "patvirtinkite" in settled["sakinys"]                 # symbols alone are not a confirmed frame type
     out = ur.calc_room_quantities(tagged)
     assert out["pasleptu_duru_staktu_m"] == round((4.8 + 0.9) + (4.2 + 0.8), 2) and out["pasleptu_duru_kompl"] == 2
     assert out["_pasleptu_duru_pagal"] == "prielaida"
     # nothing frameless anywhere in the drawing: untagged doors stay framed
     alone = [_room("09", [door(800)])]
-    assert ur.settle_frameless_default(alone) == {"value": False, "source": "nera_pozymiu"}
+    alone_settled = ur.settle_frameless_default(alone)
+    assert (alone_settled["value"], alone_settled["source"]) == (False, "nera_pozymiu")
     assert ur.calc_room_quantities(alone[0])["pasleptu_duru_staktu_m"] == 0
     # his choice wins either way
     assert ur.settle_frameless_default(alone, overrides={"vidaus_durys_beapvadines": True})["source"] == "jusu"

@@ -209,12 +209,23 @@ def hidroizoliacija_m2(
     return round(total, 3), warnings
 
 
-def _frameless_units(op, frameless_default: bool) -> int:
+def _frameless_units(op, frameless_default: bool, chosen_framed: bool = False) -> int:
     """How many units of this opening are frameless interior doors this room COUNTS: the doors the drawing
     tags as hidden, plus untagged interior doors when the project-level assumption says so — less the units
-    the same opening is counted under in the neighbouring room (universal_rules.mark_shared_doors)."""
+    the same opening is counted under in the neighbouring room (universal_rules.mark_shared_doors).
+    `chosen_framed`: he said the interior doors are framed — the plan's hidden-door symbols do not count
+    either (only a door the drawing's schedule names frameless does)."""
     t = _opening_type(op)
-    if t == "hidden_door" or (frameless_default and t == "door" and not _get(op, "_exterior")):
+    if _get(op, "_exterior") or _get(op, "_be_ziniarascio"):
+        return 0
+    scheduled = _get(op, "_duru_tipas")                        # the drawing's door schedule names the frame
+    if scheduled:
+        frameless = scheduled == "beapvadines"
+    else:
+        w_m, _h, _n = _opening_dims(op)
+        # wider than 1,3 m an interior „door" is a passage or a double leaf (universal_rules.FRAMELESS_MAX_W_M)
+        frameless = ((t == "hidden_door" and not chosen_framed) or (frameless_default and t == "door")) and w_m <= 1.3
+    if frameless and t in ("hidden_door", "door"):
         count = int(_get(op, "count") or _get(op, "kiekis") or 1)
         try:
             shared = int(_get(op, "_bendra_su_n") or 0)
@@ -224,11 +235,11 @@ def _frameless_units(op, frameless_default: bool) -> int:
     return 0
 
 
-def hidden_door_count(openings: Iterable, frameless_default: bool = False) -> int:
-    return sum(_frameless_units(op, frameless_default) for op in openings or [])
+def hidden_door_count(openings: Iterable, frameless_default: bool = False, chosen_framed: bool = False) -> int:
+    return sum(_frameless_units(op, frameless_default, chosen_framed) for op in openings or [])
 
 
-def hidden_door_frame_lm(openings: Iterable, frameless_default: bool = False) -> float:
+def hidden_door_frame_lm(openings: Iterable, frameless_default: bool = False, chosen_framed: bool = False) -> float:
     """Linear metres of paslėptų durų staktos (3-sided per komplektas).
 
     Pre-2026-05-10 this field was always 0 because no detector populated it.
@@ -240,7 +251,7 @@ def hidden_door_frame_lm(openings: Iterable, frameless_default: bool = False) ->
     """
     total = 0.0
     for op in openings or []:
-        units = _frameless_units(op, frameless_default)
+        units = _frameless_units(op, frameless_default, chosen_framed)
         if units <= 0:
             continue
         w, h, _ = _opening_dims(op)

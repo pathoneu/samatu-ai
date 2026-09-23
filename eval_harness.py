@@ -1786,6 +1786,17 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
                           f"({g.get('seconds')} s)")
                 except Exception as exc:
                     print(f"  ⚠ geometry lane failed during rescore: {exc}")
+            # The drawing's door schedule (2026-09-23, Step 2.43 in production): frame type and the
+            # door list's reconciliation with the table. Zero API, needs the PDF; a cache written
+            # before the scan existed gets it here, the way production's free re-read gives it.
+            if "_duru_ziniarastis" not in parsed:
+                try:
+                    from extractor.door_schedule import scan_door_schedule
+                    parsed["_duru_ziniarastis"] = scan_door_schedule(pdf_path.read_bytes())
+                    print(f"  ⤴ durų žiniaraštis: {parsed['_duru_ziniarastis'].get('status')} — "
+                          f"{parsed['_duru_ziniarastis'].get('sakinys')}")
+                except Exception as exc:
+                    print(f"  ⚠ door schedule scan failed during rescore: {exc}")
         else:
             print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
 

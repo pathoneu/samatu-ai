@@ -25,7 +25,7 @@ import { ArrowRight, Check, CircleHelp, Loader2, MinusCircle, PenLine } from 'lu
 import { getProject, refreshProjectFromBackend } from '@/lib/projectStore';
 import { useProjectFixes } from '@/lib/useProjectFixes';
 import {
-  answerSummary, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
+  answerSummary, doorsAnswer, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
   questionAfterAnswer, wallsAnswer,
 } from '@/lib/questions';
 import { fetchQuestions } from '@/lib/questionsApi';
@@ -223,6 +223,10 @@ export default function PatikraQuestions() {
       answer(q, numbersAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
     } else if (q.answer === 'choices' && q.kind === 'apdaila') {
       answer(q, wallsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'walls_paint_override', a.table));
+    } else if (q.answer === 'choices' && q.kind === 'durys') {
+      // one choice for the whole project — the frameless-door assumption, down the Prielaidos write path
+      // „su apvadais" takes the frameless-door row away on purpose — not an orphan to carry back
+      answer(q, doorsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'vidaus_durys_beapvadines', a.value), { scopeChange: true });
     } else if (q.answer === 'choices') {
       answer(q, floorAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
     } else if (q.answer === 'openings') {
