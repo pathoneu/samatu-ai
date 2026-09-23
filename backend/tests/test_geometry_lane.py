@@ -76,13 +76,17 @@ def test_a_perimeter_the_user_entered_is_never_touched():
     assert parsed["patalpos"][0]["perimetras_m"] == 15.5 and parsed["patalpos"][0]["perimetras_saltinis"] == "user_override"
 
 
-def test_an_open_plan_names_its_members_and_offers_the_shared_walls_as_an_estimate():
+def test_an_open_plan_names_its_members_and_offers_the_shared_walls_as_an_estimate(monkeypatch):
+    """When NO boundary can be proposed (2026-09-23: otherwise the lane divides the space itself, see
+    test_a_two_room_open_plan_is_divided_by_the_lane_itself…) the shared walls are offered as an estimate."""
+    monkeypatch.setattr(gl, "propose_split", lambda *a, **k: {"status": "no_proposal"})
     a = two_rooms()                                                 # (its strings give the sheet a scale)
     a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]       # no partition: one space, two rooms in the table
     parsed = _parsed()
     parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
     parsed["patalpos"][0]["plotas_m2"] = 12.6
-    gl.apply_geometry(parsed, build_plan([a]))
+    out = gl.apply_geometry(parsed, build_plan([a]))
+    assert out["ribos"] == [] and out["ribos_nepasiulytos"] == [["01", "02"]]
     r1, r2 = parsed["patalpos"]
     assert r1["polygon_source"] == "synthesized_from_bbox" and "atvira erdvė su 02" in r1["_konturo_priezastis"]
     erdve = r1["_atvira_erdve"]
@@ -106,8 +110,10 @@ def test_an_open_plan_member_whose_perimeter_someone_stated_keeps_it():
     parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
     gl.apply_geometry(parsed, build_plan([a]))
     r1, r2 = parsed["patalpos"]
-    assert r1["perimetras_m"] == 15.5 and "_perimetras_ivertis_m" not in r1
-    assert r2["perimetras_saltinis"] == "atviros_erdves_ivertis" and r2["_perimetras_ivertis_m"] > 0
+    assert r1["perimetras_m"] == 15.5 and r1["perimetras_saltinis"] == "user_override" and "_perimetras_ivertis_m" not in r1
+    # the space is still divided (the outline is geometry, not his number) and the OTHER room's walls are read
+    assert r1["_konturas"]["saltinis"] == "padalinta_programos" and r2["_konturas"]["saltinis"] == "padalinta_programos"
+    assert r2["perimetras_saltinis"] in ("matmenu_eilutes", "konturo_ivertis") and r2["perimetras_m"] > 0
 
 
 def test_the_lane_never_raises():
@@ -337,3 +343,32 @@ def test_a_neighbour_outlined_on_another_sheet_of_the_plan_is_still_named():
     assert abs(x0 - fx(4.3)) < 0.002 and abs(x1 - fx(4.3)) < 0.002
     assert sorted([round(y0, 3), round(y1, 3)]) == sorted([round(fy(1.0), 3), round(fy(1.9), 3)])
     assert parsed["_meta"]["geometrija"]["angos_sienose"] == ["01", "02"]
+
+
+def test_a_two_room_open_plan_is_divided_by_the_lane_itself_and_the_boundary_is_never_a_wall():
+    """2026-09-23, the founder: „o koks tau skirtumas, kur riba?" — none to the wall total; so the program
+    takes its own proposal (vector_rooms.propose_split) instead of asking, says where and why, and a person
+    may still redraw it."""
+    a = two_rooms()
+    a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]       # no partition: one space, two rooms in the table
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    parsed["patalpos"][0]["plotas_m2"] = 12.6
+    out = gl.apply_geometry(parsed, build_plan([a]))
+    r1, r2 = parsed["patalpos"]
+    for r, other in ((r1, "02"), (r2, "01")):
+        k = r["_konturas"]
+        assert r["polygon_source"] == "vektoriniai_konturai" and len(r["polygon_pct"]) >= 4
+        assert k["saltinis"] == "padalinta_programos" and k["pagal"] in ("kampas", "plotai") and k["su"] == [other]
+        assert len(k["menamos"]) == 1 and len(k["riba_pct"]) == 2
+        assert r["_atvira_erdve"]["nariai"] == ["01", "02"]        # the shared outline stays: shown dashed, redrawable
+        assert "_konturo_priezastis" not in r
+        assert r["perimetras_saltinis"] != "atviros_erdves_ivertis"  # not the share by area any more: this side's own walls
+        assert r["perimetras_m"] > 0
+    assert abs(r1["_konturas"]["plotas_m2"] / r2["_konturas"]["plotas_m2"] - 12.6 / 9.0) < 0.06
+    # the boundary is an edge of both outlines and a wall of neither: the two perimeters add up to the space's walls
+    assert abs(r1["perimetras_m"] + r2["perimetras_m"] - r1["_atvira_erdve"]["perimetras_m"]) < 0.3
+    assert out["ribos"] == [{"nariai": ["01", "02"], "pagal": r1["_konturas"]["pagal"]}] and out["ribos_nepasiulytos"] == []
+    assert set(out["konturai"]) >= {"01", "02"} and not ({"01", "02"} & set(out["perimetrai_tusti"]) - set(out["perimetrai_sudeti"]) & set()) 
+    assert out["atviros_erdves"] == [["01", "02"]]
+    assert gl.LANE_VERSION >= 8

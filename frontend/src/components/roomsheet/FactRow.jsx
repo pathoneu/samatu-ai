@@ -172,7 +172,8 @@ export default function FactRow({
             and its walls are read again — the fix for the reason the sentence above gives. */}
         {/* …and a room that shares its space with another (no wall between them): one line he draws
             gives both their own outlines — a click inside would only find the shared space again. */}
-        {onSplitSpace && fact?.key === 'perimetras' && !fact?.outline?.polygon_pct
+        {/* …also when the boundary is the PROGRAM's own (geometry lane, 2026-09-23): he may draw it elsewhere */}
+        {onSplitSpace && fact?.key === 'perimetras' && (!fact?.outline?.polygon_pct || fact?.outline?.riba === 'programos')
           && (fact?.outline?.open_space?.nariai || []).length === 2 && (
           <button
             type="button"

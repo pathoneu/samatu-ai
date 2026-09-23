@@ -127,10 +127,13 @@ def _ask_erdves(rows: list[tuple[dict, dict]], by_nr: dict[str, dict]) -> list[d
         seen.add(key)
         a, b = (by_nr[m] for m in members)
         areas = [_f(x.get("plotas_m2")) for x in (a, b)]
-        by_area = (f" Siūlau ribą pagal lentelės plotus ({lt_num(areas[0])} ir {lt_num(areas[1])} m²)."
-                   if all(areas) else " Siūlau ribą pagal patalpų plotus.")
-        why = ("Sienos tarp šių patalpų nėra, todėl jų perimetrų nesudėjau." + by_area
-               + " Milimetrų tikslumo nereikia: abiejų patalpų sienų suma nuo ribos vietos nesikeičia.")
+        # 2026-09-23: asked only when the lane could NOT propose the boundary itself (geometry_lane divides a
+        # two-room space by its own proposal); the founder: „o koks tau skirtumas, kur riba?" — said plainly
+        by_area = (f" Plotus imu iš lentelės ({lt_num(areas[0])} ir {lt_num(areas[1])} m²) — jų neperskaičiuoju."
+                   if all(areas) else " Plotus imu iš lentelės — jų neperskaičiuoju.")
+        why = ("Sienos tarp šių patalpų nėra, o ribos pats pasiūlyti negalėjau — nubrėžkite ją." + by_area
+               + " Riba reikalinga tik sienų ilgiams paskirstyti tarp dviejų patalpų: abiejų sienų suma nuo jos "
+               "nesikeičia, milimetrų tikslumo nereikia.")
         items = [{"room_nr": m, "room_name": str(by_nr[m].get("pavadinimas") or "").strip(), "field": None,
                   "unit": "m²", "proposed": _f(by_nr[m].get("plotas_m2")), "sentence": "",
                   "page": space.get("page") or by_nr[m].get("puslapio_nr")} for m in members]

@@ -48,10 +48,13 @@ from .plan_area_annotations import plan_pages_from_classification
 from .plan_dimensions import read_dimension_strings
 from .room_locator import locate_rooms
 from .sheet_alignment import align_sheets, from_base, to_base
-from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, trace_vector_rooms, wall_openings
+from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, propose_split, trace_vector_rooms, wall_openings
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
 OPEN_PLAN_ESTIMATE = "atviros_erdves_ivertis"
+# `_konturas.saltinis` of one side of the boundary the LANE proposed through a two-room open space (2026-09-23):
+# a person's own line is "padalinta" (api/room_outline.py), and is never replaced by this
+DIVIDED_BY_LANE = "padalinta_programos"
 ESTIMATES = (ESTIMATE_SOURCE, OPEN_PLAN_ESTIMATE)
 _PT_M = 25.4 / 72 / 1000          # metres per PDF point at 1:1
 
@@ -70,9 +73,12 @@ def _nr(room: dict) -> str:
 # („101", „102" — a house) are found by their number (objektas_a: 1 → 11 outlines);
 # 7 — a slanted wall's length is read off its slanted dimension line, and a wall
 # written in pieces either side of a door is added up through the door
-# (objektas_h bedroom 09: an estimate → 16,01 m READ).
+# (objektas_h bedroom 09: an estimate → 16,01 m READ); 8 — a space two rooms share
+# is divided by the lane's own proposed boundary (through a wall end the table agrees
+# with, else by the table's area ratio), so each room's walls are read instead of a
+# share by floor area (objektas_h 04/05: estimates 16,08 / 21,69 → read 17,93 / 19,82).
 # RAISE it when the lane starts reading something a stored project would gain from.
-LANE_VERSION = 7
+LANE_VERSION = 8
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -225,11 +231,57 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
     meta["grindu_dangos"]["dvi_dangos"] = sorted(nr for nr in two if nr not in read)
 
 
+def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, page, m_per_pt, size, meta) -> None:
+    """A space TWO rooms share is divided by the boundary the lane itself proposes (vector_rooms.propose_split:
+    through a wall end when the table's two areas agree with it, else where the areas stand in the table's
+    ratio) — 2026-09-23, the founder: „o koks tau skirtumas, kur riba?". None to the wall total: the
+    boundary is an edge of both outlines and a wall of neither, so each room's walls can be READ instead of
+    guessed as a share by floor area. Both rooms keep `_atvira_erdve` (the shared outline is shown dashed,
+    and a person may still draw the line elsewhere — that line, "padalinta", is never replaced by this).
+    Only rooms still to do are written; a space of three rooms, or one whose numbers or areas are not known,
+    is left with its estimates."""
+    by_nr = {_nr(r): r for r in rooms}
+    W, H = size
+    for g in groups:
+        members = sorted(str(n) for n in g["nariai"])
+        if len(members) != 2 or not all(m in todo and m in by_nr for m in members):
+            continue
+        seats = {m: (float(seats_on_page[m]["cx"]), float(seats_on_page[m]["cy"])) for m in members
+                 if m in seats_on_page and seats_on_page[m].get("saltinis") in STRONG}
+        table = {m: float(areas.get(m) or 0) for m in members}
+        if len(seats) != 2 or min(table.values()) <= 0:
+            meta["ribos_nepasiulytos"].append(members)
+            continue
+        cut = propose_split(pdf_bytes, page, seats, table, m_per_pt, (W, H))
+        if cut.get("status") != "ok" or any(m not in cut["rooms"] for m in members):
+            meta["ribos_nepasiulytos"].append(members)
+            continue
+        for m in members:
+            r, part = by_nr[m], cut["rooms"][m]
+            r["polygon_pct"] = part["polygon_pct"]
+            r["polygon_source"] = VECTOR_SOURCE                # the lane's own: the next run does it again
+            r["_konturas"] = {"page": page, "plotas_m2": part["plotas_m2"], "perimetras_m": part["perimetras_m"],
+                              "plotas_uzrasas_m2": areas.get(m), "paklaida": part["paklaida"],
+                              "plotas_nesutampa": bool(part.get("plotas_nesutampa")), "menamos": part["menamos"],
+                              "su": [o for o in members if o != m], "saltinis": DIVIDED_BY_LANE,
+                              "pagal": cut["pagal"], "riba_pct": cut["line_pct"]}
+            r.pop("_konturo_priezastis", None)
+            if str(r.get("perimetras_saltinis") or "") == OPEN_PLAN_ESTIMATE:
+                # the share by floor area written a moment ago — this side's own walls are read below
+                # (sum_perimeters: the strings along them, else the outline's length as an estimate with its reason)
+                for stale in ("_perimetras_priezastis", "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis"):
+                    r.pop(stale, None)
+            if m not in meta["konturai"]:
+                meta["konturai"].append(m)
+            meta["perimetrai_tusti"] = [nr for nr in meta["perimetrai_tusti"] if nr != m]
+        meta["ribos"].append({"nariai": members, "pagal": cut["pagal"]})
+
+
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
-                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [],
+                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "ribos": [], "ribos_nepasiulytos": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"
     try:
@@ -361,6 +413,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     r["_perimetras_priezastis"] = (f"atvira erdvė su {others} — sienos šių patalpų neskiria; bendras erdvės sienų ilgis "
                                                    f"{g['perimetras_m']:.2f} m padalytas pagal plotą").replace(".", ",")
                     meta["perimetrai_tusti"].append(_nr(r))
+            _divide_shared_spaces(rooms, res["groups"], todo, everyone, areas, pdf_bytes, page, scale[page], (W, H), meta)
 
         outlined = any(str(r.get("polygon_source") or "") in KEEP_POLYGONS for r in rooms)
         if outlined and not everything:

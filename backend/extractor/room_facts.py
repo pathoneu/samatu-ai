@@ -417,6 +417,8 @@ def _perimeter_drawing(room: dict) -> dict:
     if outline is not None and isinstance(kont.get("menamos"), list) and kont["menamos"]:
         # the boundary a person drew through a shared space: an edge of the outline, not a wall — drawn dashed
         outline["menamos"] = [[[_f(a[0]), _f(a[1])], [_f(b[0]), _f(b[1])]] for a, b in kont["menamos"]]
+        # whose boundary it is: the program's (2026-09-23, geometry_lane — he may draw it elsewhere) or his own
+        outline["riba"] = "programos" if kont.get("saltinis") == "padalinta_programos" else "jusu"
     space = room.get("_atvira_erdve")
     shared = normalize_polygon(space.get("polygon_pct")) if isinstance(space, dict) else None
     if shared:
@@ -515,6 +517,15 @@ def _fact_perimetras(project: dict, room: dict,
         if dev is not None and dev > 0.08 and _f(kont.get("plotas_m2")) and _f(kont.get("plotas_uzrasas_m2")):
             whose += (f" Šios dalies kontūro plotas {lt_num(_f(kont.get('plotas_m2')))} m², "
                       f"lentelėje užrašyta {lt_num(_f(kont.get('plotas_uzrasas_m2')))} m².")
+    elif kont.get("saltinis") == "padalinta_programos":
+        # 2026-09-23: one side of the boundary the LANE proposed through a shared space (geometry_lane) — the
+        # founder: „o koks tau skirtumas, kur riba?" — none to the wall total, so it is taken, said, and changeable
+        others = ", ".join(str(n) for n in (kont.get("su") or []))
+        where = ("per sienos galą, kur su ja sutinka lentelės plotai" if kont.get("pagal") == "kampas"
+                 else "ten, kur plotai pasidalija lentelės santykiu")
+        whose = (f" Bendrą erdvę su patalpa {others} padalijau pats — riba {where}." if others
+                 else f" Bendrą erdvę padalijau pats — riba {where}.")
+        whose += " Riba ne siena: į perimetrą neįskaičiuota, sienų sumai įtakos neturi. Pakeisti galite čia — „Padalinti erdvę“."
     tail += whose
 
     estimated = str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis")

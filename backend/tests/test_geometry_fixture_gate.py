@@ -63,6 +63,15 @@ def test_geometry_gate(slug):
     for nr, metres in want["atviru_erdviu_iverciai"].items():
         assert rooms[nr]["perimetras_saltinis"] == "atviros_erdves_ivertis"
         assert abs(rooms[nr]["perimetras_m"] - metres) <= 0.05, (nr, rooms[nr]["perimetras_m"])
+    # a space two rooms share is divided by the lane's own boundary (2026-09-23): both rooms outlined, the
+    # boundary an edge of both and a wall of neither, each room's walls read on their own
+    for members in want.get("ribos", []):
+        assert members in [r["nariai"] for r in out["ribos"]], out["ribos_nepasiulytos"]
+        for nr in members:
+            k = rooms[nr]["_konturas"]
+            assert k["saltinis"] == "padalinta_programos" and k["menamos"] and rooms[nr]["_atvira_erdve"]["nariai"] == members
+            assert rooms[nr]["perimetras_saltinis"] in ("matmenu_eilutes", "konturo_ivertis")
+        assert abs(sum(rooms[nr]["perimetras_m"] for nr in members) - rooms[members[0]]["_atvira_erdve"]["perimetras_m"]) <= 0.1
     blanks = [r for r in rooms.values() if r.get("perimetras_saltinis") in ("konturo_ivertis", "atviros_erdves_ivertis")]
     # an estimate is a NUMBER (the sąmata rows are built from it) that the sheet shows as a blank
     assert all(r.get("perimetras_m") and r["perimetras_m"] == r.get("_perimetras_ivertis_m") for r in blanks)

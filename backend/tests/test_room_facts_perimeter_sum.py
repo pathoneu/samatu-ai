@@ -189,3 +189,22 @@ def test_a_figure_nobody_could_check_is_not_called_read_from_the_outline():
     # a project the lane never ran on keeps the sentence it had (nothing new is known about it)
     old = {f["key"]: f for f in build_room_facts(_project(room), "01")["facts"]}["perimetras"]
     assert old["status"] == "read"
+
+
+def test_a_boundary_the_lane_proposed_is_said_to_be_the_programs_and_changeable():
+    """2026-09-23: the founder asked what difference the boundary makes — none to the wall total, so the lane
+    takes its own proposal; the sheet says so, says where, and that it can be changed."""
+    room = _summed_room()
+    room.update({"nr": "04", "pavadinimas": "Virtuvė", "plotas_m2": 26.31, "perimetras_m": 17.93,
+                 "_konturas": {"page": 1, "plotas_m2": 25.74, "plotas_uzrasas_m2": 26.31, "paklaida": 0.0217, "pagal": "kampas",
+                               "menamos": [[[0.625, 0.572], [0.625, 0.659]]], "su": ["05"], "saltinis": "padalinta_programos"},
+                 "_atvira_erdve": {"nariai": ["04", "05"], "polygon_pct": OUTLINE, "perimetras_m": 37.77, "plotas_m2": 60.55, "page": 1}})
+    room["_perimetras_suma"]["suma_m"] = 17.93
+    p = _perimetras(room)
+    assert p["status"] == "read" and p["value"] == 17.93
+    assert "Bendrą erdvę su patalpa 05 padalijau pats — riba per sienos galą, kur su ja sutinka lentelės plotai." in p["sentence"]
+    assert "sienų sumai įtakos neturi" in p["sentence"] and "Padalinti erdvę" in p["sentence"] and "padalijote" not in p["sentence"]
+    assert p["outline"]["menamos"] == [[[0.625, 0.572], [0.625, 0.659]]] and p["outline"]["open_space"]["nariai"] == ["04", "05"]
+    assert p["outline"]["riba"] == "programos"                     # the sheet keeps „Padalinti erdvę" for a redraw
+    room["_konturas"]["pagal"] = "plotai"
+    assert "ten, kur plotai pasidalija lentelės santykiu" in _perimetras(room)["sentence"]
