@@ -311,3 +311,7 @@ langai 26/30). Testai `tests/test_praejimai_2026_09_24.py`.
 
 **Pastaba dėl 1,56 m angos.** Sienų sąrašas ją veda iš 03 į 04, mano skaitymo tiesa buvo užrašiusi „į 05": anga guli ant
 04/05 sandūros (pagal pataisytus kontūrus 65 % pločio virš 04) — atviro plano dviprasmybė, angokraščiams nesvarbi.
+
+**Formuluotė (tą patį vakarą).** Angų faktas praėjimą vadina praėjimu: 04 „2 langai, 2 praėjimai … 1 × praėjimas 2,13 ×
+2,40 m", koridoriuje „Praėjimai į patalpą 04 (2,13 m), į patalpą 04 (1,56 m) įrašyti prie tos patalpos" (buvo „1 paslėptos
+durys, 1 durys" ir „Durys … įrašytos"). Patikrinta naršyklėje ant demo H.

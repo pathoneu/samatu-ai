@@ -1017,8 +1017,10 @@ _ELEMENT_LT: dict[str, tuple[str, str, str]] = {
     "pasleptos_duris": ("paslėptos durys", "paslėptos durys", "paslėptų durų"),
     "langas": ("langas", "langai", "langų"),
     "stoglangis": ("stoglangis", "stoglangiai", "stoglangių"),
+    # a door element the walls pass marked `_praejimas` (2026-09-24): an opening without a door
+    "praejimas": ("praėjimas", "praėjimai", "praėjimų"),
 }
-_OPENING_TIPAI = tuple(_ELEMENT_LT)
+_OPENING_TIPAI = ("duris", "pasleptos_duris", "langas", "stoglangis")
 
 
 def element_label(tipas: str, n: int) -> str:
@@ -1153,8 +1155,17 @@ def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stoo
     unbacked = int(stood.get("unbacked") or 0)
     n = len(openings)
     listed = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in openings)
-    said_beyond = ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for k, o in enumerate(openings) if k in beyond and k not in consumed)
-    tail_beyond = f" Durys {said_beyond} įrašytos prie tos patalpos." if said_beyond else ""
+    beyond_open = [(k, o) for k, o in enumerate(openings) if k in beyond and k not in consumed]
+    # what stands beyond is said by its kind: a passage the room beyond lists is no door of theirs
+    beyond_pass = [o for k, o in beyond_open if is_passage and is_passage(o["plotis_m"], o["i"])]
+    beyond_doors = [o for k, o in beyond_open if o not in beyond_pass]
+    tail_beyond = ""
+    if beyond_doors:
+        tail_beyond += " Durys " + ", ".join(f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in beyond_doors) + " įrašytos prie tos patalpos."
+    if beyond_pass:
+        tail_beyond += (" Praėjimas " if len(beyond_pass) == 1 else " Praėjimai ") + ", ".join(
+            f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in beyond_pass) + (
+            " įrašytas prie tos patalpos." if len(beyond_pass) == 1 else " įrašyti prie tos patalpos.")
     open_rest = [(k, o) for k, o in enumerate(openings) if k not in consumed and k not in beyond]
     suggestions, named = [], []
     for k, o in open_rest:
@@ -1237,14 +1248,16 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
         tipas = e.get("tipas") or ""
         n = int(_f(e.get("kiekis")) or 1)
         total += n
-        per_type[tipas] = per_type.get(tipas, 0) + n
+        # a passage is counted as what it is — „2 langai, 2 praėjimai", not „1 paslėptos durys, 1 durys"
+        counted_as = "praejimas" if e.get("_praejimas") else tipas
+        per_type[counted_as] = per_type.get(counted_as, 0) + n
         anchored = anchored or bool(e.get("_schedule_anchored"))
         # Recorded per element since 2026-09-04; older blobs fall back to the
         # classified `door_window_schedule` sheet below.
         schedule_page = schedule_page or _f(e.get("_schedule_page"))
         details.append({
             "tipas": tipas,
-            "pavadinimas": element_label(tipas, n),
+            "pavadinimas": element_label(counted_as, n),
             "kiekis": n,
             "plotis_mm": _f(e.get("plotis_mm")),
             "aukstis_mm": _f(e.get("aukstis_mm")),
@@ -1280,7 +1293,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
     if not details:
         # 2026-09-23: nothing listed here, but every opening the walls show is a door the room BEYOND lists —
         # that door is counted there (universal_rules.mark_shared_doors); this room has nothing to add
-        if openings and not short and not suggestions and "įrašytos prie tos patalpos" in (walls_said or ""):
+        if openings and not short and not suggestions and "prie tos patalpos" in (walls_said or ""):
             return _fact("angos", 0, "vnt.", "read", "sienu_angos", where[0], where[1], walls_said, editable, details=[], **shown)
         return _fact("angos", 0, "vnt.", "missing", "sienu_angos" if openings else "nera",
                      where[0], where[1],
