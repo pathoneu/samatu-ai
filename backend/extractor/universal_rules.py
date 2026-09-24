@@ -1153,10 +1153,13 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
       · a unit added from an opening (`_is_sienu_angos`) stands in that opening;
       · a window stands in an opening to the outside (its width, else the widest);
       · a door stands in the closest opening to another room; a door in an opening wider than a door
-        between two living spaces is a PASSAGE (`_praejimas`: no frame, no reveal row); a door with no
-        opening to a room left takes an opening to the outside of door width — it is EXTERIOR;
+        between two living spaces is a PASSAGE (`_praejimas`: no frame; its reveals are finished like a
+        window's, 2026-09-24); a door with no opening to a room left takes an opening to the outside of
+        door width — it is EXTERIOR;
       · a door no opening backs is `_be_angos` — kept (the walls do miss an opening now and then) but
-        counted for no per-opening row and named for a look.
+        counted for no per-opening row and named for a look;
+      · a FREE opening wider than a door between two living spaces that nobody stands in becomes a passage
+        element of its own (2026-09-24, objektas_h's 1,56 m opening from the corridor to the living room).
 
     A matched unit takes the WALL's width (`_plotis_pagal = "sienos"`; a size he typed stays) and records
     its opening (`_anga_ks`, `_anga_i`), so pairing across rooms is exact. Elements of several units whose
@@ -1273,6 +1276,26 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                 idx = len(els) - 1
                 take(o, idx, "exterior" if _to_outside(o["i"], by_nr) else "interior")
                 out["added"] = out.get("added", 0) + 1
+        # 4c. a FREE opening wider than a door between two living spaces, with no element standing in it
+        #     from either side, is a passage without a door (objektas_h: the 1,56 m opening from the corridor
+        #     to the living room — Vision listed nothing, the walls show it). Added once, tagged with the
+        #     opening; its reveals are finished like a window's, it is no door for the frame rows.
+        nr_here = str(r.get("nr") or "").strip()
+        for o in sorted(free.values(), key=lambda o: o["k"]):
+            if o["i"] in ("laukas", "vidus") or o["i"] not in by_nr or not _is_passage(o["w"], o["i"], r, by_nr):
+                continue
+            other = by_nr[o["i"]]
+            if any(isinstance(f, dict) and (f.get("tipas") or "").lower() in _DOOR_KINDS
+                   and str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                   for f in other.get("elementai") or []):
+                continue
+            added = {"tipas": "duris", "kiekis": 1, "plotis_mm": int(round(o["w"] * 100)) * 10,
+                     "aukstis_mm": int(STANDARD_DOOR_H_M * 1000), "_is_sienu_angos": o["i"],
+                     ADDED_FROM_WALLS_KEY: True}
+            r.setdefault("elementai", []).append(added)
+            els.append(added)
+            take(o, len(els) - 1, "passage")
+            out["added"] = out.get("added", 0) + 1
         # 5. apply — split an element whose units met different fates
         for idx in sorted(fates, reverse=True):
             e = els[idx]
@@ -2752,8 +2775,13 @@ def calc_room_quantities(room: dict,
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_DOOR_H_M
             if is_exterior:
                 angokrasciu_m += kiekis * (w_m + 2 * h_m)
-            elif el.get(BEYOND_SCHEDULE_KEY) or el.get(PASSAGE_KEY) or el.get(UNBACKED_KEY):
-                pass                                           # no such door in the schedule / a passage / no opening in the walls
+            elif el.get(PASSAGE_KEY):
+                # a door-less opening has no frame to cover its reveals — they are finished like a window's
+                # (2026-09-24, objektas_h: the 2,13 m and 1,56 m openings from the corridor to the kitchen and
+                # the living room are in his „Angokraščių apdirbimas GKP" row)
+                angokrasciu_m += kiekis * (w_m + 2 * h_m)
+            elif el.get(BEYOND_SCHEDULE_KEY) or el.get(UNBACKED_KEY):
+                pass                                           # no such door in the schedule / no opening in the walls
             elif w_m > FRAMELESS_MAX_W_M and not el.get(SCHEDULE_TYPE_KEY) and not el.get(OPENING_SIDE_KEY):
                 # a „door" this wide inside a flat is an open passage or a double leaf, not a frameless
                 # door frame — the founder, 2026-09-23: „durys 1,40 pločio nebus tikrai" (objektas_h: a

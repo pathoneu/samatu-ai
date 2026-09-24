@@ -279,3 +279,35 @@ ankstesniu (skiriasi tik sekundės), skaitiklis duoda tuos pačius 9 / 6 / 20 / 
 **Ribos.** Juodas ženklas neskaičiuojamas (juodi keliai — ir sienos); H šviestuvai dalijasi spalva ir dydžiu tarp rūšių
 (jo 20 „priglaistomi" prieš ~33 plano ženklus yra apimties pasirinkimas); rastrinis brėžinys → `defined=False`, lieka
 vizualaus skaitytuvo kiekis su legendos inkaru kaip iki šiol.
+
+## 10. H angokraščiai: „grąžink kaip buvo" išmatuota, o ne grąžinta (2026-09-24 vakaras)
+
+**Prašymas.** Įkūrėjas: „H angokraščius grąžink kaip buvo, pažiūrėsim ar H pagerės" — H eilutė „Angokraščių apdirbimas
+GKP" 63,23 m gamyboje buvo 70 m (+10,7 %), po 2026-09-23 taisyklės (angokraščiai = langai + lauko durys) 46,24 m
+(−26,9 %).
+
+**Kas sudarė gamybos 70 m.** Senoji taisyklė — visos durys su dydžiais, langai tik be „_exterior" žymos. H 03
+koridoriuje Vision išvardijo 7 duris, sienose yra 4 durų angos ir 2 praėjimai: trys išgalvotos durys (`_be_angos`) davė
+~15 m, kurių brėžinyje nėra. 70 m buvo arti 63 m dviem klaidoms susidėjus.
+
+**Trys variantai, tas pats eval'as (`--rows --recompute --geometry`, atskiri worktree'ai, tos pačios talpyklos):**
+
+| Variantas | H angokraščiai (jo 63,23) | H eilutės ±10 % | Kiti projektai |
+|---|---|---|---|
+| dabartinis | 46,24 (−26,9 %) | 29,2 % | — |
+| A: senoji taisyklė šiandieniniuose duomenyse | 84,9 (+34,3 %) | 29,2 % | A 90 → 83,95; C 37,2 → 30 (−13 %); D 29,8 → 44,9 (+41 %) |
+| B: praėjimo be durų angokraščiai kaip lango | 53,17 (−15,9 %) | 29,2 % | nepakito |
+| C: B + laisva plati anga tarp gyvenamųjų erdvių = praėjimas | **58,33 (−7,7 %)** | **33,3 %** (€ 32,5 → 37,6 %) | nepakito nė viena eilutė |
+
+Pirmas variantų paleidimas buvo negaliojantis (worktree'uose `ln -s` pateko į jau esamą `fixtures` katalogą, PDF nerasti,
+variklis elgėsi kaip iki legendos inkaro) — pastebėta pagal difuzorių eilutes, perleista su teisinga nuoroda.
+
+**Pritaikyta C** (`universal_rules.py`): skaičiavimo cikle praėjimas (`_praejimas`) gauna angokraščius W + 2H (jo neuždengia
+jokia stakta); `reconcile_openings_with_walls` 4c žingsnis — laisva anga, platesnė už duris, tarp dviejų gyvenamųjų erdvių,
+kurioje niekas nestovi iš nė vienos pusės, tampa praėjimo elementu (`_praejimas`, `_pridėta_pagal_sienas`, standartinis
+2,1 m aukštis, pridedama vieną kartą, idempotentiška). H: 04 praėjimas 2,13×2,40 + pridėtas 1,56 m praėjimas; skaitymo
+lentelė praėjimai 1/3 → 2/3. Likęs H skirtumas (−7,7 %) — neperskaitytas trečias langas 04 patalpoje (skaitymo lentelė
+langai 26/30). Testai `tests/test_praejimai_2026_09_24.py`.
+
+**Pastaba dėl 1,56 m angos.** Sienų sąrašas ją veda iš 03 į 04, mano skaitymo tiesa buvo užrašiusi „į 05": anga guli ant
+04/05 sandūros (pagal pataisytus kontūrus 65 % pločio virš 04) — atviro plano dviprasmybė, angokraščiams nesvarbi.
