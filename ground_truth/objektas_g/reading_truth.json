@@ -1,0 +1,92 @@
+{
+  "slug": "objektas_g",
+  "kas": "Ką BRĖŽINYS sako apie angas — perskaityta akimis iš pertvarų (3) ir baldų (1) planų 2026-09-24, patalpos atpažintos pagal sienų angų kaimynystę. Durys rašomos kaip pora VIENOJE patalpoje; `neaisku` — plane vienareikšmiškai nematyti.",
+  "patalpos": {
+    "01": {
+      "durys": {
+        "02": 1,
+        "04": 1,
+        "05": 1,
+        "06": 1,
+        "08": 1
+      },
+      "durys_lauko": 2,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "svetainė su holu: penkios durys su lankais į 02, 04, 05, 06, 08; buto įėjimo durys D2 holo gale ir terasos durys prie L-03 (lankas) — lauko 2; langas L-03 (~2,8 m)"
+    },
+    "02": {
+      "durys": {
+        "03": 1
+      },
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 01 prie 01; durys į 03 (san. mazgas); langas L-02"
+    },
+    "03": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys iš 02 prie 02; be lango"
+    },
+    "04": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 01 prie 01; vienas langas (~2,2 m)"
+    },
+    "05": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "skalbykla: durys iš 01 prie 01; be lango"
+    },
+    "06": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "vonia su vonia, WC, bidė: durys iš 01 prie 01; be lango"
+    },
+    "07": {
+      "durys": {
+        "01": 1
+      },
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "neaisku": [
+        "durys"
+      ],
+      "pastaba": "dušo patalpa tarp 05 ir 06, plane be numerio — durys iš holo (01), lankas nematomas"
+    },
+    "08": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 01 prie 01; langas L-01 (~2,2 m)"
+    },
+    "09": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {},
+      "neaisku": [
+        "durys_lauko"
+      ],
+      "pastaba": "techninė patalpa: įėjimas iš lauko/balkono pro stiklo duris G01 (~2,0 m), vidaus durų nematyti"
+    }
+  },
+  "projektas": {
+    "vidaus_duru_is_viso": 7,
+    "lauko_duru_is_viso": 3,
+    "langu_is_viso": 4,
+    "praejimu_is_viso": 0,
+    "duru_tipas": "apdailos lape durų gaminiai su apvadais; beapvadinių neminima"
+  }
+}

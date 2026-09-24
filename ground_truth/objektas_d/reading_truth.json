@@ -1,0 +1,49 @@
+{
+  "slug": "objektas_d",
+  "kas": "Ką BRĖŽINYS sako apie angas — perskaityta akimis iš g/k pertvarų plano (2 lapas) su durų žiniaraščiu 2026-09-24. Durys rašomos kaip pora VIENOJE patalpoje; lauko durys ir langai — prie patalpos.",
+  "patalpos": {
+    "01": {
+      "durys": {
+        "02": 1,
+        "03": 1
+      },
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {
+        "04": 1
+      },
+      "pastaba": "įėjimo durys pietinėje sienoje (su lanku); D-1 į 02 ir D-2 į 03 (abi 910×2100, beapvadinės — žiniaraštis); į 04 atvira anga ~1,44 m (g/k „kakta“ virš jos — ne siena)"
+    },
+    "02": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "D-1 iš 01 įrašytos prie 01; be lango"
+    },
+    "03": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "D-2 iš 01 įrašytos prie 01; vienas langas šiaurinėje sienoje (~2,65 m)"
+    },
+    "04": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 2,
+      "praejimai": {},
+      "neaisku": [
+        "langai"
+      ],
+      "pastaba": "balkono durys rytų sienoje (su lanku, ~1,37 m); langas šiaurinėje sienoje ir stiklas rytų sienoje virš/žemiau durų — skaičiuojama kaip 2 langai, gali būti 3"
+    }
+  },
+  "projektas": {
+    "vidaus_duru_is_viso": 2,
+    "lauko_duru_is_viso": 2,
+    "langu_is_viso": 3,
+    "praejimu_is_viso": 1,
+    "duru_tipas": "žiniaraštis: D-1, D-2 beapvadinės; su apvadais 0"
+  }
+}

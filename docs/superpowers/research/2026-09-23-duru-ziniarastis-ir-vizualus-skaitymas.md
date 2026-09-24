@@ -198,3 +198,26 @@ Liko: B/C/D be vektorinių sienų (ten viskas kaip buvo); H angokraščiai −27
   parašus: primityvų matmenys svyruoja per 0,1–0,2 pt, todėl „vienodo parašo" skaičiavimas neveikia be
   tolerantiško parašo ir mastelio normalizavimo (legenda ↔ planas). Tai atskiras tyrimo darbas; paliekamas
   sąraše su šiais faktais.
+
+## 8. 2026-09-24: skaitymo lentelė (4 skyriaus 2 punktas)
+
+`scripts/reading_scorecard.py` + `ground_truth/<slug>/reading_truth.json` (A, D, G, H). Tiesa surašyta akimis iš
+planų — kas NUPIEŠTA, ne kas sąmatoje: durys kaip poros patalpa↔kaimynas (vienoje iš dviejų patalpų), lauko
+durys ir langai prie patalpos, praėjimai be durų; kur plane vienareikšmiškai nematyti — `neaisku`, tas faktas
+nevertinamas. Matuoja variklio patalpas po geometrijos juostos ir projektinio paruošimo (angos iš sienų).
+
+| | A | D | G | H | Korpusas |
+|---|---|---|---|---|---|
+| Vidaus durų poros sutampa | 8/9 | 0/2 (be sienų) | 6/7 | 6/8 | **20/26** |
+| Trūksta / per daug | 1 / 0 | 2 / 0 | 1 / 1 | 2 / 5 | 6 / 6 |
+| Lauko durys sutampa (patalpų) | 9/9 | 4/4 | 8/8 | 9/11 | **30/32** |
+| Langai sutampa (patalpų) | 7/7 | 3/3 | 8/9 | 8/11 | **26/30** |
+| Praėjimai | — | 0/1 | — | 1/2 | 1/3 |
+
+Ką lentelė parodė iš karto: A trūksta vienos angos (103↔106 — juosta jos nemato, o skalbykla duris gavo iš
+garažo angos); D be vektorinių sienų durys nestovi niekur (poros nevertinamos, žiniaraštis vis tiek duoda tikslią
+eilutę); G 07 (dušas) be kontūro; H — 01↔02 ir 01↔03 durys, kurių juosta neranda (tambūras pasiūlytas, ne
+priimtas), 02 dvejos lauko durys užimtos Vision „lango", 04 terasos durys tik siūlomos, po vieną langą trūksta
+04 ir 09, koridoriuje 3 durys be angos. Tai ir yra skaitytuvo darbų sąrašas su skaičiais; kiekvienas juostos ar
+Vision pakeitimas nuo šiol ginamas prieš šią lentelę taip pat, kaip eilutės — prieš jo sąmatas.
+

@@ -1,0 +1,104 @@
+{
+  "slug": "objektas_h",
+  "kas": "Ką BRĖŽINYS sako apie angas — perskaityta akimis iš išdėstymo (1) ir pertvarų (8) planų 2026-09-24. Ne sąmata: tik tai, kas nupiešta. Durys rašomos kaip pora patalpa↔kaimynas VIENOJE iš dviejų patalpų (skaičiuojamos vieną kartą); lauko durys ir langai — prie patalpos.",
+  "patalpos": {
+    "01": {
+      "durys": {
+        "02": 1,
+        "03": 1
+      },
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "įėjimas su šoniniu stiklu (~1,6 m) vakarų sienoje; anga į 03 (1,0 m) be lanko — laikoma durimis; anga į 02 (~0,74 m)"
+    },
+    "02": {
+      "durys": {},
+      "durys_lauko": 2,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys į 01 įrašytos prie 01; dvejos lauko durys su lankais: šiaurinėje sienoje ir vakarinėje (į garažo pusę); lango nėra"
+    },
+    "03": {
+      "durys": {
+        "06": 1,
+        "07": 1,
+        "09": 1,
+        "11": 1
+      },
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {
+        "04": 1,
+        "05": 1
+      },
+      "pastaba": "durys į 01 įrašytos prie 01; praėjimai be durų į 04 (2,13 m) ir 05 (1,56 m)"
+    },
+    "04": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 3,
+      "praejimai": {},
+      "pastaba": "terasos durys vakarų sienoje (~0,9 m, su lanku); trys langai pietinėje sienoje"
+    },
+    "05": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "stumdomos terasos durys / stiklo siena rytų sienoje (~5 m); vienas langas"
+    },
+    "06": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys į 03 įrašytos prie 03"
+    },
+    "07": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys į 03 įrašytos prie 03; vidinė patalpa be lango"
+    },
+    "08": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys iš 09 įrašytos prie 09; be lango"
+    },
+    "09": {
+      "durys": {
+        "08": 1,
+        "10": 1
+      },
+      "durys_lauko": 0,
+      "langai": 2,
+      "praejimai": {},
+      "pastaba": "durys į 03 įrašytos prie 03; į 08 (~1,4 m anga) ir į 10 (dvivėrės, ~1,2 m); du langai šiaurinėje sienoje (vienas įstrižoje)"
+    },
+    "10": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "dvivėrės durys iš 09 įrašytos prie 09"
+    },
+    "11": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 03 įrašytos prie 03; vienas langas rytų sienoje"
+    }
+  },
+  "projektas": {
+    "vidaus_duru_is_viso": 8,
+    "lauko_duru_is_viso": 5,
+    "langu_is_viso": 8,
+    "praejimu_is_viso": 2,
+    "duru_tipas": "brėžinyje neužrašyta (nei žiniaraščio, nei anotacijų)"
+  }
+}

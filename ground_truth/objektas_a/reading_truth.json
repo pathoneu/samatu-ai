@@ -1,0 +1,121 @@
+{
+  "slug": "objektas_a",
+  "kas": "Ką BRĖŽINYS sako apie angas — perskaityta akimis iš pertvarų plano (2 lapas) 2026-09-24. Durys rašomos kaip pora VIENOJE patalpoje; durys į garažą — prie patalpos kaip lauko; `neaisku` — faktai, kurių plane vienareikšmiškai nematyti (neskaičiuojami).",
+  "patalpos": {
+    "101": {
+      "durys": {
+        "102": 1,
+        "103": 1
+      },
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {},
+      "neaisku": [
+        "durys"
+      ],
+      "pastaba": "pagrindinis įėjimas šiaurėje (lankas, trikampis); angos į 102 ir į 103 be lankų — laikomos durimis, plane vienareikšmiškai nematyti"
+    },
+    "102": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 4,
+      "praejimai": {},
+      "neaisku": [
+        "langai"
+      ],
+      "pastaba": "terasos durys pietinėje sienoje (lankas); langai: du šiaurinėje, vienas vakarinėje, vienas pietinėje — gali būti 3"
+    },
+    "103": {
+      "durys": {
+        "104": 1,
+        "106": 1,
+        "107": 1,
+        "108": 1,
+        "109": 1,
+        "110": 1
+      },
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "neaisku": [
+        "langai"
+      ],
+      "pastaba": "šešios durys su lankais į 104, 106, 107, 108, 109, 110; į 104 ir 109 — „skirta beapvadinėms durims“; langas vakarinėje sienoje tarp 110 ir 111 durų — neaišku"
+    },
+    "104": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 103 įrašytos prie 103; langas šiaurinėje sienoje"
+    },
+    "105": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {},
+      "neaisku": [
+        "durys_lauko"
+      ],
+      "pastaba": "garažas: vartai/durys šiaurinėje sienoje (neaišku), durys į 106 „pagal konstruktyvą“ įrašytos prie 106"
+    },
+    "106": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys iš 103 prie 103; durys į garažą 105 (lankas) — lauko tipo"
+    },
+    "107": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 0,
+      "praejimai": {},
+      "pastaba": "durys iš 103 prie 103; be lango"
+    },
+    "108": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 103 prie 103; langas rytų sienoje"
+    },
+    "109": {
+      "durys": {},
+      "durys_lauko": 0,
+      "langai": 1,
+      "praejimai": {},
+      "pastaba": "durys iš 103 prie 103; langas rytų sienoje"
+    },
+    "110": {
+      "durys": {
+        "111": 1
+      },
+      "durys_lauko": 1,
+      "langai": 2,
+      "praejimai": {},
+      "neaisku": [
+        "langai"
+      ],
+      "pastaba": "durys iš 103 prie 103; stiklinė pertvara su durimis į 111; terasos durys vakarinėje sienoje (lankas); langai rytų sienoje — 2, neaišku"
+    },
+    "111": {
+      "durys": {},
+      "durys_lauko": 1,
+      "langai": 1,
+      "praejimai": {},
+      "neaisku": [
+        "durys_lauko",
+        "langai"
+      ],
+      "pastaba": "durys iš 110 prie 110; lankas pietrytiniame kampe — durys į lauką?; langas vakarinėje sienoje"
+    }
+  },
+  "projektas": {
+    "vidaus_duru_is_viso": 9,
+    "lauko_duru_is_viso": 6,
+    "langu_is_viso": 11,
+    "praejimu_is_viso": 0,
+    "duru_tipas": "anotacijos: dvi angos „skirta beapvadinėms durims“ (103↔104, 103↔109); žiniaraščio nėra"
+  }
+}
