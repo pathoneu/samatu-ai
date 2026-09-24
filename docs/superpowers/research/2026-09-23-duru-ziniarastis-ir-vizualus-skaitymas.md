@@ -221,3 +221,58 @@ priimtas), 02 dvejos lauko durys užimtos Vision „lango", 04 terasos durys tik
 04 ir 09, koridoriuje 3 durys be angos. Tai ir yra skaitytuvo darbų sąrašas su skaičiais; kiekvienas juostos ar
 Vision pakeitimas nuo šiol ginamas prieš šią lentelę taip pat, kaip eilutės — prieš jo sąmatas.
 
+
+## 9. Ženklai suskaičiuoti iš brėžinio kelių — difuzoriai (2026-09-24)
+
+**Klausimas.** Vizualus skaitytuvas difuzorius skaičiavo su paklaida (H: 10 vietoj 9, D: 4 vietoj 6, B: 18 vietoj 20).
+Brėžinys vektorinis — kiekvienas ženklas yra keliai su spalva ir dydžiu, o legenda sako, kuris ženklas ką reiškia.
+Skaičiuoti galima be modelio, už 0 €.
+
+**Kaip veikia** (`backend/extractor/vector_symbols.py`, `scan_vector_symbols`). Spalvoti kelio objektai (juoda ir pilka —
+sienos ir matmenys, niekada ženklas) sugrupuojami į glifus: kompaktiškas ≤ 16 pt, pailgas (plyšys, dviguba linija) ≤ 4 pt
+storio ir ≤ 120 pt ilgio; per didelė grupė (žiedas, kurio žiedlapiai jį liečia — D mėlynasis ženklas) skaidoma atgal į
+savus kelius; užpildyta figūra, ant kurios dar kartą nupieštas kontūras (B, H), — vienas glifas. Prie kiekvienos legendos
+eilutės su žodžiu *difuzorius/difuzoriai* (tas pats vardininko taisyklės filtras kaip `symbol_legend.py`) glifai kairiau
+eilutės pirmo žodžio grupuojami į ženklus: didžiausias glifas — inkaras, viskas per 2 × jo dydį — dalys; antras ženklas
+toje pačioje eilutėje (D: mėlynas ir raudonas greta) tampa antru inkaru. Egzempliorius plane — inkaro klasės glifas
+(spalva, užpildas, dydis ±35 %; pailgam — tas pats storis ir ≥ 60 % legendos ilgio, nes plyšiai piešiami tikru ilgiu)
+su ≥ 60 % šablono dalių aplink, ne legendos zonoje; kaimynystėje laimi kandidatas su daugiausiai dalių (žiedlapis
+niekada neskaičiuojamas šalia savo žiedo). Lapas, kurio egzemplioriai stovi tose pačiose lapo dalyse kaip ankstesnio,
+kartoja planą ir nesumuojamas.
+
+**Patikrinta akimis ant keturių brėžinių** (išrenderinti planai su pažymėtais egzemplioriais, `scratchpad/probe/*_marks.png`):
+
+| Projektas | Legenda | Iš kelių | Vizualus skaitytuvas | Jo eilutė |
+|---|---|---|---|---|
+| H | mėlynas apskritimas, raudonas apskritimas, mėlynas brūkšnys (plyšinis) | 3 + 4 + 2 = **9** | 10 | 7 gipsiniai + 2 plyšiniai = 9 |
+| D | vienoje eilutėje du žiedai su keturiais žiedlapiais (mėlynas, raudonas) | 3 + 3 = **6** | 4 | 6 |
+| B | mėlynas ir raudonas apskritimas + žalia dviguba linija; tas pats planas 5 ir 7 lape | 6 + 12 + 2 = **20** (7 lapas — kartojasi) | 18 | 7 gipsiniai + 13 plyšinių = 20 |
+| G | blyški dėžutė su keturiomis rodyklėmis (mėlynos / raudonos) | 4 + 4 = **8** | 8 | (sąmatoje eilutės nėra) |
+| A, C | difuzoriaus ženklo legendoje nėra | neapibrėžta | — | A: 15 (ne iš brėžinio) |
+
+B plyšinių skaičius — tai dviejų dvigubų linijų (po 56,6 pt = 2 m masteliu 1:100) vienetai; jis skaičiuoja 13 vienetų po
+1 m — tas pats ženklas, kitas matas. Skaičiuojame tai, kas nupiešta (žr. [[feedback_samata_is_the_exam_not_the_textbook]]).
+
+**Kur atsiduria.** Ištraukime 2.44 žingsnis (`parsed["_vector_symbols"]`), nemokamame perskaityme, demo atnaujinimo
+scenarijuje, `eval_harness` (kai talpykla neturi). Eilučių statytojas (`vision_call._build_pozicijos_from_rooms`) difuzorių
+eilutėms ima kiekį iš kelių, kai legenda ženklą apibrėžia ir rastas bent vienas; sakinys eina į `_assumption` („Difuzoriai
+suskaičiuoti iš brėžinio ženklų pagal legendą (lapas 3): … — iš viso 9. Patikrinkite vėdinimo (lubų) plane."); žalia, kai
+abu skaitytuvai sutampa (G), geltona, kai skiriasi (H). Priekyje: `_vector_symbols` recompute kontekste
+(`recomputeContext.js`), o nemokamo perskaitymo sąjunga (`freeReread.js`) dabar perima ir `_duru_ziniarastis`, ir
+`_vector_symbols` — iki šiol naršyklė vakarykštį žiniaraštį iš atsakymo išmesdavo (spraga, rasta jungiant).
+
+**Išmatuota.** Eilučių lentelė (`--rows --recompute --geometry`): korpuso eilutės ±10 % 28,4 → 28,9 %, € 38,5 → 39,1 %;
+B difuzorių šeima 20 = 20. 15 testų (`tests/test_vector_symbols_2026_09_24.py`, reportlab piešti brėžiniai pagal korpuso
+ženklus), visa backend rinktinė 3779 žalia, priekis 771.
+
+**Šalutinis radinys — pdfminer 20251230 lėtumas.** Skaitiklis G lape truko 125 s; profilis parodė, kad 53 s praeina
+`pdfplumber.open(...).pages[n]` — pdfminer.six 20251230 kiekvienam žetonui formatuoja DEBUG žinutę su visu analizatoriaus
+steku (f-eilute, be lygio patikros): 146 mln. `repr()` iškvietimų. Tą patį moka kiekvienas pdfplumber atidarymas
+programoje (puslapių tekstai, durų žiniaraštis, legenda, aukščių žymos). `extractor/pdfminer_lazy_log.py` vykdymo metu
+pakeičia tą vieną metodą tinginiais `%r` argumentais — tik kai įdiegtas pdfminer tebeturi f-eilutes (šaltinio patikra, ne
+versijos spėjimas): G 52,7 s → 1,2 s, tekstai identiški. Tikras pataisymas — pdfplumber 0.11.10 (pdfminer.six 20260107,
+kur tai sutvarkyta), bet jis kelia ir pypdfium2 ≥ 5.9 (dabar 5.7) — priklausomybių sprendimas įkūrėjui.
+
+**Ribos.** Juodas ženklas neskaičiuojamas (juodi keliai — ir sienos); H šviestuvai dalijasi spalva ir dydžiu tarp rūšių
+(jo 20 „priglaistomi" prieš ~33 plano ženklus yra apimties pasirinkimas); rastrinis brėžinys → `defined=False`, lieka
+vizualaus skaitytuvo kiekis su legendos inkaru kaip iki šiol.

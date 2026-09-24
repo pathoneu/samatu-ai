@@ -4385,18 +4385,36 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if not difuzoriai_anchored:
         difuzoriai_n = 0                   # billable count — 0 without an anchor
 
+    # 2026-09-24 — the count from the drawing's own PATHS (extractor/vector_symbols.py) beats the Vision
+    # count: deterministic, per legend row, verified to the piece on four drawings (H 9, D 6, B 20, G 8).
+    # Used whenever the drawing defines the symbol and the counter found at least one; its sentence goes on
+    # the rows so the person sees where the number comes from. Vision stays the fallback — and the second
+    # reader: when the two agree the row is green.
+    _vec = parsed.get("_vector_symbols") if isinstance(parsed.get("_vector_symbols"), dict) else {}
+    _vec = _vec.get("difuzoriai") if isinstance(_vec.get("difuzoriai"), dict) else {}
+    difuzoriai_vector_n = int(_vec.get("count") or 0) if _vec.get("defined") else 0
+    difuzoriai_sentence = None
+    difuzoriai_conf = "medium"
+    if difuzoriai_vector_n > 0:
+        difuzoriai_sentence = (_vec.get("sakinys") or "") + " Patikrinkite vėdinimo (lubų) plane."
+        difuzoriai_conf = "high" if difuzoriai_raw == difuzoriai_vector_n else "medium"
+        difuzoriai_n = difuzoriai_vector_n
+        difuzoriai_anchored = True
+        difuzoriai_unanchored_n = 0
+
     if difuzoriai_n > 0:
         # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
         # (priglaistomas + glaistymo darbas — separate trade tasks)
+        _dif_extra = {"_assumption": difuzoriai_sentence} if difuzoriai_sentence else {}
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "Difūzorių montavimas (vėdinimo taškai)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+            "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
         })
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "Difūzorių apdirbimas (priglaistomas)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
+            "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
         })
     else:
         # HONESTY CHECKLIST (2026-07-25): the symbol reader persistently finds
@@ -5985,6 +6003,18 @@ def extract_interior(
               f"{parsed['_duru_ziniarastis'].get('sakinys')}")
     except Exception as exc:
         print(f"[extractor] door schedule scan failed (non-fatal): {exc}")
+
+    # Step 2.44: symbols COUNTED from the drawing's own paths (deterministic, $0): a legend row's glyph is
+    # the template, its instances on the plan are the count — today the diffusers. Measured to the piece on
+    # four drawings (extractor/vector_symbols.py); the row builder prefers this count over the Vision one.
+    try:
+        from extractor.vector_symbols import scan_vector_symbols
+        parsed["_vector_symbols"] = scan_vector_symbols(pdf_bytes)
+        _vs = parsed["_vector_symbols"].get("difuzoriai") or {}
+        print(f"[extractor] vector symbol scan: difuzoriai defined={_vs.get('defined')} "
+              f"count={_vs.get('count')} — {_vs.get('sakinys')}")
+    except Exception as exc:
+        print(f"[extractor] vector symbol scan failed (non-fatal): {exc}")
 
     # Step 2.45: Apply per-room ceiling heights when Vision provided them
     # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).

@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 CONTEXT_KEYS = ("_door_types", "detected_symbols_summary", "_plyteliu_specs", "_symbol_legend", "_duru_ziniarastis",
+                "_vector_symbols",
                 "bendras_plotas_m2", "v9_meta", "_overrides", "_ceiling_anchor", "_walls_anchor", "_floor_anchors", "_meta",
                 "_autoriaus_kiekiai")
 
@@ -67,6 +68,11 @@ def main() -> int:
     from extractor.door_schedule import scan_door_schedule
     project["_duru_ziniarastis"] = scan_door_schedule(pdf)
     print(f"durų žiniaraštis: {project['_duru_ziniarastis'].get('status')} — {project['_duru_ziniarastis'].get('sakinys')}")
+    # the symbols counted from the drawing's paths (€0) — the diffuser rows take this count
+    from extractor.vector_symbols import scan_vector_symbols
+    project["_vector_symbols"] = scan_vector_symbols(pdf)
+    _vs = project["_vector_symbols"].get("difuzoriai") or {}
+    print(f"ženklai iš brėžinio: difuzoriai {_vs.get('count')} — {_vs.get('sakinys')}")
     print(f"status {out['status']} in {out['seconds']} s | vietos {out['vietos']} | plano lapai {out['grupes']}")
     print(f"kontūrai {out['konturai']} | atviros erdvės {out['atviros_erdves']}")
     print(f"perimetrai sudėti {out['perimetrai_sudeti']} | tušti {out['perimetrai_tusti']}")

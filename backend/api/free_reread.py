@@ -132,12 +132,21 @@ def api_free_reread(request: Request, project_id: str):
             schedule = scan_door_schedule(pdf_bytes)
         except Exception as exc:  # noqa: BLE001 — never the lane's failure
             log.warning("free-reread door schedule scan failed for %s: %r", project_id, exc)
+        # the symbols counted from the drawing's paths (extractor/vector_symbols): the diffuser rows take
+        # this count on the next recompute
+        vector_symbols = None
+        try:
+            from extractor.vector_symbols import scan_vector_symbols
+            vector_symbols = scan_vector_symbols(pdf_bytes)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("free-reread vector symbol scan failed for %s: %r", project_id, exc)
         return {
             "status": "ok",
             "lane": out.get("status"),
             "patalpos": parsed.get("patalpos") or [],
             "_meta": parsed.get("_meta") or {},
             **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
+            **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
             "santrauka": {
                 "konturai": len(out.get("konturai") or []),
                 "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),

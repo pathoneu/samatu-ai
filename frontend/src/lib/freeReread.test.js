@@ -64,6 +64,16 @@ test('only the rooms and the lane\'s record change — rows, prices, assumptions
   assert.equal(project._reextracted_at, undefined, 'this was not a paid re-read');
 });
 
+test('the door schedule and the symbol count the lane brings along land on the project — and their absence changes nothing', () => {
+  const withReads = { ...result(), _duru_ziniarastis: { status: 'lentele', beapvadines: 2 }, _vector_symbols: { difuzoriai: { defined: true, count: 9 } } };
+  const { project } = mergeFreeReread(base(), withReads, 'T');
+  assert.equal(project._duru_ziniarastis.beapvadines, 2);
+  assert.equal(project._vector_symbols.difuzoriai.count, 9);
+  const kept = mergeFreeReread({ ...base(), _duru_ziniarastis: { status: 'nera' } }, result(), 'T').project;
+  assert.deepEqual(kept._duru_ziniarastis, { status: 'nera' }, 'a response without the read keeps the stored one');
+  assert.equal('_vector_symbols' in kept, false);
+});
+
 test('a lane that failed or returned nothing changes nothing', () => {
   const b = base();
   assert.equal(mergeFreeReread(b, { status: 'ok', lane: 'failed', patalpos: b.patalpos, _meta: b._meta }).project, null);

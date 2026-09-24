@@ -48,6 +48,12 @@ from __future__ import annotations
 import hashlib
 import io
 import threading
+
+# pdfminer.six 20251230 formats a debug string with the whole parser stack for every token — 51 s per
+# pdfplumber open on objektas_g. Made lazy at runtime (extractor/pdfminer_lazy_log.py); a no-op elsewhere.
+from .pdfminer_lazy_log import install as _install_lazy_pdfminer_log  # noqa: E402
+
+_install_lazy_pdfminer_log()
 from collections import OrderedDict
 from typing import Any
 

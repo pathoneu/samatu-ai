@@ -18,6 +18,9 @@
 
 import { mergeReextractRooms } from './mergeReextract.js';
 
+/** Project-level reads the free re-read returns beside the rooms (api/free_reread.py). */
+export const PROJECT_READ_KEYS = Object.freeze(['_duru_ziniarastis', '_vector_symbols']);
+
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
@@ -40,6 +43,12 @@ export function mergeFreeReread(base, result, now = new Date().toISOString()) {
     _reread_diff: diff,
     _geometrija_perskaityta_at: now,
   };
+  // the drawing's project-level reads the lane brings along (the door schedule, the symbols counted from
+  // the paths): a project read before they existed gets them with the same click — never overwritten by
+  // their absence
+  for (const key of PROJECT_READ_KEYS) {
+    if (isObj(result[key])) project[key] = result[key];
+  }
   return { project, diff };
 }
 

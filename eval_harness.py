@@ -1797,6 +1797,16 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
                           f"{parsed['_duru_ziniarastis'].get('sakinys')}")
                 except Exception as exc:
                     print(f"  ⚠ door schedule scan failed during rescore: {exc}")
+            # Symbols counted from the drawing's own paths (2026-09-24, Step 2.44 in production): the
+            # diffuser rows take this count. Zero API, needs the PDF; scanned when the cache lacks it.
+            if "_vector_symbols" not in parsed:
+                try:
+                    from extractor.vector_symbols import scan_vector_symbols
+                    parsed["_vector_symbols"] = scan_vector_symbols(pdf_path.read_bytes())
+                    _vs = parsed["_vector_symbols"].get("difuzoriai") or {}
+                    print(f"  ⤴ ženklai iš brėžinio: difuzoriai {_vs.get('count')} — {_vs.get('sakinys')}")
+                except Exception as exc:
+                    print(f"  ⚠ vector symbol scan failed during rescore: {exc}")
         else:
             print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
 
