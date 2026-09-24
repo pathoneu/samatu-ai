@@ -10,7 +10,11 @@ uvicorn[standard]==0.32.1
 anthropic>=0.40.0
 # pdfplumber hard-pins pdfminer.six==. Bumped 0.11.4 -> 0.11.9 to pull
 # pdfminer.six 20251230 (clears CVE-2025-64512 + CVE-2025-70559, untrusted PDF parse).
-pdfplumber==0.11.9
+# 2026-09-24: 0.11.9 -> 0.11.10 pulls pdfminer.six 20260107, which makes its per-token
+# DEBUG message lazy again — 20251230 formatted the whole parser stack eagerly, 53 s per
+# pdfplumber open on a drawing with big object streams (extractor/pdfminer_lazy_log.py
+# holds the measurement; it is a no-op on 20260107). 0.11.10 also needs pypdfium2 >= 5.9.
+pdfplumber==0.11.10
 pdf2image==1.17.0
 shapely>=2.0.0
 pydantic>=2.10.0
@@ -33,7 +37,7 @@ numpy>=1.26.0
 # Drawing analysis tools (Task 1) — fast PDF rasterization for the CV
 # render cache. pypdfium2 is the same engine browsers use, ~3× faster
 # than pdf2image+poppler for the dpi/grayscale path. Apache 2.0 / BSD.
-pypdfium2>=4.30
+pypdfium2>=5.9        # pdfplumber 0.11.10 requires >= 5.9 (was >= 4.30; 5.7 ran until 2026-09-24)
 
 # EXPERIMENT native-PDF pass-1 input (SAMATU_PDF_NATIVE=1, 2026-07-04) —
 # splits the source PDF to the selected page subset for the document block.

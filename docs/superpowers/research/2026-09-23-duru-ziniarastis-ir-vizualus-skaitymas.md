@@ -271,7 +271,10 @@ steku (f-eilute, be lygio patikros): 146 mln. `repr()` iškvietimų. Tą patį m
 programoje (puslapių tekstai, durų žiniaraštis, legenda, aukščių žymos). `extractor/pdfminer_lazy_log.py` vykdymo metu
 pakeičia tą vieną metodą tinginiais `%r` argumentais — tik kai įdiegtas pdfminer tebeturi f-eilutes (šaltinio patikra, ne
 versijos spėjimas): G 52,7 s → 1,2 s, tekstai identiški. Tikras pataisymas — pdfplumber 0.11.10 (pdfminer.six 20260107,
-kur tai sutvarkyta), bet jis kelia ir pypdfium2 ≥ 5.9 (dabar 5.7) — priklausomybių sprendimas įkūrėjui.
+kur tai sutvarkyta), bet jis kelia ir pypdfium2 ≥ 5.9 (buvo 5.7). **Padaryta tą pačią dieną įkūrėjo nurodymu:**
+`requirements.txt` pdfplumber 0.11.10, pypdfium2 ≥ 5.9 (venv'e 5.13.0); G lapas atsidaro per 0,9 s be pataisos,
+pataisos modulis lieka kaip sargas ir nieko nedaro; eval su naujomis bibliotekomis eilutė į eilutę sutampa su
+ankstesniu (skiriasi tik sekundės), skaitiklis duoda tuos pačius 9 / 6 / 20 / 8.
 
 **Ribos.** Juodas ženklas neskaičiuojamas (juodi keliai — ir sienos); H šviestuvai dalijasi spalva ir dydžiu tarp rūšių
 (jo 20 „priglaistomi" prieš ~33 plano ženklus yra apimties pasirinkimas); rastrinis brėžinys → `defined=False`, lieka

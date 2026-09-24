@@ -2,14 +2,16 @@
 eagerly, in an f-string, whether or not debug logging is on. On a drawing whose object streams hold large
 arrays (objektas_g, 16 pages) one `pdfplumber.open(...).pages[n]` costs 51 s of `repr()`; with the two
 messages made lazy it costs 0,3 s (measured 2026-09-24, same file, same machine). Upstream fixed it in
-20260107 (`log.debug("nextobject: %r", obj)`), but pdfplumber 0.11.9 pins 20251230 exactly and 0.11.10
-(which pins 20260107) also raises pypdfium2 to ≥ 5.9 — a dependency decision, not a code fix.
+20260107 (`log.debug("nextobject: %r", obj)`); requirements.txt was raised to pdfplumber 0.11.10 (which pins
+20260107, and pypdfium2 ≥ 5.9) the same day on the founder's go — the eval under the new libraries was
+identical to the one before, line for line.
 
-So this module patches the ONE method at runtime, only when the installed pdfminer still carries the eager
-f-strings (a source check, not a version guess): the method's source is rewritten with lazy `%r` arguments
-and re-executed in pdfminer's own namespace. Any other pdfminer is left alone. `install()` is idempotent and
-never raises — a pdfminer this cannot patch simply stays slow. Every pdfplumber user in the app benefits
-(page texts, the door schedule, the legend and symbol scans, the height markers).
+So on the pinned environment this module does nothing. It stays as the guard for the one case that would
+bring the slowness back (an environment that resolves to 20251230 again): it patches the ONE method at
+runtime, only when the installed pdfminer still carries the eager f-strings (a source check, not a version
+guess): the method's source is rewritten with lazy `%r` arguments and re-executed in pdfminer's own
+namespace. Any other pdfminer is left alone. `install()` is idempotent and never raises. Every pdfplumber
+user in the app is covered (page texts, the door schedule, the legend and symbol scans, the height markers).
 """
 from __future__ import annotations
 
