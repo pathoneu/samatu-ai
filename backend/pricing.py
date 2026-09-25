@@ -44,14 +44,17 @@ for — add the rate here instead.
 # USD per 1M tokens.
 RATES: dict[str, dict[str, float]] = {
     "claude-opus-5": {"in": 5.0, "out": 25.0},      # champion since 2026-07-28
+    # 2026-09-25 (live pricing page): $4 / $20, cache reads 0.05× — 20 % below
+    # Opus 5. NOT evaluated on LT drawings yet; the row is here so a
+    # MODEL_OVERRIDE bake-off run is metered instead of silently lost.
+    "claude-opus-5-5": {"in": 4.0, "out": 20.0, "cache_read": 0.05},
     "claude-opus-4-8": {"in": 5.0, "out": 25.0},    # previous champion / rollback
     "claude-fable-5": {"in": 10.0, "out": 50.0},
     # 2026-09-02 (released 2026-09-01): same base rates as Fable 5; its cache
-    # READS are $0.25/MTok (0.025×, not 0.1×) — CACHE_READ_MULT below is still
-    # the 0.1× that every other model bills, so a Fable 5.1 cost is slightly
-    # OVER-stated on the cache-read component until that becomes per-model.
-    "claude-fable-5-1": {"in": 10.0, "out": 50.0},
-    "claude-sonnet-5": {"in": 3.0, "out": 15.0},    # evaluated, not used for vision
+    # READS are $0.25/MTok (0.025×) — per-model `cache_read` since 2026-09-25.
+    "claude-fable-5-1": {"in": 10.0, "out": 50.0, "cache_read": 0.025},
+    # 2026-09-25: the $2 / $10 launch price became the standard one
+    "claude-sonnet-5": {"in": 2.0, "out": 10.0},    # evaluated, not used for vision
 }
 
 # EVERY model reachable via models_config must have a rate here: record_usage
@@ -61,7 +64,7 @@ RATES: dict[str, dict[str, float]] = {
 # this row and the first real extraction went unmetered. test_models_config's
 # rate-coverage test now fails the build instead.
 
-CACHE_READ_MULT = 0.1                       # × input rate
+CACHE_READ_MULT = 0.1                       # × input rate — unless the model's RATES row says otherwise (`cache_read`)
 CACHE_WRITE_MULT = {"1h": 2.0, "5m": 1.25}  # × input rate, by TTL
 
 
@@ -105,7 +108,7 @@ def calc_claude_cost_usd(
     return (
         input_tokens * in_rate
         + output_tokens * out_rate
-        + cache_read_tokens * in_rate * CACHE_READ_MULT
+        + cache_read_tokens * in_rate * float(rates.get("cache_read", CACHE_READ_MULT))
         + cache_write_tokens * in_rate * CACHE_WRITE_MULT[cache_ttl]
     )
 

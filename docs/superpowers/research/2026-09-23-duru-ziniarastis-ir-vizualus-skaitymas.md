@@ -381,3 +381,42 @@ kurių angų angokraščiai skaičiuojami), ne variklio kalibracija.
 Testai: `tests/test_drawn_openings_2026_09_25.py` (reportlab: brūkšninis lankas iš atkarpėlių, Bezier lankas, stiklas,
 stalas, siena be tarpo, laiptuota anga), `tests/test_angos_pagal_brezini_2026_09_25.py` (perėjimo taisyklės); pilna
 rinktinė žalia.
+
+## 12. Išmatuota ir NEĮDIEGTA: šviestuvai, rozetės, jungikliai iš legendos ženklų (2026-09-25)
+
+Difuzorių skaitiklį pabandyta apibendrinti kitoms legendos eilutėms. Naivus variantas (eilutė = bet kuris žodis
+„šviestuv/rozet/jungikl") ima plano užrašus už legendą: A rozetės 387, jungikliai 342, D „Sieninis šviestuvas" 171
+(patalpų ženkliukai ir baldų kontūrai tampa šablonu). Griežtesnis variantas — legendos BLOKAS (≥ 3 eilutės vienoje
+teksto kolonoje su ženklu vienoje ženklų kolonoje kairėje arba lentelės „Žymėjimas" stulpelyje dešinėje) — davė:
+
+| | Iš legendos | Vision | Jo eilutė |
+|---|---|---|---|
+| D priglaistomi | **9** (+ difuzoriai 6 = 15) | 20 | 9; apdirbimas 15 |
+| D pakabinami | 10 | 16 | 2 |
+| B priglaistomi | 10 + 10 (dvi eilutės) | 64 | 69 |
+| G (lentelė dešinėje, rasta) | 0 visose eilutėse — plano ženklai ne legendos klasės | — | eilučių nėra |
+| H | virtuvės rozečių užrašų kolonos plane praeina bloko testą: 37, 51, 16… | 35 | 20 |
+| A | šviestuvų legenda skaitosi (paviršiniai 21–23, įleidžiami 21–23, pakabinami 7–8, sieniniai 9–10), bet jo 38 „priglaistomų" neatitinka nė vienos eilutės nei sumos | 39 | 38 |
+
+Vienintelis švarus laimėjimas — D priglaistomi 9. B ir H su tokiu perrašymu nutoltų nuo brėžinio (B 64 → 20,
+H 35 → 89), todėl kiekių iš to neimame; kodas neįdiegtas (išmatuota atskirame bandyme, `vector_symbols.py`
+liko kaip buvo). Kelias į priekį, jei kada prireiks: legendos blokas tik už plano ribų (ne užrašų kolonos plane),
+ženklas ≤ 16 pt, plano ženklų mastelis normalizuojamas pagal legendą — tada permatuoti B.
+
+## 13. Angokraščių apimtis — jungiklis Prielaidose, ne kalibracija (2026-09-25)
+
+Iš §11 aritmetikos: brėžinys rodo angas, o kurių angų angokraščius rangovas skaičiuoja, brėžinys nepasako (H: nupiešta
+77,5 m, jo 63,23 m). Todėl apimtis tapo jo jungikliu, kaip ir kiti apimties pasirinkimai:
+`_overrides.angokrasciai_apimtis = {langai, lauko_durys, praejimai, vidaus_durys}` (numatyta: langai, lauko durys,
+praėjimai — taip; vidaus durys — ne, nes jų angą dengia apvadai arba ji paruošiama savo eilutėje).
+`universal_rules.settle_reveals_scope` rašo kiekvienai patalpai `_angokrasciu_apimtis`, `calc_room_quantities`
+sumuoja tik pažymėtas rūšis (W + 2H); recompute API priima raktą ir grąžina `_paruosimas` (dabar ir perėjimo
+verdiktai grįžta į projektą, tad Prielaidų pastaba seka jungiklį); angokraščių eilutės gauna `_assumption` su sakiniu
+„Angokraščiai skaičiuojami langų, lauko durų … ; praėjimų be durų, vidaus durų — ne.“ Prielaidose — blokas
+„Angokraščiai — kurių angų“ su keturiais mygtukais. Patikrinta naršyklėje ant demo H: nuėmus „Praėjimų be durų“,
+eilutės 77,51 → 64,82 m, pastaba persirašė į „Jūsų pasirinkimas“; demo grąžintas į numatytąją būseną.
+Eval su numatytąja apimtimi sutampa eilutė į eilutę. Testai `tests/test_angokrasciu_apimtis_2026_09_25.py`.
+
+Ta pačia proga kainų lentelė (`backend/pricing.py`): Opus 5.5 eilutė (4 / 20 $, talpyklos skaitymas 0,05×), Fable 5.1
+talpyklos skaitymas 0,025× (buvo pervertinamas 4×), Sonnet 5 — 2 / 10 $ (paleidimo kaina liko nuolatinė);
+talpyklos skaitymo daugiklis dabar pagal modelį. Patikrinta pagal gyvą kainų puslapį 2026-09-25.

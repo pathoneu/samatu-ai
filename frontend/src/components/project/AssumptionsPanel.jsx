@@ -594,6 +594,49 @@ export default function AssumptionsPanel({
             </div>
           </Row>
 
+          {/* Angokraščiai — kurių angų (2026-09-25). The drawing shows the openings; which reveals the finisher
+              bills is his scope: windows, exterior doors and door-less passages by default, interior doors
+              off (their reveals sit under architraves or on the frameless-door row). Same
+              `_overrides.angokrasciai_apimtis` the engine reads (universal_rules.settle_reveals_scope). */}
+          <Row
+            label={t('project.assumptions.revealsScope')}
+            note={[t('project.assumptions.revealsScopeNote'), rawData?._paruosimas?.angokrasciai?.sakinys].filter(Boolean).join(' ')}
+          >
+            <div className="flex flex-wrap gap-1">
+              {['langai', 'lauko_durys', 'praejimai', 'vidaus_durys'].map((kind) => {
+                const defaults = { langai: true, lauko_durys: true, praejimai: true, vidaus_durys: false };
+                const current = {
+                  ...defaults,
+                  ...(rawData?._paruosimas?.angokrasciai?.value || {}),
+                  ...(safeAssumptions.angokrasciai_apimtis || {}),
+                };
+                const on = Boolean(current[kind]);
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...current, [kind]: !on };
+                      setField('angokrasciai_apimtis', next);
+                      handleRecompute('angokrasciai_apimtis', next);
+                    }}
+                    title={t(`project.assumptions.revealKindTitles.${kind}`)}
+                    aria-pressed={on}
+                    data-assumption={`angokrasciai_apimtis:${kind}:${on ? 'on' : 'off'}`}
+                    className={`rounded border font-medium transition-colors ${
+                      on
+                        ? 'bg-primary/10 text-foreground border-primary'
+                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
+                    }`}
+                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
+                  >
+                    {on ? '✓ ' : ''}{t(`project.assumptions.revealKinds.${kind}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+
           {/* Sienos storis */}
           <Row
             label={t('project.assumptions.wallThickness')}

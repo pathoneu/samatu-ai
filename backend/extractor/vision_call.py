@@ -3447,11 +3447,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
         _door_conf = _dt.get("confidence")
         _door_reason = _dt.get("reason")
+    # 2026-09-25: the rows say which openings' reveals they sum (universal_rules.settle_reveals_scope — his
+    # Prielaidos choice or the default), so a number that does not match his practice explains itself
+    _scope_said = str(((parsed.get("_paruosimas") or {}).get("angokrasciai") or {}).get("sakinys") or "")
+    _scope_extra = {"_assumption": _scope_said} if _scope_said else {}
     if angokrasciai_m > 0:
         # Glaistymo skyriaus eilutė (apdailos darbas)
         pozicijos.append({
             "skyrius": SK_GD, "aprasymas": "Angokraščių glaistymas-dažymas",
-            "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
+            "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL, **_scope_extra,
         })
         # P2 fix: GKP skyriaus eilutė (struktūrinis darbas — angokraščio formavimas).
         # rangovas P1+P2+P5 4/5 freq. Tas pats kiekis, kita skyrius.
@@ -3459,7 +3463,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_GKP, "aprasymas": "Angokraščių apdirbimas GKP (struktūra)",
             "vnt": "m", "kiekis": angokrasciai_m, "saltinis": SAL,
             "medziagos_aprasymas": "GKP juostelės + savisriegiai",
-            "medziagos_kiekis": angokrasciai_m, "medziagos_vnt": "m",
+            "medziagos_kiekis": angokrasciai_m, "medziagos_vnt": "m", **_scope_extra,
         })
     if pasleptu_duru_staktu_m > 0.5:
         # P5 fix: paslėptų durų staktų pozicija (4/5 freq, ~400 EUR/proj)

@@ -1204,6 +1204,9 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                   // would be counted twice.
                   (result._merge_notes || []).filter((n) => n.reason === 'relabeled')),
                 _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
+                // the pass's verdicts (frameless doors, reveals scope) follow the recompute, so the
+                // Prielaidos notes describe the switch he just set, not the extraction-time state (2026-09-25)
+                ...(result._paruosimas && typeof result._paruosimas === 'object' ? { _paruosimas: result._paruosimas } : {}),
               };
               setProject(nextProject);
               updateProject(project.id, nextProject);

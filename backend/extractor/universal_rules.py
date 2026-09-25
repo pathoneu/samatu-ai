@@ -907,6 +907,9 @@ DOOR_WIDTH_TOL_M = 0.16
 FRAMELESS_MAX_W_M = 1.3                 # wider than this an interior „door" is a passage or a double leaf, not a frame
 STANDARD_DOOR_W_M = 0.9
 STANDARD_DOOR_H_M = 2.1
+REVEALS_SCOPE_KEY = "_angokrasciu_apimtis"   # room: which openings' reveals the finisher does — his choice or the default
+REVEALS_SCOPE_KINDS = ("langai", "lauko_durys", "praejimai", "vidaus_durys")
+REVEALS_SCOPE_DEFAULT = {"langai": True, "lauko_durys": True, "praejimai": True, "vidaus_durys": False}
 STANDARD_WINDOW_W_M = 1.2
 STANDARD_WINDOW_H_M = 1.5
 
@@ -1652,6 +1655,51 @@ def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, d
     return {"value": value, "source": source, "sakinys": _frameless_sentence(source, sch)}
 
 
+_REVEALS_KIND_LT = {"langai": "langų", "lauko_durys": "lauko durų", "praejimai": "praėjimų be durų", "vidaus_durys": "vidaus durų"}
+
+
+def reveals_scope(room: dict | None) -> dict:
+    """The kinds of openings whose reveals this room counts (REVEALS_SCOPE_DEFAULT unless settled otherwise)."""
+    raw = (room or {}).get(REVEALS_SCOPE_KEY) if isinstance(room, dict) else None
+    out = dict(REVEALS_SCOPE_DEFAULT)
+    if isinstance(raw, dict):
+        for k in REVEALS_SCOPE_KINDS:
+            if k in raw:
+                out[k] = bool(raw[k])
+    return out
+
+
+def settle_reveals_scope(rooms: list[dict], overrides: dict | None = None) -> dict:
+    """Which openings' reveals (angokraščiai, W + 2H each) the finisher does (2026-09-25): his choice in the
+    Prielaidos panel (`_overrides.angokrasciai_apimtis`, {langai, lauko_durys, praejimai, vidaus_durys}) or the
+    default — windows, exterior doors and door-less passages, not interior doors (a framed door's reveals
+    are under its architraves; a frameless one is prepared on its own row). The drawing never says which
+    reveals a contractor bills, so this is scope, never a reading. Written on every room as
+    `_angokrasciu_apimtis`; returned with its source and a sentence for the panel and the rows."""
+    raw = (overrides or {}).get("angokrasciai_apimtis") if isinstance(overrides, dict) else None
+    scope = dict(REVEALS_SCOPE_DEFAULT)
+    chosen = False
+    if isinstance(raw, dict):
+        for k in REVEALS_SCOPE_KINDS:
+            if k in raw:
+                scope[k] = bool(raw[k])
+                chosen = True
+    for r in rooms:
+        if isinstance(r, dict):
+            r[REVEALS_SCOPE_KEY] = dict(scope)
+    on = [_REVEALS_KIND_LT[k] for k in REVEALS_SCOPE_KINDS if scope[k]]
+    off = [_REVEALS_KIND_LT[k] for k in REVEALS_SCOPE_KINDS if not scope[k]]
+    if on:
+        sakinys = "Angokraščiai skaičiuojami " + ", ".join(on) + " (W + 2H kiekvienai angai)"
+    else:
+        sakinys = "Angokraščiai neskaičiuojami nė vienai angų rūšiai"
+    if off:
+        sakinys += "; " + ", ".join(off) + " — ne"
+    sakinys += ". " + ("Jūsų pasirinkimas." if chosen else
+                       "Numatyta: vidaus durų angokraščius dengia apvadai arba jie paruošiami savo eilutėje.")
+    return {"value": scope, "source": "jusu" if chosen else "numatyta", "sakinys": sakinys}
+
+
 def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, door_types: dict | None = None,
                            legend: dict | None = None, schedule: dict | None = None) -> dict:
     """The project-level pass every calc path runs BEFORE `calc_room_quantities` (extraction, the assumptions
@@ -1679,6 +1727,10 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
         pass
     try:
         out["frameless"] = settle_frameless_default(rooms, overrides, door_types, schedule)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        out["angokrasciai"] = settle_reveals_scope(rooms, overrides)
     except Exception:  # noqa: BLE001
         pass
     try:
@@ -2872,6 +2924,9 @@ def calc_room_quantities(room: dict,
     pasleptu_duru_staktu_m = 0.0
     pasleptu_duru_n = 0
     frameless_default = bool(room.get(FRAMELESS_DEFAULT_KEY))
+    # 2026-09-25: which kinds of openings' reveals he bills — his Prielaidos choice or the default above
+    # (settle_reveals_scope); the drawing shows the openings, the contractor decides the scope
+    scope = reveals_scope(room)
     for el in room.get("elementai") or []:
         if not isinstance(el, dict):
             continue
@@ -2888,12 +2943,14 @@ def calc_room_quantities(room: dict,
             w_m = w_mm / 1000.0 if w_mm > 0 else STANDARD_DOOR_W_M
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_DOOR_H_M
             if is_exterior:
-                angokrasciu_m += kiekis * (w_m + 2 * h_m)
+                if scope["lauko_durys"]:
+                    angokrasciu_m += kiekis * (w_m + 2 * h_m)
             elif el.get(PASSAGE_KEY):
                 # a door-less opening has no frame to cover its reveals — they are finished like a window's
                 # (2026-09-24, objektas_h: the 2,13 m and 1,56 m openings from the corridor to the kitchen and
                 # the living room are in his „Angokraščių apdirbimas GKP" row)
-                angokrasciu_m += kiekis * (w_m + 2 * h_m)
+                if scope["praejimai"]:
+                    angokrasciu_m += kiekis * (w_m + 2 * h_m)
             elif el.get(BEYOND_SCHEDULE_KEY) or el.get(UNBACKED_KEY):
                 pass                                           # no such door in the schedule / no opening in the walls
             elif w_m > FRAMELESS_MAX_W_M and not el.get(SCHEDULE_TYPE_KEY) and not el.get(OPENING_SIDE_KEY):
@@ -2901,22 +2958,27 @@ def calc_room_quantities(room: dict,
                 # door frame — the founder, 2026-09-23: „durys 1,40 pločio nebus tikrai" (objektas_h: a
                 # 2,0 m opening between the corridor and the kitchen was read as a hidden door)
                 pass
-            elif el.get(SCHEDULE_TYPE_KEY):
-                # the schedule names the frame: a frameless door is prepared, a framed or sliding one is not
-                if el.get(SCHEDULE_TYPE_KEY) == "beapvadines":
+            else:
+                if scope["vidaus_durys"]:
+                    # his convention: the interior doors' reveals are finished too (off by default)
+                    angokrasciu_m += kiekis * (w_m + 2 * h_m)
+                if el.get(SCHEDULE_TYPE_KEY):
+                    # the schedule names the frame: a frameless door is prepared, a framed or sliding one is not
+                    if el.get(SCHEDULE_TYPE_KEY) == "beapvadines":
+                        pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
+                        pasleptu_duru_n += kiekis
+                elif frameless_default or (tipas == "pasleptos_duris" and not room.get(FRAMELESS_CHOSEN_KEY)):
+                    # a hidden-door symbol counts unless he said the interior doors are framed
                     pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
                     pasleptu_duru_n += kiekis
-            elif frameless_default or (tipas == "pasleptos_duris" and not room.get(FRAMELESS_CHOSEN_KEY)):
-                # a hidden-door symbol counts unless he said the interior doors are framed
-                pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
-                pasleptu_duru_n += kiekis
         elif tipas in ("langas", "stoglangis"):
             # a window without a readable size still has a reveal — the standard one, and confidence.py
             # flags the row for the room whose opening sizes were not read
             kiekis = int(el.get("kiekis") or 1)
             w_m = w_mm / 1000.0 if w_mm > 0 else STANDARD_WINDOW_W_M
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_WINDOW_H_M
-            angokrasciu_m += kiekis * (w_m + 2 * h_m)
+            if scope["langai"]:
+                angokrasciu_m += kiekis * (w_m + 2 * h_m)
 
     # Grindjuostės (perimetras − durų pločiai, vonia/wc neturi)
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste

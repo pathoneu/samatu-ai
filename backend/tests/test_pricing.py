@@ -80,3 +80,13 @@ def test_default_model_is_opus_48():
 def test_rates_table_shape():
     assert RATES["claude-opus-4-8"] == {"in": 5.0, "out": 25.0}
     assert RATES["claude-fable-5"] == {"in": 10.0, "out": 50.0}
+
+
+def test_per_model_cache_read_rates_2026_09_25():
+    """Fable 5.1 bills cache reads at 0.025× ($0.25/MTok), Opus 5.5 at 0.05× ($0.20/MTok); every other
+    model at the standard 0.1×. Opus 5.5 is $4 / $20 (live pricing page, 2026-09-25)."""
+    assert calc_claude_cost_usd(cache_read_tokens=MTOK, model="claude-fable-5-1") == pytest.approx(0.25)
+    assert calc_claude_cost_usd(cache_read_tokens=MTOK, model="claude-opus-5-5") == pytest.approx(0.20)
+    assert calc_claude_cost_usd(MTOK, MTOK, model="claude-opus-5-5") == pytest.approx(24.0)
+    assert calc_claude_cost_usd(cache_read_tokens=MTOK, model="claude-opus-5") == pytest.approx(0.50)
+    assert calc_claude_cost_usd(MTOK, MTOK, model="claude-sonnet-5") == pytest.approx(12.0)

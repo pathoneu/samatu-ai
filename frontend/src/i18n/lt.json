@@ -1133,6 +1133,20 @@
         "true": "Dvi eilutės kiekvienam maišytuvui: potinkinė dalis + virštinkinė dalis",
         "false": "Viena eilutė kiekvienam maišytuvui"
       },
+      "revealsScope": "Angokraščiai — kurių angų",
+      "revealsScopeNote": "Angokraščių eilutės (GKP struktūra ir glaistymas-dažymas) sumuoja pažymėtų rūšių angas, po W + 2H kiekvienai. Nuimta rūšis iš eilučių dingsta. Brėžinys rodo angas, apimtis — jūsų.",
+      "revealKinds": {
+        "langai": "Langų",
+        "lauko_durys": "Lauko durų",
+        "praejimai": "Praėjimų be durų",
+        "vidaus_durys": "Vidaus durų"
+      },
+      "revealKindTitles": {
+        "langai": "Langų angokraščiai — visi langai, W + 2H",
+        "lauko_durys": "Lauko durų angokraščiai — įėjimas, terasos durys, stiklo sienos",
+        "praejimai": "Praėjimų be durų angokraščiai — angos, kuriose durų nėra",
+        "vidaus_durys": "Vidaus durų angokraščiai — paprastai dengia apvadai arba paruošiama savo eilutėje"
+      },
       "framelessDoors": "Vidaus durys — beapvadinės ar su apvadais",
       "framelessDoorsNote": "Beapvadinėms durims skaičiuojama angų paruošimo eilutė (glaistymas, dažymas aplink staktą); su apvadais jos nereikia. Lauko durys čia neįskaitomos.",
       "framelessYes": "Beapvadinės",

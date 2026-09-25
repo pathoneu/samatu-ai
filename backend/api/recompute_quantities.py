@@ -86,6 +86,10 @@ _ASSUMPTION_FIELDS = {
     # to the door-type question (or the Prielaidos switch); read by
     # universal_rules.settle_frameless_default ahead of anything the drawing says.
     "vidaus_durys_beapvadines",
+    # 2026-09-25: which openings' reveals (angokraščiai) he bills — {langai, lauko_durys, praejimai,
+    # vidaus_durys: bool}; read by universal_rules.settle_reveals_scope. Scope, not a reading: the drawing
+    # shows the openings, the contractor decides which reveals are his.
+    "angokrasciai_apimtis",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -1141,8 +1145,11 @@ def recompute(
         from extractor.universal_rules import calc_room_quantities, translate_user_prefs_to_room_rules
         _rules = translate_user_prefs_to_room_rules(assumptions) or None
         for room in rooms:
-            # a legacy payload lists its doors under `openings` (line_items helpers above), not `elementai`
-            if not any(isinstance(e, dict) and "dur" in str(e.get("tipas") or "") for e in room.get("elementai") or []):
+            # a legacy payload lists its doors under `openings` (line_items helpers above), not `elementai`;
+            # windows count too since the reveals scope (2026-09-25) can switch them off
+            if not any(isinstance(e, dict) and ("dur" in str(e.get("tipas") or "") or "lang" in str(e.get("tipas") or "")
+                                                 or str(e.get("tipas") or "") in ("door", "hidden_door", "window"))
+                       for e in room.get("elementai") or []):
                 continue
             own_h = _num(room.get("lubu_aukstis_m"), 0) or 2.82
             recalc = calc_room_quantities(_calc_input(room), ceiling_height_m=own_h, rules=_rules)
@@ -1331,6 +1338,9 @@ def recompute(
     darbu_sarasas = _user_text.scrub_prose(darbu_sarasas)
     return {
         "rooms": rooms,
+        # 2026-09-25: the project-level pass's verdicts (frameless doors, reveals scope) travel back so the
+        # Prielaidos panel's notes follow his switch instead of the extraction-time sentence
+        "_paruosimas": _paruosimas,
         "pozicijos": pozicijos,
         "darbu_sarasas": darbu_sarasas,
         "assumptions": assumptions,
