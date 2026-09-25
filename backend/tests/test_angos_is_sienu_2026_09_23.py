@@ -46,7 +46,8 @@ def test_the_kitchen_of_h_terrace_door_windows_and_the_passage_to_the_corridor()
     kitchen = _room("04", [window(1200), window(1200), {"tipas": "pasleptos_duris", "kiekis": 1, "plotis_mm": 2000, "aukstis_mm": 2100}],
                     angos=[("03", 2.13), ("laukas", 1.37), ("laukas", 1.36), ("laukas", 0.89), ("laukas", 1.35)], paskirtis="virtuve")
     out = ur.reconcile_openings_with_walls([corridor, kitchen])
-    assert out == {"rooms": 1, "matched": 3, "widths": 3, "exterior": 0, "passages": 1, "unbacked": 0, "added": 0}
+    assert out == {"rooms": 1, "matched": 3, "widths": 3, "exterior": 0, "passages": 1, "unbacked": 0, "added": 0,
+                   "added_windows": 0, "converted": 0, "stood_unbacked": 0}
     els = kitchen["elementai"]
     # each 1200 window takes the closest opening still free: 1,35 then 1,36 — the 1,37 stays open
     assert els[0]["plotis_mm"] == 1350 and els[1]["plotis_mm"] == 1360 and els[0][ur.WIDTH_SOURCE_KEY] == "sienos"

@@ -49,6 +49,7 @@ from .plan_dimensions import read_dimension_strings
 from .room_locator import locate_rooms
 from .sheet_alignment import align_sheets, from_base, to_base
 from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, propose_split, trace_vector_rooms, wall_openings
+from .drawn_openings import page_marks
 
 KEEP_POLYGONS = ("sienu_konturas", "corrected", "manual", VECTOR_SOURCE)
 OPEN_PLAN_ESTIMATE = "atviros_erdves_ivertis"
@@ -78,7 +79,7 @@ def _nr(room: dict) -> str:
 # with, else by the table's area ratio), so each room's walls are read instead of a
 # share by floor area (objektas_h 04/05: estimates 16,08 / 21,69 → read 17,93 / 19,82).
 # RAISE it when the lane starts reading something a stored project would gain from.
-LANE_VERSION = 8
+LANE_VERSION = 9                # 9 (2026-09-25): openings carry what the drawing shows in them — glazing → langas, swing arc → durys; doors drawn where the wall is not cut
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -119,6 +120,10 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
     for plan, votes in plans.items():
         fp = max(sorted(votes), key=lambda p: votes[p])
         W, H = sizes[fp]
+        try:
+            marks = page_marks(pdf_bytes, fp, scale[fp])       # the swing arcs and lines of this sheet
+        except Exception:  # noqa: BLE001 — extra evidence, never the reason openings go unread
+            marks = None
 
         def lay(page: int, x: float, y: float, back: bool = False):
             """A point of `page` (page fractions) on the sheet that is read — or, `back`, the other way."""
@@ -132,7 +137,7 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
         same_plan = {nr: (page, ring) for nr, (page, ring) in outlined.items()
                      if page == fp or (page in group_of and group_of[page] == plan)}
         context = {nr: [lay(page, float(x), float(y)) for x, y in ring] for nr, (page, ring) in same_plan.items()}
-        got = wall_openings(pdf_bytes, fp, context, scale[fp], (W, H))
+        got = wall_openings(pdf_bytes, fp, context, scale[fp], (W, H), marks=marks)
         for nr in todo & set(got):
             page = same_plan[nr][0]
             angos = []
@@ -148,6 +153,16 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
             else:
                 r.pop("_angos_sienose", None)
     meta["angos_sienose"] = sorted(_nr(r) for r in rooms if isinstance(r.get("_angos_sienose"), dict))
+    drawn = {"langai": 0, "durys": 0, "be_tarpo": 0}
+    for r in rooms:
+        for a in (r.get("_angos_sienose") or {}).get("angos") or [] if isinstance(r.get("_angos_sienose"), dict) else []:
+            if a.get("nupiesta") == "langas":
+                drawn["langai"] += 1
+            elif a.get("nupiesta") == "durys":
+                drawn["durys"] += 1
+            if a.get("be_tarpo"):
+                drawn["be_tarpo"] += 1
+    meta["nupiesta"] = drawn
 
 
 def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta) -> None:
@@ -284,7 +299,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
-                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
+                  "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "nupiesta": {"langai": 0, "durys": 0, "be_tarpo": 0}, "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
     status = "insufficient"
     try:

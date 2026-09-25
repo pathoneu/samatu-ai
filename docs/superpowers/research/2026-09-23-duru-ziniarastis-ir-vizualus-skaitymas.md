@@ -315,3 +315,69 @@ langai 26/30). Testai `tests/test_praejimai_2026_09_24.py`.
 **Formuluotė (tą patį vakarą).** Angų faktas praėjimą vadina praėjimu: 04 „2 langai, 2 praėjimai … 1 × praėjimas 2,13 ×
 2,40 m", koridoriuje „Praėjimai į patalpą 04 (2,13 m), į patalpą 04 (1,56 m) įrašyti prie tos patalpos" (buvo „1 paslėptos
 durys, 1 durys" ir „Durys … įrašytos"). Patikrinta naršyklėje ant demo H.
+
+## 11. Angos, kaip nupieštos: stiklas ir durų lankas iš PDF vektorių (2026-09-25)
+
+**Kodėl.** Skaitymo lentelė rodė, ko sienų angose Vision nesurašė: H 04 langai 3 → 2 (iš tikrųjų 4), 09 langai 2 → 1,
+02 „langas" ten, kur nupieštos lauko durys, 04 terasos durys niekur, A 103↔106 durys niekur. Brėžinys apie kiekvieną angą
+sako daugiau, negu jos plotį: lange per sienos juostą eina dvi–trys plonos lygiagrečios linijos (rėmas) su stulpeliais
+galuose, prie durų — lapas ir ketvirčio apskritimo lankas (posūkis). Perskaityti galima be modelio, už 0 €.
+
+**Kaip veikia** (`backend/extractor/drawn_openings.py`, kviečiama iš `vector_rooms._openings` per `geometry_lane`
+`_read_wall_openings`, `LANE_VERSION` 8 → 9).
+- Lankai: dviejų stilių — CAD eksportas brūkšninį lanką rašo dešimtimis atskirų 1–2 pt atkarpėlių (H: 3 308 tokių
+  lape); jos sujungiamos besiliečiančiais galais (ta pati spalva), apskritimas pritaikomas mažiausių kvadratų būdu
+  (Kasa), priimamas, kai spindulys 0,45–1,6 m, liekana ≤ 0,6 pt, kampas 60–200°. Kitas eksportas lanką rašo vienu
+  Bezier kreivės objektu (A) — kreivė išskleidžiama ir pritaikoma taip pat. Pilnas apskritimas (stalas, šviestuvas)
+  neįtraukiamas. H p1: 9 lankai (7 durys + terasos durys + 1 dvigubų durų pusė), A p2: 9 lankai — visi prie durų.
+- Stiklas: ≥ 2 plonos linijos išilgai angos, griežtai juostos viduje (sienų paviršių linijos ant juostos krašto —
+  palangė — neskaičiuojamos), ≥ 55 % angos ilgio.
+- Kiekviena sienų anga gauna `nupiesta`: „durys" (lankas su vyriu prie angos galo, spindulys ≈ angos plotis arba jo
+  pusė) arba „langas" (stiklas). Stiklo siena (H 05, 5,07 m) — nė vienas: linijos dengia 58 % ilgio.
+- Durys ten, kur sienos užpildas NEPERTRAUKTAS (H terasos durys — lapas ir lankas už ištisinės sienos) arba kur skaitytuvas
+  tarpo atmetė (A skalbyklos durys — lapas nupieštas uždarytas tarpe): lankas be angos tampa angos įrašu `be_tarpo`
+  (vyris ant patalpos kontūro, plotis = spindulys, kita pusė — per sieną arba už brėžinio užpildo; A atveju kontūrai
+  net persidengia, todėl žengiama iki pirmo KITO kontūro).
+- Storoje sienoje laiptuota anga (A 103/104, 0,67 m siena: stakta 0,86 m ir tarpas 1,15 m) buvo skaitoma du kartus, antras
+  įrašas vedė „į lauką" — vienoje patalpoje lygiagretūs, per sienos storį vienas nuo kito nutolę, persidengiantys įrašai
+  suliejami į vieną (`merge_stepped_openings`), patalpą įvardijantis laimi.
+
+**Perėjimas** (`universal_rules.reconcile_openings_with_walls`): vienetas ima angą pagal nupieštą rūšį (savo rūšis, tada
+niekas, tada priešinga rūšis; A įėjimas: sąrašo 1,34 m durys stoja į 1,44 m angą su lanku, ne į gretimą 1,34 m be nieko);
+sąrašo langas, kuriam liko tik durimis nupiešta anga, tampa lauko durimis (H 02, `_tipas_pagal_brezini`); laisva
+įstiklinta anga į lauką tampa langu (plotis iš sienų, aukštis kaip kitų patalpos langų, kitaip projekto, kitaip 1,5 m);
+laisva anga su lanku tampa durimis (pirma jose pastatomos sąrašo durys be angos, tik tada pridedama; garažas pats durų
+neprideda — jas prideda patalpa už jo kaip lauko tipo). Faktas sako: „Pagal brėžinį pridėta: langas 1,37 m į lauką
+(nupieštas stiklas); … lauko durys 0,95 m (nupieštas durų lankas)" ir „Sąraše buvo langas, o angoje į lauką nupieštos
+durys su lanku — įrašytos lauko durys 1,00 m"; patalpos lape prie eilutės — „pridėta pagal brėžinį — angoje nupieštas
+stiklas". Patikrinta naršyklėje ant demo H (02, 04); klausimų sąraše „Durys ir langai" liko tik 03 koridorius.
+
+**Skaitymo lentelė** (tiesa patikslinta priartinus: H 04 — 4 įstiklinti vienetai, ne 3; 01/02 durys veda į
+nesunumeruotą erdvę (garažo pusė), ne viena į kitą — nauja `durys_kitur` skiltis; 01↔03 — 1,0 m anga be durų, praėjimas):
+
+| | prieš | po |
+|---|---|---|
+| Vidaus durų poros | 20/26 | **21/24** (A 8/9 → 9/9, H 6/6) |
+| Lauko durys per patalpą | 30/32 | **32/32** (H 9/11 → 11/11) |
+| Langai per patalpą | 26/30 | **29/30** (H 8/11 → 11/11; liko G 09) |
+| Praėjimai | 2/3 | 2/4 (H 01↔03 atviros erdvės viduje) |
+
+**Eilučių lentelė** (`--rows --recompute --geometry`) — čia atvirai: skaitymas pagerėjo, o dvi H eilutės nuo jo sąmatos
+NUTOLO, nes dabar skaičiuojama viskas, kas nupiešta.
+
+| | prieš | po |
+|---|---|---|
+| Korpusas eilutės ±10 % / € | 28,9 % / 39,1 % | 28,4 % / 38,4 % |
+| A | 43,4 % / 59,6 % | 41,5 % / 56,9 % — beapvadinės 42,55 → 48,13 (+22,8 %, brėžinyje aplink koridorių 7 durys, sąraše buvo 6) |
+| H | 33,3 % / 37,6 % | 29,2 % / 28,8 % — beapvadinės 36,63 → **41,47 (+1,3 %)**; kampai 449 → 473 (+14,5 %); angokraščiai 58,33 → **76,91 (+21,6 %)** |
+| B, C, D, G | — | nepakito nė viena eilutė |
+
+**H angokraščių aritmetika** (kas nupiešta, W + 2H): langai 39,2 m (9 vnt.), lauko durys 25,6 m (įėjimas 5,8; katilinė
+5,2; terasa 5,15; stiklo siena 9,47), praėjimai 12,7 m — iš viso 77,5 m; jo 63,23 m. Du paprasti paaiškinimai, kurių
+brėžinys neatskiria: be stiklo sienos ir terasos durų (77,5 − 14,6 = 62,9 m, −0,5 %) arba be praėjimų (64,8 m, +2,5 %).
+Vakarykštis 58,33 m buvo arčiau jo dėl praleidimų, ne dėl teisingumo. Sprendimas — jo (apimties jungiklis Prielaidose:
+kurių angų angokraščiai skaičiuojami), ne variklio kalibracija.
+
+Testai: `tests/test_drawn_openings_2026_09_25.py` (reportlab: brūkšninis lankas iš atkarpėlių, Bezier lankas, stiklas,
+stalas, siena be tarpo, laiptuota anga), `tests/test_angos_pagal_brezini_2026_09_25.py` (perėjimo taisyklės); pilna
+rinktinė žalia.

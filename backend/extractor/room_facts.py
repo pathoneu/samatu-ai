@@ -1134,6 +1134,8 @@ def _stood_in_walls(elems: list[dict]) -> dict | None:
     consumed: set[int] = set()
     passages: set[int] = set()
     unbacked = 0
+    added: list[dict] = []                                     # what the pass added because the drawing shows it
+    converted: list[dict] = []                                 # a listed window that stands in a drawn door
     for e in elems:
         ks = [int(k) for k in (e.get("_anga_ks") or []) if isinstance(k, (int, float))]
         consumed.update(ks)
@@ -1141,7 +1143,31 @@ def _stood_in_walls(elems: list[dict]) -> dict | None:
             passages.update(ks)
         if e.get("_be_angos") and (e.get("tipas") or "") in _DOOR_TIPAI:
             unbacked += int(_f(e.get("kiekis")) or 1)
-    return {"consumed": consumed, "passages": passages, "unbacked": unbacked}
+        if e.get("_pridėta_pagal_sienas") and e.get("_nupiesta") and not e.get("_praejimas"):
+            added.append({"tipas": e.get("tipas") or "", "plotis_m": (_f(e.get("plotis_mm")) or 0) / 1000.0,
+                          "i": str(e.get("_anga_i") or e.get("_is_sienu_angos") or ""), "nupiesta": e.get("_nupiesta"),
+                          "lauko": bool(e.get("_exterior"))})
+        if e.get("_tipas_pagal_brezini"):
+            converted.append({"plotis_m": (_f(e.get("plotis_mm")) or 0) / 1000.0, "i": str(e.get("_anga_i") or "")})
+    return {"consumed": consumed, "passages": passages, "unbacked": unbacked, "added": added, "converted": converted}
+
+
+def _drawn_said(stood: dict) -> str:
+    """What the drawing showed in the openings the pass filled by itself (2026-09-25): a glazed opening became
+    a window, a swing arc a door; a listed window standing in the one drawn door became that door."""
+    parts = []
+    for a in stood.get("added") or []:
+        what = ("langas" if a["tipas"] == "langas"
+                else "lauko durys" if a.get("lauko") else "durys")
+        why = "nupieštas stiklas" if a["nupiesta"] == "langas" else "nupieštas durų lankas"
+        parts.append(f"{what} {lt_num(a['plotis_m'])} m {_leads_to(a['i'])} ({why})")
+    said = ""
+    if parts:
+        said = " Pagal brėžinį pridėta: " + "; ".join(parts) + "."
+    for c in stood.get("converted") or []:
+        said += (f" Sąraše buvo langas, o angoje {_leads_to(c['i'])} nupieštos durys su lanku — "
+                 f"įrašytos lauko durys {lt_num(c['plotis_m'])} m.")
+    return said
 
 
 def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stood: dict,
@@ -1189,7 +1215,7 @@ def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stoo
         parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — patikrinkite patalpoje.")
     if not suggestions and not unbacked and not named:
         parts = [f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje."]
-    return " ".join(parts) + tail_beyond, bool(suggestions or unbacked), suggestions
+    return " ".join(parts) + _drawn_said(stood) + tail_beyond, bool(suggestions or unbacked), suggestions
 
 
 def _against_the_walls(per_type: dict[str, int], openings: list[dict], listed_beyond: set[int] | None = None
@@ -1269,6 +1295,10 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
             "pridėta_pagal_sienas": bool(e.get("_pridėta_pagal_sienas")),
             "be_angos": bool(e.get("_be_angos")),
             "praejimas": bool(e.get("_praejimas")),
+            # 2026-09-25: what the drawing shows in the element's opening (glazing / a swing arc), and a kind
+            # that follows the drawing rather than the list
+            "nupiesta": e.get("_nupiesta") if e.get("_nupiesta") in ("langas", "durys") else None,
+            "tipas_pagal_brezini": bool(e.get("_tipas_pagal_brezini")),
         })
     editable = {"field": "elementai", "kind": "count"}
     walls_page, openings = _wall_openings(room)

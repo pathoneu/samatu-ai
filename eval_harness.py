@@ -1782,8 +1782,8 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
                     g = apply_geometry(parsed, pdf_path.read_bytes())
                     print(f"  ⤴ geometry lane: {g.get('status')} — kontūrai {g.get('konturai')}, "
                           f"atviros erdvės {g.get('atviros_erdves')}, perimetrai sudėti "
-                          f"{g.get('perimetrai_sudeti')}, tušti su įverčiu {g.get('perimetrai_tusti')} "
-                          f"({g.get('seconds')} s)")
+                          f"{g.get('perimetrai_sudeti')}, tušti su įverčiu {g.get('perimetrai_tusti')}, "
+                          f"angose nupiešta {g.get('nupiesta')} ({g.get('seconds')} s)")
                 except Exception as exc:
                     print(f"  ⚠ geometry lane failed during rescore: {exc}")
             # The drawing's door schedule (2026-09-23, Step 2.43 in production): frame type and the

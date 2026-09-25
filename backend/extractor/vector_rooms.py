@@ -46,6 +46,7 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from .pdf_vectors import _is_wall_shape, dominant_wall_colour, filled_shapes, page_geometry
+from .drawn_openings import doors_without_gap, opening_kind
 
 AREA_TOL = 0.08             # the outline agrees with the table
 AREA_WARN = 0.25            # …or is kept with the disagreement shown; beyond this it is not this room
@@ -804,12 +805,65 @@ def joined_space(pdf_bytes: bytes, page: int, own_seat_pct: Sequence[float], oth
 
 
 
+def merge_stepped_openings(angos: list[dict], W: float, H: float, m_per_pt: float) -> list[dict]:
+    """ONE record per hole in the wall (2026-09-25). A stepped opening in a thick wall — the door frame
+    narrower than the gap behind it (objektas_a's 103/104 door in a 0,67 m wall) — is read twice, once per
+    pair of facing edges, a few points apart; the second reading's far side probe landed inside the wall's
+    own gap and said „laukas", so the room got an exterior opening it does not have. Two records of one
+    room whose lines run parallel, lie within the wall's thickness of each other and overlap along the wall
+    are the same opening: the one naming a room (over „laukas"/„vidus") is kept, else the wider."""
+    keep: list[dict] = []
+    for a in angos:
+        try:
+            pa, qa = [(float(x) * W, float(y) * H) for x, y in a["line_pct"]]
+        except (TypeError, ValueError, KeyError):
+            keep.append(a)
+            continue
+        twin = None
+        for b in keep:
+            pb, qb = [(float(x) * W, float(y) * H) for x, y in b["line_pct"]]
+            tol = max(float(a.get("storis_m") or 0), float(b.get("storis_m") or 0)) / m_per_pt + 3.0
+            if _same_hole(pa, qa, pb, qb, tol):
+                twin = b
+                break
+        if twin is None:
+            keep.append(a)
+            continue
+        rank = lambda o: (str(o.get("i")) not in ("laukas", "vidus"), not o.get("be_tarpo"), float(o.get("plotis_m") or 0))  # noqa: E731
+        kept, dropped = (a, twin) if rank(a) > rank(twin) else (twin, a)
+        if dropped.get("nupiesta") and not kept.get("nupiesta"):
+            kept = {**kept, "nupiesta": dropped["nupiesta"]}   # the swing was matched to the reading that goes
+        keep[keep.index(twin)] = kept
+    return keep
+
+
+def _same_hole(pa, qa, pb, qb, tol: float) -> bool:
+    ax, ay = qa[0] - pa[0], qa[1] - pa[1]
+    bx, by = qb[0] - pb[0], qb[1] - pb[1]
+    la, lb = math.hypot(ax, ay), math.hypot(bx, by)
+    if la <= 0 or lb <= 0:
+        return False
+    if abs(ax * by - ay * bx) / (la * lb) > math.sin(math.radians(10)):
+        return False                                           # not parallel
+    ux, uy = ax / la, ay / la
+    nx, ny = -uy, ux
+    mb = ((pb[0] + qb[0]) / 2 - pa[0], (pb[1] + qb[1]) / 2 - pa[1])
+    if abs(mb[0] * nx + mb[1] * ny) > tol:
+        return False                                           # farther apart than the wall is thick
+    lo_b = min((pb[0] - pa[0]) * ux + (pb[1] - pa[1]) * uy, (qb[0] - pa[0]) * ux + (qb[1] - pa[1]) * uy)
+    hi_b = max((pb[0] - pa[0]) * ux + (pb[1] - pa[1]) * uy, (qb[0] - pa[0]) * ux + (qb[1] - pa[1]) * uy)
+    overlap = min(la, hi_b) - max(0.0, lo_b)
+    return overlap >= 0.5 * min(la, lb)
+
+
 def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[Sequence[float]]], m_per_pt: float,
-                  page_size: tuple[float, float] | None = None) -> dict[str, list[dict]]:
+                  page_size: tuple[float, float] | None = None, marks=None) -> dict[str, list[dict]]:
     """The openings in the walls of rooms whose outline came from ELSEWHERE (the raster outline lane, a
     person's correction): {nr: [{plotis_m, storis_m, line_pct, i}]}. Same reading as for a traced room;
     such an outline is a few points off the wall face, so the space beyond an opening is looked up with
-    that much tolerance. No vector walls on the sheet → {}."""
+    that much tolerance. No vector walls on the sheet → {}. `marks` (drawn_openings.page_marks of this
+    sheet) adds what the drawing shows in each opening — `nupiesta` „langas"/„durys" — and the doors whose
+    swing is drawn where the wall is not cut (`be_tarpo`)."""
     if page_size is None:
         W, H, _ = page_geometry(pdf_bytes, page)
     else:
@@ -820,12 +874,12 @@ def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[
     if solid is None or n_walls < MIN_WALLS:
         return {}
     polys = _outlines(outlines_pct, W, H)
-    found = _openings(solid, _edges(solid), polys, m_per_pt, W, H, tol_pt=FOREIGN_OUTLINE_TOL_PT)
+    found = _openings(solid, _edges(solid), polys, m_per_pt, W, H, tol_pt=FOREIGN_OUTLINE_TOL_PT, marks=marks)
     return {nr: found.get(nr, []) for nr in polys}
 
 
 def _openings(solid, edges: Sequence[dict], solved: dict[str, Polygon], m_per_pt: float, W: float, H: float,
-              tol_pt: float = 0.3) -> dict[str, list[dict]]:
+              tol_pt: float = 0.3, marks=None) -> dict[str, list[dict]]:
     """The openings in each outlined room's walls: {nr: [{plotis_m, storis_m, line_pct, i}]}, `i` = the
     room on the other side, "vidus" (a space inside the walls with no outline of its own) or "laukas".
 
@@ -856,6 +910,8 @@ def _openings(solid, edges: Sequence[dict], solved: dict[str, Polygon], m_per_pt
         return ("vidus" if any(f.contains(p) for f in faces) else "laukas"), 0.0
 
     out: dict[str, list[dict]] = {}
+    read: dict[str, list[dict]] = {}                           # the gaps read per room (page points) — for the arcs
+    used_arcs: set[int] = set()
     for r in records:
         (a, da), (b, db) = where(r["sides"][0]), where(r["sides"][1])
         if a == b and a in solved and (da > 0 or db > 0):
@@ -871,10 +927,27 @@ def _openings(solid, edges: Sequence[dict], solved: dict[str, Polygon], m_per_pt
         (x0, y0), (x1, y1) = r["line"]
         line = [[round(x0 / W, 5), round(y0 / H, 5)], [round(x1 / W, 5), round(y1 / H, 5)]]
         line.sort()                                            # one order, whichever room reports it
+        # what the drawing shows IN the gap (2026-09-25): a swing arc → „durys", glazing lines → „langas"
+        kind = opening_kind(r["line"], r["plotis_m"], r["storis_m"], marks, m_per_pt, used_arcs)[0] if marks is not None else None
         for here, there in ((a, b), (b, a)):
             if here in solved:
-                out.setdefault(here, []).append({"plotis_m": r["plotis_m"], "storis_m": r["storis_m"],
-                                                 "line_pct": line, "i": there})
+                entry = {"plotis_m": r["plotis_m"], "storis_m": r["storis_m"], "line_pct": line, "i": there}
+                if kind:
+                    entry["nupiesta"] = kind
+                out.setdefault(here, []).append(entry)
+                read.setdefault(here, []).append({"line": r["line"]})
+    if marks is not None:
+        # a door whose swing is drawn beside a wall the reader found no gap in (objektas_h's terrace door):
+        # an opening of its own, hinge on the room's outline, width = the swing's radius
+        for d in doors_without_gap(marks, used_arcs, solved, where, solid, m_per_pt, read):
+            (x0, y0), (x1, y1) = d["line"]
+            line = sorted([[round(x0 / W, 5), round(y0 / H, 5)], [round(x1 / W, 5), round(y1 / H, 5)]])
+            for here, there in ((d["nr"], d["i"]), (d["i"], d["nr"])):
+                if here in solved:
+                    out.setdefault(here, []).append({"plotis_m": d["plotis_m"], "storis_m": d["storis_m"], "line_pct": line,
+                                                     "i": there, "nupiesta": "durys", "be_tarpo": True})
+    for nr, angos in list(out.items()):
+        out[nr] = merge_stepped_openings(angos, W, H, m_per_pt)
     for angos in out.values():
         angos.sort(key=lambda o: (o["i"] in ("vidus", "laukas"), o["i"], o["line_pct"]))
     return out

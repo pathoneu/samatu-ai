@@ -63,6 +63,7 @@ def app_view(rooms: list[dict]) -> dict:
     exterior: Counter = Counter()
     windows: Counter = Counter()
     passages: Counter = Counter()
+    unbacked_vidus: Counter = Counter()
     for r in rooms:
         nr = str(r.get("nr") or "").strip()
         walls_read = bool(r.get("_angos_sienose_suderinta"))
@@ -89,12 +90,14 @@ def app_view(rooms: list[dict]) -> dict:
                 unstood[nr] += units                           # no walls to stand it in — not scored as a pair
             else:
                 side = str(e.get(ur.OPENING_SIDE_KEY) or e.get("_is_sienu_angos") or "?")
-                if side in ("vidus", "laukas", "?", ""):
+                if side == "vidus":
+                    unbacked_vidus[nr] += units                # a door into a space the table does not number
+                elif side in ("laukas", "?", ""):
                     unbacked[nr] += units                      # a door stood in no room's opening is not a pair
                 else:
                     pairs[_pair(nr, side)] += units
     return {"pairs": pairs, "unbacked": unbacked, "unstood": unstood, "exterior": exterior, "windows": windows,
-            "passages": passages}
+            "passages": passages, "unbacked_vidus": unbacked_vidus}
 
 
 def score_project(slug: str, registry: dict) -> dict | None:
@@ -118,6 +121,7 @@ def score_project(slug: str, registry: dict) -> dict | None:
     matched = sum(min(n, app["pairs"].get(k, 0)) for k, n in tp.items())
     missing = sum(max(0, n - app["pairs"].get(k, 0)) for k, n in tp.items())
     extra = sum(max(0, n - tp.get(k, 0)) for k, n in app["pairs"].items()) + sum(app["unbacked"].values())
+    kitur = sum(app["unbacked_vidus"].values())
     # a fact the person could not read unambiguously (`neaisku`) is left out of that fact's count
     ext_truth = {nr: int(r.get("durys_lauko") or 0) for nr, r in truth["patalpos"].items() if "durys_lauko" not in (r.get("neaisku") or [])}
     win_truth = {nr: int(r.get("langai") or 0) for nr, r in truth["patalpos"].items() if "langai" not in (r.get("neaisku") or [])}
@@ -125,9 +129,14 @@ def score_project(slug: str, registry: dict) -> dict | None:
     win_ok = sum(1 for nr, n in win_truth.items() if app["windows"].get(nr, 0) == n)
     pas_matched = sum(min(n, app["passages"].get(k, 0)) for k, n in tpas.items())
     no_walls = sum(app["unstood"].values())
+    # doors into a space the table does not number (a garage, a porch): the truth lists them under `durys_kitur`;
+    # the engine stands them in an opening „į vidų" — said per room, never scored as a pair (2026-09-25)
+    kitur_truth = {nr: sum(int(v) for v in (r.get("durys_kitur") or {}).values()) for nr, r in truth["patalpos"].items() if r.get("durys_kitur")}
+    kitur_app = {nr: n for nr, n in app["unbacked_vidus"].items()}
     print(f"\n### {slug} — vidaus durys (poros): brėžinyje {sum(tp.values())}, sąraše sutampa {matched}, "
           f"trūksta {missing}, per daug {extra} (iš jų be angos {sum(app['unbacked'].values())})"
-          + (f"; be sienų (juosta neskaitė) {no_walls} durys — poros nevertinamos" if no_walls else "") + "; "
+          + (f"; be sienų (juosta neskaitė) {no_walls} durys — poros nevertinamos" if no_walls else "")
+          + (f"; į nesunumeruotą erdvę {kitur}" if kitur else "") + "; "
           f"lauko durys sutampa {ext_ok}/{len(ext_truth)} patalpų; langai sutampa {win_ok}/{len(win_truth)} patalpų; "
           f"praėjimai {pas_matched}/{sum(tpas.values())}")
     for k in sorted(set(tp) | set(app["pairs"])):
@@ -139,11 +148,14 @@ def score_project(slug: str, registry: dict) -> dict | None:
         e_t, e_a = ext_truth.get(nr), app["exterior"].get(nr, 0)
         w_t, w_a = win_truth.get(nr), app["windows"].get(nr, 0)
         u = app["unbacked"].get(nr, 0)
+        k_t, k_a = kitur_truth.get(nr), kitur_app.get(nr, 0)
         bad_e = e_t is not None and e_t != e_a
         bad_w = w_t is not None and w_t != w_a
-        if bad_e or bad_w or u:
+        bad_k = (k_t or 0) != k_a
+        if bad_e or bad_w or u or bad_k:
             print(f"    {nr}: lauko durys {'?' if e_t is None else e_t}→{e_a}, langai {'?' if w_t is None else w_t}→{w_a}"
-                  + (f", durys be angos {u}" if u else ""))
+                  + (f", durys be angos {u}" if u else "")
+                  + (f", durys į nesunumeruotą erdvę {k_t or 0}→{k_a}" if bad_k or k_t else ""))
     return {"slug": slug, "pairs_truth": sum(tp.values()), "matched": matched, "missing": missing, "extra": extra,
             "ext_ok": ext_ok, "ext_n": len(ext_truth), "win_ok": win_ok, "win_n": len(win_truth),
             "pas_matched": pas_matched, "pas_truth": sum(tpas.values())}

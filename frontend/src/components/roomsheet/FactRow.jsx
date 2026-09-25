@@ -230,9 +230,15 @@ export default function FactRow({
                         ? t('project.roomSheet.openingNoWallOpening')
                         : d.praejimas
                           ? t('project.roomSheet.openingPassage')
-                          : d.pridėta_pagal_sienas
-                            ? t('project.roomSheet.openingAddedFromWalls')
-                            : d.plotis_pagal_sienas
+                          : d.tipas_pagal_brezini
+                            ? t('project.roomSheet.openingKindByDrawing')
+                            : d.pridėta_pagal_sienas
+                              ? (d.nupiesta === 'langas'
+                                ? t('project.roomSheet.openingAddedDrawnWindow')
+                                : d.nupiesta === 'durys'
+                                  ? t('project.roomSheet.openingAddedDrawnDoor')
+                                  : t('project.roomSheet.openingAddedFromWalls'))
+                              : d.plotis_pagal_sienas
                               ? t('project.roomSheet.openingWidthFromWalls')
                               : t('project.roomSheet.openingsAssumed')}
                 </span>

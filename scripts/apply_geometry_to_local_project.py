@@ -76,6 +76,7 @@ def main() -> int:
     print(f"status {out['status']} in {out['seconds']} s | vietos {out['vietos']} | plano lapai {out['grupes']}")
     print(f"kontūrai {out['konturai']} | atviros erdvės {out['atviros_erdves']}")
     print(f"perimetrai sudėti {out['perimetrai_sudeti']} | tušti {out['perimetrai_tusti']}")
+    print(f"angose nupiešta {out.get('nupiesta')} (langai — stiklas angoje, durys — lankas; be_tarpo — durys ten, kur siena nepertraukta)")
     print(f"grindų dangos {out['grindu_dangos']}")
     for r in project.get("patalpos") or []:
         suma = r.get("_perimetras_suma") or {}
