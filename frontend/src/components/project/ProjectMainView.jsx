@@ -22,6 +22,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isReverseVat, vatPercent } from '@/lib/vatMode';
 import { toast } from 'sonner';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
@@ -601,11 +602,11 @@ export default function ProjectMainView({
     return { darbo, medz, viso: darbo + medz, count };
   }, [darbai]);
 
-  // Reverse-VAT (renovacija): no output VAT — match the Excel/PDF export so the
-  // in-app total doesn't show a 21% VAT line the deliverable omits. (2026-06-19.)
-  const reverseVat = (project.vat_mode || '').toLowerCase() === 'reverse_vat'
-    || (project.archetipas || '').toLowerCase() === 'renovacija';
-  const vatPct = reverseVat ? 0 : (project.vat_rate || 21);
+  // Reverse-VAT: no output VAT — match the Excel/PDF export so the in-app total
+  // doesn't show a 21% VAT line the deliverable omits. (2026-06-19.) His choice
+  // wins over the drawing label — one rule, lib/vatMode.js.
+  const reverseVat = isReverseVat(project);
+  const vatPct = vatPercent(project);
 
   const totalArea = useMemo(() => {
     const rooms = project.v8_rooms || project.patalpos || [];
@@ -743,7 +744,7 @@ export default function ProjectMainView({
             <div className="flex items-center gap-2 shrink-0">
               {/* The paid re-read moved to the Nustatymai drawer (council cut
                   list, 2026-09-13): beside Export it read as a routine step. */}
-              <ExportDropdown project={projectWithDarbai} />
+              <ExportDropdown project={projectWithDarbai} onProjectChange={onProjectChange} />
             </div>
           </div>
 

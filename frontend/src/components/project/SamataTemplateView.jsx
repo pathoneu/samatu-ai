@@ -24,7 +24,7 @@ import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';
 import { renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
 import {
   EXTRA_SECTION, FILL, acceptSuggestion, canTypeQuantity, darbaiFingerprint,
-  groupBySection, setPrice, singleSourceRow, summarize, typeQuantity, typedSourceRow,
+  groupBySection, lineAmount, setPrice, singleSourceRow, summarize, typeQuantity, typedSourceRow,
 } from '@/lib/samataTemplate';
 
 const eur = new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' });
@@ -97,7 +97,9 @@ function Row({ row, darbai, onDarbaiChange, onOpenLedger }) {
   const isKita = !row._sablonas;
   const kiekis = row.kiekis;
   const kaina = row.kaina;
-  const suma = kiekis != null && kaina != null ? Number(kiekis) * Number(kaina) : null;
+  // A merged line may carry its own amount and no single price (lineAmount).
+  const suma = lineAmount(row);
+  const ownAmount = Boolean(row._suma_be_vieneto_kainos);
 
   const commitQty = (num) => {
     try {
@@ -128,7 +130,7 @@ function Row({ row, darbai, onDarbaiChange, onOpenLedger }) {
             {t('project.samataTemplate.occasional')}
           </span>
         )}
-        {isBlank && row._pastaba && (
+        {(isBlank || ownAmount) && row._pastaba && (
           <span className="block text-[13px] text-muted-foreground">{row._pastaba}</span>
         )}
         {typed && (
@@ -183,7 +185,7 @@ function Row({ row, darbai, onDarbaiChange, onOpenLedger }) {
         )}
       </td>
       <td className="px-3 py-2 text-right font-semibold tabular-nums align-top" style={{ fontSize: 16 }}>
-        {suma != null && Number(kaina) > 0 ? eur.format(suma) : ''}
+        {suma != null && (ownAmount || Number(kaina) > 0) ? eur.format(suma) : ''}
       </td>
       <td className="px-2 py-2 text-right align-top whitespace-nowrap">
         {isSuggested && (
@@ -253,8 +255,7 @@ export default function SamataTemplateView({ project, darbai, onDarbaiChange, on
 
   const groups = useMemo(() => groupBySection(rows || []), [rows]);
   const summary = useMemo(() => summarize(rows || []), [rows]);
-  const total = useMemo(() => (rows || []).reduce((s, r) => (
-    r.kiekis != null && r.kaina != null ? s + Number(r.kiekis) * Number(r.kaina) : s), 0), [rows]);
+  const total = useMemo(() => (rows || []).reduce((s, r) => s + (lineAmount(r) ?? 0), 0), [rows]);
 
   const change = (next) => onDarbaiChange(next);
 

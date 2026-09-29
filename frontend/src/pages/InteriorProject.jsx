@@ -35,6 +35,7 @@ import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
+import { isReverseVat, vatPercent } from '@/lib/vatMode';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1033,10 +1034,9 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // Reverse-VAT (renovacija): no output VAT. The top bar used to add 21%
   // unconditionally, so it disagreed with the Kiekiai tab, the Excel and the
   // PDF — all of which already respect vat_mode. (2026-07-27 audit; mirrors
-  // ProjectMainView's condition.)
-  const reverseVat = (project.vat_mode || '').toLowerCase() === 'reverse_vat'
-    || (project.archetipas || '').toLowerCase() === 'renovacija';
-  const vatRate = reverseVat ? 0 : (project.vat_rate || 21);
+  // ProjectMainView's condition — one rule, lib/vatMode.js.)
+  const reverseVat = isReverseVat(project);
+  const vatRate = vatPercent(project);
   const totalGross = totalNet * (1 + vatRate / 100);
 
   return (
@@ -1248,7 +1248,13 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
       {/* ── STEP 4 · SIŲSTI — three actions and one sentence before sending ─ */}
       {step === 'siusti' && (
-        <SendStep project={project} />
+        <SendStep
+          project={project}
+          onProjectChange={(updated) => {
+            setProject(updated);
+            updateProject(project.id, updated);
+          }}
+        />
       )}
 
       {/* ── LEGACY BLOCK (unreachable) — the old V8 „Kiekiai" screen.
@@ -1787,7 +1793,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 // Design §E5: three actions and, before sending, ONE sentence — not a list of
 // warnings. „3 eilutės be kiekio bus praleistos. Siųsti?"
 
-function SendStep({ project }) {
+function SendStep({ project, onProjectChange }) {
   const { t } = useTranslation();
   const rows = project.darbu_sarasas || [];
   const noQty = rows.filter((r) => !Number(r?.kiekis)).length;
@@ -1823,7 +1829,7 @@ function SendStep({ project }) {
       </p>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <ExportDropdown project={project} />
+        <ExportDropdown project={project} onProjectChange={onProjectChange} />
         <ShareButton project={project} />
       </div>
 

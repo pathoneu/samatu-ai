@@ -221,9 +221,31 @@ export function setPrice(darbai, templateRow, kaina) {
 }
 
 /**
+ * A merged line of HIS whose source rows carry different prices, or only some
+ * carry one: no single unit price, and the backend's `suma` is
+ * Σ(quantity × that row's own price) (audit 2026-09-29, exports-money-1).
+ */
+function hasOwnAmount(r) {
+  return Boolean(r?._suma_be_vieneto_kainos) && r.suma != null && Number.isFinite(Number(r.suma));
+}
+
+/**
+ * The money on a rendered line: quantity × unit price (as the view always
+ * computed it), or a merged line's own amount. null without a quantity or any
+ * price.
+ */
+export function lineAmount(r) {
+  if (!r || r.kiekis == null || r.kiekis === '') return null;
+  if (hasOwnAmount(r)) return Number(r.suma);
+  return r.kaina == null ? null : Number(r.kiekis) * Number(r.kaina);
+}
+
+/**
  * The rows `POST /generate-excel?layout=template` prints. Blank stays blank —
  * `kiekis: null`, no `suma` — the backend leaves that cell empty rather than
- * printing „0,00 €" to his client. A greyed suggestion is NOT exported.
+ * printing „0,00 €" to his client. A greyed suggestion is NOT exported. A
+ * merged line without one unit price goes as `kaina: null` + its amount; the
+ * backend prints Kaina blank and Suma as a value.
  */
 export function exportRows(rows, allowedSkyriai = null) {
   const keep = (s) => !allowedSkyriai || allowedSkyriai.has(s);
@@ -233,18 +255,41 @@ export function exportRows(rows, allowedSkyriai = null) {
       const skyrius = String(r.skyrius || EXTRA_SECTION);
       const kiekis = (r.kiekis == null || r.kiekis === '') ? null : Number(r.kiekis);
       const kaina = r.kaina == null ? null : Number(r.kaina);
+      const own = kiekis != null && hasOwnAmount(r);
       return {
         nr: String(r.nr || r.eil_nr || i + 1),
         aprasymas: r.aprasymas || '',
         mato_vnt: r.mato_vnt || r.vnt || '',
         kiekis,
-        kaina: kaina ?? 0,
-        suma: kiekis == null ? null : kiekis * (kaina ?? 0),
+        kaina: own ? null : (kaina ?? 0),
+        suma: kiekis == null ? null : (own ? Number(r.suma) : kiekis * (kaina ?? 0)),
         skyrius,
         confidence: r.confidence || 'medium',
+        ...(own && r._dalis_be_kainos ? { _dalis_be_kainos: true } : {}),
       };
     })
     .filter((r) => keep(r.skyrius));
+}
+
+/**
+ * Does an exported line still need a price? A merged line counts when part of
+ * its quantity is unpriced, not when it is fully priced at several prices.
+ */
+export function lacksPrice(r) {
+  if (r?._dalis_be_kainos) return true;
+  if (r?.kaina == null && Number(r?.suma) > 0) return false;
+  return !(Number(r?.kaina) > 0);
+}
+
+/** An exported line × the floor count (SM02). Blank stays blank. */
+export function scaleExportRow(r, factor) {
+  if (r?.kiekis == null) return r;
+  return {
+    ...r,
+    kiekis: r.kiekis * factor,
+    suma: r.kaina == null ? (r.suma == null ? null : r.suma * factor)
+      : r.kiekis * factor * (r.kaina || 0),
+  };
 }
 
 /**

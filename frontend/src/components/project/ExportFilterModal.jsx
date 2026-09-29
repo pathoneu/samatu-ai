@@ -7,7 +7,9 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ltCount } from '@/lib/ltPlural';
+import { VAT_REVERSE, VAT_STANDARD, vatChoice } from '@/lib/vatMode';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import {
   exportSelectionKey,
@@ -47,7 +49,11 @@ export default function ExportFilterModal({
   // section whose rows are all still blank stays listed — blank is a state of
   // his sheet, not a reason to drop the section.
   rows = null,
+  // PVM (audit 2026-09-29): called with 'standard' | 'reverse_vat' when he
+  // picks one; the parent stores it on the project as `vat_mode`.
+  onVatModeChange,
 }) {
+  const { t } = useTranslation();
   // Build unique-skyrius list with row count + total kiekis per skyrius.
   const sections = useMemo(() => {
     const map = new Map();
@@ -79,6 +85,16 @@ export default function ExportFilterModal({
   const [uzsakovas, setUzsakovas] = useState(project.uzsakovas || '');
   const [objektas, setObjektas] = useState(project.objektas || project.name || '');
 
+  // What the document will print, and his switch. Until he picks, a reverse
+  // VAT that came from the drawing label is named as such (lib/vatMode.js).
+  const [vatMode, setVatMode] = useState(() => vatChoice(project).mode);
+  const [vatFromLabel, setVatFromLabel] = useState(() => vatChoice(project).fromLabel);
+  const chooseVat = (mode) => {
+    setVatMode(mode);
+    setVatFromLabel(false);
+    onVatModeChange?.(mode);
+  };
+
   const allChecked = selected.size === sections.length;
   const noneChecked = selected.size === 0;
 
@@ -102,6 +118,7 @@ export default function ExportFilterModal({
       format,
       uzsakovas: uzsakovas.trim(),
       objektas: objektas.trim(),
+      vat_mode: vatMode,
     });
   };
 
@@ -147,6 +164,37 @@ export default function ExportFilterModal({
               className="mt-0.5 w-full h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
+        </div>
+
+        <div className="px-5 py-3 border-b border-border">
+          <p className="text-[11px] text-muted-foreground">{t('project.vatChoice.title')}</p>
+          <div role="radiogroup" aria-label={t('project.vatChoice.title')} className="mt-1 space-y-0.5">
+            {[
+              [VAT_STANDARD, 'standard', 'standardDesc'],
+              [VAT_REVERSE, 'reverse', 'reverseDesc'],
+            ].map(([mode, label, desc]) => (
+              <label key={mode}
+                className="flex items-start gap-2.5 px-2 py-1.5 rounded hover:bg-muted/40 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="vat_mode"
+                  value={mode}
+                  checked={vatMode === mode}
+                  onChange={() => chooseVat(mode)}
+                  className="mt-0.5 w-4 h-4 accent-foreground"
+                />
+                <span className="flex-1">
+                  <span className="block text-sm text-foreground">{t(`project.vatChoice.${label}`)}</span>
+                  <span className="block text-[12px] text-muted-foreground">{t(`project.vatChoice.${desc}`)}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {vatFromLabel && (
+            <p className="mt-1 px-2 text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
+              {t('project.vatChoice.fromLabel')}
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">

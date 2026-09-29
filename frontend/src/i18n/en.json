@@ -1378,6 +1378,14 @@
       "checkOk_one": "The one row has a quantity. Ready to send.",
       "checkOk_other": "All {{count}} rows have a quantity. Ready to send."
     },
+    "vatChoice": {
+      "title": "VAT on the document",
+      "standard": "Add 21 % VAT",
+      "standardDesc": "A 21 % VAT line is added to the total — the usual case.",
+      "reverse": "Reverse-charge VAT",
+      "reverseDesc": "The customer is VAT-registered and accounts for VAT themselves (Law on VAT, Art. 96). No VAT line is printed.",
+      "fromLabel": "Reverse-charge VAT was picked by the app because the project was recognised as a renovation. Please check and choose yourself."
+    },
     "samataTemplate": {
       "layoutLabel": "Layout",
       "layoutPathon": "Pathon",
@@ -1780,7 +1788,7 @@
     "vat": "VAT ({{rate}}%)",
     "grandTotalReverse": "TOTAL (excl. VAT)",
     "grandTotal": "Total",
-    "reverseVatNote": "Reverse-charge VAT (renovation): VAT is calculated and paid by the buyer (Law on VAT, Art. 96).",
+    "reverseVatNote": "Reverse-charge VAT: VAT is calculated and paid by the buyer (Law on VAT, Art. 96).",
     "emptyList": "This project's quantity list is still empty."
   },
   "workspace": {

@@ -14,7 +14,7 @@ import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
-import { exportRows as templateExportRows } from '@/lib/samataTemplate';
+import { exportRows as templateExportRows, lacksPrice, scaleExportRow } from '@/lib/samataTemplate';
 
 // "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
 // warning doesn't read like machine output.
@@ -144,7 +144,13 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     objektas:     extra.objektas || project.objektas || '',
     pasiulymo_nr: extra.pasiulymo_nr || project.pasiulymo_nr || '',
   };
-  const payload = { ...(payloadOverride || buildPayload(project, allowedSkyriai)), ...branding };
+  // PVM (audit 2026-09-29): the mode the export dialog showed him — his pick or,
+  // untouched, what lib/vatMode.js derives. Explicit, so the file prints it.
+  const payload = {
+    ...(payloadOverride || buildPayload(project, allowedSkyriai)),
+    ...branding,
+    vat_mode: extra.vat_mode || project.vat_mode || '',
+  };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
     credentials: 'include',
@@ -156,7 +162,9 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   triggerDownload(blob, filename);
 }
 
-export default function ExportDropdown({ project }) {
+// `onProjectChange` (2026-09-29): stores his PVM choice on the project as
+// `vat_mode`, so the on-screen totals and every export agree.
+export default function ExportDropdown({ project, onProjectChange }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(null);
   const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | 'excel-template' | null
@@ -203,7 +211,7 @@ export default function ExportDropdown({ project }) {
     setFilterFor(action);
   };
 
-  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr }) => {
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode }) => {
     // Guard: exporting a sąmata where every line is 0,00 € sends the client a
     // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
     // Check ALL candidate lists, not just pozicijos: interior prices live in
@@ -231,7 +239,9 @@ export default function ExportDropdown({ project }) {
       ? templateExportRows(templateRows || [], skyriai)
       : (buildPayload(project, skyriai).eilutes || []))
       .filter((r) => (r.kiekis || 0) > 0);
-    const unpricedRows = exportedRows.filter((r) => !(Number(r.kaina) > 0));
+    // A merged line of his counts when part of its quantity has no price yet
+    // (lacksPrice), not when it is priced at several prices.
+    const unpricedRows = exportedRows.filter(lacksPrice);
     if (unpricedRows.length > 0 && unpricedRows.length < exportedRows.length) {
       const ok = await confirm({
         title: `${ltEilutes(unpricedRows.length)} be kainos — eksportuoti vis tiek?`,
@@ -244,16 +254,15 @@ export default function ExportDropdown({ project }) {
     setLoading(format);
     try {
       const safeName = sanitizeExportFilename(project.name);
-      const extra = { uzsakovas, objektas, pasiulymo_nr };
+      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'excel-template') {
         // His sections, his order, his labels; a blank cell prints EMPTY (the
         // backend's `layout=template` branch), never „0,00 €".
         const floorCount = getFloorCount(project);
-        const eilutes = templateExportRows(templateRows || [], skyriai).map((r) => (
-          r.kiekis == null ? r : { ...r, kiekis: r.kiekis * floorCount, suma: r.kiekis * floorCount * (r.kaina || 0) }
-        ));
+        const eilutes = templateExportRows(templateRows || [], skyriai)
+          .map((r) => scaleExportRow(r, floorCount));
         const payload = {
           projektas: floorCount > 1 ? `${project.name} (× ${floorCount} aukštai)` : project.name,
           eilutes,
@@ -348,6 +357,7 @@ export default function ExportDropdown({ project }) {
           loading={loading === filterFor}
           onCancel={() => { if (loading == null) setFilterFor(null); }}
           onConfirm={handleConfirm}
+          onVatModeChange={(mode) => onProjectChange?.({ ...project, vat_mode: mode })}
         />
       )}
     </div>

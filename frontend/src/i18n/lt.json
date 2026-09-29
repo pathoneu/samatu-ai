@@ -1412,6 +1412,14 @@
       "checkOk_few": "Visos {{count}} eilutės turi kiekį. Galima siųsti.",
       "checkOk_other": "Visos {{count}} eilučių turi kiekį. Galima siųsti."
     },
+    "vatChoice": {
+      "title": "PVM dokumente",
+      "standard": "Pridėti 21 % PVM",
+      "standardDesc": "Prie sumos pridedama 21 % PVM eilutė — įprastas atvejis.",
+      "reverse": "Atvirkštinis PVM",
+      "reverseDesc": "Užsakovas — PVM mokėtojas ir PVM apskaičiuoja pats (PVMĮ 96 str.). PVM eilutė dokumente nespausdinama.",
+      "fromLabel": "Atvirkštinį PVM parinko programa, nes projektas atpažintas kaip renovacija. Patikrinkite ir pasirinkite patys."
+    },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",
       "layoutPathon": "Pathon",
@@ -1825,7 +1833,7 @@
     "vat": "PVM ({{rate}}%)",
     "grandTotalReverse": "IŠ VISO (be PVM)",
     "grandTotal": "Iš viso",
-    "reverseVatNote": "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas (PVMĮ 96 str.).",
+    "reverseVatNote": "Atvirkštinis PVM: PVM apskaičiuoja ir sumoka pirkėjas (PVMĮ 96 str.).",
     "emptyList": "Šio projekto kiekių sąrašas dar tuščias."
   },
   "workspace": {

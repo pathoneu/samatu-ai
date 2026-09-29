@@ -82,7 +82,8 @@ log = logging.getLogger("pathon.samata_template")
 
 __all__ = [
     "TEMPLATE_VERSION", "DEFAULT_ON_MIN_SOURCES", "EXTRA_SECTION",
-    "NOTE_BLANK", "NOTE_NO_ROOMS", "NOTE_UNVERIFIED",
+    "NOTE_BLANK", "NOTE_NO_ROOMS", "NOTE_UNVERIFIED", "NOTE_PART_UNPRICED",
+    "NOTE_MIXED_PRICES",
     "STATUS_DEFAULT", "STATUS_OPTIONAL",
     "FILL_DONE", "FILL_SUGGESTED", "FILL_EMPTY",
     "build_template", "template_from_samata", "merge_samata", "merge_templates",
@@ -138,6 +139,11 @@ FILL_EMPTY = "tuscia"          # we have nothing for this row
 NOTE_BLANK = "Iš brėžinio nenustatyta — įrašykite"
 NOTE_NO_ROOMS = "Brėžinyje patalpų nerasta — įrašykite"
 NOTE_UNVERIFIED = "Patikrinkite prieš naudodami"
+# A merged line where only some of the rows behind it have a price: the amount
+# covers the priced part only (audit 2026-09-29, exports-money-1).
+NOTE_PART_UNPRICED = "Dalis kiekio dar be kainos — įrašykite kainas"
+# …and one where every row is priced, but not at one price: Kaina stays blank.
+NOTE_MIXED_PRICES = "Skirtingos kainos — suma sudėta iš eilučių"
 
 # Bounds for `validate_template` — a stored template arrives over a PUT, so it is
 # attacker-shaped in a way a derived one is not.
@@ -836,11 +842,24 @@ def render_samata(template: dict,
                     if rid:
                         source_ids.append(str(rid))
                     source_labels.append(_app_name(rows[i]))
-                    if kaina is None:
-                        p = _app_price(rows[i])
-                        if p is not None:
-                            kaina = p
-                            kaina_source = rows[i].get("kaina_source")
+
+                # One unit price only when EVERY row behind the line carries
+                # the same one. Otherwise the line has no single price: its
+                # amount is Σ(quantity × that row's own price), an unpriced row
+                # adding nothing — never the summed quantity at the first
+                # row's price (audit 2026-09-29, exports-money-1).
+                prices = [_app_price(rows[i]) for i in used]
+                line_amount: float | None = None
+                part_unpriced = False
+                if prices and None not in prices and len(set(prices)) == 1:
+                    kaina = prices[0]
+                    kaina_source = rows[used[0]].get("kaina_source")
+                elif any(p is not None for p in prices) and kiekis is not None:
+                    line_amount = round(sum(
+                        (_app_qty(rows[i]) or 0.0) * p
+                        for i, p in zip(used, prices) if p is not None), 2)
+                    part_unpriced = None in prices
+                    note = NOTE_PART_UNPRICED if part_unpriced else NOTE_MIXED_PRICES
 
                 label = f"{f_label} ({qualifier})" if qualifier else f_label
 
@@ -873,6 +892,15 @@ def render_samata(template: dict,
                 }
                 if kaina is not None and kiekis is not None:
                     row["suma"] = round(kiekis * kaina, 2)
+                if line_amount is not None:
+                    # Printed as a value with the Kaina cell left blank — by the
+                    # screen (`lib/samataTemplate.js lineAmount`) and by the
+                    # template Excel (`generate_excel`), which would otherwise
+                    # write Kiekis × an empty Kaina = 0.
+                    row["suma"] = line_amount
+                    row["_suma_be_vieneto_kainos"] = True
+                    if part_unpriced:
+                        row["_dalis_be_kainos"] = True
                 if kaina_source is not None:
                     row["kaina_source"] = kaina_source
                 out.append(row)

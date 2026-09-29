@@ -337,6 +337,7 @@ import os
 import math
 import asyncio
 from extractor import user_text as _user_text
+from extractor.vat_mode import is_reverse_vat as _is_reverse_vat
 import hashlib
 from collections import defaultdict
 from datetime import datetime
@@ -5061,6 +5062,17 @@ def generate_excel(request: Request, data: dict):
             # then it is named in the Pastabos sheet instead of failing quietly.
             kiekis, _k_ok = _excel_number(e.get("kiekis", 0))
             kaina,  _p_ok = _excel_number(e.get("kaina",  0))
+            # A merged line of HIS whose source rows carry different prices (or
+            # only some carry one) has no single unit price: the render sends
+            # its amount (`samata_template._suma_be_vieneto_kainos`). Kaina
+            # stays blank and Suma is that amount as a VALUE — the formula
+            # would print Kiekis × blank = 0,00 € and drop it from the total.
+            _line_amount = None
+            if (_his_layout and e.get("kaina") is None
+                    and e.get("suma") is not None and kiekis not in (None, "")):
+                _line_amount, _s_ok = _excel_number(e.get("suma"))
+                if not _s_ok or not isinstance(_line_amount, float):
+                    _line_amount = None
             if not _k_ok or not _p_ok:
                 _bad = "kiekis" if not _k_ok else "kaina"
                 _label = str(e.get("aprasymas") or e.get("nr") or "—")[:60]
@@ -5131,9 +5143,9 @@ def generate_excel(request: Request, data: dict):
 
         return r
 
-    # Reverse-VAT (renovacija) — no output VAT line; VISO equals the be-PVM sum.
-    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
-                    or str(data.get("archetipas") or "").lower() == "renovacija")
+    # Reverse-VAT — no output VAT line; VISO equals the be-PVM sum. His
+    # `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
+    _reverse_vat = _is_reverse_vat(data)
 
     def _write_totals(ws, rows: list[dict], r: int):
         ws.row_dimensions[r].height = 6
@@ -5488,8 +5500,8 @@ def generate_pdf(request: Request, data: dict):
     # Reverse-VAT (atvirkštinis PVM) for renovation/modernizavimas: the contractor
     # must NOT add output VAT — the užsakovas self-accounts (PVMĮ 96 str.). Charging
     # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
-    _reverse_vat = (str(data.get("vat_mode") or "").lower() == "reverse_vat"
-                    or str(data.get("archetipas") or "").lower() == "renovacija")
+    # His `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
+    _reverse_vat = _is_reverse_vat(data)
     pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
     viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
     # A priced export is a SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by definition
@@ -5901,7 +5913,7 @@ def generate_pdf(request: Request, data: dict):
     if _reverse_vat:
         _totals_group.append(Spacer(1, 0.3*cm))
         _totals_group.append(Paragraph(
-            "Atvirkštinis PVM (renovacija): PVM apskaičiuoja ir sumoka pirkėjas "
+            "Atvirkštinis PVM: PVM apskaičiuoja ir sumoka pirkėjas "
             "(PVMĮ 96 str.).",
             ParagraphStyle("rvat", fontName=_FONT_NORMAL, fontSize=8,
                            textColor=colors.HexColor("#666666"), leading=11),
@@ -7191,7 +7203,10 @@ def _build_chat_context(project: dict) -> dict:
         # Server-side money roll-up over the FULL list (not the 100-row slice),
         # so the assistant never has to add 70+ rows in its head — and can still
         # answer totals honestly when the row list itself is truncated.
-        "kainu_suvestine": _chat_price_summary(_darbai_src, project.get("vat_rate", 21)),
+        # Reverse VAT → 0 %, by the same rule as the top bar and the files.
+        "kainu_suvestine": _chat_price_summary(
+            _darbai_src,
+            0 if _is_reverse_vat(project) else project.get("vat_rate", 21)),
         "warnings": [
             {"level": w.get("level"), "room": w.get("room"), "message": w.get("message")}
             for w in (sanity.get("warnings") or [])[:30]

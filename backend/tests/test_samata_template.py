@@ -420,6 +420,66 @@ def test_a_price_rides_along_from_the_row_that_filled_the_cell():
     assert widget["suma"] == 35.0
 
 
+# ── A merged cell's money (audit 2026-09-29, exports-money-1) ────────────────
+# Several of our rows feed one of HIS lines. The quantity is their sum; the
+# amount must be each row's quantity × THAT row's price — never the summed
+# quantity at the first row's price, which billed pendant lights at the
+# recessed-light rate and an unpriced row at its neighbour's price.
+
+_RU = [{"op": "sum", "label": "Σ", "value": 1.0}]
+
+
+def _widget_cell(*priced):
+    """Render two ledgered widget rows (30 + 5 vnt) with the given prices."""
+    t = build_template(FIVE)
+    app = [_app("Widget assembly (lubiniai)", "vnt", 30.0, id="w1",
+                roll_up=_RU, **({"kaina": priced[0]} if priced[0] is not None else {})),
+           _app("Widget assembly (pakabinami)", "vnt", 5.0, id="w2",
+                roll_up=_RU, **({"kaina": priced[1]} if priced[1] is not None else {}))]
+    rows = render_samata(t, app, rooms=[{"nr": "1"}])
+    return next(r for r in rows if r["_sablono_eile"] == "c:widget")
+
+
+def test_a_merged_cell_with_different_prices_sums_each_rows_own_amount():
+    cell = _widget_cell(25.0, 15.0)
+    assert cell["kiekis"] == 35.0
+    assert cell["suma"] == 825.0            # 30 × 25 + 5 × 15, not 35 × 25
+    assert cell["kaina"] is None            # no single unit price to print
+    assert cell["_suma_be_vieneto_kainos"] is True
+    assert not cell.get("_dalis_be_kainos")
+    assert cell["_pastaba"] == st.NOTE_MIXED_PRICES
+    assert "kaina_source" not in cell
+
+
+def test_a_merged_cell_with_an_unpriced_row_bills_only_the_priced_part():
+    cell = _widget_cell(25.0, None)
+    assert cell["kiekis"] == 35.0
+    assert cell["suma"] == 750.0            # the unpriced 5 vnt carry no amount
+    assert cell["kaina"] is None
+    assert cell["_suma_be_vieneto_kainos"] is True
+    assert cell["_dalis_be_kainos"] is True
+    assert cell["_pastaba"] == st.NOTE_PART_UNPRICED
+
+
+def test_a_merged_cell_with_equal_prices_is_unchanged():
+    cell = _widget_cell(25.0, 25.0)
+    assert cell["kaina"] == 25.0
+    assert cell["suma"] == 875.0
+    assert cell["_pastaba"] is None
+    assert "_suma_be_vieneto_kainos" not in cell
+    assert "_dalis_be_kainos" not in cell
+
+
+def test_a_merged_cell_with_no_prices_is_unchanged():
+    cell = _widget_cell(None, None)
+    assert cell["kiekis"] == 35.0
+    assert cell["kaina"] is None
+    assert "suma" not in cell
+    assert cell["_pastaba"] is None
+    assert "_suma_be_vieneto_kainos" not in cell
+    assert "_dalis_be_kainos" not in cell
+
+
 # ── Itemised families ────────────────────────────────────────────────────────
 # He bills GKP ceilings by carcass height, tiles by format, a mixer by concealed
 # vs exposed part. Collapsing those into one summed cell was the ONLY thing the

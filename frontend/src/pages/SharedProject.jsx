@@ -11,6 +11,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Eye, ArrowLeft, Building2 } from 'lucide-react';
 import { API_BASE as API } from '../lib/apiBase';
+import { isReverseVat, vatPercent } from '../lib/vatMode';
 
 // LT number formatting — same idiom as ProjectMainView (space thousands, comma
 // decimals). The share link is what the CLIENT sees, and it was the one surface
@@ -75,9 +76,9 @@ export default function SharedProject() {
   // Reverse-VAT (atvirkštinis PVM) for renovation: no output VAT — must match the
   // Excel/PDF export, which already does this. Otherwise the share link over-states
   // the price by 21% and prints an illegal VAT line. (2026-06-19 deliverable hunt.)
-  const reverseVat = (p.vat_mode || '').toLowerCase() === 'reverse_vat'
-    || (p.archetipas || '').toLowerCase() === 'renovacija';
-  const vatRate = reverseVat ? 0 : (p.vat_rate || 21) / 100;
+  // One rule for the contractor's choice vs the drawing label: lib/vatMode.js.
+  const reverseVat = isReverseVat(p);
+  const vatRate = vatPercent(p) / 100;
   const sumWithVat = sumNoVat * (1 + vatRate);
   const totalArea = patalpos.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
 

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   EXTRA_SECTION, FILL, LAYOUT_PATHON, LAYOUT_TEMPLATE, acceptSuggestion, canTypeQuantity, darbaiFingerprint,
-  exportRows, groupBySection, hasLayoutChoice, isTypedRow, loadLayoutChoice, saveLayoutChoice, sectionsOf,
-  setPrice, summarize, typeQuantity, typedSourceRow,
+  exportRows, groupBySection, hasLayoutChoice, isTypedRow, lacksPrice, lineAmount, loadLayoutChoice,
+  saveLayoutChoice, scaleExportRow, sectionsOf, setPrice, summarize, typeQuantity, typedSourceRow,
 } from './samataTemplate.js';
 
 // Every label below is invented — no customer wording.
@@ -163,4 +163,58 @@ test('an uploaded template is the default layout until he picks one himself', ()
   } finally {
     globalThis.localStorage = saved;
   }
+});
+
+// ── A merged line without one unit price (audit 2026-09-29) ─────────────────
+// Several of our rows fed one of HIS lines at different prices, or only some of
+// them priced. The render sends the line's amount and no unit price.
+const mixed = {
+  nr: 5, skyrius: 'Alfa darbai', aprasymas: 'Widget montavimas (visi)', mato_vnt: 'vnt',
+  kiekis: 35, kaina: null, suma: 825, id: 'tpl-mixed', _sablonas: true,
+  _sablono_eile: 'c:widget', _pildymas: FILL.DONE, _saltinio_id: ['w-1', 'w-2'],
+  _suma_be_vieneto_kainos: true,
+};
+const partial = {
+  ...mixed, aprasymas: 'Widget montavimas (dalis)', id: 'tpl-partial', suma: 750,
+  _dalis_be_kainos: true,
+};
+
+test('lineAmount is his unit price × quantity, or a merged line\'s own amount', () => {
+  assert.equal(lineAmount(done), 140);
+  assert.equal(lineAmount(mixed), 825, 'not 35 × a borrowed price');
+  assert.equal(lineAmount(partial), 750);
+  assert.equal(lineAmount(kita), 0, 'a zero price is zero money, as before');
+  assert.equal(lineAmount({ ...done, kaina: null }), null, 'no price, no amount');
+  assert.equal(lineAmount(blank), null);
+  assert.equal(lineAmount(suggested), null, 'a suggestion has no quantity yet');
+});
+
+test('exportRows sends a merged line as its amount with a blank price', () => {
+  const [m, p, d, k] = exportRows([mixed, partial, done, kita]);
+  assert.equal(m.kaina, null, 'Kaina stays blank, never 0,00');
+  assert.equal(m.suma, 825);
+  assert.equal(p.kaina, null);
+  assert.equal(p.suma, 750);
+  assert.equal(d.kaina, 7, 'a single-price line is unchanged');
+  assert.equal(d.suma, 140);
+  assert.equal(k.kaina, 0, 'an unpriced line is unchanged');
+  assert.equal(k.suma, 0);
+});
+
+test('lacksPrice counts a partly unpriced merged line, not a fully priced one', () => {
+  const [m, p, d, k] = exportRows([mixed, partial, done, kita]);
+  assert.equal(lacksPrice(m), false);
+  assert.equal(lacksPrice(p), true);
+  assert.equal(lacksPrice(d), false);
+  assert.equal(lacksPrice(k), true);
+  assert.equal(lacksPrice({ kiekis: 2, kaina: 3 }), false, 'a Pathon-layout row reads as before');
+  assert.equal(lacksPrice({ kiekis: 2, kaina: 0 }), true);
+});
+
+test('scaleExportRow multiplies a merged line\'s amount, not a blank price', () => {
+  const [m, d, b] = exportRows([mixed, done, blank]);
+  assert.deepEqual([scaleExportRow(m, 3).kiekis, scaleExportRow(m, 3).suma, scaleExportRow(m, 3).kaina],
+    [105, 2475, null]);
+  assert.equal(scaleExportRow(d, 3).suma, 420);
+  assert.equal(scaleExportRow(b, 3), b, 'a blank cell stays blank');
 });
