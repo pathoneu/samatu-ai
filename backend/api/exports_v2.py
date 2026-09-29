@@ -53,21 +53,16 @@ def _require_project_access(request: Request, project_id: str) -> dict:
     previously took only a project_id path param, so any caller who knew (or
     guessed) a project UUID could GET the project's full priced line-item export
     (quantities + unit prices + grand totals) with no login and no ownership
-    check. Mirrors the owner-scoping guard used across main.py's project routes
+    check. Delegates to the canonical gate, auth.require_owned_project
     (require_user → admin sees all, otherwise scope db.get_project to user["id"]).
 
-    Raises 401 if not logged in, 403 if the project belongs to another user,
-    404 if there is no such project. Returns the caller's user dict.
+    Raises 401 if not logged in, and 404 — the same answer — both when the
+    project belongs to another user and when there is no such project, so the
+    API never says whether an id exists (docs/SECURITY.md §3; these routes
+    answered 403 for a foreign project until 2026-09-29). Returns the caller's
+    user dict.
     """
-    user = _auth.require_user(request)  # 401 if not logged in
-    user_filter = None if user.get("is_admin") else user["id"]
-    if db.get_project(project_id, user_id=user_filter) is not None:
-        return user
-    # Owner-scoped fetch missed — distinguish "doesn't exist" (404) from
-    # "exists but you don't own it" (403) so the caller gets an honest status.
-    if db.get_project(project_id) is None:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found.")
-    raise HTTPException(status_code=403, detail="Neturite teisės į šį projektą")
+    return _auth.require_owned_project(request, project_id)
 
 
 _SALTINIS_TO_F2_SOURCE = {

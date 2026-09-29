@@ -49,11 +49,6 @@ _PINNED_FOREIGN_CODES: dict[tuple[str, str], set[int]] = {
     # project, someone else's id is refused. Pinned by
     # test_sweep_2026_07_28_save_path.py::test_f8_ownership_still_wins_over_conflict.
     ("PUT", "/api/projects/{project_id}"): {403},
-    # F2/F3 exports answer 403 (not 404) to another user. Pinned by
-    # test_export_auth.py::test_export_blocks_cross_user.
-    ("GET", "/api/export/v2/f2/{project_id}.csv"): {403},
-    ("GET", "/api/export/v2/f2/{project_id}.json"): {403},
-    ("GET", "/api/export/v2/f3/{project_id}.json"): {403},
 }
 
 # Dummy values for path parameters other than project_id.

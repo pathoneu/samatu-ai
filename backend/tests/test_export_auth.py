@@ -7,8 +7,12 @@ line-item export (quantities + unit prices + grand totals) without logging in
 or owning the project. These tests pin the closed gap:
 
   - anonymous caller            → 401
-  - authenticated non-owner     → 403
+  - authenticated non-owner     → 404, the same answer a missing id gets
+                                  (docs/SECURITY.md §3: never say whether an id
+                                  exists; these routes answered 403 until
+                                  2026-09-29)
   - the owner                   → 200 (gate must not block legitimate access)
+  - an admin                    → 200 on anyone's project, as before
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -73,8 +77,13 @@ def test_export_blocks_cross_user(tmp_path, monkeypatch, route):
     db.create_user("attacker@x.lt", auth.hash_password(_PW), name="Att")
     db.upsert_project("proj-1", _PROJECT, user_id=owner["id"])
 
-    r = _logged_in_client("attacker@x.lt").get(route)
-    assert r.status_code == 403, r.text
+    attacker = _logged_in_client("attacker@x.lt")
+    r = attacker.get(route)
+    assert r.status_code == 404, r.text
+    # Byte-for-byte the answer for an id that does not exist (same length id).
+    missing = attacker.get(route.replace("proj-1", "proj-9"))
+    assert missing.status_code == 404, missing.text
+    assert r.json() == {"detail": missing.json()["detail"].replace("proj-9", "proj-1")}
 
 
 def test_export_owner_can_download(tmp_path, monkeypatch):
@@ -85,3 +94,14 @@ def test_export_owner_can_download(tmp_path, monkeypatch):
     r = _logged_in_client("owner@x.lt").get("/api/export/v2/f2/proj-1.json")
     assert r.status_code == 200, r.text
     assert r.json()["rows"], "owner export should contain the priced rows"
+
+
+@pytest.mark.parametrize("route", _ROUTES)
+def test_export_admin_reads_any_project(tmp_path, monkeypatch, route):
+    _isolate(tmp_path, monkeypatch)
+    owner = db.create_user("owner@x.lt", auth.hash_password(_PW), name="Owner")
+    db.create_user("admin@x.lt", auth.hash_password(_PW), name="Adm", is_admin=True)
+    db.upsert_project("proj-1", _PROJECT, user_id=owner["id"])
+
+    r = _logged_in_client("admin@x.lt").get(route)
+    assert r.status_code == 200, r.text
