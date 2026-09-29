@@ -39,6 +39,8 @@ SNAPSHOT = (Path(__file__).resolve().parents[1]
 
 @pytest.fixture(scope="module")
 def blob() -> dict:
+    if not SNAPSHOT.exists():  # backend/data/ is gitignored: absent in a fresh checkout (CI)
+        pytest.skip(f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)")
     return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
 

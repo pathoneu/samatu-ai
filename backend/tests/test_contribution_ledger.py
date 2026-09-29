@@ -39,6 +39,10 @@ client = TestClient(app)
 
 SNAPSHOT = ROOT / "data" / "demo-objektas-a-snapshot-20260714.json"
 CORPUS = sorted((ROOT.parent / "ground_truth").glob("*/ai_extract.json"))
+# backend/data/ is gitignored, so a fresh checkout (CI) has no snapshot: skip, don't fail.
+_NO_SNAPSHOT = f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)"
+SNAPSHOT_PARAM = pytest.param(SNAPSHOT, marks=pytest.mark.skipif(not SNAPSHOT.exists(),
+                                                                 reason=_NO_SNAPSHOT))
 
 
 @pytest.fixture
@@ -48,6 +52,8 @@ def blob() -> dict:
     test's rebuild decide whether the next one passed: the exclusion test below
     only saw an excluded room after `test_kampai_terms_…` had run the recompute
     over the shared dict, and failed when run alone."""
+    if not SNAPSHOT.exists():
+        pytest.skip(_NO_SNAPSHOT)
     return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
 
@@ -91,7 +97,7 @@ def _ledger_c(room: dict, value: float) -> dict:
 
 # ── the keystone ────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+@pytest.mark.parametrize("fixture", [SNAPSHOT_PARAM] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_every_ledger_replays_to_its_kiekis(fixture: Path):
     rows = _shipped(json.loads(fixture.read_text(encoding="utf-8")))
@@ -105,7 +111,7 @@ def test_every_ledger_replays_to_its_kiekis(fixture: Path):
             f"billed {row['kiekis']}")
 
 
-@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+@pytest.mark.parametrize("fixture", [SNAPSHOT_PARAM] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_no_ledger_leans_on_a_rounding_step(fixture: Path):
     """The keystone above only proves the chain ENDS at `kiekis`; without this
@@ -144,7 +150,7 @@ def test_attach_refuses_to_reconcile_a_chain_that_is_simply_wrong():
     assert rounding_bound(12.0) == 0.05
 
 
-@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+@pytest.mark.parametrize("fixture", [SNAPSHOT_PARAM] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_the_ledger_keys_are_exactly_what_the_frontend_reads(fixture: Path):
     for row in _ledgered(_shipped(json.loads(fixture.read_text(encoding="utf-8")))):
@@ -331,7 +337,7 @@ _RESTATES_THE_PREDICATE = (
 )
 
 
-@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+@pytest.mark.parametrize("fixture", [SNAPSHOT_PARAM] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_an_excluded_room_names_the_predicate_not_the_outcome(fixture: Path):
     """„Šios patalpos sienos nedažomos" tells the contractor what he can already
@@ -445,7 +451,7 @@ def test_a_prielaidos_edit_rebuilds_the_ledger(blob):
 from test_confidence_reasons_are_for_the_user import BANNED  # noqa: E402
 
 
-@pytest.mark.parametrize("fixture", [SNAPSHOT] + CORPUS,
+@pytest.mark.parametrize("fixture", [SNAPSHOT_PARAM] + CORPUS,
                          ids=[SNAPSHOT.stem] + [p.parent.name for p in CORPUS])
 def test_every_ledger_string_guides_rather_than_confesses(fixture: Path):
     for row in _ledgered(_shipped(json.loads(fixture.read_text(encoding="utf-8")))):

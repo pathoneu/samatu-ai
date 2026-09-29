@@ -41,6 +41,8 @@ SNAPSHOT = (Path(__file__).resolve().parents[2]
 def blob() -> dict:
     """The shipped demo snapshot: 11 rooms, 73 pozicijos, 73 priced
     darbu_sarasas rows — i.e. exactly the production shape."""
+    if not SNAPSHOT.exists():  # backend/data/ is gitignored: absent in a fresh checkout (CI)
+        pytest.skip(f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)")
     return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
 

@@ -453,6 +453,8 @@ def test_the_ledger_is_read_from_darbu_sarasas_never_from_pozicijos(objektas_a):
     assert payload["ledger_available"] is False
 
 
+@pytest.mark.skipif(not SNAPSHOT.exists(),  # backend/data/ is gitignored: absent in CI
+                    reason=f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)")
 def test_no_ledger_is_reported_not_silently_empty():
     """A project last recomputed before 2026-09-02 has no ledger. „No data
     yet" and „this room contributes nothing" are different statements."""

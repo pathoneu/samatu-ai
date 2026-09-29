@@ -1,0 +1,66 @@
+# CI: run the backend and frontend test suites on every push / PR to the two
+# branches that deploy or are about to. It does NOT gate the deploys by itself:
+# Vercel and Railway deploy on push unless they are told to wait for checks.
+name: CI
+
+on:
+  push:
+    branches: [main, viewer-rebuild]
+  pull_request:
+    branches: [main, viewer-rebuild]
+
+# A newer push to the same branch cancels the older, still-running check.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"  # production (nixpacks.toml) runs python312
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: System libraries (pdf2image needs poppler; opencv needs libGL + glib)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils libgl1 libglib2.0-0t64
+      - name: Install the locked dependencies
+        run: pip install -r backend/requirements.lock
+      - name: Backend tests
+        working-directory: backend
+        env:
+          SAMATU_AUTH_DISABLED: "1"
+          SAMATU_DB_PATH: ${{ runner.temp }}/ci-test.db
+          # main.py reads the key at import. This placeholder is not a secret and
+          # would be refused by the API if any call ever reached it.
+          ANTHROPIC_API_KEY: ci-placeholder-no-api-calls
+        run: python -m pytest -q -p no:cacheprovider
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"  # the version the suite runs on locally (v20.19)
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Unit tests
+        run: node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js
+      - name: Lint
+        run: npx eslint . --quiet
+      - name: Build
+        run: npx vite build

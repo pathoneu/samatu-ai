@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   mergeDarbuSarasasEdits,
   carriedOrphans,
@@ -215,7 +215,11 @@ test('merging is idempotent — carried orphans do not multiply', () => {
 
 // ── against the real 73-row blob ─────────────────────────────────────────────
 
-test('the real demo blob loses no row and no euro on a 61-row rebuild', () => {
+// backend/data/ is gitignored, so a fresh checkout (CI) has no snapshot: skip, don't fail.
+const NO_SNAPSHOT = !existsSync(SNAPSHOT)
+  && 'demo-objektas-a-snapshot-20260714.json is not in this checkout (backend/data/ is gitignored)';
+
+test('the real demo blob loses no row and no euro on a 61-row rebuild', { skip: NO_SNAPSHOT }, () => {
   const blob = JSON.parse(readFileSync(SNAPSHOT, 'utf-8'));
   const old = blob.darbu_sarasas.map((r, i) => ({
     ...r, kaina: r.kaina || 10 + i,
