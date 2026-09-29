@@ -1687,11 +1687,24 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
     return pozicijos
 
 
+# Vision's own labels for a room height it says it READ (prompt.py schema) — its `default_fallback` is not one
+_VISION_READ_HEIGHTS = ("section_pjuvis", "ceiling_plan_annotation")
+
+
 def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
                             section_average: float,
                             name_key: str = "name") -> list[dict]:
     """Sprint 0 Fix 4: use Vision's per-room ceiling heights when available
     and the flag is enabled; otherwise apply section average to all rooms.
+
+    One room's height, strongest source first (2026-09-29): his own entry →
+    the altitude printed inside the room (height_markers) → the height the plan
+    states (plan_area_annotations, `plano_uzrasas`) → the room's own height the
+    rounds voted, when Vision says it read it → the name/number map from the
+    sections (`per_room`) → the section average. A weaker source never replaces
+    a stronger one; the label names the winner. The per-room steps are Vision's
+    and stay behind the flag. When the rounds disagreed, their heights are kept
+    as `_lubu_aukstis_sklaida` for the check sheet.
 
     Returns a NEW list of room dicts (not in-place mutation).
 
@@ -1704,7 +1717,22 @@ def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
     for r in rooms:
         room = {**r}
         room_name = r.get(name_key)
-        if flag_on and room_name and room_name in per_room:
+        src = str(r.get("lubu_aukstis_saltinis") or "").strip().lower()
+        has_own = r.get("lubu_aukstis_m") is not None
+        votes = [float(v) for v in (((r.get("_vote") or {}).get("lubu_aukstis_m") or {}).get("values") or [])
+                 if v is not None]
+        if len(set(votes)) > 1:
+            room["_lubu_aukstis_sklaida"] = {"values": votes, "min_m": min(votes), "max_m": max(votes)}
+        if src in ("user_override", "manual") and has_own:
+            pass                                              # his own entry
+        elif r.get("_height_source") == "positioned_marker" and r.get("_height_marker_m") is not None:
+            room["lubu_aukstis_m"] = float(r["_height_marker_m"])
+            room["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
+        elif src in ("ceiling_plan_marker", "plano_uzrasas") and has_own:
+            pass                                              # printed in the room / stated on the plan
+        elif flag_on and src in _VISION_READ_HEIGHTS and has_own:
+            pass                                              # the room's own voted height, its label says from where
+        elif flag_on and room_name and room_name in per_room:
             room["lubu_aukstis_m"] = per_room[room_name]
             room["lubu_aukstis_saltinis"] = "per_room"
         else:
@@ -6267,7 +6295,8 @@ def extract_interior(
         # skip it, else the room keeps the section-average height and the
         # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
         # zoom-once regression where 10/11 objektas_a rooms got a uniform 2.82 m.)
-        if (r.get("lubu_aukstis_saltinis") or "section_average") != "per_room":
+        # (2026-09-29: the room's own voted height keeps Vision's label — resolved the same way.)
+        if (r.get("lubu_aukstis_saltinis") or "section_average") not in ("per_room", *_VISION_READ_HEIGHTS):
             return False
         return True
 
