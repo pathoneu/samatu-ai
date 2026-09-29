@@ -50,6 +50,7 @@ from __future__ import annotations
 from typing import Any
 
 from .page_classifier import canonical_tipas
+from .universal_rules import REMOVED_OPENINGS_KEY, kiekis_units
 
 # ── the six facts, in the order the check sheet walks them ──────────────────
 FACT_KEYS = ("plotas", "perimetras", "aukstis", "apdaila", "angos", "grindys")
@@ -1116,7 +1117,7 @@ def _listed_beyond(project: dict, room: dict, openings: list[dict]) -> set[int]:
             w = _f(el.get("plotis_mm"))
             if leads != mine and w and abs(w / 1000.0 - float(o["plotis_m"])) > 0.16:
                 continue
-            units = int(_f(el.get("kiekis")) or 1)
+            units = kiekis_units(_f(el.get("kiekis")))       # a door he removed (0) claims nothing
             if claimed.get((str(o.get("i")), j), 0) >= units:
                 continue
             claimed[(str(o.get("i")), j)] = claimed.get((str(o.get("i")), j), 0) + 1
@@ -1129,9 +1130,11 @@ def _stood_in_walls(elems: list[dict]) -> dict | None:
     """What the walls pass (universal_rules.reconcile_openings_with_walls) recorded on this room's elements:
     the openings its units stand in, the passages, the doors no opening backs — or None for a room the
     pass has not seen (an older blob), which keeps the count-only cross-check below."""
-    if not any(e.get("_anga_ks") or e.get("_be_angos") or e.get("_praejimas") for e in elems):
+    if not any(e.get("_anga_ks") or e.get("_be_angos") or e.get("_praejimas") or e.get(REMOVED_OPENINGS_KEY)
+               for e in elems):
         return None
     consumed: set[int] = set()
+    removed: list[dict] = []                                   # openings he emptied (universal_rules._hold_removed_openings)
     passages: set[int] = set()
     unbacked = 0
     added: list[dict] = []                                     # what the pass added because the drawing shows it
@@ -1142,14 +1145,19 @@ def _stood_in_walls(elems: list[dict]) -> dict | None:
         if e.get("_praejimas"):
             passages.update(ks)
         if e.get("_be_angos") and (e.get("tipas") or "") in _DOOR_TIPAI:
-            unbacked += int(_f(e.get("kiekis")) or 1)
+            unbacked += kiekis_units(_f(e.get("kiekis")))
+        for t in e.get(REMOVED_OPENINGS_KEY) or []:
+            if isinstance(t, dict) and isinstance(t.get("k"), int):
+                consumed.add(t["k"])
+                removed.append({"tipas": e.get("tipas") or "", "plotis_m": _f(t.get("w")) or 0.0, "i": str(t.get("i") or "")})
         if e.get("_pridėta_pagal_sienas") and e.get("_nupiesta") and not e.get("_praejimas"):
             added.append({"tipas": e.get("tipas") or "", "plotis_m": (_f(e.get("plotis_mm")) or 0) / 1000.0,
                           "i": str(e.get("_anga_i") or e.get("_is_sienu_angos") or ""), "nupiesta": e.get("_nupiesta"),
                           "lauko": bool(e.get("_exterior"))})
         if e.get("_tipas_pagal_brezini"):
             converted.append({"plotis_m": (_f(e.get("plotis_mm")) or 0) / 1000.0, "i": str(e.get("_anga_i") or "")})
-    return {"consumed": consumed, "passages": passages, "unbacked": unbacked, "added": added, "converted": converted}
+    return {"consumed": consumed, "passages": passages, "unbacked": unbacked, "added": added, "converted": converted,
+            "removed": removed}
 
 
 def _drawn_said(stood: dict) -> str:
@@ -1164,6 +1172,12 @@ def _drawn_said(stood: dict) -> str:
     said = ""
     if parts:
         said = " Pagal brėžinį pridėta: " + "; ".join(parts) + "."
+    gone = [f"{'langas' if r['tipas'] == 'langas' else 'durys'} {lt_num(r['plotis_m'])} m {_leads_to(r['i'])}"
+            for r in stood.get("removed") or []]
+    if gone:
+        # his removal on the room sheet (universal_rules._hold_removed_openings): the opening stays empty
+        said += (" Jūs pašalinote: " + "; ".join(gone) + (" — sienose anga matoma" if len(gone) == 1
+                 else " — sienose angos matomos") + ", bet sąmatoje neskaičiuojama.")
     for c in stood.get("converted") or []:
         said += (f" Sąraše buvo langas, o angoje {_leads_to(c['i'])} nupieštos durys su lanku — "
                  f"įrašytos lauko durys {lt_num(c['plotis_m'])} m.")
@@ -1213,7 +1227,7 @@ def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stoo
         parts.append("Be durų: " + "; ".join(named) + ".")
     if unbacked:
         parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — patikrinkite patalpoje.")
-    if not suggestions and not unbacked and not named:
+    if not suggestions and not unbacked and not named and not stood.get("removed"):
         parts = [f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje."]
     return " ".join(parts) + _drawn_said(stood) + tail_beyond, bool(suggestions or unbacked), suggestions
 
@@ -1272,7 +1286,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
     schedule_page = None
     for e in elems:
         tipas = e.get("tipas") or ""
-        n = int(_f(e.get("kiekis")) or 1)
+        n = kiekis_units(_f(e.get("kiekis")))                  # the 0 he stepped down to shows as 0
         total += n
         # a passage is counted as what it is — „2 langai, 2 praėjimai", not „1 paslėptos durys, 1 durys"
         counted_as = "praejimas" if e.get("_praejimas") else tipas
@@ -1332,7 +1346,7 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
 
     # Summed per type, not per element: two door rows of one door each read as
     # „2 durys", the way he would say it.
-    counts = ", ".join(f"{n} {element_label(t, n)}" for t, n in per_type.items())
+    counts = ", ".join(f"{n} {element_label(t, n)}" for t, n in per_type.items() if n) or "Durų ir langų neliko"
     zin = None
     if anchored:
         zin = (int(schedule_page) if schedule_page

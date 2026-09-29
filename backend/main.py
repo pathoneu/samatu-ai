@@ -6650,8 +6650,19 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             # recompute counted the drawing's openings. Same contract as
             # api.recompute_quantities._calc_input (2026-09-07; parity test in
             # tests/test_recompute_interior_parity.py).
-            from api.recompute_quantities import _calc_input
-            recalc = calc_room_quantities(_calc_input(room), rules=single_rules)
+            from api.recompute_quantities import _calc_input, _walls_paint_choice, _with_paint_choice
+            calc_in = _calc_input(room)
+            # His per-room „Dažomos / Nedažomos" rides in the assumptions on
+            # every recompute — honoured here exactly as the Prielaidos path
+            # does, so a room edit does not quietly paint the walls he said are
+            # not painted (audit calc-engine-3, 2026-09-29).
+            try:
+                _wp = _walls_paint_choice((payload.rules_override or {}).get("walls_paint_override"), str(nr))
+            except (TypeError, ValueError):
+                _wp = None                      # a malformed stored choice: the Prielaidos path reports it
+            if _wp is not None:
+                calc_in = _with_paint_choice(calc_in, rt_rules, _wp)
+            recalc = calc_room_quantities(calc_in, rules=single_rules)
         except Exception as exc:  # noqa: BLE001
             log.warning("[recompute-interior] room %s calc failed: %s",
                         room.get('nr'), exc)

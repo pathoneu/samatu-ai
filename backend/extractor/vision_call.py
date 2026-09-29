@@ -27,7 +27,7 @@ from .prompt import (
 )
 from models_config import model_for
 from . import ledger as _ledger
-from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -1092,7 +1092,7 @@ def _elementai_to_counts(elementai: list) -> dict:
     door_areas, window_areas, niche_lengths = [], [], []
     for el in (elementai or []):
         tipas = (el.get("tipas") or "").lower()
-        kiekis = int(el.get("kiekis") or 1)
+        kiekis = kiekis_units(el.get("kiekis"))   # an explicit 0 he set is none (calc-engine-4)
         plotis_mm = el.get("plotis_mm") or 0
         aukstis_mm = el.get("aukstis_mm") or 0
         ilgis_m = el.get("ilgis_m") or 0
@@ -1342,7 +1342,7 @@ def _calc_nisu_metrai_m(elementai: list) -> float:
             if ilgis > 0:
                 total += ilgis  # ilgis_m is total per room — do NOT multiply by kiekis
             else:
-                kiekis = int(el.get("kiekis") or 1)
+                kiekis = kiekis_units(el.get("kiekis"))
                 plotis_mm = float(el.get("plotis_mm") or 0)
                 if plotis_mm > 0:
                     total += (plotis_mm / 1000 + 0.40) * kiekis
@@ -3139,7 +3139,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         def _tile_plinth(r: dict) -> float:
             if float(r.get("plyteles_grindys_m2") or 0) <= 0 or _pask(r) in WET:
                 return 0.0
-            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+            n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
             return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10
 
@@ -3971,7 +3971,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             })
         else:
             # Fallback: opening-count heuristic when no symbols detected
-            n_holes = sum(int(el.get("kiekis") or 1)
+            n_holes = sum(kiekis_units(el.get("kiekis"))
                           for r in rooms_pl if _pask(r) in WET
                           for el in (r.get("elementai") or [])
                           if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris", "langas"))
@@ -4029,7 +4029,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         def _tile_wall_base_m(r: dict) -> float:
             """The wall base a tile-floor room offers skirting: perimeter less
             0,85 m per door, +10 % waste — the same primitives as the MDF line."""
-            n_d = sum(int(el.get("kiekis") or 1) for el in (r.get("elementai") or [])
+            n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
             return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
 

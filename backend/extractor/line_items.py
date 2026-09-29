@@ -43,6 +43,14 @@ def _get(d: dict, key: str, default=None):
     return d.get(key, default)
 
 
+def _units(op) -> int:
+    """`count`, else `kiekis`, else one unit — but an explicit 0 he set on the room sheet stays 0
+    (universal_rules.kiekis_units, audit calc-engine-4)."""
+    from .universal_rules import kiekis_units
+    raw = _get(op, "count")
+    return kiekis_units(raw if raw not in (None, "") else _get(op, "kiekis"))
+
+
 def _as_float(value, default: float = 0.0) -> float:
     try:
         f = float(value)
@@ -87,7 +95,7 @@ def _opening_dims(op) -> tuple[float, float, int]:
         mm = _get(op, "height_mm") or _get(op, "aukstis_mm")
         if mm:
             h = _as_float(mm) / 1000.0
-    count = int(_get(op, "count") or _get(op, "kiekis") or 1)
+    count = _units(op)
     if t in ("door", "hidden_door"):
         return (
             _as_float(w, DEFAULT_DOOR_W_M),
@@ -226,7 +234,7 @@ def _frameless_units(op, frameless_default: bool, chosen_framed: bool = False) -
         # wider than 1,3 m an interior „door" is a passage or a double leaf (universal_rules.FRAMELESS_MAX_W_M)
         frameless = ((t == "hidden_door" and not chosen_framed) or (frameless_default and t == "door")) and (w_m <= 1.3 or bool(_get(op, "_anga_i")))
     if frameless and t in ("hidden_door", "door"):
-        count = int(_get(op, "count") or _get(op, "kiekis") or 1)
+        count = _units(op)
         try:
             shared = int(_get(op, "_bendra_su_n") or 0)
         except (TypeError, ValueError):

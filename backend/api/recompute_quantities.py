@@ -187,6 +187,47 @@ def _calc_input(room: dict) -> dict:
     return {**room, **_elementai_to_counts(room.get("elementai") or [])}
 
 
+def _walls_paint_choice(per_room_paint, nr: str) -> float | None:
+    """His per-room „Dažomos / Nedažomos" (`walls_paint_override`: Prielaidos, the check sheet, the
+    questions) — 1.0, 0.0, or None when he chose nothing for this room. A value that is no number raises
+    ValueError; the callers degrade the room and say so."""
+    if not isinstance(per_room_paint, dict) or nr not in per_room_paint:
+        return None
+    return 1.0 if float(per_room_paint[nr]) >= 0.5 else 0.0
+
+
+def _with_paint_choice(calc_in: dict, rt: dict, wp: float) -> dict:
+    """The calculator input with his paint choice applied (`rt` is the room's rules, set in place).
+    „Nedažomos" travels as the per-room factor override, the one input EVERY wall branch honours first:
+    `walls_paint` alone was overruled by a finishes read, the bathroom paint-above-tile default and the
+    elevation read (audit calc-engine-3, 2026-09-29) — and the room now says why it has no paint
+    (`_walls_unpainted_reason = "override"`)."""
+    rt["walls_paint"] = wp
+    return {**calc_in, "walls_paint_factor_override": 0.0} if wp <= 0 else calc_in
+
+
+# What a room keeps when the calculator's result is merged into it — the same fields as
+# `preserved` in main.recompute_interior (keep the two lists equal).
+_KEPT_ON_RECALC = ("nr", "pavadinimas", "paskirtis", "puslapio_nr", "bbox_pct", "plotas_saltinis",
+                   "lubu_aukstis_saltinis", "lubu_tipas", "confidence", "elementai", "_zoom",
+                   "_zoom_changes")
+
+
+def _apply_recalc(room: dict, recalc: dict, rules_override: dict | None) -> None:
+    """The per-room tail /recompute-interior runs after the calculator (main.recompute_interior): every
+    key the calculator returns replaces the room's, then the materials and the rest (`derive_room_extras`:
+    putty, paint, primer, hidroizoliacija, karnizas, LED, trace). The hand-picked subset this path copied
+    before left the plasterboard ceiling in the wrong height tier and the putty and primer stale after a
+    height edit, so the two endpoints disagreed on the same edit (audit calc-engine-2, 2026-09-29)."""
+    from extractor.vision_call import _elementai_to_counts, derive_room_extras
+    # The calculator echoes the room's identity back NORMALISED (`paskirtis` „svetaine" → „gyvenamoji")
+    # — the room keeps its own, exactly the fields main.recompute_interior's `preserved` holds back.
+    kept = {k: room[k] for k in _KEPT_ON_RECALC if k in room}
+    room.update(recalc)
+    room.update(kept)
+    derive_room_extras(room, _elementai_to_counts(room.get("elementai") or []), rules_override)
+
+
 def _degrade(degradations: list, room: str | None, field: str, reason: str,
              **extra) -> None:
     """Append one machine-readable degradation entry. Silent drops/excepts in the
@@ -274,29 +315,11 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
                     from extractor.universal_rules import calc_room_quantities
                     recalc = calc_room_quantities(
                         _calc_input(room), ceiling_height_m=new_h, rules=rules_all)
-                    # Carry forward the recomputed wall/ceiling/cornice fields.
-                    for k in ("walls_gross_m2", "walls_paintable_m2",
-                              "ceiling_paintable_m2", "dazymo_plotas_m2",
-                              "kampai_m", "kampu_metrai", *_KAMPAI_TERMS,
-                              "lubu_karnizo_m",
-                              "glaistas_kg", "gruntas_l"):
-                        if k in recalc:
-                            room[k] = recalc[k]
-                    # Regenerate the human-readable trace so it matches
-                    # the new H (Playwright regression 2026-05-10).
-                    existing = room.get("elementai") or []
-                    n_doors = sum(int(e.get("kiekis") or 1) for e in existing
-                                  if (e.get("tipas") or "").lower().startswith("dur"))
-                    n_windows = sum(int(e.get("kiekis") or 1) for e in existing
-                                    if (e.get("tipas") or "").lower().startswith("lang"))
-                    perim = _num(room.get("perimetras_m"), 0)
-                    room["calculation_trace"] = (
-                        f"perim({perim:.2f}) × H({new_h:.2f}) = "
-                        f"{perim * new_h:.2f} m² "
-                        f"− {n_windows} lang./{n_doors} dur. atimimai → "
-                        f"dažymas {_num(room.get('dazymo_plotas_m2'), 0):.2f} m². "
-                        f"Skaičiavo Python (deterministinis)."
-                    )
+                    # The same per-room tail as /recompute-interior — every
+                    # computed field (the ceiling's height tier included), the
+                    # materials, and the trace for the new H (Playwright
+                    # regression 2026-05-10).
+                    _apply_recalc(room, recalc, assumptions)
                 except Exception as exc:  # noqa: BLE001 — degrade, never 500
                     _degrade(degradations, nr, "lubu_aukstis",
                              "recompute_failed", stage="calc_room_quantities",
@@ -319,29 +342,21 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
         # Per-room finishing override (2026-07-05): flip walls_paint (raw↔painted)
         # and recompute the paint geometry. Runs AFTER the height block so a room
         # with BOTH overrides gets the combined result (calc reads the already-set
-        # lubu_aukstis_m). Same carry-forward set as the height path.
+        # lubu_aukstis_m). The same per-room tail as the height path (`_apply_recalc`).
         if isinstance(per_room_paint, dict) and nr in per_room_paint:
             try:
-                wp = 1.0 if float(per_room_paint[nr]) >= 0.5 else 0.0
+                wp = _walls_paint_choice(per_room_paint, nr)
                 from extractor.universal_rules import (
                     calc_room_quantities, ROOM_TYPE_RULES, normalize_paskirtis,
                 )
                 pask = normalize_paskirtis(room.get("paskirtis") or "")
                 rt = dict((rules_all or {}).get(pask) or ROOM_TYPE_RULES.get(pask)
                           or ROOM_TYPE_RULES["gyvenamoji"])
-                rt["walls_paint"] = wp
                 room["_walls_paint_override"] = wp
-                recalc = calc_room_quantities(_calc_input(room),
+                recalc = calc_room_quantities(_with_paint_choice(_calc_input(room), rt, wp),
                                               rules={pask: rt})
-                for k in ("walls_gross_m2", "walls_paintable_m2",
-                          "ceiling_paintable_m2", "dazymo_plotas_m2",
-                          "kampai_m", "kampu_metrai", *_KAMPAI_TERMS,
-                          "lubu_karnizo_m",
-                          "glaistas_kg", "gruntas_l",
-                          "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2"):
-                    if k in recalc:
-                        room[k] = recalc[k]
-            except (ValueError, TypeError) as exc:
+                _apply_recalc(room, recalc, assumptions)
+            except Exception as exc:  # noqa: BLE001 — degrade, never 500
                 _degrade(degradations, nr, "walls_paint_override",
                          "recompute_failed", stage="walls_paint_override",
                          error=str(exc)[:120])

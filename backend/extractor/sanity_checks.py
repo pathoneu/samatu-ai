@@ -129,7 +129,8 @@ def check_baseboard_perimeter(rooms):
             # check read only those, so on a live project it counted 0 doors.
             kind = (e.get("tipas") or e.get("type") or "").lower()
             if kind in ("duris", "pasleptos_duris", "durys", "doorway", "door"):
-                door_count += int(e.get("kiekis") or 1)
+                from .universal_rules import kiekis_units
+                door_count += kiekis_units(e.get("kiekis"))
     if total_grind < 1 or total_perim < 1:
         return None
     expected_subtract = door_count * 0.8

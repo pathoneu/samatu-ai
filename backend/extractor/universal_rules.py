@@ -897,6 +897,8 @@ OPENING_INDEX_KEY = "_anga_ks"          # element: indices (in `_angos_sienose.a
 OPENING_SIDE_KEY = "_anga_i"            # element: where that opening leads (room nr / „vidus" / „laukas")
 WIDTH_SOURCE_KEY = "_plotis_pagal"      # element: „sienos" when the width is the wall opening's
 ADDED_FROM_WALLS_KEY = "_pridėta_pagal_sienas"  # door element the walls pass added to a room that had none
+REMOVED_OPENINGS_KEY = "_angos_pasalintos"  # element: openings he emptied on the room sheet — [{k, i, w}], kept empty
+USER_OPENINGS_KEY = "_angos_user_at"     # room: he corrected the doors and windows on the room sheet (lib/roomSheet.js)
 DRAWN_KEY = "_nupiesta"                 # element: what the drawing shows in its opening — „langas" (glazing) / „durys" (swing)
 KIND_BY_DRAWING_KEY = "_tipas_pagal_brezini"  # element: its kind follows the drawing (a listed window stood in a drawn door)
 WALL_WIDTH_TOL_M = 0.25                 # a Vision-read size against the wall's gap
@@ -932,9 +934,18 @@ def _el_width_m(el) -> float | None:
     return w if w > 0 else None
 
 
+def kiekis_units(v) -> int:
+    """`int(v or 1)` — a MISSING count is one unit, as it always was — except that an explicit 0 stays 0:
+    the room sheet keeps an opening he stepped down to zero with `kiekis: 0` (lib/roomSheet.js
+    adjustOpeningCount), and `or 1` counted it as one again (audit calc-engine-4, 2026-09-29)."""
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and v == 0:
+        return 0
+    return int(v or 1)
+
+
 def _el_units(el) -> int:
     try:
-        return max(0, int(el.get("kiekis") or 1))
+        return max(0, kiekis_units(el.get("kiekis")))
     except (TypeError, ValueError):
         return 1
 
@@ -1191,6 +1202,38 @@ def _window_h_mm(room: dict, rooms: list[dict]) -> int:
     return int(STANDARD_WINDOW_H_M * 1000)
 
 
+def _hold_removed_openings(els: list[dict], prev_ks: dict[int, list], free: dict[int, dict]) -> None:
+    """The openings he EMPTIED on the room sheet stay empty (audit calc-engine-4, 2026-09-29). The sheet keeps
+    a unit he removed as a lower `kiekis` on its element (lib/roomSheet.js adjustOpeningCount) and marks the
+    room (`_angos_user_at`); the openings that element stood in on the last run (`_anga_ks`) beyond the units
+    it has now are his removal. They are remembered on the element (`_angos_pasalintos`: index, where it
+    leads, width) and taken out of `free`, so no step stands anything in them and none adds a window or a
+    door there again. A unit he steps back up releases one. An index whose opening changed (the walls read
+    again) holds nothing."""
+    for e in els:
+        held = [t for t in (e.get(REMOVED_OPENINGS_KEY) or []) if isinstance(t, dict)]
+        prev = [k for k in prev_ks.get(id(e)) or [] if isinstance(k, int)]
+        units = _el_units(e)
+        if units < len(prev):
+            held += [{"k": k, "i": free[k]["i"], "w": round(free[k]["w"], 2)} for k in prev[units:] if k in free]
+        elif held and units > len(prev):
+            held = held[:max(0, len(held) - (units - len(prev)))]
+        if held:
+            e[REMOVED_OPENINGS_KEY] = held
+        else:
+            e.pop(REMOVED_OPENINGS_KEY, None)
+        for t in held:
+            o = free.get(t.get("k"))
+            if o is not None and o["i"] == str(t.get("i")) and abs(o["w"] - float(t.get("w") or 0)) <= 0.05:
+                free.pop(o["k"])
+
+
+def _held_toward(el: dict, nr: str) -> bool:
+    """An opening toward room `nr` he emptied on this element (`_hold_removed_openings`) — the room beyond
+    does not add a door of its own in it."""
+    return any(isinstance(t, dict) and str(t.get("i") or "") == nr for t in el.get(REMOVED_OPENINGS_KEY) or [])
+
+
 def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
     """The wall openings the geometry lane read (`_angos_sienose`: width, where they lead, „laukas") are the
     exact list of holes in a room's walls; the doors and windows Vision counted are a list with guessed
@@ -1222,6 +1265,7 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
            "added_windows": 0, "converted": 0, "stood_unbacked": 0}
     for r in rooms:
         els = [e for e in (r.get("elementai") or []) if isinstance(e, dict)]
+        prev_ks = {id(e): e.get(OPENING_INDEX_KEY) for e in els} if r.get(USER_OPENINGS_KEY) else {}
         for e in els:
             for key in (PASSAGE_KEY, UNBACKED_KEY, OPENING_INDEX_KEY, OPENING_SIDE_KEY, DRAWN_KEY):
                 e.pop(key, None)
@@ -1232,6 +1276,8 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
             continue
         out["rooms"] += 1
         free = {o["k"]: o for o in openings}
+        if r.get(USER_OPENINGS_KEY):
+            _hold_removed_openings(els, prev_ks, free)
         fates: dict[int, list[dict]] = {}                      # element index → one fate per unit
 
         def take(o: dict, idx: int, kind: str) -> None:
@@ -1320,7 +1366,7 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                     continue
                 other = by_nr[o["i"]]
                 if any(isinstance(f, dict) and (f.get("tipas") or "").lower() in _DOOR_KINDS
-                       and str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                       and (str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here or _held_toward(f, nr_here))
                        for f in other.get("elementai") or []):
                     continue
                 added = {"tipas": "duris", "kiekis": 1, "plotis_mm": int(round(o["w"] * 100)) * 10,
@@ -1341,7 +1387,7 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                 continue
             other = by_nr[o["i"]]
             if any(isinstance(f, dict) and (f.get("tipas") or "").lower() in _DOOR_KINDS
-                   and str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                   and (str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here or _held_toward(f, nr_here))
                    for f in other.get("elementai") or []):
                 continue
             added = {"tipas": "duris", "kiekis": 1, "plotis_mm": int(round(o["w"] * 100)) * 10,
@@ -1377,7 +1423,8 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
             if o["i"] in by_nr and _to_outside(nr_here, by_nr):
                 continue                                       # a garage adds no doors: the room beyond adds its exterior-type door
             if o["i"] in by_nr and any(isinstance(f, dict) and (f.get("tipas") or "").lower() in _DOOR_KINDS
-                                        and str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                                        and (str(f.get("_is_sienu_angos") or f.get(OPENING_SIDE_KEY) or "") == nr_here
+                                             or _held_toward(f, nr_here))
                                         for f in by_nr[o["i"]].get("elementai") or []):
                 continue
             kind = "exterior" if _to_outside(o["i"], by_nr) else "interior"
@@ -1409,6 +1456,7 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                     piece = dict(e)
                     piece.pop(SHARED_DOOR_KEY, None)
                     piece.pop(SHARED_DOOR_N_KEY, None)
+                    piece.pop(REMOVED_OPENINGS_KEY, None)          # his removal stays on one element
                     r["elementai"].insert(pos + 1, piece)
                     targets.append(piece)
             for piece, group in zip(targets, pieces):
@@ -1768,7 +1816,7 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
         try:
             w = float(el.get("plotis_mm") or 0) / 1000.0
             h = float(el.get("aukstis_mm") or 0) / 1000.0
-            k = int(el.get("kiekis") or 1)
+            k = kiekis_units(el.get("kiekis"))
         except (TypeError, ValueError):
             continue
         if w <= 0 or h <= 0 or k <= 0:
@@ -1963,7 +2011,7 @@ def _openings_in_tile_band_m2(room: dict, band_h_m: float, tile_share: float) ->
         try:
             w = float(el.get("plotis_mm") or 0) / 1000.0
             h = float(el.get("aukstis_mm") or 0) / 1000.0
-            k = max(0, int(el.get("kiekis") or 1))
+            k = max(0, kiekis_units(el.get("kiekis")))
         except (TypeError, ValueError):
             continue
         if tipas in _DOOR_KINDS:
@@ -2974,7 +3022,7 @@ def calc_room_quantities(room: dict,
         elif tipas in ("langas", "stoglangis"):
             # a window without a readable size still has a reveal — the standard one, and confidence.py
             # flags the row for the room whose opening sizes were not read
-            kiekis = int(el.get("kiekis") or 1)
+            kiekis = kiekis_units(el.get("kiekis"))
             w_m = w_mm / 1000.0 if w_mm > 0 else STANDARD_WINDOW_W_M
             h_m = h_mm / 1000.0 if h_mm > 0 else STANDARD_WINDOW_H_M
             if scope["langai"]:
