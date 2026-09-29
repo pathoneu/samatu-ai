@@ -133,7 +133,7 @@ async def upload_pdf(
     request: Request,
     project_id: str = Form(...),
     pdf_file: UploadFile = File(...),
-    user: dict = Depends(_auth.require_billable_user),
+    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
 ) -> dict:
     """Prime the PDF cache for a session. Frontend calls once before the
     first match-template / magic-wand request; subsequent JSON calls
@@ -166,7 +166,7 @@ def _load_project_pdf(project_id: str) -> bytes:
 def match_template(
     body: MatchTemplateBody,
     request: Request,
-    user: dict = Depends(_auth.require_billable_user),
+    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
 ) -> dict:
     _rate_limit(request, "match-template")
     _require_owned_project(user, body.project_id)  # N6: ownership BEFORE compute
@@ -188,7 +188,7 @@ def match_template(
 def magic_wand(
     body: MagicWandBody,
     request: Request,
-    user: dict = Depends(_auth.require_billable_user),
+    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
 ) -> dict:
     _rate_limit(request, "magic-wand")
     _require_owned_project(user, body.project_id)  # N6: ownership BEFORE compute
@@ -207,7 +207,7 @@ def magic_wand(
 def record_decision(
     body: RecordDecisionBody,
     request: Request,
-    user: dict = Depends(_auth.require_billable_user),
+    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
 ) -> dict:
     _rate_limit(request, "record-decision")
     _require_owned_project(user, body.project_id)  # N6: ownership BEFORE record

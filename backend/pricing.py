@@ -173,8 +173,11 @@ def calc_meta_cost_usd(
     """
     extra = calc_extra_calls_cost_usd(meta, cache_ttl)
 
+    # An errored round is priced only when it carries tokens: a cut-off or
+    # refused answer was billed; an exception before the API answered was not.
     rounds = [r for r in (meta.get("voting_models") or [])
-              if r.get("model") and not r.get("error")]
+              if r.get("model") and (not r.get("error") or r.get("input_tokens")
+                                     or r.get("output_tokens"))]
     if rounds:
         return extra + sum(
             calc_claude_cost_usd(

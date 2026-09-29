@@ -4027,7 +4027,10 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
 @app.post("/detect-type")
 async def detect_type(request: Request, file: UploadFile = File(...)):
     """Quick peek — classify PDF as 'kz', 'interior', or 'unknown'."""
-    _billable_user(request)
+    # pdfplumber text scan, no Anthropic call → plain login, no spend
+    # reservation (audit 2026-09-29); per-IP limited like /api/pdf-preflight.
+    _auth.require_user(request)
+    _check_rate_limit(_client_key(request), "detect-type")
     contents = await file.read()
     _validate_pdf_upload(contents, file.filename or "")
     proj_type = await asyncio.to_thread(_detect_project_type, contents)
@@ -5092,6 +5095,8 @@ def generate_excel(request: Request, data: dict):
                     # Blank in, blank out. SUBTOTAL(9,…) skips empty cells, so
                     # the section and grand totals are unaffected.
                     fc.value        = (None if (_his_layout and kiekis in (None, ""))
+                                       else round(_line_amount, 2)
+                                       if _line_amount is not None
                                        else f"=ROUND(D{r}*E{r},2)")
                     fc.fill         = fill
                     fc.border       = border
@@ -6010,7 +6015,11 @@ async def extract_interior_endpoint(
     # (best-effort — never break the extraction on a metering hiccup).
     try:
         if _user and isinstance(result, dict):
-            db.record_usage(_user.get("id"), result, kind="extract-interior")
+            # A failed run's paid tokens count too, under their own kind
+            # (still '%extract%', so the hourly cap sees it). Audit 2026-09-29.
+            _failed = result.get("status") == "error"
+            db.record_usage(_user.get("id"), result,
+                            kind="extract-interior-failed" if _failed else "extract-interior")
     except Exception as _exc:
         log.warning("record_usage failed (extract-interior): %r", _exc)
 
@@ -6330,11 +6339,14 @@ async def extract_interior_stream_endpoint(
                     _sum["medium"] = _sum.get("medium", 0) + 1
                 result["_pdf_page_count"] = validation.get("page_count", 0)
             # Meter Vision cost against the user (best-effort) so the spend
-            # cap can fire. Only on a successful extraction with token usage.
+            # cap can fire — a failed run too, when it carries the tokens it
+            # paid for (record_usage writes nothing without them). Audit 2026-09-29.
             try:
-                if _user and result.get("status") != "error":
+                if _user:
+                    _failed = result.get("status") == "error"
                     db.record_usage(_user.get("id"), result,
-                                    kind="extract-interior-stream")
+                                    kind="extract-interior-stream-failed" if _failed
+                                    else "extract-interior-stream")
             except Exception as _exc:
                 log.warning("record_usage failed (stream): %r", _exc)
 
@@ -6490,7 +6502,9 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     Returns the same shape as /extract-interior (sans _meta zoom/cost stats).
     Used by AssumptionsPanel — user edits a toggle, we recompute synchronously.
     """
-    _billable_user(request)
+    # Pure formulas, no Anthropic call → plain login, no spend reservation and
+    # no € cap: every room edit lands here (audit 2026-09-29).
+    _auth.require_user(request)
     # DoS guard: bound per-request work. A real interior project is tens of
     # rooms; 500 is generous headroom, absurd payloads are rejected.
     if len(payload.patalpos) > 500:
@@ -7612,7 +7626,7 @@ async def click_to_fill_endpoint(
     this project_id. Subsequent clicks for the same project can omit pdf_file
     and reuse the cached PDF (~1h TTL). Returns polygon in PDF point space.
     """
-    _user = _billable_user(request)
+    _user = _auth.require_user(request)  # OpenCV only — no spend reservation
     _check_rate_limit(
         _client_key(request),
         "click-to-fill",
@@ -7716,7 +7730,7 @@ async def detect_room_polygons_endpoint(
     'manual_needed' — never ships a leaked/wrong polygon. rooms_json is a JSON
     list of {nr, plotas_m2}. PDF is taken from pdf_file (cached) or the cache.
     """
-    _n6_user = _billable_user(request)
+    _n6_user = _auth.require_user(request)  # OpenCV only — no spend reservation
     _check_rate_limit(
         _client_key(request),
         "detect-room-polygons",

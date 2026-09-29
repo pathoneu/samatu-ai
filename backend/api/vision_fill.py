@@ -68,7 +68,9 @@ def call_vision_for_polygon(
 @router.post("/vision-fill")
 def vision_fill(
     req: VisionFillRequest,
-    user: dict = Depends(_auth.require_billable_user),
+    # Stub, no Anthropic call (audit 2026-09-29). Wiring a real Vision call
+    # here means switching back to _auth.require_billable_user.
+    user: dict = Depends(_auth.require_user),
 ) -> dict:
     _require_project_ownership(user, req.project_id)
     try:

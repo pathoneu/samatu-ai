@@ -4950,24 +4950,11 @@ def _run_pass1_once(client, system, pages, *,
             ) as stream:
                 resp = stream.get_final_message()
 
-            if resp.stop_reason == "refusal":
-                return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal"}
-            if resp.stop_reason == "max_tokens":
-                return {"status": "error", "_error": "output_truncated", "_stop_reason": "max_tokens"}
-
-            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError:
-                try:
-                    parsed = json.loads(_repair_json(text))
-                    parsed["_repaired"] = True
-                except json.JSONDecodeError as je:
-                    return {"status": "error", "_error": "json_decode_failure",
-                            "_raw_text": text[:4000], "_je": str(je)}
-
-            usage = resp.usage
-            parsed["_meta"] = {
+            # Usage is read BEFORE the stop_reason / JSON checks: a refused, cut
+            # off or unparseable answer was billed in full, and its `_meta`
+            # lets db.record_usage meter it (audit 2026-09-29).
+            usage = getattr(resp, "usage", None)
+            meta = {
                 "input_tokens": getattr(usage, "input_tokens", None),
                 "output_tokens": getattr(usage, "output_tokens", None),
                 "cache_read_tokens": getattr(usage, "cache_read_input_tokens", 0),
@@ -4978,7 +4965,27 @@ def _run_pass1_once(client, system, pages, *,
                 "model": model,
             }
             if experiment_meta:
-                parsed["_meta"]["experiment"] = experiment_meta
+                meta["experiment"] = experiment_meta
+
+            if resp.stop_reason == "refusal":
+                return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal",
+                        "_meta": meta}
+            if resp.stop_reason == "max_tokens":
+                return {"status": "error", "_error": "output_truncated", "_stop_reason": "max_tokens",
+                        "_meta": meta}
+
+            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                try:
+                    parsed = json.loads(_repair_json(text))
+                    parsed["_repaired"] = True
+                except json.JSONDecodeError as je:
+                    return {"status": "error", "_error": "json_decode_failure",
+                            "_raw_text": text[:4000], "_je": str(je), "_meta": meta}
+
+            parsed["_meta"] = meta
             return parsed
         except Exception as exc:
             last_err = exc
@@ -5153,8 +5160,20 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
         if p.get("status") == "error":
             print(f"[voting] round {i + 1} failed: {p.get('_error')}")
             _emit({"event": "voting_round_failed", "round": i + 1, "error": p.get("_error")})
-            per_round_meta.append({"round": i + 1, "model": round_models[i],
-                                   "error": p.get("_error")})
+            _entry = {"round": i + 1, "model": round_models[i], "error": p.get("_error")}
+            _em = p.get("_meta") or {}
+            if _em:
+                # A cut-off / refused / unparseable round was still billed —
+                # keep its tokens so pricing counts them (audit 2026-09-29).
+                _entry.update({
+                    "model": _em.get("model") or round_models[i],
+                    "input_tokens": int(_em.get("input_tokens") or 0),
+                    "output_tokens": int(_em.get("output_tokens") or 0),
+                    "cache_read_tokens": int(_em.get("cache_read_tokens") or 0),
+                    "cache_write_tokens": int(_em.get("cache_write_tokens") or 0),
+                    "cost_usd": _round_cost_usd(_em),
+                })
+            per_round_meta.append(_entry)
             continue
         runs.append(p)
         # T4 (2026-07-28 telemetry audit): populated UNCONDITIONALLY. This used
@@ -5177,7 +5196,15 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
                "rooms": len(p.get("patalpos") or [])})
 
     if not runs:
-        return {"status": "error", "_error": "all_voting_runs_failed"}
+        failed = {"status": "error", "_error": "all_voting_runs_failed"}
+        paid = [r for r in per_round_meta if r.get("input_tokens") or r.get("output_tokens")]
+        if paid:
+            failed["_meta"] = {
+                "model": paid[0]["model"], "voting_runs": 0, "voting_models": per_round_meta,
+                **{k: sum(r.get(k) or 0 for r in paid) for k in (
+                    "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")},
+            }
+        return failed
 
     # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
     # hash), applied to every run's rooms. Best-effort — failure leaves
@@ -5435,6 +5462,9 @@ def extract_interior(
         # callers see the same payloads as before.
         err = (parsed or {}).get("_error", "Unknown error")
         _emit({"event": "error", "message": str(err)})
+        if parsed and parsed.get("_meta"):
+            # The eksplikacija pre-pass was paid for too (audit 2026-09-29).
+            _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
         return parsed or {"status": "error", "_error": "Unknown error"}
 
     # `_meta.pages_sent` alone can't be audited — it says how many pages the
