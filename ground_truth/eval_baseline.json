@@ -1,0 +1,66 @@
+{
+  "rows": {
+    "objektas_a": {
+      "within_10_share": 37.736
+    },
+    "objektas_b": {
+      "within_10_share": 9.91
+    },
+    "objektas_c": {
+      "within_10_share": 22.222
+    },
+    "objektas_d": {
+      "within_10_share": 40.0
+    },
+    "objektas_g": {
+      "within_10_share": 15.0
+    },
+    "objektas_h": {
+      "within_10_share": 29.167
+    }
+  },
+  "totals": {
+    "objektas_a": {
+      "Bendras plotas": 0.018,
+      "Dažymo plotas (samata items 16+17, excl garažas)": 9.67,
+      "LED nišų ilgis": 0.993,
+      "Lubų dažomas plotas": 0.0,
+      "MAE": 3.06,
+      "Sienų dažomas plotas": 11.228
+    },
+    "objektas_b": {
+      "Dažymo plotas (samata items 16+17, excl garažas)": 20.12,
+      "LED nišų ilgis": 18.207,
+      "Lubų dažomas plotas": 0.0,
+      "MAE": 16.632,
+      "Sienų dažomas plotas": 31.69
+    },
+    "objektas_c": {
+      "Dažymo plotas (samata items 16+17, excl garažas)": 19.52,
+      "LED nišų ilgis": 7.957,
+      "Lubų dažomas plotas": 16.845,
+      "MAE": 15.135,
+      "Sienų dažomas plotas": 20.603
+    },
+    "objektas_d": {
+      "Dažymo plotas (samata items 16+17, excl garažas)": 9.491,
+      "LED nišų ilgis": 2.457,
+      "Lubų dažomas plotas": 0.0,
+      "MAE": 5.177,
+      "Sienų dažomas plotas": 13.075
+    },
+    "objektas_g": {
+      "Dažymo plotas (samata items 16+17, excl garažas)": 60.434,
+      "MAE": 8.104,
+      "Sienų dažomas plotas": 8.104
+    },
+    "objektas_h": {
+      "Bendras plotas": 0.0,
+      "Dažymo plotas (samata items 16+17, excl garažas)": 14.605,
+      "LED nišų ilgis": 8.497,
+      "Lubų dažomas plotas": 0.0,
+      "MAE": 6.797,
+      "Sienų dažomas plotas": 18.69
+    }
+  }
+}

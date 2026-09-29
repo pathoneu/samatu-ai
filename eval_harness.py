@@ -1430,7 +1430,7 @@ def _partition_headline_metrics(results, ai_mode):
 
 
 def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
-                          recompute: bool = False) -> int:
+                          recompute: bool = False, collect: dict | None = None) -> int:
     """Iterate every project in ground_truth/registry.yaml and run the
     AI-vs-truth diff on its gt_totals block (no per-room work).
 
@@ -1697,6 +1697,9 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
         print(f"  Saved → {out_json}")
 
+    if collect is not None:  # --gate / --accept-baseline read the same numbers
+        collect["projects"] = per_project_summary
+
     # Exit 1 only if at least one OK project broke the 2.0% per-project cap.
     breached = [s for s in per_project_summary
                 if s["status"] == "ok" and (s.get("worst_pct") or 0) > 2.0]
@@ -1939,7 +1942,7 @@ def _print_rows_block(scored: list[tuple[str, Any]],
 
 
 def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
-                       detailed: bool = False) -> int:
+                       detailed: bool = False, collect: dict | None = None) -> int:
     """`--rows`: score every cached extract against the contractor's own sąmata,
     row by row, through the frozen concept table. Zero API spend.
 
@@ -2008,6 +2011,8 @@ def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
             print(f"    · šeimų sutapimas (Σ vs Σ, granuliaciją ignoruojant): "
                   f"{sc.families_within_10}/{sc.families_scored} ±10 %")
             print(f"    · mūsų eilutės be jo atitikmens: {len(sc.app_extra)}")
+    if collect is not None:  # --gate / --accept-baseline read the same numbers
+        collect["scorecards"] = details
     return 0
 
 
@@ -2135,6 +2140,129 @@ def human_corpus_summary() -> dict:
     }
 
 
+# ── Regression gate (audit 2026-09-29, testing-eval-4) ─────────────────────────
+# The plain exit code above (1 when any project's worst metric is over 2 %) is
+# 1 on every run, so it gates nothing. `--gate` compares against the accepted
+# numbers in ground_truth/eval_baseline.json and exits 1 only on a real
+# regression; `--accept-baseline` writes today's numbers there.
+EVAL_BASELINE_PATH = GROUND_TRUTH_ROOT / "eval_baseline.json"
+GATE_TOLERANCE_PP = {"totals": 0.25, "rows": 1.0}
+# The baseline file is tracked, so it holds codenames only. Registry slugs that
+# are not codenames are left out of it (they are outside the means anyway).
+_CODENAME_PREFIX = "objektas_"
+
+
+def gate_numbers_totals(per_project_summary: list[dict]) -> dict:
+    """{slug: {"MAE": %, <metric label>: |% error|}} for every scored project.
+    Lower is better."""
+    out: dict[str, dict[str, float]] = {}
+    for s in per_project_summary:
+        if s.get("status") != "ok" or not s["slug"].startswith(_CODENAME_PREFIX):
+            continue
+        nums = {"MAE": s["mae_pct"]} if s.get("mae_pct") is not None else {}
+        for m in s.get("metrics") or []:
+            if m.get("pct_error") is not None:
+                nums[m["label"]] = round(abs(m["pct_error"]), 3)
+        out[s["slug"]] = nums
+    return out
+
+
+def gate_numbers_rows(scorecards: list[tuple[str, Any]]) -> dict:
+    """{slug: {"within_10_share": %}} — his rows we reproduce within ±10 %.
+    Higher is better."""
+    return {slug: {"within_10_share": round(sc.within_10_share, 3)}
+            for slug, sc in scorecards if slug.startswith(_CODENAME_PREFIX)}
+
+
+def compare_to_baseline(baseline: dict, current: dict, *, tolerance: float,
+                        higher_is_better: bool = False) -> tuple[list[str], list[str]]:
+    """Return (regressions, improvements) as printable lines. A regression is a
+    baseline project or metric that is gone, or a metric worse than its
+    baseline by more than `tolerance` percentage points. Projects and metrics
+    that are new are neither."""
+    regressions: list[str] = []
+    improvements: list[str] = []
+    for slug in sorted(baseline):
+        if slug not in current:
+            regressions.append(f"{slug}: project missing from this run")
+            continue
+        for metric in sorted(baseline[slug]):
+            base = baseline[slug][metric]
+            now = current[slug].get(metric)
+            if now is None:
+                regressions.append(f"{slug} · {metric}: missing from this run "
+                                   f"(baseline {base:.3f} %)")
+                continue
+            worse_by = (base - now) if higher_is_better else (now - base)
+            line = (f"{slug} · {metric}: baseline {base:.3f} %, now {now:.3f} % "
+                    f"({'worse' if worse_by > 0 else 'better'} by {abs(worse_by):.3f} pp)")
+            if worse_by > tolerance + 1e-9:
+                regressions.append(line)
+            elif worse_by < 0:
+                improvements.append(line)
+    return regressions, improvements
+
+
+def accept_baseline(mode: str, current: dict, *, path: Path = EVAL_BASELINE_PATH) -> int:
+    """Write today's numbers for `mode` ("totals" | "rows"); the other mode's
+    section is kept. Sorted keys + fixed indent so a diff reads line by line."""
+    if not current:
+        print(f"\n  Nothing scored in '{mode}' — baseline NOT written")
+        return 1
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    data[mode] = current
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8")
+    print(f"\n  Baseline ({mode}) accepted: {len(current)} project(s) → {path}")
+    return 0
+
+
+def run_gate(mode: str, current: dict, *, tolerance: float | None = None,
+             path: Path = EVAL_BASELINE_PATH) -> int:
+    tol = GATE_TOLERANCE_PP[mode] if tolerance is None else tolerance
+    try:
+        baseline = json.loads(path.read_text(encoding="utf-8")).get(mode)
+    except FileNotFoundError:
+        baseline = None
+    print(f"\n  Regression gate ({mode}, tolerance {tol:g} pp) vs {path.name}")
+    if not baseline:
+        print(f"  GATE FAIL: no accepted '{mode}' baseline — run once with --accept-baseline")
+        return 1
+    regressions, improvements = compare_to_baseline(
+        baseline, current, tolerance=tol, higher_is_better=(mode == "rows"))
+    for line in regressions:
+        print(f"  WORSE   {line}")
+    for line in improvements:
+        print(f"  BETTER  {line}")
+    new = sorted(set(current) - set(baseline))
+    if new:
+        print(f"  NEW     not in the baseline yet: {', '.join(new)}")
+    if regressions:
+        print(f"  GATE FAIL: {len(regressions)} regression(s) beyond {tol:g} pp")
+        return 1
+    print("  GATE OK: nothing worse than the accepted baseline"
+          + (" — improvements above: --accept-baseline locks them in" if improvements else ""))
+    return 0
+
+
+def _gate_mode(args) -> str | None:
+    """Return "totals" / "rows" when --gate or --accept-baseline is on, else None."""
+    if not (args.gate or args.accept_baseline):
+        return None
+    if args.gate and args.accept_baseline:
+        raise SystemExit("--gate and --accept-baseline: pick one")
+    if not args.recompute or not (args.rows or args.totals_only or args.all):
+        raise SystemExit("--gate / --accept-baseline need --totals-only --recompute "
+                         "or --rows --recompute (the live engine, not frozen numbers)")
+    return "rows" if args.rows else "totals"
+
+
+def _finish_gate(args, mode: str, current: dict) -> int:
+    if args.accept_baseline:
+        return accept_baseline(mode, current)
+    return run_gate(mode, current, tolerance=args.gate_tolerance)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sąmatų AI evaluation harness")
     ap.add_argument("--project", default=None,
@@ -2224,7 +2352,18 @@ def main() -> int:
                          "pipeline import. REQUIRES --vision (same guard as "
                          "--model: experiments must be FRESH reads). Output "
                          "lands in eval_runs/<model-or-config>__<experiment>/")
+    ap.add_argument("--gate", action="store_true",
+                    help="with --totals-only --recompute or --rows --recompute: "
+                         "exit 1 only when a project or metric is missing or a "
+                         "metric is worse than ground_truth/eval_baseline.json "
+                         "by more than the tolerance (totals 0.25 pp, rows 1.0 pp)")
+    ap.add_argument("--accept-baseline", action="store_true",
+                    help="with the same modes: write today's numbers to "
+                         "ground_truth/eval_baseline.json (codenames only)")
+    ap.add_argument("--gate-tolerance", type=float, default=None, metavar="PP",
+                    help="override the --gate tolerance in percentage points")
     args = ap.parse_args()
+    gate_mode = _gate_mode(args)
     global GEOMETRY_LANE
     GEOMETRY_LANE = bool(args.geometry)
 
@@ -2275,21 +2414,31 @@ def main() -> int:
         return run_debug_project(args.debug_project)
 
     if args.rows:
-        return run_rows_scorecard(
+        collected = {} if gate_mode else None
+        rc = run_rows_scorecard(
             GROUND_TRUTH_ROOT / "registry.yaml",
             recompute=args.recompute,
             detailed=args.detailed,
+            collect=collected,
         )
+        if collected is None:
+            return rc
+        return _finish_gate(args, "rows", gate_numbers_rows(collected.get("scorecards", [])))
 
     if args.rescore:
         return run_rescore(args.rescore, args.project, recompute=args.recompute)
 
     if args.totals_only or args.all:
-        return run_totals_only_multi(
+        collected = {} if gate_mode else None
+        rc = run_totals_only_multi(
             GROUND_TRUTH_ROOT / "registry.yaml",
             detailed=args.detailed,
             recompute=args.recompute,
+            collect=collected,
         )
+        if collected is None:
+            return rc
+        return _finish_gate(args, "totals", gate_numbers_totals(collected.get("projects", [])))
 
     if args.use_gt_inputs:
         mode = "use_gt_inputs"
