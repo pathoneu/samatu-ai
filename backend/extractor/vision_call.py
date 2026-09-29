@@ -550,6 +550,23 @@ def _vision_zoom_room(
         return None, zoom_meta
 
 
+# Every source label that means „read from the drawing or set by the contractor", per field (2026-09-29).
+# A zoomed re-read — the model reading a crop its own box placed — is weaker evidence than any of them: it
+# never replaces such a value; its figure is kept beside it and noted in `_zoom_changes`. Built from the
+# labels the lanes write (tests/test_zoom_keeps_read_values.py holds it to them): the plan's dimension
+# strings (plan_dimensions), the strings added along the walls (dimension_sum.KEEP), the table, the traced
+# outline (wall_outline) and the geometry lane's outline-length / open-space estimates — off the drawing's
+# own walls, which outrank a model's reading — the plan's area labels and storey height
+# (plan_area_annotations), the altitude printed inside the room (height_markers), his own entry.
+READ_SOURCES = {
+    "perimetras_saltinis": ("plano_matmenys", "matmenu_eilutes", "eksplikacija", "sienu_konturas",
+                            "konturo_ivertis", "atviros_erdves_ivertis", "user_override", "manual"),
+    "plotas_saltinis": ("eksplikacija", "plano_uzrasas", "user_override", "manual"),
+    "lubu_aukstis_saltinis": ("ceiling_plan_marker", "plano_uzrasas", "user_override", "manual"),
+}
+ZOOM_SOURCE = "zoom"          # a perimeter or height the zoomed re-read replaced
+
+
 def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     """Merge zoom result into room dict (in-place). Returns True if changes applied."""
     if not zoom or zoom.get("confidence_zoom") == "low":
@@ -560,20 +577,23 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     if zoom.get("perimetras_saltinis") == "from_zoom" and zoom.get("perimetras_m") is not None:
         old = room.get("perimetras_m")
         new = float(zoom["perimetras_m"])
-        if room.get("perimetras_saltinis") in ("plano_matmenys", "eksplikacija", "sienu_konturas"):
-            # the drawing STATES the walls (plan_dimensions), the table does, or
-            # the walls were traced (wall_outline) — a zoomed re-read is weaker
-            # evidence; kept beside it
+        if room.get("perimetras_saltinis") in READ_SOURCES["perimetras_saltinis"]:
+            # the drawing STATES the walls, the table does, the walls were traced
+            # or he typed it — a zoomed re-read is weaker evidence; kept beside it
             room["_perimetras_zoom_m"] = new
+            if abs(new - (old or 0)) > 0.1:
+                room.setdefault("_zoom_changes", []).append(
+                    f"perimetras (zoom): {new} — paliktas {old}")
         elif abs(new - (old or 0)) > 0.1:  # only update if meaningful diff
             room["perimetras_m"] = new
+            room["perimetras_saltinis"] = ZOOM_SOURCE
             room.setdefault("_zoom_changes", []).append(f"perimetras: {old} → {new}")
             changed = True
 
     if zoom.get("plotas_saltinis") == "from_zoom" and zoom.get("plotas_m2") is not None:
         old = room.get("plotas_m2")
         new = float(zoom["plotas_m2"])
-        if room.get("plotas_saltinis") in ("plano_uzrasas", "eksplikacija"):
+        if room.get("plotas_saltinis") in READ_SOURCES["plotas_saltinis"]:
             # The drawing STATES this room's area (a plan label adopted at Step
             # 2.44, or the eksplikacija table). Wall-dimension arithmetic off a
             # zoomed crop is weaker evidence and must not overwrite it — on the
@@ -594,8 +614,16 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
     if zoom.get("lubu_aukstis_m") is not None:
         old = room.get("lubu_aukstis_m")
         new = float(zoom["lubu_aukstis_m"])
-        if abs(new - (old or 0)) > 0.05:
+        if room.get("lubu_aukstis_saltinis") in READ_SOURCES["lubu_aukstis_saltinis"]:
+            # the altitude printed inside the room, the plan's storey height or his
+            # own — a marker may only raise a height, and a crop's guess never does
+            room["_lubu_aukstis_zoom_m"] = new
+            if abs(new - (old or 0)) > 0.05:
+                room.setdefault("_zoom_changes", []).append(
+                    f"lubu_aukstis (zoom): {new} — paliktas {old}")
+        elif abs(new - (old or 0)) > 0.05:
             room["lubu_aukstis_m"] = new
+            room["lubu_aukstis_saltinis"] = ZOOM_SOURCE
             room.setdefault("_zoom_changes", []).append(f"lubu_aukstis: {old} → {new}")
             changed = True
 

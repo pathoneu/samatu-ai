@@ -683,6 +683,14 @@ def _fact_perimetras(project: dict, room: dict,
                      rect or region_on_page(room, page, region),
                      "Iš patalpų eksplikacijos lentelės." + tail, editable)
 
+    if str(room.get("perimetras_saltinis") or "") == "zoom":
+        # vision_call.ZOOM_SOURCE (2026-09-29): the zoomed re-read replaced the figure — the program's
+        # own reading of a close-up, checked by nothing printed. Amber, on every kind of drawing.
+        return _fact("perimetras", round(measured, 2), "m", "assumed", "prielaida",
+                     room.get("puslapio_nr"), region,
+                     "Perimetrą programa įvertino iš padidinto plano vaizdo — brėžinyje užrašytais "
+                     "matmenimis nepatikrintas. Palikite arba įrašykite tikrą." + tail, editable)
+
     if isinstance((project.get("_meta") or {}).get("geometrija"), dict):
         # 2026-09-19: the geometry lane ran on this project and could neither add
         # this room's wall lengths nor trace its outline — so the figure is what
@@ -711,6 +719,10 @@ _HEIGHT_SOURCES: dict[str, tuple[str, str, str]] = {
     "per_room": ("read", "planas", "Aukštis užrašytas prie šios patalpos."),
     "plano_uzrasas": ("read", "planas", "Aukštis — užrašytas plane (visam aukštui)."),
     "user_override": ("read", "prielaida", "Šį aukštį įrašėte patys."),
+    # vision_call.ZOOM_SOURCE: the program's own reading of a close-up of the plan, checked by nothing printed
+    "zoom": ("assumed", "planas",
+             "Aukštį programa įvertino iš padidinto plano vaizdo — prie patalpos užrašyto aukščio neradau. "
+             "Įrašykite tikrą."),
     "section_average": ("assumed", "pjuvis",
                         "Prie šios patalpos aukščio neradau — imu tokį pat "
                         "kaip kitose patalpose. Įrašykite tikrą."),
