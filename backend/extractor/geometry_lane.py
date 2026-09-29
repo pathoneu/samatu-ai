@@ -19,7 +19,10 @@ outline's length marked `konturo_ivertis`, with its reason). An estimate is a
 number — the sąmata rows are built from `perimetras_m` — that the check sheet
 shows as a BLANK with the number to accept. The figure a stated or
 blanked perimeter replaces is kept as `_perimetras_pries_geometrija`. A room
-the lane cannot place or outline is left exactly as it was.
+the lane cannot place or outline is left exactly as it was — unless the lane
+itself outlined it on an earlier run: then that outline and what rests on it
+go, and its perimeter goes back to the kept figure (`_forget_outline`; never
+a room he worked on).
 
 Last, the FLOOR COVERING the floor plan draws in each room (2026-09-20,
 extractor/floor_coverings.py): `grindu_danga` + `grindu_danga_saltinis =
@@ -41,7 +44,7 @@ from __future__ import annotations
 import time
 from typing import Sequence
 
-from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, sum_perimeters
+from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, SOURCE as SUMMED, sum_perimeters
 from .floor_coverings import find_floor_sheets, read_floor_coverings
 from .pdf_vectors import page_geometry
 from .plan_area_annotations import plan_pages_from_classification
@@ -62,6 +65,34 @@ _PT_M = 25.4 / 72 / 1000          # metres per PDF point at 1:1
 
 def _nr(room: dict) -> str:
     return str(room.get("nr") or "").strip()
+
+
+# What rests on an outline this lane traced: the outline, its record, the open space it was part of, the
+# openings read in its walls, the walls and their summed perimeter.
+FROM_THE_OUTLINE = ("polygon_pct", "polygon_source", "_konturas", "_atvira_erdve", "_angos_sienose", "_sienos", "_perimetras_suma")
+LANE_PERIMETERS = (SUMMED, ESTIMATE_SOURCE, OPEN_PLAN_ESTIMATE)          # the perimeter labels this lane (and dimension_sum) writes
+PERIMETER_ESTIMATE_KEYS = ("_perimetras_priezastis", "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis")
+
+
+def _his(room: dict) -> bool:
+    """He worked on this room — typed its perimeter, corrected its openings, marked it checked. (An outline he
+    drew or fixed is `corrected` / `manual`, which this lane never traces again.)"""
+    return (str(room.get("perimetras_saltinis") or "") in ("user_override", "manual")
+            or bool(room.get("_angos_user_at")) or bool(room.get("user_verified_at")))
+
+
+def _forget_outline(room: dict) -> None:
+    """A room this lane outlined on an earlier run and cannot outline now (2026-09-29: the table's area was
+    corrected, a re-read): the old outline and what rests on it go, and a perimeter this lane set goes back to
+    the figure it had before — or, with none kept, stays as a number the drawing no longer confirms (no
+    source). Before, the room kept a trusted outline and a „read" perimeter its own new reason contradicted."""
+    for key in FROM_THE_OUTLINE:
+        room.pop(key, None)
+    if str(room.get("perimetras_saltinis") or "") in LANE_PERIMETERS:
+        if room.get("_perimetras_pries_geometrija") is not None:
+            room["perimetras_m"] = room["_perimetras_pries_geometrija"]
+        for key in ("perimetras_saltinis", "_perimetras_pries_geometrija") + PERIMETER_ESTIMATE_KEYS:
+            room.pop(key, None)
 
 
 # What the lane reads, as a number a stored project can be compared against
@@ -408,6 +439,8 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 if nr not in todo:
                     continue
                 hit = res["rooms"].get(nr)
+                if not hit and str(r.get("polygon_source") or "") == VECTOR_SOURCE and not _his(r):
+                    _forget_outline(r)                 # outlined on an earlier run, not by today's reading
                 if hit:
                     r["polygon_pct"] = hit["polygon_pct"]
                     r["polygon_source"] = VECTOR_SOURCE

@@ -6,6 +6,8 @@ import io
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from extractor import geometry_lane as gl  # noqa: E402
@@ -431,3 +433,74 @@ def test_a_pocket_beside_an_outline_a_person_owns_is_neither_joined_nor_divided(
     assert his["polygon_pct"] == kept and his["polygon_source"] == "corrected" and "_atvira_erdve" not in his
     r1 = parsed["patalpos"][0]
     assert out["atviros_erdves"] == [] and "_konturo_siulymas" in r1 and "_konturas" not in r1
+
+
+# ── 2026-09-29: a later run that can no longer outline a room this lane outlined before ─────────────────────
+# (the table's area was corrected, a re-read, a lane that learned something). Before: the room kept the old
+# outline, its walls and a „read" perimeter while its new reason said the walls close nothing that fits.
+
+_FROM_THE_OUTLINE = ("polygon_pct", "polygon_source", "_konturas", "_atvira_erdve", "_angos_sienose", "_sienos", "_perimetras_suma")
+
+
+def _outlined_once():
+    parsed = _parsed()
+    pdf = _two_sheets()
+    gl.apply_geometry(parsed, pdf)
+    r1 = parsed["patalpos"][0]
+    assert r1["polygon_source"] == "vektoriniai_konturai" and r1["_sienos"] and r1["_angos_sienose"]
+    assert r1["perimetras_m"] == 14.0 and r1["perimetras_saltinis"] == "matmenu_eilutes" and r1["_perimetras_pries_geometrija"] == 13.9
+    return parsed, pdf
+
+
+def test_a_room_outlined_on_the_first_run_and_not_found_on_the_second_loses_the_outline_and_gets_its_earlier_perimeter():
+    import copy
+    parsed, pdf = _outlined_once()
+    r1, r2 = parsed["patalpos"]
+    neighbour = {k: copy.deepcopy(r2.get(k)) for k in ("polygon_pct", "polygon_source", "_konturas", "perimetras_m",
+                                                       "perimetras_saltinis", "_sienos", "_perimetras_suma")}
+    r1["plotas_m2"] = 30.0                      # the table now says an area the walls around 01 do not close
+    out = gl.apply_geometry(parsed, pdf)
+    assert [k for k in _FROM_THE_OUTLINE if k in r1] == []
+    assert r1["perimetras_m"] == 13.9           # the figure it had before the lane added the wall strings
+    assert "perimetras_saltinis" not in r1 and "_perimetras_pries_geometrija" not in r1
+    assert r1["_konturo_priezastis"] == "sienos prie numerio uždaro 12,00 m², lentelėje 30,00 m²"
+    assert r1["_konturo_siulymas"]["plotas_uzrasas_m2"] == 30.0          # what the walls close is offered instead
+    assert "01" not in out["konturai"] and "01" in out["konturu_siulymai"]
+    assert {k: r2.get(k) for k in neighbour} == neighbour                 # the room found on both runs is unchanged
+
+
+def test_without_an_earlier_figure_the_perimeter_stays_but_is_no_longer_called_read():
+    parsed, pdf = _outlined_once()
+    r1 = parsed["patalpos"][0]
+    del r1["_perimetras_pries_geometrija"]      # the plan gave no perimeter before the lane added one
+    r1["plotas_m2"] = 30.0
+    gl.apply_geometry(parsed, pdf)
+    assert r1["perimetras_m"] == 14.0 and "perimetras_saltinis" not in r1 and "polygon_pct" not in r1
+    from extractor.room_facts import _fact_perimetras
+    fact = _fact_perimetras(parsed, r1, None)
+    assert fact["status"] == "assumed" and fact["value"] == 14.0 and "nepatikrintas" in fact["sentence"]
+
+
+@pytest.mark.parametrize("his", [
+    {"user_verified_at": "2026-09-29T10:00:00+00:00"},                    # he marked the room checked
+    {"_angos_user_at": "2026-09-29T10:00:00+00:00"},                      # he corrected its openings
+    {"perimetras_m": 15.5, "perimetras_saltinis": "user_override"},       # he typed the perimeter
+    {"polygon_source": "corrected"},                                      # he took / fixed the outline
+])
+def test_a_room_he_corrected_keeps_everything_when_the_lane_cannot_outline_it_again(his):
+    import copy
+    parsed, pdf = _outlined_once()
+    r1 = parsed["patalpos"][0]
+    r1.update(his)
+    kept = {k: copy.deepcopy(r1.get(k)) for k in _FROM_THE_OUTLINE + ("perimetras_m", "perimetras_saltinis", "_perimetras_pries_geometrija")}
+    r1["plotas_m2"] = 30.0
+    gl.apply_geometry(parsed, pdf)
+    assert {k: r1.get(k) for k in kept} == kept
+
+
+def test_a_room_the_lane_outlines_on_both_runs_is_unchanged():
+    import copy
+    parsed, pdf = _outlined_once()
+    once = copy.deepcopy(parsed["patalpos"])
+    gl.apply_geometry(parsed, pdf)
+    assert parsed["patalpos"] == once

@@ -93,3 +93,25 @@ test('what the banner says afterwards', () => {
   assert.deepEqual(freeRereadSummary(result().santrauka), { konturai: 2, perimetrai: 1, tusti: 1, dangos: 3 });
   assert.deepEqual(freeRereadSummary(null), { konturai: 0, perimetrai: 0, tusti: 0, dangos: 0 });
 });
+
+test('an outline the lane drew last time and cannot draw now leaves with the re-read — a verified room keeps it', () => {
+  // 2026-09-29 (geometry_lane._forget_outline): the server answers such a room WITHOUT its old outline and
+  // with the perimeter it had before; the merge takes that answer whole for a room he never touched.
+  const outlined = { polygon_source: 'vektoriniai_konturai', polygon_pct: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]],
+    _konturas: { page: 1 }, _sienos: [{ ilgis_m: 4 }], _perimetras_suma: { suma_m: 14 }, perimetras_m: 14, perimetras_saltinis: 'matmenu_eilutes' };
+  const b = { patalpos: [{ nr: '01', plotas_m2: 12, ...outlined }, { nr: '02', plotas_m2: 9, ...outlined, user_verified_at: 'T0' }] };
+  const r = {
+    status: 'ok', lane: 'applied', _meta: { geometrija: { versija: 9, konturai: [] } },
+    patalpos: [
+      { nr: '01', plotas_m2: 30, perimetras_m: 13.9, _konturo_priezastis: 'sienos prie numerio uždaro 12,00 m², lentelėje 30,00 m²' },
+      { nr: '02', plotas_m2: 9, ...outlined, user_verified_at: 'T0' },
+    ],
+  };
+  const [r1, r2] = mergeFreeReread(b, r, 'T').project.patalpos;
+  for (const key of ['polygon_source', 'polygon_pct', '_konturas', '_sienos', '_perimetras_suma', 'perimetras_saltinis']) {
+    assert.equal(r1[key], undefined, key);
+  }
+  assert.equal(r1.perimetras_m, 13.9);
+  assert.equal(r2.polygon_source, 'vektoriniai_konturai');
+  assert.equal(r2.perimetras_saltinis, 'matmenu_eilutes');
+});
