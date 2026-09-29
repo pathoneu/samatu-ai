@@ -574,8 +574,12 @@
       "toastExported_one": "Backup downloaded ({{count}} project)",
       "toastExported_other": "Backup downloaded ({{count}} projects)",
       "toastExportFail": "Export failed: {{error}}",
-      "toastImported_one": "Imported: {{count}} project. Total in storage: {{total}}.",
-      "toastImported_other": "Imported: {{count}} projects. Total in storage: {{total}}.",
+      "toastSaved_one": "Imported and saved to the server: {{count}} project.",
+      "toastSaved_other": "Imported and saved to the server: {{count}} projects.",
+      "toastKeptServer_one": "Kept the server's version because it is newer: {{count}} project.",
+      "toastKeptServer_other": "Kept the server's version because it is newer: {{count}} projects.",
+      "toastSaveFailed_one": "Could not save to the server: {{count}} project. It is not saved yet — import the same file again.",
+      "toastSaveFailed_other": "Could not save to the server: {{count}} projects. They are not saved yet — import the same file again.",
       "toastImportFail": "Import failed",
       "toastFileReadFail": "Could not read the file"
     }

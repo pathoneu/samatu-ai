@@ -576,9 +576,15 @@
       "toastExported_few": "Atsarginė kopija atsisiųsta ({{count}} projektai)",
       "toastExported_other": "Atsarginė kopija atsisiųsta ({{count}} projektų)",
       "toastExportFail": "Nepavyko eksportuoti: {{error}}",
-      "toastImported_one": "Importuota: {{count}} projektas. Iš viso saugykloje: {{total}}.",
-      "toastImported_few": "Importuota: {{count}} projektai. Iš viso saugykloje: {{total}}.",
-      "toastImported_other": "Importuota: {{count}} projektų. Iš viso saugykloje: {{total}}.",
+      "toastSaved_one": "Importuota ir įrašyta į serverį: {{count}} projektas.",
+      "toastSaved_few": "Importuota ir įrašyta į serverį: {{count}} projektai.",
+      "toastSaved_other": "Importuota ir įrašyta į serverį: {{count}} projektų.",
+      "toastKeptServer_one": "Palikta serverio versija, nes ji naujesnė: {{count}} projektas.",
+      "toastKeptServer_few": "Palikta serverio versija, nes ji naujesnė: {{count}} projektai.",
+      "toastKeptServer_other": "Palikta serverio versija, nes ji naujesnė: {{count}} projektų.",
+      "toastSaveFailed_one": "Nepavyko įrašyti į serverį: {{count}} projektas. Jis dar neišsaugotas — importuokite tą patį failą dar kartą.",
+      "toastSaveFailed_few": "Nepavyko įrašyti į serverį: {{count}} projektai. Jie dar neišsaugoti — importuokite tą patį failą dar kartą.",
+      "toastSaveFailed_other": "Nepavyko įrašyti į serverį: {{count}} projektų. Jie dar neišsaugoti — importuokite tą patį failą dar kartą.",
       "toastImportFail": "Importas nepavyko",
       "toastFileReadFail": "Nepavyko nuskaityti failo"
     }

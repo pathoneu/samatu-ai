@@ -222,14 +222,37 @@ export function noteServerVersion(id, updatedAt) {
   _setServerVersion(id, updatedAt);
 }
 
-// In-flight PUT per project id — used to supersede a slow earlier request so a
-// PUT can never land after a newer one for the same project on a lossy link.
-const _inflight = new Map();   // id -> AbortController
-const _lastSeq = new Map();    // id -> monotonically increasing sequence number
-let _seqCounter = 0;
+// At most ONE PUT on the wire per project id, plus the newest snapshot waiting
+// behind it. (2026-09-29 audit) A new save used to ABORT the PUT still in
+// flight — but the server had often stored that request already, so its
+// updated_at moved on while this tab never saw the answer and kept the old base:
+// the next PUT came back 409, and so did every save after it in the tab. Now
+// nothing is aborted. While a PUT is on the wire only the LATEST snapshot is
+// remembered, and it goes out when that PUT settles, carrying the version the
+// answer just reported. Requests for one project thus reach the server strictly
+// one after another, so the user's last change is the last one it stores.
+const _inflight = new Map();   // id -> { done: Promise } for the PUT on the wire
+const _queued = new Map();     // id -> { project, opts, promise, resolve }
 
-const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
+const _syncToBackend = (project, opts = {}) => {
   if (!project?.id) return;
+  const id = project.id;
+  if (!_inflight.has(id)) return _sendPut(project, opts);
+  const waiting = _queued.get(id);
+  if (waiting) {
+    // Replace the snapshot, keep one promise: every caller waiting on this
+    // project learns the verdict of the PUT that actually carries its edit.
+    waiting.project = project;
+    waiting.opts = { ...waiting.opts, ...opts };
+    return waiting.promise;
+  }
+  let resolve;
+  const promise = new Promise((r) => { resolve = r; });
+  _queued.set(id, { project, opts, promise, resolve });
+  return promise;
+};
+
+function _sendPut(project, { keepArchiveFlags = false } = {}) {
   const id = project.id;
   // Archive flags are persisted server-side SINCE 2026-07-15 (pre-prod QA:
   // localStorage-only soft-delete meant "deleted" projects resurrected after
@@ -243,42 +266,48 @@ const _syncToBackend = (project, { keepArchiveFlags = false } = {}) => {
   const base = _serverVersions.get(id);
   const body = base ? { ...persisted, base_updated_at: base } : persisted;
 
-  // Supersede any PUT still in flight for THIS project. Two overlapping saves
-  // on a slow connection could otherwise arrive out of order and resurrect the
-  // older blob; aborting means the newer request is always the last one the
-  // server sees.
-  const prev = _inflight.get(id);
-  if (prev) { try { prev.abort(); } catch { /* already settled */ } }
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  if (controller) _inflight.set(id, controller);
-  const seq = ++_seqCounter;
-  _lastSeq.set(id, seq);
+  // `token` is this PUT's slot. A user switch or a permanent delete drops the
+  // slot, so a late answer is ignored — it is never aborted: the server may
+  // already hold it.
+  const token = {};
+  _inflight.set(id, token);
+  const mine = () => _inflight.get(id) === token;
+  // The PUT is settled: free the slot and send the snapshot that waited.
+  const settle = (verdict) => {
+    _inflight.delete(id);
+    const next = _queued.get(id);
+    if (next) {
+      _queued.delete(id);
+      next.resolve(_sendPut(next.project, next.opts));
+    }
+    return verdict;
+  };
 
-  return fetch(`${API}/api/projects/${id}`, {
+  // `new Promise(… fetch …)` calls fetch synchronously but turns a synchronous
+  // throw into a rejection, so the slot is always freed.
+  token.done = new Promise((ok) => ok(fetch(`${API}/api/projects/${id}`, {
     method: 'PUT',
     credentials: 'include',
-    ...(controller ? { signal: controller.signal } : {}),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  }).then(async (res) => {
-    if (_lastSeq.get(id) !== seq) return 'superseded';   // a newer PUT started
-    _inflight.delete(id);
+  }))).then(async (res) => {
+    if (!mine()) return 'superseded';
     const verdict = _handleSyncResponse(res);
     if (verdict === 'ok') {
       // Track what the server now holds so the NEXT save carries a fresh base.
       try {
         const saved = await res.json();
-        if (saved?.updated_at) _setServerVersion(id, saved.updated_at);
+        if (saved?.updated_at && mine()) _setServerVersion(id, saved.updated_at);
       } catch { /* body not JSON — leave the old base, worst case a false 409 */ }
     }
-    return verdict;
+    return mine() ? settle(verdict) : 'superseded';
   }).catch((e) => {
-    if (e?.name === 'AbortError' || _lastSeq.get(id) !== seq) return 'superseded';
-    _inflight.delete(id);
+    if (!mine()) return 'superseded';
     _handleSyncError(e);
-    return 'failed';
+    return settle('failed');
   });
-};
+  return token.done;
+}
 
 // ── Debounced save layer (2026-07-28 perf sweep) ──────────────────────────────
 //
@@ -362,9 +391,11 @@ function _doFlush() {
  * ProjectDetail, whose prices lived only in this browser's cache when the PUT
  * came back 409 and nothing ever retried. (2026-09-02)
  *
- * @returns {Promise<Array<{id: string, verdict: string}>>} one entry per PUT
- *   this flush started ('ok' | 'conflict' | 'unauthorized' | 'failed' |
- *   'superseded'); empty when there was nothing pending.
+ * @returns {Promise<Array<{id: string, verdict: string}>>} one entry per
+ *   project this flush pushed ('ok' | 'conflict' | 'unauthorized' | 'failed' |
+ *   'superseded' — the last only after a user switch or a permanent delete);
+ *   a snapshot that waits behind a PUT already on the wire resolves once its
+ *   own PUT is answered. Empty when there was nothing pending.
  */
 export function flushProjectSaves() {
   if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
@@ -392,8 +423,6 @@ function _replaceAll(projects) {
 // user-switch path leaves behind.
 export function _resetSaveState() {
   resetPullCache();
-  _lastSeq.clear();
-  _seqCounter = 0;
 }
 
 if (typeof window !== 'undefined') {
@@ -447,8 +476,11 @@ export function resetPullCache() {
   _lsDirty = false;
   _dirtyIds.clear();
   _pendingOpts.clear();
-  for (const c of _inflight.values()) { try { c.abort(); } catch { /* settled */ } }
+  // PUTs still on the wire are NOT aborted (the server may already hold them);
+  // dropping their slots makes their late answers change nothing here.
   _inflight.clear();
+  for (const q of _queued.values()) q.resolve('superseded');
+  _queued.clear();
   _serverVersions.clear();
   _saveVersions();
   // Price lists are user-scoped and backend-backed since 2026-09-02 — releasing
@@ -562,7 +594,8 @@ export async function refreshProjectFromBackend(id) {
   // the version it was made on. Rebasing here (2026-09-13 – 09-15) handed the
   // pending PUT the server's NEWER stamp, so a stale cache plus one edit
   // overwrote another device's work with no 409.
-  if (_dirtyIds.has(id)) return getProject(id);
+  // A snapshot waiting behind a PUT on the wire is an unsaved edit too.
+  if (_dirtyIds.has(id) || _queued.has(id)) return getProject(id);
   const raw = _readProjectsRaw();
   const projects = Array.isArray(raw) ? raw : [];
   const cached = projects.find(p => p?.id === id) || null;
@@ -684,18 +717,21 @@ export function restoreProject(id) {
 
 export function permanentlyDeleteProject(id) {
   const projects = getProjects().filter(p => p.id !== id);
-  // Drop any pending PUT for this id and abort one in flight — a save that
-  // landed AFTER the DELETE would resurrect the project server-side.
+  // Drop any pending or waiting PUT for this id — a save that landed AFTER the
+  // DELETE would resurrect the project server-side. A PUT already on the wire
+  // is not aborted (the server may have it); the DELETE waits for its answer
+  // instead, so it is always the last word.
   _dirtyIds.delete(id);
   _pendingOpts.delete(id);
-  const inflight = _inflight.get(id);
-  if (inflight) { try { inflight.abort(); } catch { /* already settled */ } }
-  _inflight.delete(id);
-  _lastSeq.set(id, ++_seqCounter);   // invalidate any late response
+  const waiting = _queued.get(id);
+  if (waiting) { waiting.resolve('superseded'); _queued.delete(id); }
+  const onWire = _inflight.get(id)?.done;
+  _inflight.delete(id);              // its late answer must not re-record a version
   _serverVersions.delete(id);
   _saveVersions();
   _saveNow(projects, null);
-  _deleteFromBackend(id);
+  if (onWire) onWire.then(() => _deleteFromBackend(id));
+  else _deleteFromBackend(id);
 }
 
 export function getArchivedProjects() {
@@ -1164,7 +1200,35 @@ export function downloadProjectsBackup() {
   URL.revokeObjectURL(url);
 }
 
-export function importProjectsBackup(jsonText, opts = {}) {
+// What the server holds right now: id -> updated_at, or null when it could not
+// be asked (offline, expired session, server error).
+async function _fetchServerVersions() {
+  try {
+    const res = await fetch(`${API}/api/projects`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const { projects: list } = await res.json();
+    if (!Array.isArray(list)) return null;
+    return new Map(list.filter(p => p?.id).map(p => [p.id, p.updated_at || null]));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Restore a backup file: merge it into the cache AND send the restored projects
+ * to the server. (2026-09-29 audit) It used to fill the cache only — the next
+ * Dashboard pull replaces the cache with the server's list, so every restored
+ * project the server did not have vanished without a word.
+ *
+ * A project whose server copy is NEWER than the file's is left as the server has
+ * it (counted in `projects_kept_server`) — the file's older copy is not adopted
+ * and not sent. Every other project in the file goes through the ordinary save
+ * path: with the server's version as base when the server has the id, with no
+ * base when it does not. `projects_saved` / `projects_failed` count what the
+ * server actually took; when the server cannot be asked at all, nothing is sent
+ * and every candidate counts as failed (it stays in this browser, as before).
+ */
+export async function importProjectsBackup(jsonText, opts = {}) {
   // opts: { mergeStrategy: 'replace' | 'merge' (default) }
   const merge = opts.mergeStrategy !== 'replace';
   let parsed;
@@ -1198,12 +1262,20 @@ export function importProjectsBackup(jsonText, opts = {}) {
   parsed.projects = parsed.projects.map(_migrateProject);
 
   const incoming = parsed.projects;
+  // The sample project is local-only — never sent, never compared.
+  const toServer = incoming.filter(p => p?.id && !p.is_demo);
+  const onServer = toServer.length ? await _fetchServerVersions() : new Map();
+  const keptOnServer = new Set();
+  for (const p of toServer) {
+    const theirs = onServer?.get(p.id);
+    if (theirs && !(p.updated_at && p.updated_at > theirs)) keptOnServer.add(p.id);
+  }
   let final;
   if (merge) {
     const existing = getProjects();
     const byId = new Map(existing.map(p => [p.id, p]));
     for (const p of incoming) {
-      if (!p?.id) continue;
+      if (!p?.id || keptOnServer.has(p.id)) continue;
       // Newer updated_at wins (or incoming if no timestamps)
       const old = byId.get(p.id);
       if (!old || (p.updated_at && (!old.updated_at || p.updated_at > old.updated_at))) {
@@ -1212,7 +1284,7 @@ export function importProjectsBackup(jsonText, opts = {}) {
     }
     final = Array.from(byId.values());
   } else {
-    final = incoming;
+    final = incoming.filter(p => !keptOnServer.has(p?.id));
   }
   // Wholesale cache replacement — same as the backend pull, so any debounced
   // save is flushed and the pending state cleared before the swap.
@@ -1243,9 +1315,39 @@ export function importProjectsBackup(jsonText, opts = {}) {
     for (const pl of restored) _priceListsSyncToBackend(pl);
   }
 
+  // Every file project the server lacks or holds older goes out through the
+  // ordinary save path — the cache's copy after the merge, which is the file's
+  // or a newer local one. Deciding by the SERVER (not by what the merge
+  // changed) is what lets a second import of the same file retry a failed
+  // send. The base is what the server holds NOW (none for an id it does not
+  // have), so a copy that changes on the server meanwhile still meets the 409
+  // guard. Archive flags go as restored, so an archived project stays archived.
+  const pushIds = [...new Set(toServer.map(p => p.id))].filter(id => !keptOnServer.has(id));
+  let projectsSaved = 0;
+  let projectsFailed = 0;
+  if (pushIds.length && !onServer) {
+    projectsFailed = pushIds.length;
+  } else if (pushIds.length) {
+    for (const id of pushIds) {
+      const theirs = onServer.get(id);
+      if (theirs) _serverVersions.set(id, theirs);
+      else _serverVersions.delete(id);
+      _dirtyIds.add(id);
+      _pendingOpts.set(id, { keepArchiveFlags: true });
+    }
+    _saveVersions();
+    for (const { verdict } of await flushProjectSaves()) {
+      if (verdict === 'ok') projectsSaved += 1;
+      else projectsFailed += 1;
+    }
+  }
+
   return {
     projects_imported: incoming.length,
     projects_total: final.length,
+    projects_saved: projectsSaved,
+    projects_failed: projectsFailed,
+    projects_kept_server: keptOnServer.size,
     settings_imported: !!parsed.settings,
     price_lists_imported: priceListsImported,
   };

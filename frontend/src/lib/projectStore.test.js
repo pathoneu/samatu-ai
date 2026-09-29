@@ -5,7 +5,7 @@ import {
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
   pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
-  consumePriceFillPending, refreshProjectFromBackend,
+  consumePriceFillPending, refreshProjectFromBackend, noteServerVersion,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -241,14 +241,14 @@ test('exportProjectsBackup includes price lists and settings', () => {
   assert.equal(payload.settings.company_name, 'UAB Testas');
 });
 
-test('importProjectsBackup restores price lists without deleting existing ones', () => {
+test('importProjectsBackup restores price lists without deleting existing ones', async () => {
   _resetSaveState();
   installLocalStorage({
     samatu_projects: JSON.stringify([]),
     samatu_price_lists: JSON.stringify([{ id: 'local', name: 'Vietinis' }]),
   });
   installFetchRecorder();
-  const res = importProjectsBackup(JSON.stringify({
+  const res = await importProjectsBackup(JSON.stringify({
     version: 2,
     projects: [{ id: 'p1', name: 'Iš backupo' }],
     price_lists: [{ id: 'pl1', name: 'Iš backupo kainos' }],
@@ -258,14 +258,14 @@ test('importProjectsBackup restores price lists without deleting existing ones',
   assert.deepEqual(names, ['Iš backupo kainos', 'Vietinis']);
 });
 
-test('a v1 backup (no price_lists) leaves the existing lists untouched', () => {
+test('a v1 backup (no price_lists) leaves the existing lists untouched', async () => {
   _resetSaveState();
   installLocalStorage({
     samatu_projects: JSON.stringify([]),
     samatu_price_lists: JSON.stringify([{ id: 'local', name: 'Vietinis' }]),
   });
   installFetchRecorder();
-  const res = importProjectsBackup(JSON.stringify({
+  const res = await importProjectsBackup(JSON.stringify({
     version: 1, projects: [{ id: 'p1', name: 'Senas backupas' }],
   }));
   assert.equal(res.price_lists_imported, 0);
@@ -410,7 +410,7 @@ test('restoring a backup pushes the recovered price lists to the backend', async
     samatu_price_lists: JSON.stringify([]),
   });
   const calls = installFetchRecorder();
-  const res = importProjectsBackup(JSON.stringify({
+  const res = await importProjectsBackup(JSON.stringify({
     version: 2,
     projects: [],
     price_lists: [{ id: 'pl-restored', name: 'Atkurtas', items: [] }],
@@ -544,4 +544,286 @@ test('refreshProjectFromBackend: an unsaved local edit is not swapped away, and 
   const same = await refreshProjectFromBackend('p9');
   assert.equal(same.name, 'Redaguota');
   assert.equal(await refreshProjectFromBackend(null), null);
+});
+
+// ── One PUT in flight per project, never aborted (2026-09-29 audit) ──────────
+//
+// A new save used to ABORT the PUT still on the wire. The server had often
+// stored that request already, so its version moved on while this tab kept the
+// old base — the next PUT was a false 409, and so was every save after it.
+
+/** fetch double whose responses the test releases by hand. */
+function installDeferredFetch() {
+  const calls = [];
+  globalThis.fetch = (url, opts = {}) => new Promise((resolve, reject) => {
+    calls.push({ url, method: opts.method, body: JSON.parse(opts.body || 'null'),
+                 signal: opts.signal, resolve, reject });
+  });
+  return calls;
+}
+const okVersion = (v) => ({ ok: true, status: 200, json: async () => ({ updated_at: v }) });
+
+test('three quick saves send two PUTs: the second on the first answer\'s version, with the newest content', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  noteServerVersion('p1', 'v0');
+  const calls = installDeferredFetch();
+
+  updateProject('p1', { name: 'e1' }); const f1 = flushProjectSaves();
+  updateProject('p1', { name: 'e2' }); const f2 = flushProjectSaves();
+  updateProject('p1', { name: 'e3' }); const f3 = flushProjectSaves();
+  assert.equal(calls.length, 1, 'only one PUT on the wire per project');
+  assert.equal(calls[0].body.base_updated_at, 'v0');
+
+  calls[0].resolve(okVersion('v1'));
+  assert.deepEqual(await f1, [{ id: 'p1', verdict: 'ok' }]);
+  assert.equal(calls.length, 2, 'the remembered snapshot goes out once the first is answered');
+  assert.equal(calls[1].body.base_updated_at, 'v1', 'carries the version that just arrived');
+  assert.equal(calls[1].body.name, 'e3', 'carries the LATEST snapshot, e2 is never sent');
+
+  calls[1].resolve(okVersion('v2'));
+  assert.deepEqual(await f2, [{ id: 'p1', verdict: 'ok' }]);
+  assert.deepEqual(await f3, [{ id: 'p1', verdict: 'ok' }]);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(c => !c.signal?.aborted), 'no PUT is ever aborted');
+  assert.equal(_getServerVersion('p1'), 'v2');
+});
+
+/**
+ * A tiny server with the backend's lost-update rule. `applyAt` says when it
+ * stores a request: on receipt (the audit's case — the response is what is
+ * slow) or only when it answers. The first answer is slow, later ones fast.
+ */
+function installVersionedServer(applyAt) {
+  const srv = { stored: 'A', version: 'v0', n: 0, calls: [], conflicts: 0 };
+  const apply = (body) => {
+    if (body.base_updated_at && body.base_updated_at !== srv.version) {
+      srv.conflicts += 1;
+      return { ok: false, status: 409, json: async () => ({ current_updated_at: srv.version }) };
+    }
+    srv.stored = body.name;
+    srv.version = `v${++srv.n}`;
+    const v = srv.version;
+    return { ok: true, status: 200, json: async () => ({ updated_at: v }) };
+  };
+  globalThis.fetch = (url, opts = {}) => {
+    const body = JSON.parse(opts.body);
+    srv.calls.push({ body, signal: opts.signal });
+    const early = applyAt === 'receipt' ? apply(body) : null;
+    const delay = srv.calls.length === 1 ? 40 : 2;
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => resolve(early || apply(body)), delay);
+      opts.signal?.addEventListener('abort', () => {
+        clearTimeout(t);
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    });
+  };
+  return srv;
+}
+
+for (const applyAt of ['receipt', 'response']) {
+  test(`a slow first answer and a fast second cannot leave the older content on the server (stored on ${applyAt})`, async () => {
+    _resetSaveState();
+    installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+    noteServerVersion('p1', 'v0');
+    const srv = installVersionedServer(applyAt);
+
+    updateProject('p1', { name: 'e1' }); flushProjectSaves();
+    await tick(10);                                   // e1 is on the wire, its answer is slow
+    updateProject('p1', { name: 'e2' });
+    const verdicts = await flushProjectSaves();
+    await tick(60);
+
+    assert.deepEqual(verdicts, [{ id: 'p1', verdict: 'ok' }]);
+    assert.equal(srv.stored, 'e2', 'the last change the user made is the last one stored');
+    assert.equal(srv.conflicts, 0, 'no false conflict');
+    assert.ok(srv.calls.every(c => !c.signal?.aborted), 'nothing aborted');
+
+    // …and the tab is not stuck: a later save goes through too.
+    updateProject('p1', { name: 'e3' });
+    assert.deepEqual(await flushProjectSaves(), [{ id: 'p1', verdict: 'ok' }]);
+    assert.equal(srv.stored, 'e3');
+  });
+}
+
+test('a real 409 still reports a conflict, and the waiting snapshot does not advance the version', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  noteServerVersion('p1', 'v0');
+  const calls = installDeferredFetch();
+  const conflict = { ok: false, status: 409, json: async () => ({ current_updated_at: 'other-tab' }) };
+
+  updateProject('p1', { name: 'e1' }); const f1 = flushProjectSaves();
+  updateProject('p1', { name: 'e2' }); const f2 = flushProjectSaves();
+  calls[0].resolve(conflict);
+  assert.deepEqual(await f1, [{ id: 'p1', verdict: 'conflict' }]);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].body.base_updated_at, 'v0', 'a conflict keeps the old base, as before');
+  calls[1].resolve(conflict);
+  assert.deepEqual(await f2, [{ id: 'p1', verdict: 'conflict' }]);
+  assert.equal(_getServerVersion('p1'), 'v0');
+});
+
+test('a failed in-flight PUT does not lose the snapshot waiting behind it', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  noteServerVersion('p1', 'v0');
+  const calls = installDeferredFetch();
+
+  updateProject('p1', { name: 'e1' }); const f1 = flushProjectSaves();
+  updateProject('p1', { name: 'e2' }); const f2 = flushProjectSaves();
+  calls[0].reject(new TypeError('Failed to fetch'));
+  assert.deepEqual(await f1, [{ id: 'p1', verdict: 'failed' }]);
+  assert.equal(calls.length, 2, 'the waiting snapshot is still sent');
+  assert.equal(calls[1].body.name, 'e2');
+  assert.equal(calls[1].body.base_updated_at, 'v0');
+  calls[1].resolve(okVersion('v1'));
+  assert.deepEqual(await f2, [{ id: 'p1', verdict: 'ok' }]);
+  assert.equal(_getServerVersion('p1'), 'v1');
+});
+
+test('refreshProjectFromBackend does not swap away an edit waiting behind a PUT on the wire', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A', updated_at: '2026-09-29T09:00:00Z' }]) });
+  noteServerVersion('p1', 'v0');
+  const calls = installDeferredFetch();
+  updateProject('p1', { name: 'e1' }); flushProjectSaves();
+  updateProject('p1', { name: 'e2' }); const waiting = flushProjectSaves();   // waits behind e1
+
+  const refreshed = refreshProjectFromBackend('p1');
+  calls[1].resolve({ ok: true, status: 200,
+    json: async () => ({ id: 'p1', name: 'e1', updated_at: '2999-01-01T00:00:00Z' }) });
+  assert.equal((await refreshed).name, 'e2', 'the waiting edit stays in the cache');
+  calls[0].resolve(okVersion('v1'));
+  await tick(0);
+  assert.equal(calls[2].body.name, 'e2');
+  calls[2].resolve(okVersion('v2'));
+  assert.deepEqual(await waiting, [{ id: 'p1', verdict: 'ok' }]);
+});
+
+// ── Backup import reaches the server (2026-09-29 audit) ──────────────────────
+//
+// The import merged into the local cache only. The next Dashboard pull replaces
+// that cache with the server's list, so every restored project the server did
+// not have was deleted without a word.
+
+/** A backend double for /api/projects: list, detail and PUT with the 409 rule. */
+function installProjectServer(initial = [], { failPut = () => false, failList = false } = {}) {
+  const rows = new Map(initial.map(p => [p.id, { ...p }]));
+  const calls = [];
+  let n = 0;
+  const json = (status, data) => ({ ok: status < 300, status, json: async () => data });
+  globalThis.fetch = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    const body = opts.body ? JSON.parse(opts.body) : null;
+    calls.push({ url, method, body });
+    const m = url.match(/\/api\/projects(?:\/([^/?]+))?$/);
+    if (!m) return json(200, {});                       // price lists and the like
+    const id = m[1];
+    if (!id) {
+      if (failList) return json(500, {});
+      return json(200, { projects: [...rows.values()].map(r => ({ id: r.id, updated_at: r.updated_at })) });
+    }
+    if (method === 'GET') return rows.has(id) ? json(200, rows.get(id)) : json(404, {});
+    if (failPut(id)) return json(500, {});
+    const { base_updated_at, ...data } = body;
+    const cur = rows.get(id);
+    if (cur && base_updated_at && base_updated_at !== cur.updated_at) {
+      return json(409, { current_updated_at: cur.updated_at });
+    }
+    const saved = { ...data, id, updated_at: `2026-09-29T12:00:0${++n}Z` };
+    rows.set(id, saved);
+    return json(200, saved);
+  };
+  return { rows, calls };
+}
+
+test('imported projects the server does not have are sent, and a later pull keeps them', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([]) });
+  const srv = installProjectServer([{ id: 'srv1', name: 'Serverio', updated_at: '2026-09-20T10:00:00Z' }]);
+
+  const res = await importProjectsBackup(JSON.stringify({
+    version: 2,
+    projects: [
+      { id: 'r1', name: 'Atkurtas 1', updated_at: '2026-09-10T10:00:00Z' },
+      { id: 'r2', name: 'Atkurtas 2', updated_at: '2026-09-11T10:00:00Z' },
+      { id: 'demo-objektas-a', is_demo: true, name: 'Pavyzdys' },
+    ],
+  }));
+  const puts = srv.calls.filter(c => c.method === 'PUT');
+  assert.deepEqual(puts.map(c => c.url.split('/').pop()).sort(), ['r1', 'r2'],
+    'every new project is sent; the local-only sample never is');
+  assert.ok(puts.every(c => !('base_updated_at' in c.body)), 'no base for an id the server does not have');
+  assert.equal(res.projects_saved, 2);
+  assert.equal(res.projects_failed, 0);
+  assert.equal(res.projects_kept_server, 0);
+
+  // The Dashboard pull that used to delete them.
+  await pullProjectsFromBackend({ force: true });
+  const ids = getProjects().map(p => p.id).sort();
+  assert.deepEqual(ids, ['r1', 'r2', 'srv1']);
+  assert.equal(getProject('r1').name, 'Atkurtas 1');
+});
+
+test('a project that could not be sent is reported, not dropped silently', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([]) });
+  let failing = true;
+  const srv = installProjectServer([], { failPut: id => failing && id === 'bad' });
+  const file = JSON.stringify({
+    version: 2,
+    projects: [{ id: 'good', name: 'Gerai' }, { id: 'bad', name: 'Nepavyko' }],
+  });
+
+  const res = await importProjectsBackup(file);
+  assert.equal(res.projects_saved, 1);
+  assert.equal(res.projects_failed, 1);
+
+  // Importing the same file again retries the one that failed, even though
+  // this browser's cache already holds it.
+  failing = false;
+  const again = await importProjectsBackup(file);
+  assert.equal(again.projects_saved, 1);
+  assert.equal(again.projects_failed, 0);
+  assert.equal(srv.rows.get('bad').name, 'Nepavyko');
+});
+
+test('when the server cannot be asked, nothing is sent and every project is reported as not saved', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([]) });
+  const srv = installProjectServer([], { failList: true });
+
+  const res = await importProjectsBackup(JSON.stringify({
+    version: 2, projects: [{ id: 'r1', name: 'Atkurtas' }],
+  }));
+  assert.equal(srv.calls.filter(c => c.method === 'PUT').length, 0);
+  assert.equal(res.projects_saved, 0);
+  assert.equal(res.projects_failed, 1);
+  assert.equal(getProject('r1').name, 'Atkurtas', 'still in this browser, as before');
+});
+
+test('a newer server copy is kept; an imported copy newer than the server is sent on the server version', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([]) });
+  const srv = installProjectServer([
+    { id: 'kept', name: 'Serverio naujesnis', updated_at: '2026-09-20T10:00:00Z' },
+    { id: 'older', name: 'Serverio senesnis', updated_at: '2026-09-20T10:00:00Z' },
+  ]);
+
+  const res = await importProjectsBackup(JSON.stringify({
+    version: 2,
+    projects: [
+      { id: 'kept', name: 'Senas iš failo', updated_at: '2026-09-01T10:00:00Z' },
+      { id: 'older', name: 'Naujas iš failo', updated_at: '2026-09-25T10:00:00Z' },
+    ],
+  }));
+  const puts = srv.calls.filter(c => c.method === 'PUT');
+  assert.deepEqual(puts.map(c => c.url.split('/').pop()), ['older']);
+  assert.equal(puts[0].body.base_updated_at, '2026-09-20T10:00:00Z');
+  assert.equal(res.projects_saved, 1);
+  assert.equal(res.projects_kept_server, 1);
+  assert.equal(srv.rows.get('kept').name, 'Serverio naujesnis');
+  assert.notEqual(getProject('kept')?.name, 'Senas iš failo', 'the older file copy is not adopted');
 });

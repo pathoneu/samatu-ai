@@ -535,16 +535,26 @@ function BackupSection() {
     if (!file) return;
     setImporting(true);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
-        const result = importProjectsBackup(reader.result, { mergeStrategy: 'merge' });
-        toast.success(
-          t('settings.backup.toastImported', {
-            count: result.projects_imported,
-            total: result.projects_total,
-          })
-        );
-        setTimeout(() => window.location.reload(), 800);
+        // The import now also sends the restored projects to the server — the
+        // counts below are what the server took, not what the file held.
+        const result = await importProjectsBackup(reader.result, { mergeStrategy: 'merge' });
+        if (result.projects_saved || !result.projects_failed) {
+          toast.success(t('settings.backup.toastSaved', { count: result.projects_saved }));
+        }
+        if (result.projects_kept_server) {
+          toast.info(t('settings.backup.toastKeptServer', { count: result.projects_kept_server }),
+            { duration: 10000 });
+        }
+        if (result.projects_failed) {
+          // Stays until closed: these projects are not on the server yet.
+          toast.error(t('settings.backup.toastSaveFailed', { count: result.projects_failed }),
+            { duration: Infinity });
+        } else if (!result.projects_kept_server) {
+          // Reload only when there is nothing to read — a reload clears the toasts.
+          setTimeout(() => window.location.reload(), 800);
+        }
       } catch (e) {
         toast.error(e.message || t('settings.backup.toastImportFail'));
       } finally {
