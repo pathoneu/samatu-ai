@@ -27,11 +27,11 @@
     "hero": {
       "eyebrow": "Quantities from construction drawings",
       "titleA": "Estimates and quantities —",
-      "titleB": "in minutes, not days.",
+      "titleB": "in an hour, not days.",
       "ctaPrimary": "Try it free",
       "ctaDemo": "Watch the demo",
       "micro": "First project per company — free. No commitments.",
-      "sub": "Pathon pulls the quantities from your PDF drawing and assembles the bill of quantities in minutes — the same takeoff you’d do by hand in hours. You review and add your own prices."
+      "sub": "Pathon pulls the quantities from your PDF drawing and assembles the bill of quantities in 15–35 minutes — the same takeoff you’d do by hand in hours. You review and add your own prices."
     },
     "heroSvg": {
       "a1": "18.4 m²",
@@ -100,11 +100,11 @@
       "items": [
         {
           "t": "Upload the project PDF",
-          "d": "Floor plans, wall elevations, room schedules — vector or scanned. No CAD needed."
+          "d": "Floor plans, wall elevations, room schedules — vector PDFs work best; check scanned ones more carefully. No CAD needed."
         },
         {
-          "t": "Review the flagged items",
-          "d": "Every line is marked: read from the drawing, computed with an assumption, or a default. You check only what is flagged."
+          "t": "Answer a few questions",
+          "d": "The app asks a few questions about the project and shows, beside every number, the place on the drawing it came from."
         },
         {
           "t": "Export the estimate",
@@ -152,10 +152,6 @@
         {
           "label": "doors",
           "val": "9 pcs"
-        },
-        {
-          "label": "excavation",
-          "val": "46.0 m³"
         }
       ],
       "note": "Every number carries its unit and a link to the exact spot on the drawing it came from."
@@ -164,7 +160,7 @@
       "eyebrow": "04 · Trust system",
       "titleA": "Trust you can verify.",
       "titleB": "",
-      "sub": "Every quantity shows where it came from: read straight off the drawing, computed from an assumption, or a default. The system surfaces the few lines worth a review before you quote — the rest are already done.",
+      "sub": "Every quantity shows where it came from: read straight off the drawing, computed from an assumption, or a default. Before you quote, the app asks a few questions and shows, beside every number, the place on the drawing it came from.",
       "cards": [
         {
           "t": "Green — read from the drawing",
@@ -187,7 +183,7 @@
       "rowVon": "Bathroom ceiling height —",
       "showBtn": "Show on drawing",
       "confirmed": "Confirmed",
-      "panelFoot": "The remaining 43 lines were read from the drawing."
+      "panelFoot": "Review the other 43 lines against the drawing."
     },
     "recalc": {
       "eyebrow": "05 · Live recalculation",
@@ -254,14 +250,14 @@
           "name": "Studio",
           "price": "149 €",
           "per": "/ mo · 35 projects",
-          "desc": "For teams and studios — shared price lists, priority processing."
+          "desc": "For teams and studios — everything in Pro, more projects."
         }
       ],
       "note": "Prices excl. VAT. Every scan, recalculation and export is included."
     },
     "cta": {
       "title": "First project is free. Upload and compare for yourself.",
-      "sub": "Got a drawing waiting for an estimate? In half an hour you’ll know if Pathon fits.",
+      "sub": "Got a drawing waiting for an estimate? Within an hour you’ll know if Pathon fits.",
       "primary": "Try it free",
       "contact": "Contact us"
     },
@@ -296,7 +292,7 @@
         "period": "/mo",
         "features": [
           "Up to 10 projects per month",
-          "Construction quantities (all types)",
+          "Interior finishing quantities",
           "PDF and Excel export",
           "Quantity correction tools"
         ]
@@ -308,7 +304,6 @@
         "features": [
           "Up to 35 projects per month",
           "All Pro features",
-          "Priority processing",
           "Extra projects at a lower price"
         ]
       },
@@ -339,9 +334,9 @@
     "termsOfUse": "Terms of Use",
     "brandEyebrow": "PATHON — CONSTRUCTION ESTIMATES",
     "brandHeadlineA": "Quantities from PDF ",
-    "brandHeadlineAccent": "in minutes",
+    "brandHeadlineAccent": "in an hour",
     "brandHeadlineB": ", not days.",
-    "brandSub": "Interior, facades, roofing, structures — one tool for all quantity types.",
+    "brandSub": "Interior finishing quantities from the project PDF — walls, ceilings, floors, openings.",
     "forgotPassword": "Forgot your password? Contact us",
     "oauthErr": {
       "invalidState": "The sign-in session has expired. Start the Google sign-in again.",
@@ -439,7 +434,7 @@
       "feat1Title": "Reads the drawing",
       "feat1Desc": "Automatic recognition of BoQ rows",
       "feat2Title": "Save time",
-      "feat2Desc": "1-2 weeks of work in a few minutes",
+      "feat2Desc": "1-2 weeks of work in an hour",
       "feat3Title": "Accurate estimate",
       "feat3Desc": "Real-time calculations and export"
     },
@@ -889,10 +884,10 @@
     "reextract": {
       "loadingPdf": "Loading PDF from memory...",
       "pdfNotFound": "The PDF was not found, so it cannot be read again. Create a new project with the PDF.",
-      "analyzing": "Reading the drawing again (3–8 min)…",
+      "analyzing": "Reading the drawing again (15–35 min)…",
       "pass1": "Measuring the rooms… ({{sec}} s)",
       "pass2": "Refining the rooms… ({{sec}} s)",
-      "complex": "A complex project ({{sec}} s)… this can take up to 8 min.",
+      "complex": "A complex project ({{sec}} s)… this can take up to 35 min.",
       "pipelineErr": "Pipeline error",
       "badFormat": "The answer came back in an unusable format",
       "updated": "✓ Updated!",
@@ -901,7 +896,7 @@
       "buttonTitle": "Read the drawing again from the stored PDF",
       "button": "Read the drawing again",
       "confirmTitle": "Read the drawing again?",
-      "bullet1": "Takes 3-8 min, costs ~$1-2",
+      "bullet1": "Takes 15-35 min, costs ~$1-2",
       "bullet2": "Verified rooms and the numbers you corrected stay",
       "bullet3": "Prices and manual quantities on the rows are kept",
       "bullet5": "What changed is shown after the read",

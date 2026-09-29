@@ -45,7 +45,7 @@ export default function SamatininkoKaina() {
     setPageMeta({
       title: 'Kiek laiko atima sąmata ir kaip skaičiuoti greičiau',
       description:
-        'Kiek laiko atima statybos sąmatos skaičiavimas iš brėžinių, kur dingsta valandos ir kaip jį sutrumpinti nuo valandų iki minučių — patiems, be sąmatininko.',
+        'Kiek laiko atima statybos sąmatos skaičiavimas iš brėžinių, kur dingsta valandos ir kaip jį gerokai sutrumpinti — patiems, be sąmatininko.',
       path: PATH,
     });
     setJsonLd('jsonld-article-samatininko-kaina', {
@@ -176,8 +176,8 @@ export default function SamatininkoKaina() {
           <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
           automatizuoja būtent tą dalį, kuri suryja valandas: nuskaito PDF brėžinį,
           atpažįsta patalpas ir elementus, apskaičiuoja kiekius pagal Lietuvos
-          praktiką ir parengia kiekių žiniaraštį. Jums lieka peržiūrėti pažymėtas
-          vietas ir suvesti savo įkainius. Kaip tai veikia žingsnis po žingsnio —{' '}
+          praktiką ir parengia kiekių žiniaraštį. Jums lieka atsakyti į kelis
+          klausimus, peržiūrėti kiekius ir suvesti savo įkainius. Kaip tai veikia žingsnis po žingsnio —{' '}
           <Link to="/kiekiai-is-brezinio" className="text-primary hover:underline">
             kiekiai iš PDF brėžinio
           </Link>.
@@ -222,9 +222,9 @@ export default function SamatininkoKaina() {
           </LI>
           <LI>
             <Term>Šimtaprocentinio atpažinimo.</Term> Simbolių ir elementų
-            nuskaitymas iš brėžinių nėra tobulas, todėl kiekvienas kiekis Pathon
-            sistemoje turi pasitikėjimo indikatorių: žalias — nuskaityta tiesiai iš
-            brėžinio, geltonas — su prielaidomis, raudonas — numatytoji reikšmė.
+            nuskaitymas iš brėžinių nėra tobulas, todėl prie kiekvieno kiekio
+            Pathon rodo vietą brėžinyje, iš kurios jis paimtas, o ko nustatyti
+            nepavyko — paklausia jūsų.
             Prieš komercinį pasiūlymą kiekius reikia peržiūrėti.
           </LI>
           <LI>
@@ -234,7 +234,7 @@ export default function SamatininkoKaina() {
         </UL>
         <Callout title="Sąžininga riba">
           <P>
-            Pathon tikslas — kad techninė kiekių dalis truktų minutes, o ne dienas.
+            Pathon tikslas — kad techninė kiekių dalis truktų valandą, o ne dienas.
             Ekspertizės, atsakomybės ir derybų jis neperima. Daugiau atsakymų —{' '}
             <Link to="/duk" className="text-primary hover:underline">DUK puslapyje</Link>.
           </P>

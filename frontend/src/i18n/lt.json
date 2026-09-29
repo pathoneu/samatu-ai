@@ -27,11 +27,11 @@
     "hero": {
       "eyebrow": "Statybų kiekiai iš PDF brėžinių",
       "titleA": "Sąmatos ir kiekiai —",
-      "titleB": "per minutes, ne dienas.",
+      "titleB": "per valandą, ne dienas.",
       "ctaPrimary": "Išbandyti nemokamai",
       "ctaDemo": "Žiūrėti demo",
       "micro": "Pirmas projektas įmonei — nemokamas. Be įsipareigojimų.",
-      "sub": "Pathon iš PDF brėžinio ištraukia kiekius ir sudėlioja žiniaraštį per minutes — tą patį, ką rankomis skaičiuotumėte valandas. Jums lieka peržiūrėti ir suvesti savo įkainius."
+      "sub": "Pathon iš PDF brėžinio ištraukia kiekius ir sudėlioja žiniaraštį per 15–35 minutes — tą patį, ką rankomis skaičiuotumėte valandas. Jums lieka peržiūrėti ir suvesti savo įkainius."
     },
     "heroSvg": {
       "a1": "18,4 m²",
@@ -100,11 +100,11 @@
       "items": [
         {
           "t": "Įkelkite projekto PDF",
-          "d": "Aukštų planai, sienų išklotinės, eksplikacijos — vektoriniai ar skenuoti. CAD programos nereikia."
+          "d": "Aukštų planai, sienų išklotinės, eksplikacijos — geriausiai vektoriniai; skenuotus tikrinkite atidžiau. CAD programos nereikia."
         },
         {
-          "t": "Peržiūrėkite pažymėtas vietas",
-          "d": "Kiekviena eilutė turi ženklą: nuskaityta, su prielaida ar numatytoji. Tikrinate tik tai, kas pažymėta — ne visą sąmatą."
+          "t": "Atsakykite į kelis klausimus",
+          "d": "Programa užduoda kelis klausimus apie projektą, o prie kiekvieno skaičiaus parodo vietą brėžinyje, iš kurios jis paimtas."
         },
         {
           "t": "Eksportuokite sąmatą",
@@ -152,10 +152,6 @@
         {
           "label": "durys",
           "val": "9 vnt."
-        },
-        {
-          "label": "iškasos",
-          "val": "46,0 m³"
         }
       ],
       "note": "Kiekvienas skaičius — su matavimo vienetu ir nuoroda į brėžinio vietą, iš kurios paimtas."
@@ -164,7 +160,7 @@
       "eyebrow": "04 · Pasitikėjimo sistema",
       "titleA": "Pasitikėjimą galima patikrinti.",
       "titleB": "",
-      "sub": "Kiekvienas kiekis rodo, iš kur atėjo: nuskaitytas tiesiai iš brėžinio, apskaičiuotas su prielaida ar numatytasis. Sistema pati iškelia tas kelias eilutes, kurias verta peržiūrėti prieš pasiūlymą — likusias jau apskaičiavo.",
+      "sub": "Kiekvienas kiekis rodo, iš kur atėjo: nuskaitytas tiesiai iš brėžinio, apskaičiuotas su prielaida ar numatytasis. Prieš pasiūlymą programa užduoda kelis klausimus ir prie kiekvieno skaičiaus parodo vietą brėžinyje, iš kurios jis paimtas.",
       "cards": [
         {
           "t": "Žalia — nuskaityta iš brėžinio",
@@ -187,7 +183,7 @@
       "rowVon": "Vonios lubų aukštis —",
       "showBtn": "Rodyti brėžinyje",
       "confirmed": "Patvirtinta",
-      "panelFoot": "Likusios 43 eilutės — nuskaitytos iš brėžinio."
+      "panelFoot": "Kitas 43 eilutes peržiūrėkite prie brėžinio."
     },
     "recalc": {
       "eyebrow": "05 · Gyvas perskaičiavimas",
@@ -254,14 +250,14 @@
           "name": "Studio",
           "price": "149 €",
           "per": "/ mėn. · 35 projektai",
-          "desc": "Komandai ir biurui — bendri kainynai, prioritetinis apdorojimas."
+          "desc": "Komandai ir biurui — visos Pro galimybės, daugiau projektų."
         }
       ],
       "note": "Kainos be PVM. Į kainą įskaičiuoti visi nuskaitymai, perskaičiavimai ir eksportai."
     },
     "cta": {
       "title": "Pirmas projektas — nemokamas. Įkelkite ir palyginkite patys.",
-      "sub": "Turite brėžinį, kurio sąmatos laukiate? Per pusvalandį žinosite, ar Pathon jums tinka.",
+      "sub": "Turite brėžinį, kurio sąmatos laukiate? Per valandą žinosite, ar Pathon jums tinka.",
       "primary": "Išbandyti nemokamai",
       "contact": "Susisiekti"
     },
@@ -296,7 +292,7 @@
         "period": "/mėn.",
         "features": [
           "Iki 10 projektų per mėnesį",
-          "Statybų kiekiai (visų tipų)",
+          "Interjero apdailos kiekiai",
           "PDF ir Excel eksportas",
           "Kiekių koregavimo įrankiai"
         ]
@@ -308,7 +304,6 @@
         "features": [
           "Iki 35 projektų per mėnesį",
           "Visos Pro funkcijos",
-          "Prioritetinis apdorojimas",
           "Papildomi projektai už mažesnę kainą"
         ]
       },
@@ -339,9 +334,9 @@
     "termsOfUse": "Naudojimo sąlygos",
     "brandEyebrow": "PATHON — STATYBŲ SĄMATOS",
     "brandHeadlineA": "Kiekiai iš PDF ",
-    "brandHeadlineAccent": "per minutes",
+    "brandHeadlineAccent": "per valandą",
     "brandHeadlineB": ", ne per dienas.",
-    "brandSub": "Interjeras, fasadai, stogai, konstrukcijos — vienas įrankis visų tipų kiekiams.",
+    "brandSub": "Interjero apdailos kiekiai iš projekto PDF — sienos, lubos, grindys, angos.",
     "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis",
     "oauthErr": {
       "invalidState": "Prisijungimo sesija nebegalioja. Pradėkite prisijungimą per Google iš naujo.",
@@ -439,7 +434,7 @@
       "feat1Title": "Skaito brėžinį",
       "feat1Desc": "Automatinis KŽ eilučių atpažinimas",
       "feat2Title": "Sutaupykite laiką",
-      "feat2Desc": "1-2 savaitės darbo per kelias minutes",
+      "feat2Desc": "1-2 savaitės darbo per valandą",
       "feat3Title": "Tiksli sąmata",
       "feat3Desc": "Skaičiavimai realiuoju laiku ir eksportas"
     },
@@ -895,10 +890,10 @@
     "reextract": {
       "loadingPdf": "Įkeliamas PDF iš atminties...",
       "pdfNotFound": "PDF nerastas. Perskaityti iš naujo negalime. Sukurkite naują projektą su PDF.",
-      "analyzing": "Skaitome brėžinį iš naujo (palaukite 3–8 min)…",
+      "analyzing": "Skaitome brėžinį iš naujo (palaukite 15–35 min)…",
       "pass1": "Matuojame patalpas… ({{sec}} s)",
       "pass2": "Tiksliname kambarius… ({{sec}} s)",
-      "complex": "Sudėtingas projektas ({{sec}} s)… gali užtrukti iki 8 min.",
+      "complex": "Sudėtingas projektas ({{sec}} s)… gali užtrukti iki 35 min.",
       "pipelineErr": "Apdorojimo klaida",
       "badFormat": "Gautas netinkamas atsakymo formatas",
       "updated": "✓ Atnaujinta!",
@@ -907,7 +902,7 @@
       "buttonTitle": "Perskaityti brėžinį iš naujo su išsaugotu PDF",
       "button": "Skaityti brėžinį iš naujo",
       "confirmTitle": "Skaityti brėžinį iš naujo?",
-      "bullet1": "Užtruks 3–8 min, kainuos ~1–2 $",
+      "bullet1": "Užtruks 15–35 min, kainuos ~1–2 $",
       "bullet2": "Patikrintos patalpos ir jūsų pataisyti skaičiai lieka",
       "bullet3": "Kainos ir rankiniai kiekiai eilutėse išsaugomi",
       "bullet5": "Kas pasikeitė — parodysime po perskaitymo",

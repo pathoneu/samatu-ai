@@ -305,9 +305,9 @@ export default function VidausApdailosSamata() {
           <P>
             <Link to="/about" className="text-primary hover:underline">Pathon</Link>{' '}
             1–4 žingsnius atlieka pats: nuskaito PDF brėžinį, pritaiko šias
-            formules ir parengia kiekių žiniaraštį su pasitikėjimo
-            indikatoriais prie kiekvienos reikšmės. Jums lieka peržiūra ir
-            kainos. Kaip tai atrodo praktiškai —{' '}
+            formules ir parengia kiekių žiniaraštį, prie kiekvienos reikšmės
+            rodydamas vietą brėžinyje, iš kurios ji paimta. Jums lieka atsakyti
+            į kelis klausimus, peržiūrėti kiekius ir suvesti kainas. Kaip tai atrodo praktiškai —{' '}
             <Link to="/kiekiai-is-brezinio" className="text-primary hover:underline">
               kiekiai iš PDF brėžinio
             </Link>.

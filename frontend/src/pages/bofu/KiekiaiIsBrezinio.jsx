@@ -42,7 +42,7 @@ function FlowStrip() {
 export default function KiekiaiIsBrezinio() {
   useEffect(() => {
     setPageMeta({
-      title: 'Kiekiai iš PDF brėžinio per kelias minutes',
+      title: 'Kiekiai iš PDF brėžinio per valandą',
       description:
         'Įkelkite statybos projekto PDF — Pathon atpažįsta patalpas, apskaičiuoja kiekius ir parengia kiekių žiniaraštį su sąmata. Eksportas į Excel ir PDF.',
       path: PATH,
@@ -51,9 +51,9 @@ export default function KiekiaiIsBrezinio() {
       '@context': 'https://schema.org',
       '@type': 'Article',
       '@id': `${URL}#article`,
-      headline: 'Kiekiai iš PDF brėžinio per kelias minutes',
+      headline: 'Kiekiai iš PDF brėžinio per valandą',
       description:
-        'Kaip iš statybos projekto PDF brėžinio automatiškai apskaičiuojami kiekiai: žingsniai, ką sistema išmatuoja, pasitikėjimo indikatoriai ir eksportas į Excel bei PDF.',
+        'Kaip iš statybos projekto PDF brėžinio automatiškai apskaičiuojami kiekiai: žingsniai, ką sistema išmatuoja, kaip tikrinti kiekius ir eksportas į Excel bei PDF.',
       inLanguage: 'lt',
       mainEntityOfPage: URL,
       image: 'https://pathon.eu/og-image.png',
@@ -69,7 +69,7 @@ export default function KiekiaiIsBrezinio() {
     <MarketingLayout
       eyebrow="Gidas / Kiekiai"
       index="GID-02"
-      title="Kiekiai iš PDF brėžinio per kelias minutes"
+      title="Kiekiai iš PDF brėžinio per valandą"
       intro="Kaip iš statybos projekto PDF gimsta kiekių žiniaraštis ir sąmata: žingsniai, ką sistema išmatuoja ir kur — sąžiningai — jos ribos."
       updated="2026-07-06"
       related={[
@@ -83,8 +83,9 @@ export default function KiekiaiIsBrezinio() {
         <SubHead>1. Įkeliate projekto PDF</SubHead>
         <P>
           Tinka aukštų planai, sienų išklotinės, lubų ir grindų planai,
-          eksplikacijos — tiek vektoriniai, tiek skenuoti failai. Jokio
-          paruošimo: keliate tą patį PDF, kurį gavote iš projektuotojo.
+          eksplikacijos — geriausiai vektoriniai PDF; skenuotuose perskaitoma
+          mažiau, todėl juos reikia tikrinti atidžiau. Jokio paruošimo: keliate
+          tą patį PDF, kurį gavote iš projektuotojo.
         </P>
         <SubHead>2. Sistema nuskaito ir apskaičiuoja</SubHead>
         <P>
@@ -92,13 +93,14 @@ export default function KiekiaiIsBrezinio() {
           klasifikuoja kiekvieną lapą (planas, išklotinė, lubų planas…),
           atpažįsta patalpas ir elementus, tada pritaiko Lietuvos sąmatininkų
           praktikos formules: plotai, perimetrai, angų atėmimai, atliekų
-          koeficientai. Nuskaitymas paprastai trunka 10–15 minučių —
-          trukmė priklauso nuo lapų skaičiaus.
+          koeficientai. Nuskaitymas paprastai trunka 15–35 minutes —
+          trukmė priklauso nuo lapų skaičiaus; langą galite uždaryti ir
+          grįžti vėliau.
         </P>
         <SubHead>3. Peržiūrite ir suvedate kainas</SubHead>
         <P>
-          Kiekviena reikšmė turi pasitikėjimo indikatorių ir nuorodą į vietą
-          brėžinyje, iš kurios ji atėjo. Pakoreguojate prielaidas (lubų aukštį,
+          Programa užduoda kelis klausimus apie projektą, o prie kiekvienos
+          reikšmės rodo vietą brėžinyje, iš kurios ji atėjo. Pakoreguojate prielaidas (lubų aukštį,
           glaistymo lygį, angas), suvedate savo įkainius — sumos
           persiskaičiuoja akimirksniu. Tuomet eksportuojate į Excel arba PDF.
         </P>
@@ -152,18 +154,19 @@ export default function KiekiaiIsBrezinio() {
           kiekiais.
         </P>
         <P>
-          Sąžiningas pastebėjimas: kuo išsamesnis projektas, tuo daugiau žalių
-          indikatorių. Jei išklotinių ar eksplikacijų nėra, sistema skaičiuoja
+          Sąžiningas pastebėjimas: kuo išsamesnis projektas, tuo daugiau
+          perskaitoma tiesiai iš brėžinio. Jei išklotinių ar eksplikacijų nėra, sistema skaičiuoja
           su prielaidomis ir aiškiai jas parodo — tokias vietas verta peržiūrėti
           pirmiausia.
         </P>
       </Section>
 
-      <Section n={4} title="Pasitikėjimo indikatoriai — kodėl jais tikime">
+      <Section n={4} title="Kaip tikrinate kiekius">
         <P>
           Joks įrankis (nei žmogus) neatpažįsta brėžinių šimtu procentų. Užuot
-          apsimetę, jog klaidų nebūna, kiekvienam kiekiui rodome, iš
-          kur jis atsirado:
+          apsimetę, jog klaidų nebūna, prie kiekvieno kiekio rodome vietą
+          brėžinyje, iš kurios jis paimtas, o ko nustatyti nepavyko — klausiame
+          jūsų. Eilutėse taip pat matote, kaip kiekis gautas:
         </P>
         <UL>
           <LI>

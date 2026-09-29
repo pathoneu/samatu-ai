@@ -18,9 +18,11 @@ English UI is available. This file is bilingual where useful.
 - Kiekiai skaičiuojami deterministinėmis formulėmis pagal Lietuvos praktiką
   (dažomas plotas, angokraščiai, glaistymo kampai, grindjuostės, GKP lapai,
   glaistas pagal Q lygį, hidroizoliacija ir kt.).
-- Kiekvienas kiekis turi pasitikėjimo indikatorių: 🟢 nuskaityta iš brėžinio,
-  🟡 apskaičiuota su prielaidomis, 🔴 numatytoji reikšmė — vartotojas mato,
-  ką tikrinti pirmiausia.
+- Prie kiekvieno kiekio rodoma vieta brėžinyje, iš kurios jis paimtas; ko
+  nustatyti nepavyko, programa paklausia vartotojo keliais klausimais.
+- Vektoriniuose PDF patalpos, sienų ilgiai ir angos perskaitomi iš brėžinio;
+  skenuotuose plotai imami iš patalpų lentelės, sienos įvertinamos
+  apytiksliai, todėl juos reikia tikrinti atidžiau.
 - Prielaidas (lubų aukštį, Q lygį, sienų storį) galima keisti — kiekiai
   perskaičiuojami iškart, be pakartotinio AI skaitymo.
 - Kainas suveda pats rangovas (produktas neprimeta kainynų); PVM 21 %,
@@ -35,16 +37,17 @@ English UI is available. This file is bilingual where useful.
 Lithuanian construction company owners, rangovai (contractors), apdailos
 brigados (finishing crews), and sąmatininkai (estimators) who currently spend
 hours — or pay €200–500 per project — for manual quantity takeoff from PDF
-drawings. Pathon produces the same work in minutes; the user reviews flagged
-items and enters unit prices.
+drawings. A Pathon run takes roughly 15–35 minutes (the user can close the tab
+and come back); the user then answers a handful of questions, each shown beside
+the place on the drawing, and enters unit prices.
 
 ## Honest accuracy statement
 
-Pathon's deterministic formulas match professional estimator output within ~1%
-when inputs are correct. AI *detection* of symbols on drawings (outlets,
-diffusers, windows) is imperfect industry-wide, so every extracted quantity
-carries a confidence flag and the workflow is built around fast human review
-and correction — not blind trust. Extracted quantities are decision-support;
+Pathon's formulas follow Lithuanian estimator practice, but reading drawings
+(rooms, walls, openings, symbols) is imperfect, so Pathon promises no accuracy
+percentage. Every quantity shows the place on the drawing it came from, and the
+workflow is built around a handful of questions and human review — not blind
+trust. Extracted quantities are decision-support;
 users must verify before using them in commercial offers.
 
 ## Pages

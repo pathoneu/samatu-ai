@@ -246,9 +246,8 @@ export default function ApvaRenovacijosKiekiai() {
             </Link>).
           </LI>
           <LI>
-            Fasado ir stogo kiekiams taikomos pirmiau aprašytos normos pagal
-            brėžinių matmenis — visos prielaidos matomos ir keičiamos, o
-            kiekvienas kiekis turi pasitikėjimo indikatorių.
+            Fasado ir stogo kiekių Pathon šiuo metu neskaičiuoja — juos
+            paskaičiuokite pagal pirmiau aprašytas normas.
           </LI>
           <LI>
             Eksportuojate į Excel (su gyvomis formulėmis) arba PDF — sąmatą
@@ -258,7 +257,7 @@ export default function ApvaRenovacijosKiekiai() {
         <Callout title="Sąžininga riba">
           <P>
             Automatika neperima atsakomybės už pasiūlymą: prieš teikdami
-            patikrinkite kiekius (sistema parodo, kuriuos pirmiausia) ir
+            patikrinkite kiekius (prie kiekvieno rodoma vieta brėžinyje) ir
             sutikrinkite priemones su investicijų planu. Kaip nuskaitymas
             veikia žingsnis po žingsnio —{' '}
             <Link to="/kiekiai-is-brezinio" className="text-primary hover:underline">

@@ -17,19 +17,19 @@ import { setJsonLd } from '@/lib/seo';
 const QA = [
   {
     q: 'Kas yra Pathon ir kaip jis veikia?',
-    a: 'Pathon — statybų kiekių ir sąmatų skaičiavimo platforma. Įkeliate statybos projekto PDF brėžinį; sistema atpažįsta patalpas ir elementus (sienas, duris, langus, plyteles, LED nišas), apskaičiuoja kiekius pagal Lietuvos sąmatininkų praktiką ir parengia kiekių žiniaraštį bei sąmatą. Jūs peržiūrite pažymėtas vietas ir suvedate savo įkainius.',
+    a: 'Pathon — statybų kiekių ir sąmatų skaičiavimo platforma. Įkeliate statybos projekto PDF brėžinį; sistema atpažįsta patalpas ir elementus (sienas, duris, langus, plyteles, LED nišas), apskaičiuoja kiekius pagal Lietuvos sąmatininkų praktiką ir parengia kiekių žiniaraštį bei sąmatą. Jūs atsakote į kelis klausimus, peržiūrite kiekius ir suvedate savo įkainius.',
   },
   {
     q: 'Kiek laiko užtrunka paruošti sąmatą?',
-    a: 'Brėžinio nuskaitymas paprastai trunka 10–15 minučių (priklauso nuo lapų skaičiaus). Po to kiekiai jau apskaičiuoti — lieka peržiūrėti pažymėtas vietas ir suvesti kainas. Palyginti: tuos pačius kiekius skaičiuojant ranka iš brėžinių, sugaištama nuo kelių valandų iki poros dienų.',
+    a: 'Brėžinio nuskaitymas paprastai trunka 15–35 minutes (priklauso nuo lapų skaičiaus); langą galite uždaryti ir grįžti vėliau. Po to kiekiai jau apskaičiuoti — lieka atsakyti į kelis klausimus, peržiūrėti kiekius ir suvesti kainas. Palyginti: tuos pačius kiekius skaičiuojant ranka iš brėžinių, sugaištama nuo kelių valandų iki poros dienų.',
   },
   {
     q: 'Ar galiu pasitikėti automatiškai apskaičiuotais kiekiais?',
-    a: 'Kiekvienas kiekis turi pasitikėjimo indikatorių: žalias — nuskaityta tiesiai iš brėžinio, geltonas — apskaičiuota su prielaidomis, raudonas — naudota numatytoji reikšmė. Skaičiavimo formulės atitinka profesionalių sąmatininkų praktiką (~1 % tikslumu, kai pradiniai duomenys teisingi), tačiau simbolių atpažinimas iš brėžinių nėra tobulas — todėl sistema aiškiai parodo, ką patikrinti pirmiausia. Prieš naudodami kiekius komerciniame pasiūlyme, juos peržiūrėkite.',
+    a: 'Prie kiekvieno kiekio rodoma vieta brėžinyje, iš kurios jis paimtas, o ko iš brėžinio nustatyti nepavyko, programa paklausia jūsų — keliais klausimais. Skaičiavimo formulės remiasi profesionalių sąmatininkų praktika, tačiau brėžinių nuskaitymas nėra tobulas, todėl rezultatas priklauso nuo brėžinio. Prieš naudodami kiekius komerciniame pasiūlyme, juos peržiūrėkite.',
   },
   {
     q: 'Kokius brėžinius Pathon skaito?',
-    a: 'Geriausiai — interjero / vidaus apdailos projektus PDF formatu: aukštų planus, sienų išklotines, lubų ir grindų planus, eksplikacijas. Taip pat nuskaitomi kiekių žiniaraščiai iš kitų statybos dalių (konstrukcijos, elektra, santechnika). Tinka tiek vektoriniai, tiek skenuoti (rastriniai) PDF.',
+    a: 'Geriausiai — interjero / vidaus apdailos projektus PDF formatu: aukštų planus, sienų išklotines, lubų ir grindų planus, eksplikacijas. Taip pat nuskaitomi kiekių žiniaraščiai iš kitų statybos dalių (konstrukcijos, elektra, santechnika). Vektoriniuose PDF patalpos, sienų ilgiai ir angos perskaitomi tiesiai iš brėžinio. Skenuoti (rastriniai) PDF irgi tinka, bet perskaitoma mažiau: plotai imami iš patalpų lentelės, sienos įvertinamos apytiksliai, todėl kiekius reikia tikrinti atidžiau.',
   },
   {
     q: 'Kiek kainuoja Pathon?',
