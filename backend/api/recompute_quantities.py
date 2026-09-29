@@ -389,7 +389,9 @@ def _apply_assumption_edits(rooms: list[dict], assumptions: dict,
         # saving glaistimo_lygis but never recomputing the putty kg, so the
         # UI buttons looked dead. CLAUDE.md §1.11 owns the canonical
         # consumption table; vision_call._calc_glaistas_kg implements it.
-        q_level = assumptions.get("glaistimo_lygis")
+        # Either key name (the wizard's `glaistas_q_lygis` too), 2026-09-29.
+        from extractor.vision_call import putty_q_level
+        q_level = putty_q_level(assumptions, default=None)
         if q_level:
             try:
                 from extractor.vision_call import _calc_glaistas_kg
@@ -1174,11 +1176,9 @@ def recompute(
         try:
             from extractor.vision_call import _build_pozicijos_from_rooms
             overrides = {**(req.context.get("_overrides") or {}), **assumptions}
-            # The Prielaidos field is `glaistimo_lygis`, but the canonical builder
-            # reads the Q-level under `glaistas_q_lygis` (vision_call.py). Bridge
-            # the two names so a Q4 toggle actually emits the Q4 sanding-labor line.
-            if assumptions.get("glaistimo_lygis"):
-                overrides["glaistas_q_lygis"] = assumptions["glaistimo_lygis"]
+            # The Prielaidos field is `glaistimo_lygis`, the wizard's is
+            # `glaistas_q_lygis`: the builder reads either (vision_call.putty_q_level),
+            # the same way /recompute-interior does, so no bridging here (2026-09-29).
             parsed = {
                 **req.context,
                 "patalpos": rooms,

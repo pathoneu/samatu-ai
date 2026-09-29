@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
 import math
 import os
 import re as _re
@@ -30,6 +31,8 @@ from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
+
+log = logging.getLogger(__name__)
 
 _ENV_TRUTHY = {"1", "true", "yes", "on"}
 _ENV_FALSY = {"0", "false", "no", "off"}
@@ -1157,6 +1160,21 @@ _PAINT_CLASS_PROFILES = {
 _PAINT_CLASS_DEFAULT = 2
 
 
+def putty_q_level(overrides: dict | None, default: str | None = "Q2") -> str | None:
+    """The putty (glaistymo) Q-level he chose, whichever key name carries it.
+
+    The Prielaidos panel stores `glaistimo_lygis`; the project wizard and older
+    blobs store `glaistas_q_lygis`. Both readers (`derive_room_extras`, the row
+    builder) and both recompute endpoints go through here, so either name gives
+    the same putty kilograms and Q4 sanding rows — until 2026-09-29 only
+    /api/recompute-quantities bridged the names and every room edit fell back
+    to Q2. When both are set the Prielaidos key wins: it is the later edit and
+    the one the panel shows.
+    """
+    o = overrides if isinstance(overrides, dict) else {}
+    return o.get("glaistimo_lygis") or o.get("glaistas_q_lygis") or default
+
+
 def _calc_glaistas_kg(dazymo_plotas_m2: float, q_level: str = "Q2") -> float:
     """LT vidaus apdailos glaisto kiekis pagal Q kokybės lygį.
 
@@ -1429,6 +1447,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             room["paskirtis"] = guessed
             room["_paskirtis_source"] = "inferred_from_name"
 
+    failed_rooms: list[dict] = []
     for room in rooms:
         # 1. Parse elementai → counts/areas the calc function understands
         counts = _elementai_to_counts(room.get("elementai") or [])
@@ -1438,10 +1457,16 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             **counts,
         }
         # 2. Compute deterministic per-room quantities
+        room.pop("_calc_failed", None)
         try:
             computed = calc_room_quantities(calc_input, rules=rules)
         except Exception as exc:
-            print(f"[extractor] calc_room_quantities failed for room {room.get('nr')}: {exc}")
+            # The room stays and is marked; one warning below says so (audit
+            # 2026-09-29: a print + continue dropped its paint, corners and
+            # reveals from every total without a word).
+            room["_calc_failed"] = f"{type(exc).__name__}: {exc}"[:200]
+            log.warning("calc_room_quantities failed for room %s: %s", room.get("nr"), exc)
+            failed_rooms.append(room)
             continue
 
         # 3. Merge — primitives win (already in room), computed overrides everything else.
@@ -1484,7 +1509,37 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         # 4–6. Everything the calculator does NOT return but every row builder
         # reads — shared with /recompute-interior (2026-09-07).
         derive_room_extras(room, counts, rules_override)
+    _warn_failed_room_calcs(parsed, failed_rooms)
     return parsed
+
+
+ROOM_CALC_FAILED_CODE = "room_calc_failed"
+
+
+def _warn_failed_room_calcs(parsed: dict, failed_rooms: list[dict]) -> None:
+    """One banner warning per room the calculator could not handle, through
+    `warnings` → `lt_sanity` (the stream SanityWarningsBanner renders). A
+    re-run replaces the previous run's warnings, so a fixed room loses its
+    warning; with no failure and none before, `parsed` is left untouched."""
+    prior = parsed.get("warnings")
+    prior = prior if isinstance(prior, list) else []
+    had = any(isinstance(w, dict) and w.get("code") == ROOM_CALC_FAILED_CODE for w in prior)
+    if not failed_rooms and not had:
+        return
+    ws = [w for w in prior if not (isinstance(w, dict) and w.get("code") == ROOM_CALC_FAILED_CODE)]
+    for room in failed_rooms:
+        nr = str(room.get("nr") or "").strip()
+        name = str(room.get("pavadinimas") or "").strip()
+        label = " ".join(x for x in (nr, f"„{name}“" if name else "") if x)
+        ws.append({
+            "level": "WARNING", "severity": "med", "code": ROOM_CALC_FAILED_CODE,
+            "patalpa_nr": nr, "field": "patalpa", "source": "room_calc",
+            "message": (f"Patalpos {label} kiekių apskaičiuoti nepavyko — sąmatoje gali "
+                        "trūkti jos sienų, lubų, kampų ir angokraščių.").replace("  ", " "),
+            "hint": ("Patikrinkite šios patalpos plotą, perimetrą, aukštį ir lubų tipą, "
+                     "pataisykite ir perskaičiuokite."),
+        })
+    parsed["warnings"] = ws
 
 
 def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) -> None:
@@ -1504,8 +1559,8 @@ def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) ->
     # 4. Hidroizoliacija (not in calc_room_quantities; CLAUDE.md §1.12)
     room["hidroizoliacija_m2"] = _calc_hidroizoliacija_m2(room, perim)
 
-    # 4.1 Glaistas (kg) per Q-level (rules_override.glaistas_q_lygis if set)
-    q_lygis = (rules_override or {}).get("glaistas_q_lygis", "Q2")
+    # 4.1 Glaistas (kg) per Q-level (either key name, see putty_q_level)
+    q_lygis = putty_q_level(rules_override)
     dazymo = float(room.get("dazymo_plotas_m2") or 0)
     room["glaistas_kg"] = _calc_glaistas_kg(dazymo, q_lygis)
 
@@ -3235,7 +3290,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Q-level for sanding labor uplift (Sprint §2A.4 Phase 2). Q4 needs full-
     # surface 80-120 grit sanding (0.30 h/m²) per Merkblatt Nr.2; lower Q's
     # use light scuff sanding only.
-    q_lygis = (parsed.get("_overrides") or {}).get("glaistas_q_lygis", "Q2")
+    q_lygis = putty_q_level(parsed.get("_overrides"))
     is_q4 = str(q_lygis).upper() == "Q4"
     sanding_suffix = " Q4 (80–120 grit, 100% paviršius)" if is_q4 else ""
 
