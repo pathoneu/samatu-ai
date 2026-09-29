@@ -669,7 +669,10 @@ export default function NewProject() {
           total_value:  0,
           status:       'ready',
           vat_rate:     21,
+          // Pages the reading could not finish — rows from them may be missing.
+          ...(json.warnings?.length ? { warnings: json.warnings } : {}),
         }, t));
+        (json.warnings || []).forEach((w) => toast.warning(w.message, { duration: 12000 }));
       }
 
       // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad

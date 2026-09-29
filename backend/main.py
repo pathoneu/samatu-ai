@@ -338,6 +338,7 @@ import math
 import asyncio
 from extractor import user_text as _user_text
 from extractor.vat_mode import is_reverse_vat as _is_reverse_vat
+from extractor.response_text import response_text
 import hashlib
 from collections import defaultdict
 from datetime import datetime
@@ -2413,6 +2414,8 @@ def _pdf_to_chunks(pdf_bytes: bytes) -> tuple[str, list[dict]]:
             chunks.append({
                 "pages": pages_label,
                 "text": chunk_text,
+                # the real page numbers: a large PDF's chunk "3-17" may hold 5
+                "page_nums": [pno for pno, _ in group],
             })
 
     return projektas, chunks
@@ -2457,13 +2460,59 @@ def _parse_eilutes(raw: str) -> list:
 # and SAMATU_MODEL_EXTRACTION.
 
 
+class _UnfinishedAnswer(RuntimeError):
+    """The model refused, or its answer stopped at the token limit.
+
+    Neither is a finished answer, so the reader must not use it as one. The
+    text that did arrive rides along: a cut-off quantity schedule still holds
+    every row it completed (llm-api-3, 2026-09-29).
+    """
+
+    def __init__(self, stop_reason: str, text: str):
+        super().__init__(f"stop_reason={stop_reason}")
+        self.stop_reason = stop_reason
+        self.text = text
+
+
+def _finished_text(msg) -> str:
+    """The answer's text, skipping thinking blocks (content[0] can be one).
+    Raises _UnfinishedAnswer on a refusal or a cut-off answer."""
+    text = response_text(msg)
+    stop_reason = getattr(msg, "stop_reason", None)
+    if stop_reason in ("refusal", "max_tokens"):
+        raise _UnfinishedAnswer(stop_reason, text)
+    return text
+
+
 def _call_claude(prompt: str) -> str:
     msg = client.messages.create(
         model=model_for("extraction"),
         max_tokens=8096,
         messages=[{"role": "user", "content": prompt}],
     )
-    return msg.content[0].text
+    return _finished_text(msg)
+
+
+def _chunk_page_nums(chunk: dict) -> list[int]:
+    """A chunk's page numbers; the "a-b" label's span when they are not listed."""
+    if chunk.get("page_nums"):
+        return list(chunk["page_nums"])
+    first, _, last = str(chunk.get("pages", "")).partition("-")
+    try:
+        return list(range(int(first), int(last or first) + 1))
+    except ValueError:
+        return []
+
+
+def _page_ranges(pages) -> str:
+    """{3, 4, 9, 16, 17} → "3–4, 9, 16–17"."""
+    runs: list[list[int]] = []   # [first, last]
+    for p in sorted(pages):
+        if runs and p == runs[-1][1] + 1:
+            runs[-1][1] = p
+        else:
+            runs.append([p, p])
+    return ", ".join(str(a) if a == b else f"{a}–{b}" for a, b in runs)
 
 
 # ── /extract ─────────────────────────────────────────────────────────────────
@@ -2569,6 +2618,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
             # response outright when nothing survived. (audit 2026-07-27)
             windows_total = 0
             windows_failed = 0
+            unread_pages: set[int] = set()   # pages a failed / cut-off window left unread
             prev_tail = ""          # last ~1000 chars of previous chunk for cross-boundary context
 
             MAX_CHARS  = 16000
@@ -2620,7 +2670,16 @@ async def extract(request: Request, file: UploadFile = File(...)):
                         .replace("{text}",  send_text)
                     )
                     try:
-                        raw = await asyncio.to_thread(_call_claude, prompt)
+                        try:
+                            raw = await asyncio.to_thread(_call_claude, prompt)
+                        except _UnfinishedAnswer as stop:
+                            if stop.stop_reason != "max_tokens":
+                                raise
+                            # Cut off: keep every row it finished, but the rest
+                            # of these pages was not read — say so below.
+                            unread_pages.update(_chunk_page_nums(chunk))
+                            log.warning("/extract window %s cut off at the token limit", pg)
+                            raw = stop.text
                         eilutes = _parse_eilutes(raw)
                         if eilutes:
                             all_eilutes.extend(eilutes)
@@ -2628,6 +2687,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
                     except Exception:
                         # šiame chunk'e duomenų nėra arba API klaida
                         windows_failed += 1
+                        unread_pages.update(_chunk_page_nums(chunk))
                         log.warning("/extract window %s failed", pg, exc_info=True)
                         continue
 
@@ -2643,7 +2703,7 @@ async def extract(request: Request, file: UploadFile = File(...)):
             # ── Post-process ──────────────────────────────────────────────
             all_eilutes = _enrich_eilutes(_postprocess_eilutes(all_eilutes))
 
-            return {
+            result = {
                 "projektas": projektas,
                 "eilutes": all_eilutes,
                 "meta": {
@@ -2656,6 +2716,18 @@ async def extract(request: Request, file: UploadFile = File(...)):
                     "extraction_model": model_for("extraction"),
                 },
             }
+            if unread_pages:
+                # Rows from these pages may be missing; a KŽ that looks whole
+                # but is not must say so (llm-api-3, 2026-09-29).
+                result["warnings"] = [{
+                    "level": "WARN",
+                    "message": (
+                        f"Ne visas PDF perskaitytas: {len(unread_pages)} psl. "
+                        f"({_page_ranges(unread_pages)}) nepavyko perskaityti iki "
+                        "galo, todėl žiniaraštyje gali trūkti eilučių iš šių "
+                        "puslapių. Patikrinkite juos arba įkelkite PDF dar kartą."),
+                }]
+            return result
 
     except asyncio.TimeoutError:
         return {"error": "Laikas baigėsi — PDF per didelis arba API neatsakė laiku."}
@@ -3053,7 +3125,7 @@ def _call_vision(b64_image: str, prompt: str) -> str:
             ],
         }],
     )
-    return msg.content[0].text
+    return _finished_text(msg)
 
 
 def _parse_json_safe(text: str) -> dict | list | None:
@@ -4543,6 +4615,12 @@ async def _run_vision_on_pages(
                     data = _parse_json_safe(raw)
                     if data and isinstance(data, dict):
                         return data
+                    return None
+                except _UnfinishedAnswer as stop:
+                    # Refused or cut off: not a result, and the same input gets
+                    # the same answer again — report it, never retry and re-pay.
+                    log.warning("vision page %s not read: stop_reason=%s",
+                                pno, stop.stop_reason)
                     return None
                 except Exception:
                     if attempt == 2:
