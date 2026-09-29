@@ -32,6 +32,9 @@ training-data/*/projektas_*_pasiulymas.pdf
 # contractor pricing). Quantities-only ground truth (truth.json, registry.yaml,
 # gap-analysis) lives in git; source PDFs stay on disk / ~/Desktop/projektai.
 docs/superpowers/fixtures/**/*.pdf
+# A sample drawing whose title block carries an identifier (audit 2026-09-29);
+# tests use backend/tests/synthetic_plan_pdf.py instead.
+backend/test_pdfs/vidaus_apdaila.pdf
 
 # Plan / experiment artifacts
 backend/scripts/baseline_output/*.json

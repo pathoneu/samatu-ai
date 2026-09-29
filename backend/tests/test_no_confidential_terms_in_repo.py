@@ -54,7 +54,8 @@ TERMS_ENV = "SAMATU_CONFIDENTIAL_TERMS"
 
 # Binaries and rendered assets. Their bytes cannot be scrubbed without changing
 # behaviour, and compressed streams throw off random letter runs that read as
-# false positives (two tracked test PDFs do exactly that).
+# false positives (two tracked test PDFs do exactly that). PDFs are still
+# checked — by their TEXT LAYER, in the second test below.
 SKIP_SUFFIXES = (
     ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".svg",
     ".pdf", ".xlsx", ".xls", ".zip", ".gz",
@@ -155,5 +156,54 @@ def test_no_confidential_terms_in_tracked_files():
         f"files. Customer and project identifiers must appear nowhere in this "
         f"repository — replace each with its codename (Objektas A/B/C/…), and "
         f"rename any file or directory whose PATH carries one:\n  "
+        + "\n  ".join(offences)
+    )
+
+
+def tracked_pdfs() -> list[Path]:
+    out = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    return [REPO_ROOT / n for n in out.split("\0")
+            if n.lower().endswith(".pdf") and (REPO_ROOT / n).is_file()]
+
+
+def test_no_confidential_terms_in_tracked_pdf_text():
+    """The text layer and metadata of every tracked PDF (audit 2026-09-29).
+
+    Skipping `.pdf` above let a tracked sample drawing carry an identifier in
+    its title block on 16 of 17 sheets while this guard stayed green. The
+    extracted text has none of the compressed-stream noise, so it is matched
+    like any text file. The failure names the denylist ENTRY NUMBER, not the
+    term, so the term never lands in a test log.
+    """
+    terms = load_terms()
+    if not terms:
+        pytest.skip("No confidentiality denylist available — see the test above.")
+    import pypdfium2 as pdfium
+
+    offences: list[str] = []
+    for path in tracked_pdfs():
+        rel = path.relative_to(REPO_ROOT)
+        doc = pdfium.PdfDocument(str(path))
+        try:
+            texts = [("metadata", " ".join(
+                str(v) for v in (doc.get_metadata_dict() or {}).values()))]
+            for i in range(len(doc)):
+                page = doc[i]
+                texts.append((f"page {i + 1}", page.get_textpage().get_text_range()))
+            for where, text in texts:
+                folded = fold(text)
+                for n, term in enumerate(terms, 1):
+                    if term in folded:
+                        offences.append(f"{rel} ({where}): denylist entry #{n}")
+        finally:
+            doc.close()
+
+    assert not offences, (
+        f"{len(offences)} confidential-identifier occurrence(s) in the text of "
+        f"tracked PDFs. Replace the file with a synthetic one (see "
+        f"backend/tests/synthetic_plan_pdf.py), untrack it and gitignore it:\n  "
         + "\n  ".join(offences)
     )

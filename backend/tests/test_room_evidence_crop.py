@@ -29,10 +29,11 @@ import db  # noqa: E402
 import storage  # noqa: E402
 from api import evidence as ev  # noqa: E402
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-# Tracked in the repo, 17 pages, A3 — always available, unlike the fixture
-# projects whose source PDFs are deliberately untracked.
-SAMPLE_PDF = ROOT / "test_pdfs" / "vidaus_apdaila.pdf"
+from synthetic_plan_pdf import plan_pdf  # noqa: E402
+
+# A synthetic A3 drawing built in memory, always available. (It used to be a
+# tracked sample client drawing that carried an identifier; audit 2026-09-29.)
+SAMPLE_PDF = plan_pdf()
 
 _PW = "passw0rd123"
 
@@ -60,11 +61,7 @@ def _project(project_id="p1", *, user_id=None, rooms=None):
 
 def _store_pdf(project_id="p1", path: pathlib.Path | None = None):
     storage.get_storage().put(storage.pdf_key(project_id),
-                              (path or SAMPLE_PDF).read_bytes())
-
-
-needs_pdf = pytest.mark.skipif(not SAMPLE_PDF.exists(),
-                               reason="sample PDF not present")
+                              path.read_bytes() if path else SAMPLE_PDF)
 
 
 # ── the coordinate frame ────────────────────────────────────────────────────
@@ -127,7 +124,6 @@ def test_the_dpi_cap_scales_down_for_a_huge_sheet():
     assert a0 < 160 and a0 * 3370 / 72 <= ev.MAX_PAGE_PX + 1
 
 
-@needs_pdf
 def test_the_crop_lands_where_the_percentages_say_on_a_real_page():
     """The end-to-end frame check, against poppler's own raster.
 
@@ -144,7 +140,7 @@ def test_the_crop_lands_where_the_percentages_say_on_a_real_page():
     from PIL import Image, ImageChops, ImageStat
     from pdf2image import convert_from_bytes
 
-    data = SAMPLE_PDF.read_bytes()
+    data = SAMPLE_PDF
     dpi = 60  # low: this test is about geometry, not legibility
     full = convert_from_bytes(data, dpi=dpi, fmt="png",
                               first_page=2, last_page=2)[0]
@@ -173,7 +169,6 @@ def test_the_crop_lands_where_the_percentages_say_on_a_real_page():
 
 # ── the endpoint ────────────────────────────────────────────────────────────
 
-@needs_pdf
 def test_a_rect_becomes_a_png_of_that_region(tmp_path, monkeypatch):
     from PIL import Image
     import io
@@ -192,7 +187,6 @@ def test_a_rect_becomes_a_png_of_that_region(tmp_path, monkeypatch):
     assert img.height > 40
 
 
-@needs_pdf
 def test_the_second_request_is_served_from_disk(tmp_path, monkeypatch):
     """Six crops per room, one room per click — a re-render per view would make
     the check sheet unusable. The cache is keyed on the whole request."""
@@ -213,7 +207,6 @@ def test_the_second_request_is_served_from_disk(tmp_path, monkeypatch):
     assert second.content == first.content
 
 
-@needs_pdf
 def test_an_etag_answers_304_without_touching_the_pdf(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     _project()
@@ -228,7 +221,6 @@ def test_an_etag_answers_304_without_touching_the_pdf(tmp_path, monkeypatch):
     assert again.headers["cache-control"].startswith("private")
 
 
-@needs_pdf
 def test_the_room_shorthand_crops_the_rooms_own_region(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     _project(rooms=[{"nr": "101", "pavadinimas": "Svetainė", "puslapio_nr": 2,
@@ -249,7 +241,7 @@ def test_a_room_with_no_geometry_is_a_404_not_a_blank_image(tmp_path, monkeypatc
     """„We cannot point at this" and „here it is" must not look the same."""
     _isolate(tmp_path, monkeypatch)
     _project(rooms=[{"nr": "101", "pavadinimas": "Svetainė", "puslapio_nr": 2}])
-    _store_pdf() if SAMPLE_PDF.exists() else None
+    _store_pdf()
     c = TestClient(app)
     r = c.get("/api/projects/p1/evidence", params={"room": "101"})
     assert r.status_code == 404
@@ -275,7 +267,6 @@ def test_a_project_with_no_stored_pdf_says_so(tmp_path, monkeypatch):
     assert "Brėžinys" in r.text
 
 
-@needs_pdf
 def test_a_page_past_the_end_is_a_404(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     _project()
@@ -321,8 +312,7 @@ def test_a_stranger_cannot_read_someone_elses_drawing(tmp_path, monkeypatch):
     owner = db.create_user("owner@x.lt", auth.hash_password(_PW), name="O")
     db.create_user("thief@x.lt", auth.hash_password(_PW), name="T")
     _project(user_id=owner["id"])
-    if SAMPLE_PDF.exists():
-        _store_pdf()
+    _store_pdf()
     c = TestClient(app)
     assert c.post("/api/auth/login",
                   json={"email": "thief@x.lt",
@@ -375,7 +365,6 @@ def test_evidence_url_is_none_when_there_is_nothing_to_point_at():
     assert ev.evidence_url("p1", 2, None) is None
 
 
-@needs_pdf
 def test_a_rooms_burst_of_crops_fetches_the_pdf_once(tmp_path, monkeypatch):
     """Six facts on one sheet = one PDF fetch, not six (2026-09-15 review).
     Since 2026-09-20 a PLACE is rendered on its own through PDFium, so the

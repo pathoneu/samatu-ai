@@ -26,7 +26,7 @@ import page_raster_cache as _pdf_cache
 from extractor.cv_match import find_similar_symbols
 from extractor.cv_render_cache import render_page
 from extractor.cv_wand import suggest_room_polygon
-from extractor.training_data import record_label
+from extractor.training_data import KLASS_PATTERN, record_label
 
 router = APIRouter(prefix="/api/cv", tags=["cv-tools"])
 
@@ -122,7 +122,7 @@ class RecordDecisionBody(BaseModel):
     project_id: str
     page_idx: int
     bbox: list[int]
-    klass: str
+    klass: str = Field(pattern=KLASS_PATTERN)  # becomes a directory name
     decision: str  # "accept" | "reject"
     confidence: float | None = None
     dpi: int = 200

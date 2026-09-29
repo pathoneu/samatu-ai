@@ -188,8 +188,8 @@ class R2Storage(_Backend):
     def delete(self, key: str) -> None:
         try:
             self._client.delete_object(Bucket=self.bucket, Key=self._k(key))
-        except Exception:  # noqa: BLE001 — best effort
-            pass
+        except Exception as exc:  # noqa: BLE001 — best effort, but never silent
+            log.warning("R2 delete failed for %s: %r", key, exc)
 
 
 _lock = threading.Lock()

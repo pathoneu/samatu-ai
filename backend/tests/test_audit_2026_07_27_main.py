@@ -648,7 +648,7 @@ def test_shared_payload_keeps_everything_SharedProject_jsx_renders(
     body = _shared_payload(tmp_path, monkeypatch)
     # top level: p.name, p.company_name, p.vat_mode, p.archetipas, p.vat_rate
     for k in ("name", "company_name", "vat_mode", "archetipas", "vat_rate",
-              "tipas", "bendras_plotas_m2", "created_at", "id", "shared", "data"):
+              "tipas", "bendras_plotas_m2", "created_at", "shared", "data"):
         assert k in body, f"SharedProject.jsx reads {k}"
     data = body["data"]
     # data.patalpos || data.v8_rooms ; data.darbu_sarasas

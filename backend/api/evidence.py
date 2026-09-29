@@ -293,6 +293,16 @@ def _cached(cache: "OrderedDict", key, maxsize: int, make, ttl_s: float = _CACHE
     return value
 
 
+def forget_project(project_id: str) -> None:
+    """Drop a deleted project's PDF, page sizes and page rasters from memory
+    (project delete, audit 2026-09-29)."""
+    with _cache_lock:
+        _PDF_CACHE.pop(project_id, None)
+        _SIZE_CACHE.pop(project_id, None)
+        for key in [k for k in _PAGE_CACHE if isinstance(k, tuple) and k[:1] == (project_id,)]:
+            _PAGE_CACHE.pop(key, None)
+
+
 def _reset_render_caches_for_test() -> None:
     with _cache_lock:
         _PAGE_CACHE.clear()

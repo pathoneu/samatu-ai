@@ -161,6 +161,12 @@ def get_pdf(project_id: str) -> bytes | None:
     return entry["bytes"]
 
 
+def drop_pdf(project_id: str) -> bytes | None:
+    """Forget a project's cached bytes (project delete). Returns them, or None."""
+    entry = _PDF_CACHE.pop(project_id, None)
+    return entry["bytes"] if entry else None
+
+
 def pdf_cache_info() -> dict:
     return {
         "entries": len(_PDF_CACHE),

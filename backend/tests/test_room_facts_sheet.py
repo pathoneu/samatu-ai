@@ -610,16 +610,12 @@ def test_every_crop_url_on_a_sheet_actually_returns_a_png(tmp_path, monkeypatch)
     the six crops the answer points at. A `crop_url` that 404s is worse than
     no crop — the card renders a broken image where the evidence should be."""
     import io
-    import pathlib
 
     from PIL import Image
 
     import storage
     from api import evidence as ev
-
-    sample = ROOT / "test_pdfs" / "vidaus_apdaila.pdf"
-    if not sample.exists():
-        pytest.skip("sample PDF not present")
+    from synthetic_plan_pdf import plan_pdf
 
     _isolate(tmp_path, monkeypatch)
     for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
@@ -656,7 +652,7 @@ def test_every_crop_url_on_a_sheet_actually_returns_a_png(tmp_path, monkeypatch)
     }
     db.upsert_project("p1", project, user_id=None)
     storage.get_storage().put(storage.pdf_key("p1"),
-                              pathlib.Path(sample).read_bytes())
+                              plan_pdf())
 
     c = TestClient(app)
     body = c.get("/api/projects/p1/rooms/101/facts").json()

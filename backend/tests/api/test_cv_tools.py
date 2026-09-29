@@ -2,15 +2,12 @@
 candidates / polygon. Tests use a real test PDF preloaded into the
 in-memory PDF cache.
 
-2026-05-11 corpus relocation: backend/test_pdfs/ was purged (out-of-scope
-non-interior PDFs lived there). The valid interior corpus now sits at
-~/Desktop/test_pdfs/ (private, outside the repo). Tests SKIP when the
-PDF isn't reachable rather than fail — CI without the local corpus
-should still run green.
+2026-09-29: the drawing is a synthetic reportlab PDF (tests/synthetic_plan_pdf)
+— the sample client drawing these tests used to read carried an identifier,
+and these checks only need "a drawing", so they now always run.
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -21,6 +18,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import page_raster_cache  # noqa: E402
 from main import app  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from synthetic_plan_pdf import plan_pdf  # noqa: E402
 
 client = TestClient(app)
 
@@ -50,31 +50,12 @@ def _own_cv_projects(tmp_path, monkeypatch):
     _main._RATE_BUCKET.clear()
     yield
 
-# Search order: env var override → ~/Desktop/test_pdfs → legacy in-repo path.
-_ENV_PDF = os.environ.get("SAMATU_TEST_PDF", "").strip()
-_TEST_PDF_CANDIDATES = [
-    Path(_ENV_PDF) if _ENV_PDF else None,
-    Path.home() / "Desktop" / "test_pdfs" / "vidaus_apdaila.pdf",
-    Path(__file__).resolve().parents[2] / "test_pdfs" / "vidaus_apdaila.pdf",
-]
-TEST_PDF = next(
-    (p for p in _TEST_PDF_CANDIDATES if p is not None and p.is_file()),
-    None,
-)
-_skip_no_pdf = pytest.mark.skipif(
-    TEST_PDF is None,
-    reason="vidaus_apdaila.pdf not found — set SAMATU_TEST_PDF or place "
-           "at ~/Desktop/test_pdfs/vidaus_apdaila.pdf",
-)
-
-
 def _preload_pdf(project_id: str = "test-cv") -> None:
-    page_raster_cache.store_pdf(project_id, TEST_PDF.read_bytes())
+    page_raster_cache.store_pdf(project_id, plan_pdf())
 
 
-@_skip_no_pdf
 def test_upload_pdf_primes_cache():
-    pdf = TEST_PDF.read_bytes()
+    pdf = plan_pdf()
     resp = client.post(
         "/api/cv/upload-pdf",
         data={"project_id": "upload-test"},
@@ -94,7 +75,6 @@ def test_upload_pdf_rejects_non_pdf():
     assert resp.status_code == 400
 
 
-@_skip_no_pdf
 def test_match_template_returns_candidates():
     _preload_pdf()
     # dpi=100 keeps the rendered page small so the 5×4 scale/rotation
@@ -114,7 +94,6 @@ def test_match_template_returns_candidates():
     assert "page_size" in body
 
 
-@_skip_no_pdf
 def test_match_template_rejects_bad_bbox():
     _preload_pdf()
     resp = client.post("/api/cv/match-template", json={
@@ -134,7 +113,6 @@ def test_match_template_404_when_pdf_not_cached():
     assert resp.status_code in (404, 409)
 
 
-@_skip_no_pdf
 def test_magic_wand_returns_polygon_or_none():
     _preload_pdf()
     resp = client.post("/api/cv/magic-wand", json={
@@ -149,7 +127,6 @@ def test_magic_wand_returns_polygon_or_none():
     assert "page_size" in body
 
 
-@_skip_no_pdf
 def test_magic_wand_rejects_out_of_bounds_click():
     _preload_pdf()
     resp = client.post("/api/cv/magic-wand", json={
@@ -159,7 +136,6 @@ def test_magic_wand_rejects_out_of_bounds_click():
     assert resp.status_code == 400
 
 
-@_skip_no_pdf
 def test_record_decision_writes_training_label(tmp_path, monkeypatch):
     _preload_pdf()
     monkeypatch.setattr("extractor.training_data.ROOT", tmp_path)
@@ -177,7 +153,6 @@ def test_record_decision_writes_training_label(tmp_path, monkeypatch):
     assert len(list((tmp_path / "rozete").glob("*.png"))) == 1
 
 
-@_skip_no_pdf
 def test_record_decision_rejects_unknown_decision(tmp_path, monkeypatch):
     _preload_pdf()
     monkeypatch.setattr("extractor.training_data.ROOT", tmp_path)
