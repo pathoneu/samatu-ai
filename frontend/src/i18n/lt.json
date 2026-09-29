@@ -477,6 +477,7 @@
     "toastLogoTooBig": "Logotipas per didelis (maks. 500 KB)",
     "toastFileReadFail": "Nepavyko nuskaityti failo",
     "toastSettingsSaved": "Nustatymai išsaugoti",
+    "toastSettingsLocalOnly": "Įmonės duomenys liko tik šioje naršyklėje — nepavyko jų išsaugoti serveryje. Bandykite dar kartą.",
     "toastProfileUpdated": "Profilis atnaujintas",
     "toastError": "Klaida",
     "toastPwMismatch": "Nauji slaptažodžiai nesutampa",

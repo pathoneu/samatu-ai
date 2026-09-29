@@ -488,6 +488,12 @@ export function resetPullCache() {
   // Kainynai visit fetch his own lists instead of reusing the previous pull.
   // (authContext.purgeLocalUserData already drops the cached rows themselves.)
   _hasPulledPriceLists = false;
+  // Company details (2026-09-29): a pull still on the wire for the previous
+  // account must not land in the next one's cache — the new epoch drops it.
+  _settingsEpoch += 1;
+  _settingsPull = null;
+  _settingsWrite = null;
+  _settingsUserId = null;
 }
 export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
@@ -1140,7 +1146,24 @@ export function consumePriceFillPending(projectId) {
   }
 }
 
-// ── Settings ──────────────────────────────────────────────────────────────────
+// ── Settings (company details + logo) ─────────────────────────────────────────
+//
+// SERVER-BACKED since 2026-09-29 (audit frontend-architecture-3). authContext
+// purges `samatu_settings` at every login and logout on purpose — the next
+// person on a shared browser must not inherit another company's IBAN — and that
+// purge used to delete the ONLY copy, so every re-login silently took the logo,
+// IBAN and codes out of his exports. GET/PUT /api/settings is now the durable
+// copy; localStorage stays the synchronous cache the pages and exports read.
+//
+// SETTINGS_OWNER_KEY says which account the cache was written for, so the
+// one-time carry-over (details that exist only in this browser go up once) can
+// never hand one account's details to another.
+const SETTINGS_OWNER_KEY = 'samatu_settings_owner';
+let _settingsUserId = null;  // the signed-in account this cache serves
+let _settingsEpoch = 0;      // bumped on every user switch (resetPullCache)
+let _settingsRev = 0;        // bumped on every local save
+let _settingsPull = null;    // this session's pull; null = not started / failed
+let _settingsWrite = null;   // the last PUT → 'ok' | 'failed'
 
 export function getSettings() {
   try {
@@ -1150,9 +1173,100 @@ export function getSettings() {
   }
 }
 
+/**
+ * Write the cache at once and send the whole object to the server. Returns the
+ * settings synchronously, as before; `flushSettingsWrites()` says whether the
+ * server took it. A failed send keeps the local copy.
+ */
 export function saveSettings(settings) {
   _persist(SETTINGS_KEY, JSON.stringify(settings));
+  if (_settingsUserId) _persist(SETTINGS_OWNER_KEY, _settingsUserId);
+  _settingsRev += 1;
+  // One PUT at a time, in order — two quick saves must not land swapped.
+  const prev = _settingsWrite || Promise.resolve();
+  _settingsWrite = prev.then(() => _putSettings(settings));
   return settings;
+}
+
+async function _putSettings(settings) {
+  try {
+    const res = await fetch(`${API}/api/settings`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (res?.ok) return 'ok';
+    console.warn('[projectStore] settings save refused:', res?.status);
+  } catch (e) {
+    console.warn('[projectStore] settings save failed:', e);
+  }
+  return 'failed';
+}
+
+/** 'ok' | 'failed' for the last save; null when nothing was sent. */
+export async function flushSettingsWrites() {
+  return _settingsWrite ? _settingsWrite : null;
+}
+
+/**
+ * Fill the cache from the server — once per session (login or session
+ * restore), shared by every caller. A failed pull leaves the cache alone and
+ * lets the next caller retry.
+ */
+export function pullSettingsFromBackend(userId) {
+  if (_settingsPull && (!userId || userId === _settingsUserId)) return _settingsPull;
+  if (userId) _settingsUserId = userId;
+  const epoch = _settingsEpoch;
+  const pull = _pullSettings(_settingsUserId, epoch, _settingsRev).then((got) => {
+    if (got === null && epoch === _settingsEpoch && _settingsPull === pull) _settingsPull = null;
+    return got;
+  });
+  _settingsPull = pull;
+  return pull;
+}
+
+async function _pullSettings(userId, epoch, rev) {
+  try {
+    if (_settingsWrite) await _settingsWrite;      // a save on the wire lands first
+    const res = await fetch(`${API}/api/settings`, { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const server = await res.json();
+    if (!server || typeof server !== 'object' || Array.isArray(server)) {
+      throw new Error('bad payload');
+    }
+    if (epoch !== _settingsEpoch) return null;     // another account signed in meanwhile
+    if (rev !== _settingsRev) return getSettings(); // he saved meanwhile — his copy is newer
+    const local = getSettings();
+    let owner = null;
+    try { owner = localStorage.getItem(SETTINGS_OWNER_KEY); } catch { /* ignore */ }
+    if (!Object.keys(server).length && Object.keys(local).length) {
+      // Account not known yet (a reader got here before authContext's pull):
+      // leave the local copy for that pull to judge.
+      if (!userId) return local;
+      // One-time carry-over: the server has nothing yet, and this browser holds
+      // details written for this same account (or before the owner mark existed).
+      if (!owner || owner === userId) {
+        saveSettings(local);
+        return local;
+      }
+    }
+    _persist(SETTINGS_KEY, JSON.stringify(server));
+    if (userId) _persist(SETTINGS_OWNER_KEY, userId);
+    return server;
+  } catch (e) {
+    console.warn('[projectStore] settings pull failed:', e);
+    return null;
+  }
+}
+
+/**
+ * The exports and the Settings page await this before reading the cache: it
+ * resolves once this session's pull has finished (starting one if none has).
+ */
+export async function ensureSettingsPulled() {
+  await pullSettingsFromBackend();
+  return getSettings();
 }
 
 // ── Sprint §13 (2026-04-29): backup / restore localStorage projects ───────────
@@ -1179,8 +1293,8 @@ export function exportProjectsBackup() {
     projects_count: projects.length,
     projects,
     settings,
-    // Settings are still localStorage-only; price lists are mirrored server-side
-    // since 2026-09-02 but stay in the payload so a v2 file remains complete.
+    // Price lists (since 2026-09-02) and settings (since 2026-09-29) are
+    // mirrored server-side but stay in the payload so a v2 file remains complete.
     price_lists: getPriceLists(),
   };
   return JSON.stringify(payload, null, 2);

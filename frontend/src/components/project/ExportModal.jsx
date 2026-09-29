@@ -7,6 +7,7 @@ import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
+import { ensureSettingsPulled } from '@/lib/projectStore';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -125,8 +126,8 @@ async function downloadFromBackend(endpoint, project, filename) {
 
   // Pull the contractor's saved identity (Settings → Įmonės informacija) so the
   // export header renders as a real LT pasiūlymas — company, person, logo, contacts.
-  let s = {};
-  try { s = JSON.parse(localStorage.getItem('samatu_settings') || '{}'); } catch { /* ignore */ }
+  // 2026-09-29: the settings live on the server; wait for this session's pull.
+  const s = await ensureSettingsPulled();
 
   const payload = {
     projektas:    project.name,

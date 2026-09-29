@@ -12,6 +12,7 @@ import { markExported } from '@/lib/telemetry';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
+import { ensureSettingsPulled } from '@/lib/projectStore';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
 import { exportRows as templateExportRows, lacksPrice, scaleExportRow } from '@/lib/samataTemplate';
@@ -128,8 +129,9 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   // 2026-06-19: send the full branding block (logo + legal details) from global
   // Settings plus the per-export client/objektas so the deliverable reads as a
   // real LT pasiūlymas, not a raw quantity dump.
-  let s = {};
-  try { s = JSON.parse(localStorage.getItem('samatu_settings') || '{}'); } catch { /* ignore */ }
+  // 2026-09-29: the settings live on the server; wait for this session's pull
+  // so a logo and IBAN restored after a login are in the header.
+  const s = await ensureSettingsPulled();
   const branding = {
     imone:        project.company_name || s.company_name || '',
     company_logo: s.company_logo || '',

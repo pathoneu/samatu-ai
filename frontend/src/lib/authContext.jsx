@@ -50,7 +50,10 @@ export function AuthProvider({ children }) {
   // Check existing session on mount
   useEffect(() => {
     apiCall('/api/auth/me')
-      .then((d) => setUser(d.user))
+      .then((d) => {
+        setUser(d.user);
+        if (d.user) pullUserSettings(d.user.id);
+      })
       .catch(() => setUser(null))
       .finally(() => setIsLoading(false));
   }, []);
@@ -76,6 +79,17 @@ export function AuthProvider({ children }) {
     } catch { /* ignore */ }
   };
 
+  // Company details + logo live on the server per user since 2026-09-29; the
+  // purge above only drops this browser's cached copy. Refill it after a login
+  // or session restore. Not awaited: the exports and the Settings page await
+  // the same pull before they read the cache.
+  const pullUserSettings = async (userId) => {
+    try {
+      const { pullSettingsFromBackend } = await import('@/lib/projectStore');
+      await pullSettingsFromBackend(userId);
+    } catch { /* the next reader retries the pull */ }
+  };
+
   const login = async (email, password) => {
     const d = await apiCall('/api/auth/login', {
       method: 'POST',
@@ -83,6 +97,7 @@ export function AuthProvider({ children }) {
     });
     await purgeLocalUserData();
     setUser(d.user);
+    if (d.user) pullUserSettings(d.user.id);
     return d.user;
   };
 
@@ -93,6 +108,7 @@ export function AuthProvider({ children }) {
     });
     await purgeLocalUserData();
     setUser(d.user);
+    if (d.user) pullUserSettings(d.user.id);
     return { user: d.user, isFirstAdmin: d.is_first_admin };
   };
 

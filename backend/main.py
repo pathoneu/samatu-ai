@@ -398,6 +398,9 @@ from api.price_lists import router as price_lists_router
 # Sąmatų šablonai (2026-09-04): the contractor's own sections + labels as the
 # skeleton of our output, and a project rendered through them.
 from api.samata_templates import router as samata_templates_router
+# Company details + logo per user (2026-09-29): the export header, stored on the
+# server because the browser copy is purged at every login and logout.
+from api.user_settings import router as user_settings_router
 # The room check sheet (2026-09-04): six read facts per room + the quantities
 # that room contributes, and the PNG crop of the drawing behind each fact.
 from api.room_facts import router as room_facts_router
@@ -723,6 +726,7 @@ app.include_router(export_excel_router)
 app.include_router(project_stats_router)
 app.include_router(price_lists_router)
 app.include_router(samata_templates_router)
+app.include_router(user_settings_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
 app.include_router(free_reread_router)

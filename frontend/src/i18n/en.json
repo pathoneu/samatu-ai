@@ -477,6 +477,7 @@
     "toastLogoTooBig": "Logo too large (max 500 KB)",
     "toastFileReadFail": "Could not read the file",
     "toastSettingsSaved": "Settings saved",
+    "toastSettingsLocalOnly": "Company details stayed in this browser only — they could not be saved on the server. Please try again.",
     "toastProfileUpdated": "Profile updated",
     "toastError": "Error",
     "toastPwMismatch": "New passwords do not match",

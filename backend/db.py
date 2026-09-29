@@ -1159,6 +1159,49 @@ def delete_samata_template(template_id: str, user_id: str) -> bool:
         return cur.rowcount > 0
 
 
+# ── Company details / user settings (2026-09-29) ─────────────────────────────
+#
+# Company name, logo (a data URL), company and PVM codes, IBAN, address and
+# default values — everything the export header prints. They lived only in the
+# browser's `samatu_settings`, which authContext purges at every login and
+# logout on purpose, so each re-login silently dropped them from the exports.
+# One row per user; the blob is the frontend's settings object stored VERBATIM
+# (the server does not interpret it). Scoped by `user_id` only, which the router
+# always takes from the session.
+
+def get_user_settings(user_id: str) -> dict:
+    """The user's settings object, or {} when he has none yet."""
+    _require_user_id(user_id)
+    with _conn() as c:
+        row = c.execute("SELECT data FROM user_settings WHERE user_id = ?",
+                        (user_id,)).fetchone()
+    if not row:
+        return {}
+    try:
+        data = json.loads(row["data"] or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        log.error("user %s has a corrupt settings blob (%s)", user_id, exc)
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def put_user_settings(user_id: str, data: dict) -> str:
+    """Replace the user's settings object. Returns the stored updated_at."""
+    _require_user_id(user_id)
+    if not isinstance(data, dict):
+        raise ValueError("settings must be a JSON object")
+    now = _now_iso()
+    with _conn() as c:
+        c.execute("""
+            INSERT INTO user_settings (user_id, data, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                data=excluded.data,
+                updated_at=excluded.updated_at
+        """, (user_id, json.dumps(data, ensure_ascii=False), now))
+    return now
+
+
 def _migrate_schema() -> None:
     """Idempotent column additions for existing DBs created before auth.
     SQLite ALTER TABLE only supports ADD COLUMN — keep migrations append-only."""
@@ -1322,6 +1365,14 @@ def _migrate_schema() -> None:
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_samata_templates_user "
                   "ON samata_templates(user_id, created_at DESC)")
+        # user_settings (2026-09-29): company details + logo for the export
+        # header, one JSON object per user. See `get_user_settings`.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id    TEXT PRIMARY KEY,
+                data       TEXT NOT NULL,      -- JSON object, stored as given
+                updated_at TEXT NOT NULL
+            )""")
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, Building2, KeyRound, User, Download, Upload, AlertCircle, Bug, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  getSettings, saveSettings, getProjects,
+  getSettings, saveSettings, getProjects, ensureSettingsPulled, flushSettingsWrites,
   downloadProjectsBackup, importProjectsBackup,
   getArchivedProjects, restoreProject, permanentlyDeleteProject,
 } from '@/lib/projectStore';
@@ -23,6 +23,9 @@ export default function Settings() {
   const [companyName, setCompanyName] = useState('');
   const [vatRate, setVatRate] = useState('21');
   const [isSaving, setIsSaving] = useState(false);
+  // False until this session's settings pull has finished — saving an empty
+  // form before then would overwrite the server copy with blanks.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Branding / business-document details (2026-06-19) — rendered into export
   // PDF/Excel headers so the deliverable looks like a real LT pasiūlymas.
@@ -47,17 +50,22 @@ export default function Settings() {
   const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
-    const s = getSettings();
-    if (s.company_name) setCompanyName(s.company_name);
-    if (s.vat_rate) setVatRate(String(s.vat_rate));
-    if (s.company_logo) setCompanyLogo(s.company_logo);
-    if (s.imones_kodas) setImonesKodas(s.imones_kodas);
-    if (s.pvm_kodas) setPvmKodas(s.pvm_kodas);
-    if (s.adresas) setAdresas(s.adresas);
-    if (s.telefonas) setTelefonas(s.telefonas);
-    if (s.el_pastas) setElPastas(s.el_pastas);
-    if (s.iban) setIban(s.iban);
-    if (s.vadovas) setVadovas(s.vadovas);
+    let alive = true;
+    ensureSettingsPulled().then((s) => {
+      if (!alive) return;
+      if (s.company_name) setCompanyName(s.company_name);
+      if (s.vat_rate) setVatRate(String(s.vat_rate));
+      if (s.company_logo) setCompanyLogo(s.company_logo);
+      if (s.imones_kodas) setImonesKodas(s.imones_kodas);
+      if (s.pvm_kodas) setPvmKodas(s.pvm_kodas);
+      if (s.adresas) setAdresas(s.adresas);
+      if (s.telefonas) setTelefonas(s.telefonas);
+      if (s.el_pastas) setElPastas(s.el_pastas);
+      if (s.iban) setIban(s.iban);
+      if (s.vadovas) setVadovas(s.vadovas);
+      setSettingsLoaded(true);
+    });
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
@@ -78,7 +86,7 @@ export default function Settings() {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     // saveSettings REPLACES the whole object — merge with existing so we never
     // wipe unrelated keys (e.g. price-list prefs stored under the same key).
@@ -95,8 +103,11 @@ export default function Settings() {
       iban,
       vadovas,
     });
+    // The browser copy is written already; say whether the server took it too.
+    const sent = await flushSettingsWrites();
     setIsSaving(false);
-    toast.success(t('settings.toastSettingsSaved'));
+    if (sent === 'ok') toast.success(t('settings.toastSettingsSaved'));
+    else toast.error(t('settings.toastSettingsLocalOnly'), { id: 'settings-sync' });
   };
 
   const handleProfileSave = async () => {
@@ -265,7 +276,7 @@ export default function Settings() {
 
         <Button
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || !settingsLoaded}
           className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
         >
           <Save className="w-4 h-4 mr-2" />
