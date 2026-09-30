@@ -94,8 +94,9 @@ def _once(resp):
 
 # ═══════════════ Pass-1 error shapes carry the paid usage ═══════════════════
 
+# A cut-off answer (max_tokens) now gets ONE bounded retry and keeps the usage
+# of both attempts — covered in test_pass1_output_cap.py (audit 2026-09-30).
 @pytest.mark.parametrize("stop_reason,text,error", [
-    ("max_tokens", '{"patalpos": [', "output_truncated"),
     ("refusal", "", "model_refused"),
     ("end_turn", "tai ne JSON {{{", "json_decode_failure"),
 ])

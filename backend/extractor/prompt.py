@@ -11,7 +11,12 @@ from __future__ import annotations
 # Model resolved per-call via models_config.model_for("vision_pass1"/"vision_pass2")
 # — the old module-level MODEL constant was removed (W1.1, 2026-07-03) so
 # MODEL_OVERRIDE / SAMATU_MODEL_* env changes apply without re-imports.
-MAX_OUTPUT_TOKENS = 32768  # Opus 4.7 supports 32k; large projects need it
+# First reading pass cap. 32,768 was too snug once thinking became on by
+# default: rounds spent ~70 % of it thinking and ended with stop_reason
+# max_tokens (2 of 3 rounds on one plan, audit 2026-09-30), so the vote ran on
+# one round. Billing is by actual use, so an unused cap costs nothing. The call
+# MUST stay streamed: the SDK refuses a non-streamed request this large.
+MAX_OUTPUT_TOKENS = 64000
 DPI = 200
 # Provider's max image long-edge before it silently downscales. Opus 4.7 raised
 # this to 2576 and 4.8 inherits it (was 1568 on 4.6). The tag/glyph readers MUST

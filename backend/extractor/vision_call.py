@@ -4998,6 +4998,25 @@ def _run_pass1_once(client, system, pages, *,
     # The actual reduction came from the client's max_retries=1 (see
     # extract_interior): 5 attempts × 3 HTTP → 5 × 2 = 10 HTTP per round.
     doc_fallback_spent = False
+    # Audit 2026-09-30 (vision-pipeline-4): an answer cut off at the cap gets
+    # ONE more try at the same cap — thinking length varies round to round, so
+    # a second try usually fits. Both attempts were billed, so the cut-off
+    # attempt's usage is folded into whatever this round finally returns.
+    truncated_metas: list[dict] = []
+
+    def _with_truncated(meta: dict) -> dict:
+        if truncated_metas:
+            for _k in ("input_tokens", "output_tokens",
+                       "cache_read_tokens", "cache_write_tokens"):
+                meta[_k] = int(meta.get(_k) or 0) + sum(
+                    int(tm.get(_k) or 0) for tm in truncated_metas)
+            meta["truncated_attempts"] = [
+                {_k: tm.get(_k) for _k in ("input_tokens", "output_tokens",
+                                           "cache_read_tokens", "cache_write_tokens",
+                                           "stop_reason", "attempt")}
+                for tm in truncated_metas]
+        return meta
+
     while attempt < max_attempts:
         try:
             with client.with_options(timeout=VISION_TIMEOUT_S).messages.stream(
@@ -5029,10 +5048,15 @@ def _run_pass1_once(client, system, pages, *,
 
             if resp.stop_reason == "refusal":
                 return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal",
-                        "_meta": meta}
+                        "_meta": _with_truncated(meta)}
             if resp.stop_reason == "max_tokens":
+                if not truncated_metas:          # one bounded retry, never more
+                    truncated_metas.append(meta)
+                    print(f"[extractor] answer cut off at max_tokens={MAX_OUTPUT_TOKENS} "
+                          f"(output_tokens={meta.get('output_tokens')}) — one more try")
+                    continue
                 return {"status": "error", "_error": "output_truncated", "_stop_reason": "max_tokens",
-                        "_meta": meta}
+                        "_meta": _with_truncated(meta)}
 
             text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
             try:
@@ -5043,9 +5067,10 @@ def _run_pass1_once(client, system, pages, *,
                     parsed["_repaired"] = True
                 except json.JSONDecodeError as je:
                     return {"status": "error", "_error": "json_decode_failure",
-                            "_raw_text": text[:4000], "_je": str(je), "_meta": meta}
+                            "_raw_text": text[:4000], "_je": str(je),
+                            "_meta": _with_truncated(meta)}
 
-            parsed["_meta"] = meta
+            parsed["_meta"] = _with_truncated(meta)
             return parsed
         except Exception as exc:
             last_err = exc
@@ -5062,9 +5087,15 @@ def _run_pass1_once(client, system, pages, *,
                     continue
             attempt += 1
             if attempt >= max_attempts:
-                return {"status": "error", "_error": f"vision_call_failed: {exc}"}
+                out = {"status": "error", "_error": f"vision_call_failed: {exc}"}
+                if truncated_metas:   # the cut-off attempt was still billed
+                    out["_meta"] = _with_truncated({"model": model})
+                return out
             time.sleep(1.5 ** (attempt - 1))
-    return {"status": "error", "_error": str(last_err or "Unknown error")}
+    out = {"status": "error", "_error": str(last_err or "Unknown error")}
+    if truncated_metas:
+        out["_meta"] = _with_truncated({"model": model})
+    return out
 
 
 def _resolve_floor_b64(pages, runs):
@@ -5233,7 +5264,10 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
                     "cache_read_tokens": int(_em.get("cache_read_tokens") or 0),
                     "cache_write_tokens": int(_em.get("cache_write_tokens") or 0),
                     "cost_usd": _round_cost_usd(_em),
+                    "stop_reason": _em.get("stop_reason"),
                 })
+                if _em.get("truncated_attempts"):
+                    _entry["truncated_attempts"] = len(_em["truncated_attempts"])
             per_round_meta.append(_entry)
             continue
         runs.append(p)
@@ -5252,7 +5286,10 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
             "cache_read_tokens": int(_rm.get("cache_read_tokens") or 0),
             "cache_write_tokens": int(_rm.get("cache_write_tokens") or 0),
             "cost_usd": _round_cost_usd(_rm),
+            "stop_reason": _rm.get("stop_reason"),
         })
+        if _rm.get("truncated_attempts"):   # this round needed its one retry
+            per_round_meta[-1]["truncated_attempts"] = len(_rm["truncated_attempts"])
         _emit({"event": "voting_round_completed", "round": i + 1,
                "rooms": len(p.get("patalpos") or [])})
 
@@ -5345,6 +5382,9 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
     for _k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"):
         _tok_sum[_k] = sum(int((r.get("_meta") or {}).get(_k) or 0) for r in runs)
     voted["_meta"] = {**runs[0].get("_meta", {}), **_tok_sum, "voting_runs": len(runs)}
+    # round 1's cut-off list would read as the whole run's; each round's count
+    # lives in voting_models[i]["truncated_attempts"] instead
+    voted["_meta"].pop("truncated_attempts", None)
     _attach_vote_meta(voted["_meta"])
     return voted
 
