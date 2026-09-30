@@ -84,3 +84,19 @@ def test_a_zoom_replaced_perimeter_is_shown_as_the_programs_estimate():
         assert perim["key"] == "perimetras"
         assert perim["status"] == "assumed", perim
         assert "padidinto plano vaizdo" in perim["sentence"]
+
+
+def test_a_zoom_replaced_perimeter_is_not_called_the_tables_when_a_row_of_that_number_has_one():
+    """The table's row for this number was not joined to the room (its area contradicted the room's), so the
+    room's perimeter is not the table's; the zoomed re-read replaced it. The sheet must not say „from the table"
+    over the zoom's number — the room's own label says what the number is."""
+    from extractor import room_facts as rf
+    room = {"nr": "01", "pavadinimas": "Kambarys", "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
+            "perimetras_m": 18.4, "perimetras_saltinis": "zoom", "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+            "plotas_match_rejected": "Sandėlis"}
+    project = {"patalpos": [room],
+               "_eksplikacija": {"patalpos": [{"row_idx": 0, "nr": "01", "pavadinimas": "Sandėlis",
+                                               "plotas_m2": 4.0, "perimetras_m": 8.0, "page": 2}]}}
+    perim = rf._fact_perimetras(project, room, None)
+    assert perim["status"] == "assumed" and perim["value"] == 18.4, perim
+    assert "padidinto plano vaizdo" in perim["sentence"] and "eksplikacijos" not in perim["sentence"]

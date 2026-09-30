@@ -206,11 +206,12 @@ def _with_paint_choice(calc_in: dict, rt: dict, wp: float) -> dict:
     return {**calc_in, "walls_paint_factor_override": 0.0} if wp <= 0 else calc_in
 
 
-# What a room keeps when the calculator's result is merged into it — the same fields as
-# `preserved` in main.recompute_interior (keep the two lists equal).
+# What a room keeps when the calculator's result is merged into it — ONE list for both paths:
+# main.recompute_interior builds its `preserved` from it too. (`calculation_trace` is redone by
+# derive_room_extras right after the merge on both paths; holding it back changes nothing.)
 _KEPT_ON_RECALC = ("nr", "pavadinimas", "paskirtis", "puslapio_nr", "bbox_pct", "plotas_saltinis",
-                   "lubu_aukstis_saltinis", "lubu_tipas", "confidence", "elementai", "_zoom",
-                   "_zoom_changes")
+                   "lubu_aukstis_saltinis", "lubu_tipas", "calculation_trace", "confidence", "elementai",
+                   "_zoom", "_zoom_changes")
 
 
 def _apply_recalc(room: dict, recalc: dict, rules_override: dict | None) -> None:

@@ -274,3 +274,19 @@ def test_a_prielaidos_edit_keeps_the_rooms_own_fields(client):
     for k, v in before.items():
         assert after.get(k) == v, f"{k}: {v!r} became {after.get(k)!r}"
     assert after["lubu_aukstis_m"] == 3.2
+
+
+def test_both_paths_hold_back_one_and_the_same_list_of_the_rooms_own_fields(client, monkeypatch):
+    """The fields a room keeps when the calculator's answer is merged into it are ONE list, read by both paths
+    (api.recompute_quantities._KEPT_ON_RECALC; main.recompute_interior builds `preserved` from it) — a field
+    added to it is held back on both at once. Before, the two lists were kept equal by a comment."""
+    from api import recompute_quantities as rq
+    assert "calculation_trace" in rq._KEPT_ON_RECALC     # redone by derive_room_extras on both paths anyway
+    monkeypatch.setattr(rq, "_KEPT_ON_RECALC", rq._KEPT_ON_RECALC + ("_walls_perimetras_saltinis",))
+    rooms = _room_sheet(client, _flat())["patalpos"]
+    for r in rooms:
+        r["_walls_perimetras_saltinis"] = "bandymas"     # a field the calculator does write
+    sheet = _room_sheet(client, copy.deepcopy(rooms), {"lubu_auksciai": {"01": 3.2}})
+    prielaidos = _prielaidos(client, rooms, [{"field": "lubu_auksciai", "new_value": {"01": 3.2}}])
+    assert _by_nr(prielaidos["rooms"])["01"]["_walls_perimetras_saltinis"] == "bandymas"
+    assert _by_nr(sheet["patalpos"])["01"]["_walls_perimetras_saltinis"] == "bandymas"

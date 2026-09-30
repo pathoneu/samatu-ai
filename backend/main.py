@@ -6676,22 +6676,10 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         # skirting) can take that room's own share off the stated total. Skipping
         # the calc left a room that arrived without numbers with no share at
         # all, and the anchored line billed the whole flat (2026-09-13).
-        # Preserve Vision-emitted fields we don't recompute
-        preserved = {
-            "nr": room.get("nr"),
-            "pavadinimas": room.get("pavadinimas"),
-            "paskirtis": room.get("paskirtis"),
-            "puslapio_nr": room.get("puslapio_nr"),
-            "bbox_pct": room.get("bbox_pct"),
-            "plotas_saltinis": room.get("plotas_saltinis"),
-            "lubu_aukstis_saltinis": room.get("lubu_aukstis_saltinis"),
-            "lubu_tipas": room.get("lubu_tipas"),
-            "calculation_trace": room.get("calculation_trace"),
-            "confidence": room.get("confidence"),
-            "elementai": room.get("elementai"),
-            "_zoom": room.get("_zoom"),
-            "_zoom_changes": room.get("_zoom_changes"),
-        }
+        # Preserve Vision-emitted fields we don't recompute — the one list the
+        # Prielaidos path (api.recompute_quantities._apply_recalc) holds back too
+        from api import recompute_quantities as _rq
+        preserved = {k: room.get(k) for k in _rq._KEPT_ON_RECALC}
 
         nr = room.get("nr") or ""
         room_override = per_room.get(nr) or {}

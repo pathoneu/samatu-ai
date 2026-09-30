@@ -673,6 +673,16 @@ def _fact_perimetras(project: dict, room: dict,
                      outline_rect_pct(room) or region_on_page(room, page, region),
                      sentence + tail, editable)
 
+    if str(room.get("perimetras_saltinis") or "") == "zoom":
+        # vision_call.ZOOM_SOURCE (2026-09-29): the zoomed re-read replaced the figure — the program's
+        # own reading of a close-up, checked by nothing printed. Amber, on every kind of drawing — and before
+        # the table: a row of this number the room was NOT joined to (its area contradicted) does not make
+        # the zoom's number the table's.
+        return _fact("perimetras", round(measured, 2), "m", "assumed", "prielaida",
+                     room.get("puslapio_nr"), region,
+                     "Perimetrą programa įvertino iš padidinto plano vaizdo — brėžinyje užrašytais "
+                     "matmenimis nepatikrintas. Palikite arba įrašykite tikrą." + tail, editable)
+
     if from_table:
         page = _row_page(project, room, row)
         rect = _bbox_pdf_to_pct(room.get("eksplikacija_row_bbox"),
@@ -682,14 +692,6 @@ def _fact_perimetras(project: dict, room: dict,
                      "eksplikacija", page,
                      rect or region_on_page(room, page, region),
                      "Iš patalpų eksplikacijos lentelės." + tail, editable)
-
-    if str(room.get("perimetras_saltinis") or "") == "zoom":
-        # vision_call.ZOOM_SOURCE (2026-09-29): the zoomed re-read replaced the figure — the program's
-        # own reading of a close-up, checked by nothing printed. Amber, on every kind of drawing.
-        return _fact("perimetras", round(measured, 2), "m", "assumed", "prielaida",
-                     room.get("puslapio_nr"), region,
-                     "Perimetrą programa įvertino iš padidinto plano vaizdo — brėžinyje užrašytais "
-                     "matmenimis nepatikrintas. Palikite arba įrašykite tikrą." + tail, editable)
 
     if isinstance((project.get("_meta") or {}).get("geometrija"), dict):
         # 2026-09-19: the geometry lane ran on this project and could neither add
