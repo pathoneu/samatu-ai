@@ -33,7 +33,7 @@ import pdfplumber
 from pdf2image import convert_from_bytes
 
 from models_config import model_for  # role: "doors" — resolved at call time
-from .response_text import response_text
+from .response_text import read_answer, usage_meta
 from .universal_rules import normalize_paskirtis
 # Raised 2026-07-29 for the SAME reason apdailos_reader was (see its comment):
 # Opus 5 runs extended thinking BY DEFAULT and it counts against this cap, so a
@@ -84,8 +84,7 @@ Output JSON:
   ],
   "total_count": number,
   "interior_count": number,
-  "exterior_count": number,
-  "audit_trail": "kelias kuriuo ėjai per planą — pradėjau nuo X, mačiau Y..."
+  "exterior_count": number
 }
 
 PROCEDŪRA (sek griežtai):
@@ -192,7 +191,16 @@ def read_doors_from_plan(
 
     # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
     # models, and reading .text off it killed this reader mid-run.
-    raw = response_text(resp)
+    # A refused or cut-off answer is named, and its billed tokens kept in
+    # _meta (2026-09-30: page 2 of objektas_g was refused and read as
+    # "no JSON in response", its 5,497 input tokens never counted).
+    raw, stopped = read_answer(resp, reader="doors_reader", page=page)
+    if stopped:
+        u = usage_meta(resp, model)
+        return {"status": "error", "page": page, "doors": [], "total_count": 0,
+                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": {"input_tokens": u["input_tokens"],
+                          "output_tokens": u["output_tokens"], "model": model}}
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "page": page, "doors": [], "total_count": 0,
@@ -213,7 +221,6 @@ def read_doors_from_plan(
     return {
         "status": "ok", "page": page, "doors": doors,
         "total_count": total, "exterior_count": ext, "interior_count": total - ext,
-        "audit_trail": parsed.get("audit_trail"),
         "_elapsed_s": round(time.time() - t0, 2),
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
                   "output_tokens": getattr(usage, "output_tokens", None), "model": model},

@@ -22,6 +22,7 @@ import anthropic
 
 from extractor.feature_flags import get_flags
 from models_config import model_for
+from extractor.response_text import ModelStopped, read_answer, usage_meta
 
 log = logging.getLogger(__name__)
 
@@ -65,13 +66,17 @@ def _call_opus(prompt: str) -> dict:
             "ANTHROPIC_API_KEY not set; cannot run verify_pass live."
         )
     client = anthropic.Anthropic(max_retries=1)
+    model = model_for("vision_pass2")
     resp = client.messages.create(
-        model=model_for("vision_pass2"),
+        model=model,
         max_tokens=4096,
         system=[{"type": "text", "text": _VERIFY_SYSTEM,
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": prompt}],
     )
+    _, stopped = read_answer(resp, reader="verify_pass")
+    if stopped:  # refused / cut off: named, usage kept (2026-09-30)
+        raise ModelStopped(stopped, usage_meta(resp, model))
     text = _extract_text(resp).strip()
     # Strip ```json fences if the model added them despite the system prompt.
     if text.startswith("```"):

@@ -25,6 +25,7 @@ import anthropic
 
 from models_config import model_for  # call-time model resolution
 from .vision_call import pdf_to_b64_images
+from .response_text import read_answer, usage_meta
 
 __all__ = ["extract_room_material_specs"]
 
@@ -208,6 +209,14 @@ def extract_room_material_specs(
                 output_config={"effort": "medium"},
             ) as stream:
                 resp = stream.get_final_message()
+            _, stopped = read_answer(resp, reader="material_specs",
+                                     page=[p["page_index"] for p in all_imgs])
+            if stopped:  # refused / cut off: named, billed tokens kept, not retried (2026-09-30)
+                return {"_error": stopped,
+                        "paint": None, "sienos_plyteles": None,
+                        "grindys_plyteles": None, "grindys_medines": None,
+                        "_meta": {"elapsed_s": round(time.time() - t0, 2),
+                                  **usage_meta(resp, model)}}
             text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
             try:
                 parsed_specs = json.loads(text)

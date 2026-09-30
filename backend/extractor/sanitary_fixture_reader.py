@@ -39,7 +39,7 @@ from .universal_rules import normalize_paskirtis
 # before any HTTP call).
 MAX_TOKENS = 16384
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
-from .response_text import response_text
+from .response_text import read_answer, run_until_refused, stopped_round_metas, usage_meta
 # `bide` added 2026-07-29: the contractor bills "Bide dušiukų potinkinės dalies
 # įrengimas" + "…virštinkinės dalies montavimas" on objektas_a AND objektas_b, and
 # no reader produced the count — the emit layer could only raise a kiekis=null
@@ -217,7 +217,13 @@ def read_fixtures(pdf_bytes: bytes, rooms: list[dict], client=None,
                 "_elapsed_s": round(time.time() - t0, 2)}
     # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
     # models, and reading .text off it killed this reader mid-run.
-    raw = response_text(resp)
+    raw, stopped = read_answer(resp, reader="sanitary_fixture_reader", page=rendered)
+    if stopped:  # refused / cut off: named, billed tokens kept (2026-09-30)
+        u = usage_meta(resp, model)
+        return {"status": "error", "_error": stopped,
+                "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": {"input_tokens": u["input_tokens"],
+                          "output_tokens": u["output_tokens"], "model": model}}
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "_error": "no JSON", "_raw": raw[:300],
@@ -263,7 +269,10 @@ def _aggregate_fixture_votes(runs: list[dict]) -> dict:
     """Median/mode-aggregate N read_fixtures runs per fixture key + record spread."""
     ok = [r for r in runs if r.get("status") == "ok"]
     if not ok:
-        return runs[0] if runs else {"status": "error"}
+        if not runs:
+            return {"status": "error"}
+        stopped = stopped_round_metas(runs)  # billed refused / cut-off rounds
+        return {**runs[0], "_round_metas": stopped} if stopped else runs[0]
     out = dict(ok[0])
     merged = {}
     spread = {}
@@ -276,7 +285,8 @@ def _aggregate_fixture_votes(runs: list[dict]) -> dict:
     # Cost metering (2026-07-04): voting made N Anthropic calls, but only ok[0]'s
     # _meta survived above. Expose EVERY OK round's _meta so the extraction flow
     # can roll each into _meta.extra_calls (priced per-model).
-    out["_round_metas"] = [r.get("_meta") or {} for r in ok]
+    out["_round_metas"] = ([r.get("_meta") or {} for r in ok]
+                           + stopped_round_metas(runs))
     return out
 
 
@@ -284,7 +294,7 @@ def read_fixtures_voted(pdf_bytes: bytes, rooms: list[dict], client=None, n: int
                         pages_meta: list[dict] | None = None) -> dict:
     """Self-consistency wrapper: run read_fixtures n times, median/mode-vote each
     fixture count (the only stability lever on Opus 4.8 for this single-pass reader)."""
-    runs = [read_fixtures(pdf_bytes, rooms, client, pages_meta) for _ in range(max(1, n))]
+    runs = run_until_refused(lambda: read_fixtures(pdf_bytes, rooms, client, pages_meta), n)
     return _aggregate_fixture_votes(runs)
 
 

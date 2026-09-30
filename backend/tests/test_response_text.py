@@ -119,5 +119,7 @@ def test_interior_readers_all_use_the_safe_path():
         assert "content[0].text" not in src, (
             f"{mod.__name__} reads content[0].text — it will crash on any "
             f"response that starts with a thinking block")
-        assert "response_text(resp)" in src, (
-            f"{mod.__name__} should extract text via response_text()")
+        # read_answer() (2026-09-30) reads text through response_text() and
+        # also names a refused / cut-off answer — either is the safe path.
+        assert "response_text(resp)" in src or "read_answer(resp" in src, (
+            f"{mod.__name__} should extract text via response_text() or read_answer()")

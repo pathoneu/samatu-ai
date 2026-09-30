@@ -20,7 +20,7 @@ import anthropic
 import pdfplumber
 
 from models_config import model_for
-from .response_text import response_text
+from .response_text import ModelStopped, read_answer, usage_meta
 
 # Model tiers — historically Haiku/Sonnet/Opus picked at call site; on
 # 2026-06-17 all tiers were promoted to Opus 4.8, and since W1.1
@@ -302,6 +302,7 @@ def _call_haiku(
     image_b64: str,
     client: anthropic.Anthropic | None = None,
     model: str | None = None,
+    page: int | None = None,
 ) -> PageClassification:
     """Single-page classification via a Claude vision model.
 
@@ -311,8 +312,9 @@ def _call_haiku(
     a fake.
     """
     client = client or anthropic.Anthropic(max_retries=1)
+    model = model or model_for("page_classifier")
     resp = client.messages.create(
-        model=model or model_for("page_classifier"),
+        model=model,
         max_tokens=4096,  # raised at Opus 5 cutover: thinking-on-by-default counts against the cap — 200 truncated instantly (caps are free; billing is by actuals)
         system=[{
             "type": "text",
@@ -340,7 +342,10 @@ def _call_haiku(
             },
         },
     )
-    payload = json.loads(response_text(resp))
+    raw, stopped = read_answer(resp, reader="page_classifier", page=page)
+    if stopped:  # refused / cut off: named, usage kept (2026-09-30)
+        raise ModelStopped(stopped, usage_meta(resp, model))
+    payload = json.loads(raw)
     return parse_classification(payload)
 
 
@@ -415,7 +420,7 @@ def classify_page(
     Errors propagate — we'd rather surface a failed classification than
     silently route to the wrong downstream prompt.
     """
-    result = _call_haiku(image_b64, client=client, model=model)
+    result = _call_haiku(image_b64, client=client, model=model, page=page_num)
     if pdf_path is not None and page_num is not None:
         try:
             text_dalis = _extract_antspaudas_text(pdf_path, page_num)

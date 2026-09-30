@@ -46,7 +46,7 @@ MAX_TOKENS = 16384
 # small door tags/annotations stay legible (research #2). 1568 px is the pre-Opus
 # limit; staying at/below it guarantees no provider downscale.
 from .prompt import PROVIDER_MAX_IMG_PX as MAX_IMG_PX  # 2576 on Opus 4.8 (was 1568)
-from .response_text import response_text
+from .response_text import read_answer, run_until_refused, stopped_round_metas, usage_meta
 MAX_DOOR_PAGES = 6
 
 # A door TAG: D-1, D1, VD-2. Case-sensitive and without „LD" (2026-09-23, checked on the corpus): the LD-1 /
@@ -199,7 +199,13 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
 
     # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
     # models, and reading .text off it killed this reader mid-run.
-    raw = response_text(resp)
+    raw, stopped = read_answer(resp, reader="door_type_reader", page=rendered)
+    if stopped:  # refused / cut off: named, billed tokens kept (2026-09-30)
+        u = usage_meta(resp, model)
+        return {"status": "error", "pages": rendered, "beapvadines_count": 0,
+                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": {"input_tokens": u["input_tokens"],
+                          "output_tokens": u["output_tokens"], "model": model}}
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,
@@ -243,7 +249,10 @@ def _aggregate_door_votes(runs: list[dict]) -> dict:
     spread so the caller can flag run-to-run disagreement (geltona)."""
     ok = [r for r in runs if r.get("status") == "ok"]
     if not ok:
-        return runs[0] if runs else {"status": "error", "beapvadines_count": 0}
+        if not runs:
+            return {"status": "error", "beapvadines_count": 0}
+        stopped = stopped_round_metas(runs)  # billed refused / cut-off rounds
+        return {**runs[0], "_round_metas": stopped} if stopped else runs[0]
     beap_vals = [int(r.get("beapvadines_count") or 0) for r in ok]
     beap = _mode_int(beap_vals)
     rep = next((r for r in ok if int(r.get("beapvadines_count") or 0) == beap), ok[0])
@@ -257,7 +266,8 @@ def _aggregate_door_votes(runs: list[dict]) -> dict:
     # representative round's _meta survived above — the other rounds' tokens
     # were dropped, undercounting spend. Expose EVERY OK round's _meta so the
     # extraction flow can roll each into _meta.extra_calls (priced per-model).
-    out["_round_metas"] = [r.get("_meta") or {} for r in ok]
+    out["_round_metas"] = ([r.get("_meta") or {} for r in ok]
+                           + stopped_round_metas(runs))
     return out
 
 
@@ -267,8 +277,8 @@ def read_door_types_voted(pdf_bytes: bytes, rooms: list[dict],
     """Self-consistency wrapper: run read_door_types n times, median/mode-vote the
     counts (Opus 4.8 has no temperature knob — sampling N times is the only
     stability lever for this recall-critical single-pass reader)."""
-    runs = [read_door_types(pdf_bytes, rooms, page_classifications, client)
-            for _ in range(max(1, n))]
+    runs = run_until_refused(
+        lambda: read_door_types(pdf_bytes, rooms, page_classifications, client), n)
     return _aggregate_door_votes(runs)
 
 

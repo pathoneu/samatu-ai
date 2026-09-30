@@ -18,7 +18,7 @@ import json
 import anthropic
 
 from models_config import model_for  # role: "legend" — resolved at call time
-from .response_text import response_text
+from .response_text import ModelStopped, read_answer, usage_meta
 
 
 _LEGEND_SYSTEM = """Extract the symbol legend from this LT construction drawing.
@@ -103,7 +103,10 @@ def extract_legend(legend_image_b64: str, client: anthropic.Anthropic | None = N
             "effort": "high",
         },
     )
-    legend = json.loads(response_text(resp))
+    raw, stopped = read_answer(resp, reader="legend_injection")
+    if stopped:  # refused / cut off: named, usage kept (2026-09-30)
+        raise ModelStopped(stopped, usage_meta(resp, model))
+    legend = json.loads(raw)
     usage = getattr(resp, "usage", None)
     legend["_meta"] = {
         "model": model,

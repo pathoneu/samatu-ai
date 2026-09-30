@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from ._cache import VisionCache, cache_key
+from ..response_text import ModelStopped, read_answer, usage_meta
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "prompts" / "room_graph.txt"
@@ -330,6 +331,10 @@ def extract_room_graph(
         }],
     ) as stream:
         resp = stream.get_final_message()
+
+    _, stopped = read_answer(resp, reader="room_graph_extractor")
+    if stopped:  # refused / cut off: named, usage kept, never cached (2026-09-30)
+        raise ModelStopped(stopped, {"cache": "miss", "key": key, **usage_meta(resp, model)})
     text = "".join(
         b.text for b in resp.content if getattr(b, "type", None) == "text"
     )

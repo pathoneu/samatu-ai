@@ -187,6 +187,33 @@ def _reader_call_metas(result: dict | None) -> list[dict]:
     return [m] if m else []
 
 
+def _note_doors_unread(parsed: dict, doors_result: dict) -> None:
+    """Record the plan sheets the doors reader left unread, and why.
+
+    ``_meta.doors_page_errors`` and the warning's internal ``_page_errors``
+    map each unread sheet to its reader ``_error`` ("refused:<category>",
+    "cut_off", "no JSON in response" …) so the next failure can be diagnosed
+    from the stored project (2026-09-30: objektas_g page 2 was refused and
+    only its number was recorded). The Lithuanian message is unchanged."""
+    unread = [p for p in (doors_result.get("pages_unread") or []) if p]
+    if not unread:
+        return
+    errors = {str(r.get("page")): str(r.get("_error") or "")
+              for r in (doors_result.get("page_results") or [])
+              if r.get("status") != "ok" and r.get("page") in unread}
+    meta = parsed.setdefault("_meta", {})
+    meta["doors_pages_unread"] = unread
+    meta["doors_page_errors"] = errors
+    parsed.setdefault("warnings", []).append({
+        "level": "WARN", "code": "doors_page_unread", "severity": "med",
+        "message": ((f"Brėžinio {unread[0]} puslapio" if len(unread) == 1 else
+                     f"Brėžinio {', '.join(str(p) for p in unread)} puslapių")
+                    + " durys nebuvo perskaičiuotos — tose patalpose paliktas pirmo "
+                    "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
+        "_page_errors": errors,
+    })
+
+
 def _meter_niche_call(parsed: dict, nl: Any) -> None:
     """Roll ONE niche_locator.extract_niches call's tokens into
     ``parsed["_meta"]["extra_calls"]`` (2026-07-04 — the last unmetered paid
@@ -5332,6 +5359,8 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
             _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
         except Exception as exc:
             print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
+            # a refused / cut-off answer was still billed (ModelStopped._meta)
+            _append_extra_call(runs[0], getattr(exc, "_meta", None), reader="adjacency")
 
     def _attach_vote_meta(meta: dict) -> None:
         """Record per-round provenance: model/tokens/cost split (each round
@@ -6565,16 +6594,7 @@ def extract_interior(
         )
         for _dm in _reader_call_metas(doors_result):  # one billed call per sheet
             _append_extra_call(parsed, _dm, reader="doors")
-        _doors_unread = [p for p in (doors_result.get("pages_unread") or []) if p]
-        if _doors_unread:
-            parsed.setdefault("_meta", {})["doors_pages_unread"] = _doors_unread
-            parsed.setdefault("warnings", []).append({
-                "level": "WARN", "code": "doors_page_unread", "severity": "med",
-                "message": ((f"Brėžinio {_doors_unread[0]} puslapio" if len(_doors_unread) == 1 else
-                             f"Brėžinio {', '.join(str(p) for p in _doors_unread)} puslapių")
-                            + " durys nebuvo perskaičiuotos — tose patalpose paliktas pirmo "
-                            "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
-            })
+        _note_doors_unread(parsed, doors_result)
         if doors_result.get("status") == "ok":
             n_updated = merge_doors_by_page(parsed.get("patalpos") or [], doors_result)
             parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
@@ -6809,6 +6829,7 @@ def extract_interior(
                        "reason": f"failed to render primary page {primary_pg}"})
     except Exception as exc:
         print(f"[extractor] niche_locator failed (non-fatal): {exc}")
+        _meter_niche_call(parsed, exc)  # a refused / cut-off answer was still billed
         _emit({"event": "niche_locator_error", "message": str(exc)})
 
     # Step 2.88: STATISTICAL NICHE INFERENCE (2026-06-05).
