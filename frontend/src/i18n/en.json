@@ -478,6 +478,7 @@
     "toastFileReadFail": "Could not read the file",
     "toastSettingsSaved": "Settings saved",
     "toastSettingsLocalOnly": "Company details stayed in this browser only — they could not be saved on the server. Please try again.",
+    "toastSettingsOtherAccount": "Company details were not saved: this window was opened for another account, and a different account is signed in now. Reload the page.",
     "toastProfileUpdated": "Profile updated",
     "toastError": "Error",
     "toastPwMismatch": "New passwords do not match",

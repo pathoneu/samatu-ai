@@ -9,6 +9,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { sanitizeHeaders } from '@/lib/safeHeaders';
 import { API_BASE as API } from './apiBase';
+import { takeSignInHint } from './signInHint';
 
 const AuthCtx = createContext({
   user: null,
@@ -47,10 +48,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check existing session on mount
+  // Check existing session on mount. This is also where a Google sign-in
+  // arrives (it finishes through a server redirect, so login() never ran):
+  // a cache left by another account is purged before the user is set, i.e.
+  // before any page can read it (2026-09-30).
   useEffect(() => {
     apiCall('/api/auth/me')
-      .then((d) => {
+      .then(async (d) => {
+        const signIn = takeSignInHint();
+        if (d.user) await claimCacheFor(d.user.id, { signIn });
         setUser(d.user);
         if (d.user) pullUserSettings(d.user.id);
       })
@@ -67,7 +73,10 @@ export function AuthProvider({ children }) {
   // samatu_price_lists (the contractor's own kainynai) are localStorage-only —
   // they used to survive a user switch, so the next person on a shared browser
   // inherited them and could apply another company's prices to their sąmata.
-  const USER_SCOPED_KEYS = ['samatu_projects', 'samatu_settings', 'samatu_price_lists'];
+  // The two owner markers go with them (2026-09-30): a marker left behind would
+  // make the next session's restore purge a cache that is already its own.
+  const USER_SCOPED_KEYS = ['samatu_projects', 'samatu_settings', 'samatu_price_lists',
+    'samatu_settings_owner', 'samatu_cache_owner'];
 
   const purgeLocalUserData = async () => {
     for (const key of USER_SCOPED_KEYS) {
@@ -77,6 +86,17 @@ export function AuthProvider({ children }) {
       const { resetPullCache } = await import('@/lib/projectStore');
       resetPullCache();
     } catch { /* ignore */ }
+  };
+
+  // Whose cache this browser holds — see claimLocalCache in projectStore. If
+  // the store cannot be loaded there is no telling, so purge.
+  const claimCacheFor = async (userId, opts) => {
+    try {
+      const { claimLocalCache } = await import('@/lib/projectStore');
+      claimLocalCache(userId, opts);
+    } catch {
+      await purgeLocalUserData();
+    }
   };
 
   // Company details + logo live on the server per user since 2026-09-29; the
@@ -96,6 +116,7 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, password }),
     });
     await purgeLocalUserData();
+    if (d.user) await claimCacheFor(d.user.id);
     setUser(d.user);
     if (d.user) pullUserSettings(d.user.id);
     return d.user;
@@ -107,6 +128,7 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, password, name, company_name }),
     });
     await purgeLocalUserData();
+    if (d.user) await claimCacheFor(d.user.id);
     setUser(d.user);
     if (d.user) pullUserSettings(d.user.id);
     return { user: d.user, isFirstAdmin: d.is_first_admin };

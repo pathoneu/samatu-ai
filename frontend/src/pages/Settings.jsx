@@ -107,6 +107,8 @@ export default function Settings() {
     const sent = await flushSettingsWrites();
     setIsSaving(false);
     if (sent === 'ok') toast.success(t('settings.toastSettingsSaved'));
+    // Another account signed in since this page opened (another tab): refused.
+    else if (sent === 'other_account') toast.error(t('settings.toastSettingsOtherAccount'), { id: 'settings-sync' });
     else toast.error(t('settings.toastSettingsLocalOnly'), { id: 'settings-sync' });
   };
 

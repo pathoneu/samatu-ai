@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import { API_BASE } from '@/lib/apiBase';
+import { noteSignInStarted } from '@/lib/signInHint';
 
 export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su Google' }) {
   const [enabled, setEnabled] = useState(null);
@@ -36,6 +37,9 @@ export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su
       </div>
       <a
         href={href}
+        // The session begins behind a server redirect; this note tells the
+        // restore on the way back that someone signed in (see signInHint.js).
+        onClick={noteSignInStarted}
         className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-border rounded-md bg-background hover:bg-muted/40 text-sm font-medium transition-colors"
         data-testid="google-signin-button"
       >

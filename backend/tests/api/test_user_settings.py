@@ -182,3 +182,42 @@ def test_table_appears_on_an_existing_database(tmp_path, monkeypatch):
     assert kept == ("lieka",)
     db.put_user_settings("u-old", {"company_name": "UAB Sena"})
     assert db.get_user_settings("u-old") == {"company_name": "UAB Sena"}
+
+
+# ── A stale second tab (2026-09-30) ──────────────────────────────────────────
+# Tab 1 signs A out and B in; tab 2 still shows A's Settings page. When tab 2
+# saves, the browser sends B's cookie — without a check A's company details
+# landed on B's account. The page now says which account it was loaded for.
+
+_FOR_USER = "X-Settings-For-User"
+
+
+def test_save_for_another_account_is_refused_and_stores_nothing(clients):
+    a, user_a = clients["a"]
+    b, user_b = clients["b"]
+    before = b.get("/api/settings").json()
+    # B's cookie, a page that was loaded for A.
+    r = b.put("/api/settings", json={**_A_SETTINGS, "company_name": "UAB Svetima"},
+              headers={_FOR_USER: user_a["id"]})
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert "Perkraukite" in detail and "neišsaugoti" in detail
+    assert b.get("/api/settings").json() == before
+    assert db.get_user_settings(user_b["id"]) == before
+
+
+def test_save_for_the_signed_in_account_goes_through(clients):
+    b, user_b = clients["b"]
+    payload = {"company_name": "UAB Antroji", "iban": "LT000000000000000002"}
+    r = b.put("/api/settings", json=payload, headers={_FOR_USER: user_b["id"]})
+    assert r.status_code == 200, r.text
+    assert b.get("/api/settings").json() == payload
+
+
+def test_save_without_the_page_account_still_works(clients):
+    """Pages loaded before this change send no account; they keep working."""
+    b, _ = clients["b"]
+    payload = {"company_name": "UAB Antroji", "iban": "LT000000000000000003"}
+    r = b.put("/api/settings", json=payload)
+    assert r.status_code == 200, r.text
+    assert b.get("/api/settings").json() == payload

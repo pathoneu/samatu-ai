@@ -37,6 +37,14 @@ MAX_SETTINGS_BYTES = 1536 * 1024
 _TOO_LARGE_LT = ("Įmonės duomenys per dideli (daugiau nei 1,5 MB). "
                  "Įkelkite mažesnį logotipą.")
 _BAD_BODY_LT = "Netinkami įmonės duomenys — tikėtasi JSON objekto."
+_OTHER_ACCOUNT_LT = ("Įmonės duomenys neišsaugoti: šis langas buvo atidarytas kitai "
+                     "paskyrai, o dabar prisijungta kita. Perkraukite puslapį.")
+
+# The page says which account it was loaded for (2026-09-30). A second tab left
+# open on A's Settings page after the first tab signed B in sends B's cookie; the
+# save must not put A's details on B's account. Absent (a page loaded before
+# this change) → no check, as before.
+_FOR_USER_HEADER = "x-settings-for-user"
 
 
 def _rate_limit_user(user: dict, endpoint: str) -> None:
@@ -65,6 +73,9 @@ def api_get_settings(request: Request) -> dict[str, Any]:
 async def api_put_settings(request: Request) -> dict[str, Any]:
     user = _auth.require_user(request)
     _rate_limit_user(user, "write")
+    page_user = request.headers.get(_FOR_USER_HEADER)
+    if page_user is not None and page_user.strip() != str(user["id"]):
+        raise HTTPException(status_code=409, detail=_OTHER_ACCOUNT_LT)
     try:
         from main import _read_body_capped
     except Exception as exc:  # noqa: BLE001 - no safe uncapped fallback exists

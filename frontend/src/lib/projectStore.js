@@ -23,6 +23,9 @@ import { toast } from 'sonner';
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
 const SETTINGS_KEY = 'samatu_settings';
+// Which account the cached projects and price lists were written for
+// (2026-09-30) — set whenever a session begins, see claimLocalCache().
+const CACHE_OWNER_KEY = 'samatu_cache_owner';
 
 // P7: Legacy ASCII-stripped skyrius names → modern LT-with-diacritics. Used
 // to migrate old projects in localStorage so UI shows consistent names.
@@ -495,6 +498,49 @@ export function resetPullCache() {
   _settingsWrite = null;
   _settingsUserId = null;
 }
+
+/**
+ * Called whenever a session begins (2026-09-30). Login and register purge the
+ * cache themselves; a Google sign-in finishes through a server redirect, so the
+ * app only learns of that session when it restores it on page load — and the
+ * previous account's projects, company details and price lists were still
+ * here. This compares the signed-in account with the owner recorded for the
+ * cache and purges a foreign cache BEFORE anything reads it:
+ *
+ *   · an owner marker for another account               → purge everything
+ *   · a sign-in just happened (signIn) and some cached
+ *     data carries no owner marker                        → purge everything
+ *   · a plain reload, no marker yet (a cache from before
+ *     the marker existed)                                 → drop the projects and
+ *     price lists (the server copy comes back on the next pull); keep the
+ *     company details, which may still exist only here and wait for the
+ *     one-time carry-over in _pullSettings
+ *
+ * Then records the account as the cache's owner. Returns true when it purged.
+ */
+export function claimLocalCache(userId, { signIn = false } = {}) {
+  if (!userId) return false;
+  const id = String(userId);
+  const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const drop = (k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } };
+  const cacheOwner = read(CACHE_OWNER_KEY);
+  const settingsOwner = read(SETTINGS_OWNER_KEY);
+  const otherOwner = [cacheOwner, settingsOwner].some((o) => o && o !== id);
+  const unmarkedLists = !cacheOwner && (read(PROJECTS_KEY) !== null || read(PRICE_LISTS_KEY) !== null);
+  const unmarkedSettings = !settingsOwner && read(SETTINGS_KEY) !== null;
+  const purge = otherOwner || (signIn && (unmarkedLists || unmarkedSettings));
+  if (purge) {
+    for (const k of [PROJECTS_KEY, SETTINGS_KEY, PRICE_LISTS_KEY, SETTINGS_OWNER_KEY]) drop(k);
+    resetPullCache();
+  } else if (unmarkedLists) {
+    drop(PROJECTS_KEY);
+    drop(PRICE_LISTS_KEY);
+    resetPullCache();
+  }
+  _persist(CACHE_OWNER_KEY, id);
+  return purge;
+}
+
 export async function pullProjectsFromBackend({ force = false } = {}) {
   if (_hasPulled && !force) return null;
   _hasPulled = true;
@@ -1163,7 +1209,7 @@ let _settingsUserId = null;  // the signed-in account this cache serves
 let _settingsEpoch = 0;      // bumped on every user switch (resetPullCache)
 let _settingsRev = 0;        // bumped on every local save
 let _settingsPull = null;    // this session's pull; null = not started / failed
-let _settingsWrite = null;   // the last PUT → 'ok' | 'failed'
+let _settingsWrite = null;   // the last PUT → 'ok' | 'failed' | 'other_account'
 
 export function getSettings() {
   try {
@@ -1177,26 +1223,45 @@ export function getSettings() {
  * Write the cache at once and send the whole object to the server. Returns the
  * settings synchronously, as before; `flushSettingsWrites()` says whether the
  * server took it. A failed send keeps the local copy.
+ *
+ * 2026-09-30: the save carries the account this page was loaded for, and the
+ * server refuses it (409 → 'other_account') when the session now belongs to
+ * someone else — a second tab left on A's Settings page after the first tab
+ * signed B in. Such a tab also leaves the shared cache alone once it is marked
+ * for another account, so B's exports never read A's details.
  */
 export function saveSettings(settings) {
-  _persist(SETTINGS_KEY, JSON.stringify(settings));
-  if (_settingsUserId) _persist(SETTINGS_OWNER_KEY, _settingsUserId);
+  const forUser = _settingsUserId;
+  if (!_cacheIsOtherAccounts(forUser)) {
+    _persist(SETTINGS_KEY, JSON.stringify(settings));
+    if (forUser) _persist(SETTINGS_OWNER_KEY, forUser);
+  }
   _settingsRev += 1;
   // One PUT at a time, in order — two quick saves must not land swapped.
   const prev = _settingsWrite || Promise.resolve();
-  _settingsWrite = prev.then(() => _putSettings(settings));
+  _settingsWrite = prev.then(() => _putSettings(settings, forUser));
   return settings;
 }
 
-async function _putSettings(settings) {
+function _cacheIsOtherAccounts(userId) {
+  if (!userId) return false;
+  let owner = null;
+  try { owner = localStorage.getItem(CACHE_OWNER_KEY); } catch { /* ignore */ }
+  return !!owner && owner !== String(userId);
+}
+
+async function _putSettings(settings, forUser) {
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (forUser) headers['X-Settings-For-User'] = String(forUser);
     const res = await fetch(`${API}/api/settings`, {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(settings),
     });
     if (res?.ok) return 'ok';
+    if (res?.status === 409) return 'other_account';
     console.warn('[projectStore] settings save refused:', res?.status);
   } catch (e) {
     console.warn('[projectStore] settings save failed:', e);
@@ -1204,7 +1269,7 @@ async function _putSettings(settings) {
   return 'failed';
 }
 
-/** 'ok' | 'failed' for the last save; null when nothing was sent. */
+/** 'ok' | 'failed' | 'other_account' for the last save; null when nothing was sent. */
 export async function flushSettingsWrites() {
   return _settingsWrite ? _settingsWrite : null;
 }

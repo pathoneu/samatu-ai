@@ -478,6 +478,7 @@
     "toastFileReadFail": "Nepavyko nuskaityti failo",
     "toastSettingsSaved": "Nustatymai išsaugoti",
     "toastSettingsLocalOnly": "Įmonės duomenys liko tik šioje naršyklėje — nepavyko jų išsaugoti serveryje. Bandykite dar kartą.",
+    "toastSettingsOtherAccount": "Įmonės duomenys neišsaugoti: šis langas buvo atidarytas kitai paskyrai, o dabar prisijungta kita. Perkraukite puslapį.",
     "toastProfileUpdated": "Profilis atnaujintas",
     "toastError": "Klaida",
     "toastPwMismatch": "Nauji slaptažodžiai nesutampa",
