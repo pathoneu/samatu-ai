@@ -156,20 +156,33 @@ def _median_or_none(vals: list[Any]) -> float | None:
     return median(nums) if nums else None
 
 
-def _vote_elementai(group: list[dict], rep: dict) -> list[dict]:
+def _vote_elementai(group: list[dict], rep: dict,
+                    record: dict | None = None) -> list[dict]:
     """Vote element (door/window/niche) counts per tipas (median across runs),
-    keeping rep's per-element dimensions but adjusting kiekis to consensus."""
-    per_run_counts: dict[str, list[int]] = defaultdict(list)
+    keeping rep's per-element dimensions but adjusting kiekis to consensus.
+
+    A round that did not list a tipas counts as 0 for it, over EVERY round in
+    the group (audit 2026-09-30, vision-pipeline-5): median of [0, 0, 2] is 0,
+    so an opening only one round of three saw no longer survives. The median
+    used to run over the listing rounds only, i.e. over [2]. ``record`` (when
+    given) receives each tipas's per-round values so the spread can be shown.
+    """
+    per_run: list[dict[str, int]] = []
+    order: list[str] = []
     for r in group:
         c: dict[str, int] = defaultdict(int)
-        present: set[str] = set()
         for el in (r.get("elementai") or []):
             t = (el.get("tipas") or "").lower()
             c[t] += int(el.get("kiekis") or 1)
-            present.add(t)
-        for t in present:
-            per_run_counts[t].append(c[t])
-    voted_counts = {t: int(round(median(v))) for t, v in per_run_counts.items() if v}
+            if t not in order:
+                order.append(t)
+        per_run.append(c)
+    voted_counts: dict[str, int] = {}
+    for t in order:
+        vals = [c.get(t, 0) for c in per_run]
+        voted_counts[t] = int(round(median(vals)))
+        if record is not None:
+            record[t] = {"values": vals, "voted": voted_counts[t], "runs": len(group)}
 
     rep_by_tipas: dict[str, list[dict]] = {}
     for el in (rep.get("elementai") or []):
@@ -212,21 +225,43 @@ def vote_room_group(group: list[dict]) -> dict:
     for f, m in medians.items():
         if m is not None:
             voted[f] = int(round(m)) if f == "n_partition_walls" else round(m, 3)
-    voted["elementai"] = _vote_elementai(group, rep)
+    el_record: dict[str, dict] = {}
+    voted["elementai"] = _vote_elementai(group, rep, record=el_record)
+    if el_record:
+        vote_meta["elementai"] = el_record
     voted["_vote"] = vote_meta
     return voted
 
 
-def vote_symbols(runs: list[dict]) -> dict:
-    """Median each detected_symbols_summary count across runs."""
-    vals: dict[str, list[float]] = defaultdict(list)
-    for r in runs:
-        for k, v in (r.get("detected_symbols_summary") or {}).items():
+def _symbol_votes(runs: list[dict]) -> dict[str, list[float]]:
+    """Per-symbol values across the rounds that answered the symbol count.
+
+    A round whose summary does not list a symbol counts as 0 for it (audit
+    2026-09-30, same fix as _vote_elementai), so a symbol only one round of
+    three listed is voted down to 0. A round that returned NO summary at all
+    gave no answer and does not vote; a listed value that is not a number is
+    skipped, as before.
+    """
+    answered = [r.get("detected_symbols_summary") for r in runs
+                if isinstance(r.get("detected_symbols_summary"), dict)]
+    order: list[str] = []
+    for summary in answered:
+        for k in summary:
+            if k not in order:
+                order.append(k)
+    vals: dict[str, list[float]] = {}
+    for k in order:
+        for summary in answered:
             try:
-                vals[k].append(float(v))
+                vals.setdefault(k, []).append(float(summary.get(k, 0)))
             except (TypeError, ValueError):
                 continue
-    return {k: int(round(median(vs))) for k, vs in vals.items() if vs}
+    return vals
+
+
+def vote_symbols(runs: list[dict]) -> dict:
+    """Median each detected_symbols_summary count across runs."""
+    return {k: int(round(median(vs))) for k, vs in _symbol_votes(runs).items() if vs}
 
 
 # Disagreement tolerances — beyond these, runs are flagged low-confidence so the
@@ -306,5 +341,8 @@ def vote_extraction(runs: list[dict], *, min_votes: int | None = None) -> dict:
         "n_rooms_consensus": len(voted_rooms),
         "n_rooms_per_run": [len(r) for r in room_runs],
         "low_confidence_fields": _low_confidence_fields(voted_rooms),
+        # per-symbol values per round, so a later step can show the spread
+        "symbols": {k: {"values": vs, "voted": int(round(median(vs)))}
+                    for k, vs in _symbol_votes(runs).items() if vs},
     }
     return base
