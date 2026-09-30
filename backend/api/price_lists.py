@@ -5,7 +5,7 @@ Task 5 of the 2026-09-02 contractor batch. Two jobs:
 1. ``POST /api/price-lists/parse-xlsx`` — the contractor keeps his €/vnt list in
    Excel, not CSV. openpyxl reads the first sheet, finds the header row within
    the first few rows using the SAME column vocabulary as the frontend CSV
-   parser (``pages/PriceLists.jsx``), and returns items in that parser's exact
+   parser (``lib/priceListCsv.js``), and returns items in that parser's exact
    shape so both importers feed one storage format and one matcher.
 
 2. CRUD for the lists themselves. They used to live only in localStorage, so a
@@ -23,6 +23,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import unicodedata
 import uuid
 import zipfile
@@ -47,6 +48,9 @@ MAX_ROWS = 20_000
 # a blank line above it.
 HEADER_SCAN_ROWS = 20   # a contractor's sąmata carries a title block before its header (2026-09-15)
 MAX_ITEMS_PER_LIST = 50_000
+# Rows named back to the user for an unreadable price cell. The count of
+# skipped rows stays exact; only the list of names is bounded.
+MAX_PROBLEM_ROWS = 200
 
 # Per-row bounds for a PUT. `aprasymas` matches what the importer already
 # truncates to (see parse_xlsx_items); the rest are new — a PUT body is
@@ -94,7 +98,7 @@ MAX_COLS = 64
 # the 413 below still fires but openpyxl never walks a forged million-row sheet.
 MAX_SCAN_ROWS = MAX_ROWS + HEADER_SCAN_ROWS + 1
 
-# Same vocabulary as the CSV parser's `headerMap` in pages/PriceLists.jsx, keyed
+# Same vocabulary as the CSV parser's `HEADER_MAP` in lib/priceListCsv.js, keyed
 # by the diacritics-folded, punctuation-stripped form so "Aprašymas", "APRASYMAS"
 # and "Aprašymas:" all land on the same column.
 _HEADER_MAP: dict[str, str] = {
@@ -346,30 +350,35 @@ def _norm_header(value: Any) -> str:
     return "".join(ch for ch in s if ch.isalnum())
 
 
-def _parse_price(value: Any) -> float | None:
-    """Read a price cell. Excel gives a real number when the cell is numeric and
-    a string when the contractor typed "12,50 €" — both must work, and the LT
-    decimal comma is the common case."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        f = float(value)
-        return f if f == f and abs(f) != float("inf") else None
-    s = str(value).strip()
-    if not s:
-        return None
-    # "1 234,56 €" → "1234.56". Thin/non-breaking spaces are what Excel actually
-    # emits for a thousands separator, so strip them explicitly.
-    s = s.replace(" ", "").replace(" ", "").replace(" ", "")
+# A typed price cell: the number FIRST, then at most a currency and a unit.
+# 2026-09-30 (exports-money-3): the old reader kept every digit in the cell, so
+# "15 €/m2" became 152, "8 €/m3" 83 and "12,50 €/m2" 12.502 — the unit's own
+# digit glued onto the price. Now the leading number is read on its own and the
+# rest must be a currency and/or a unit, or the row is refused and named.
+_SPACES = "\u00a0\u202f\u2009 "      # NBSP, narrow NBSP (what Excel emits), thin, plain
+_PRICE_NUMBER_RE = re.compile(rf"^[+-]?\d[\d.,{_SPACES}]*")
+_PRICE_TAIL_RE = re.compile(
+    r"^(?:(?:€|eur(?:ų|u|ai)?)\.?)?\s*"                  # €, EUR, Eur, eur., eurų
+    r"(?:(?:/\s*|už\s+)?"                                # "/m2", "/ m", "už m3"
+    r"(m²|m³|m2|m3|m|vnt|kompl|kg|t|l|val|h|d\.d)(\.?))?$",
+    re.IGNORECASE,
+)
+
+
+def _read_number(text: str) -> float | None:
+    """The leading number of a price cell, LT decimal comma first."""
+    s = text.strip().rstrip(".," + _SPACES)
+    for sp in _SPACES:
+        s = s.replace(sp, " ")
+    if " " in s:
+        # A space is only ever a thousands separator: "1 234,56", never "15 2".
+        if not re.fullmatch(r"[+-]?\d{1,3}(?: \d{3})+(?:[.,]\d+)?", s):
+            return None
+        s = s.replace(" ", "")
     if "," in s and "." in s:
         # Both present: the LAST one is the decimal separator.
         s = s.replace(".", "") if s.rindex(",") > s.rindex(".") else s.replace(",", "")
     s = s.replace(",", ".")
-    s = "".join(ch for ch in s if ch.isdigit() or ch in ".-")
-    if not s or s in {"-", ".", "-."}:
-        return None
     try:
         f = float(s)
     except ValueError:
@@ -377,6 +386,43 @@ def _parse_price(value: Any) -> float | None:
     if f != f or abs(f) == float("inf"):
         return None
     return f
+
+
+def _read_price_cell(value: Any) -> tuple[float | None, str | None, str]:
+    """Read a price cell → ``(price, unit_written_in_the_cell, status)``.
+
+    ``status`` is ``"ok"``, ``"empty"`` (nothing typed) or ``"unreadable"``
+    (something typed that is not a price — „sutartinė", a range, words after
+    the number, a date). Excel gives a real number when the cell is numeric and
+    a string when the contractor typed "12,50 €/m²" — both must work, and the
+    LT decimal comma is the common case.
+    """
+    if value is None:
+        return None, None, "empty"
+    if isinstance(value, bool):
+        return None, None, "unreadable"
+    if isinstance(value, (int, float)):
+        f = float(value)
+        if f == f and abs(f) != float("inf"):
+            return f, None, "ok"
+        return None, None, "unreadable"
+    s = str(value).strip()
+    if not s:
+        return None, None, "empty"
+    m = _PRICE_NUMBER_RE.match(s)
+    if not m:
+        return None, None, "unreadable"
+    tail = _PRICE_TAIL_RE.match(s[m.end():].strip())
+    price = _read_number(m.group(0))
+    if tail is None or price is None:
+        return None, None, "unreadable"
+    unit = (tail.group(1) + tail.group(2)) if tail.group(1) else None
+    return price, unit, "ok"
+
+
+def _parse_price(value: Any) -> float | None:
+    """The price in a cell, or None when there is none or it is not readable."""
+    return _read_price_cell(value)[0]
 
 
 def _cell_text(value: Any) -> str:
@@ -390,7 +436,9 @@ def _cell_text(value: Any) -> str:
 def parse_xlsx_items(data: bytes) -> dict[str, Any]:
     """Parse an xlsx workbook into the CSV parser's item shape.
 
-    Returns ``{items, skipped_rows, header_row, sheet}``. Raises HTTPException
+    Returns ``{items, skipped_rows, problem_rows, header_row, sheet}``;
+    ``problem_rows`` names each row skipped for an unreadable price cell
+    (``{row, aprasymas, kaina}``, row 1-based as in Excel). Raises HTTPException
     with a Lithuanian message on anything the user has to fix themselves.
     """
     try:
@@ -463,19 +511,23 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
         items: list[dict[str, Any]] = []
         skipped = 0
         row_count = 0
+        # Rows whose price cell holds something that is not a price. Skipped
+        # like any priceless row, but NAMED, so the user can fix the cell
+        # instead of wondering where the line went.
+        problems: list[dict[str, Any]] = []
         # A sąmata names its sections on their own rows („Skyrius | Gipso
         # kartono montavimas", or just the name in the description column with
         # no price); they are carried onto the rows below instead of skipped.
         current_section = ""
 
-        def _consume(row: tuple[Any, ...] | None) -> None:
+        def _consume(row: tuple[Any, ...] | None, excel_row: int) -> None:
             nonlocal skipped, current_section
             if not row or all(c is None or str(c).strip() == "" for c in row):
                 return
             cells = [_cell_text(c) for c in row]
             aprasymas = cells[col_idx["aprasymas"]] if col_idx["aprasymas"] < len(cells) else ""
-            kaina = _parse_price(row[col_idx["kaina"]]
-                                 if col_idx["kaina"] < len(row) else None)
+            kaina_cell = row[col_idx["kaina"]] if col_idx["kaina"] < len(row) else None
+            kaina, cell_unit, status = _read_price_cell(kaina_cell)
             sk_i = col_idx.get("skyrius")
             vnt_i = col_idx.get("mato_vnt")
             if kaina is None:
@@ -485,6 +537,9 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
                     current_section = texts[1][:200]
                 elif aprasymas and len(texts) == 1:
                     current_section = aprasymas[:200]
+                if status == "unreadable" and aprasymas and len(problems) < MAX_PROBLEM_ROWS:
+                    problems.append({"row": excel_row, "aprasymas": aprasymas[:120],
+                                     "kaina": _cell_text(kaina_cell)[:40]})
                 skipped += 1
                 return
             if not aprasymas:
@@ -494,7 +549,10 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
             item = {
                 "skyrius": section or "Kiti darbai",
                 "aprasymas": aprasymas[:400],
-                "mato_vnt": (cells[vnt_i] if vnt_i is not None and vnt_i < len(cells) else ""),
+                # The unit column first; a unit written in the price cell
+                # („12,5 Eur/m²") fills it only when the column is empty.
+                "mato_vnt": (cells[vnt_i] if vnt_i is not None and vnt_i < len(cells) else "")
+                            or (cell_unit or ""),
                 "kaina": kaina,
             }
             mk_i = col_idx.get("medziagu_kaina")
@@ -504,9 +562,10 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
                     item["medziagu_kaina"] = mk
             items.append(item)
 
+        # `excel_row` is 1-based, as the user sees it in Excel.
         for row in head[header_row + 1:]:
             row_count += 1
-            _consume(row)
+            _consume(row, header_row + 1 + row_count)
         for row in rows_iter:
             row_count += 1
             if row_count > MAX_ROWS:
@@ -514,7 +573,7 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
                     status_code=413,
                     detail=f"Per daug eilučių (daugiau nei {MAX_ROWS}). "
                            "Suskaidykite kainyną į kelis failus.")
-            _consume(row)
+            _consume(row, header_row + 1 + row_count)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001 - openpyxl raises a zoo of types
@@ -545,6 +604,7 @@ def parse_xlsx_items(data: bytes) -> dict[str, Any]:
     return {
         "items": items,
         "skipped_rows": skipped,
+        "problem_rows": problems,
         "header_row": header_row + 1,   # 1-based, as the user sees it in Excel
         "sheet": sheet_title,
     }

@@ -483,4 +483,93 @@ export function newlyCarriedOrphans(notes, priorRows) {
     !(n.id && priorOrphanIds.has(String(n.id))) && !priorOrphanLabels.has(_lc(n.aprasymas)));
 }
 
+/**
+ * Stale rows at export (audit exports-money-4, 2026-09-30). Pass 3 carries a
+ * hand-priced row the rebuild no longer emits — and when a room crossed 3 m that
+ * row is the old tier of a line that is ALSO in the list under its new tier, so
+ * the export printed the same walls twice. The export dialog asks him first;
+ * these helpers are what it counts and what his click does. Nothing here runs
+ * without that click, and no quantity is ever changed.
+ *
+ * Only rows that would be printed count (the export drops kiekis = 0 rows).
+ */
+export function staleRowsForExport(rows) {
+  return (rows || []).filter((r) => r && r._orphaned_after_rebuild && (Number(r.kiekis) || 0) > 0);
+}
+
+// ONLY the ceiling-height tier („iki/virš 3m", „standartinis aukštis"). The
+// wider `tierKey` also folds the height-premium and Q4 lines, which are extra
+// work beside the base line — a price must never be carried onto those.
+const heightTierBase = (s) => _lc(s)
+  .replace(/\s*\((?:iki|vir[sš])\s*3\s*m[^)]*\)/g, '')
+  .replace(/\s*\(standartinis aukštis\)/g, '')
+  .trim();
+const unitOf = (r) => String(r?.mato_vnt || r?.vnt || '').trim().toLowerCase();
+
+/**
+ * Where a stale row's price CLEARLY belongs: Map<staleIndex, liveIndex>. Clear
+ * means the same work with only the height tier changed (same unit), exactly
+ * one live row it could go to, no other stale row going there, and that row
+ * carries no price of his own (unpriced, or priced by the price list). Any
+ * doubt → no entry, and he is offered only „remove" / „keep".
+ */
+export function staleRowCarryTargets(rows) {
+  const list = rows || [];
+  const stale = new Set(staleRowsForExport(list));
+  const proposed = new Map();
+  list.forEach((s, i) => {
+    if (!stale.has(s) || !(Number(s.kaina) > 0)) return;
+    const base = heightTierBase(s.aprasymas);
+    if (!base) return;
+    const cands = [];
+    list.forEach((r, j) => {
+      if (!r || r._orphaned_after_rebuild) return;
+      if (_lc(r.aprasymas) === _lc(s.aprasymas)) return;
+      if (heightTierBase(r.aprasymas) !== base || unitOf(r) !== unitOf(s)) return;
+      cands.push(j);
+    });
+    if (cands.length !== 1) return;
+    const target = list[cands[0]];
+    const hisOwnPrice = Number(target.kaina) > 0 && target.kaina_source !== 'kainynas';
+    if (hisOwnPrice) return;
+    if (Number(target.kaina) > 0 && s.kaina_source === 'kainynas') return;
+    proposed.set(i, cands[0]);
+  });
+  const claims = new Map();
+  for (const j of proposed.values()) claims.set(j, (claims.get(j) || 0) + 1);
+  return new Map([...proposed].filter(([, j]) => claims.get(j) === 1));
+}
+
+/**
+ * His answer to the export dialog's stale-row line.
+ *   'remove' — drop every stale row that would be printed;
+ *   'carry'  — for the rows `staleRowCarryTargets` is sure about, move the price
+ *              (with where it came from) onto the new row and drop the stale
+ *              one; the other stale rows stay for him to decide;
+ *   anything else ('keep') — the list is returned as it is.
+ * Quantities are never touched. Returns a new array when something changed.
+ */
+export function resolveStaleRows(rows, mode) {
+  const list = rows || [];
+  if (mode === 'remove') {
+    const stale = new Set(staleRowsForExport(list));
+    return stale.size ? list.filter((r) => !stale.has(r)) : list;
+  }
+  if (mode !== 'carry') return list;
+  const targets = staleRowCarryTargets(list);
+  if (!targets.size) return list;
+  const out = list.slice();
+  for (const [i, j] of targets) {
+    const s = list[i];
+    const next = { ...out[j], kaina: s.kaina, suma: (Number(out[j].kiekis) || 0) * s.kaina };
+    for (const key of PRICE_PROVENANCE_KEYS) {
+      if (s[key] != null) next[key] = s[key];
+      else delete next[key];
+    }
+    out[j] = next;
+  }
+  const dropped = new Set([...targets.keys()]);
+  return out.filter((_, i) => !dropped.has(i));
+}
+
 export default mergeDarbuSarasasEdits;

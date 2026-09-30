@@ -7,7 +7,12 @@
  *      whitespace collapsed
  *   2. Score = max( exact_match_after_normalize, substring, token_jaccard )
  *   3. If both project pozicija and price item have `vnt`, vnt MUST match
- *      (m² ≠ m ≠ vnt) — different units = no match no matter the text
+ *      (m² ≠ m ≠ vnt) — different units = no match no matter the text. A
+ *      price item with NO unit prices a unit-bearing row only when the whole
+ *      list quotes no units (2026-09-30)
+ *   3b. SIBLING GUARD (2026-09-30): a label that adds a height tier (virš 3 m),
+ *      a Q-level, a coat count or a surface (sienų / lubų) is a different
+ *      priced line — never filled from the base line, whatever the text score
  *   4. Apply only when score >= MIN_SCORE
  *   5. AMBIGUITY GUARD: when the two best candidates are within
  *      AMBIGUITY_MARGIN of each other AND quote different prices, fill nothing
@@ -49,6 +54,9 @@ function normalize(s) {
     // `.,;:()/` list, which left hyphens, quotes and „ “ glued to their words.)
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
+    // „virš 3 m" and „virš 3m" are the same height: glue a number to its
+    // length unit so both sides of a match spell it alike.
+    .replace(/(\d) (m|mm|cm)(?= |$)/g, '$1$2')
     .trim();
 }
 
@@ -97,6 +105,68 @@ function covered(setA, setB) {
   return 1;
 }
 
+// ── Sibling qualifiers (exports-money-6, 2026-09-30) ────────────────────────
+// The substring and coverage tiers asked only „are all the words of one label
+// in the other?". A label that ADDS a height tier, a Q-level, a coat count or
+// a surface is a sibling line at a different price, and it scored 0.92 anyway:
+// „Sienų glaistymas/dažymas" priced both „(iki 3m aukščio)" and „(virš 3m
+// aukščio)", „GKP lubų montavimas" priced its above-3m row. These are the
+// words that make two otherwise-equal labels different work.
+const LAYER_WORDS = {
+  vienu: '1', vieno: '1', vienas: '1', viena: '1',
+  du: '2', dvi: '2', dviem: '2', dvieju: '2',
+  trys: '3', trim: '3', triju: '3',
+};
+const SURFACE_WORDS = {
+  lubu: 'lubos', lubos: 'lubos', lubas: 'lubos', luboms: 'lubos', lubose: 'lubos',
+  sienu: 'sienos', sienos: 'sienos', sienas: 'sienos', sienoms: 'sienos', sienose: 'sienos', siena: 'sienos',
+};
+
+/** Tier qualifiers and surfaces a NORMALIZED label names. */
+function qualifiersOf(n) {
+  const tiers = new Set();
+  for (const m of n.matchAll(/\b(iki|virs) ((?:\d+ )*\d+m)\b/g)) tiers.add(`h:${m[1]}:${m[2]}`);
+  for (const m of n.matchAll(/\bq([1-4])\b/g)) tiers.add(`q:${m[1]}`);
+  for (const m of n.matchAll(/\b(\d+|[a-z]+) sluoksn[a-z]*/g)) {
+    const count = /^\d+$/.test(m[1]) ? m[1] : LAYER_WORDS[m[1]];
+    if (count) tiers.add(`l:${count}`);
+  }
+  if (/\bsluoksn/.test(n) && ![...tiers].some(t => t.startsWith('l:'))) tiers.add('l:?');
+  const surfaces = new Set();
+  for (const w of n.split(' ')) if (SURFACE_WORDS[w]) surfaces.add(SURFACE_WORDS[w]);
+  return { tiers, surfaces };
+}
+
+/**
+ * Do two labels that share their words differ by a sibling qualifier?
+ *   'none' — same work as far as tiers and surfaces go
+ *   'row'  — the ROW names a tier or surface the price line does not quote
+ *            (the line is a different sibling, or the plain base rate): never
+ *            a candidate
+ *   'item' — the PRICE LINE is the more specific one (the row does not say
+ *            which height / Q / coats): never filled from it, but two such
+ *            lines at different prices make the row ambiguous, so it is named
+ * „iki 3 m" is the ordinary height: it only counts when the other label names
+ * a height too, so a plain line still prices our „(iki 3m aukščio)" row.
+ * A line naming MORE surfaces than the row („Sienų, lubų …") covers it.
+ */
+function siblingConflict(na, nb) {
+  const a = qualifiersOf(na);
+  const b = qualifiersOf(nb);
+  const hasHeight = (q) => [...q.tiers].some(t => t.startsWith('h:'));
+  const dropUpTo = (q) => { for (const t of [...q.tiers]) if (t.startsWith('h:iki:')) q.tiers.delete(t); };
+  if (!hasHeight(b)) dropUpTo(a);
+  if (!hasHeight(a)) dropUpTo(b);
+  if ([...a.tiers].some(t => !b.tiers.has(t))) return 'row';
+  if ([...a.surfaces].some(sf => !b.surfaces.has(sf))) return 'row';
+  if ([...b.tiers].some(t => !a.tiers.has(t))) return 'item';
+  if (a.surfaces.size === 0 && b.surfaces.size > 0) return 'item';
+  return 'none';
+}
+
+// A sibling's score is held under MIN_SCORE so it can never fill a row.
+const SIBLING_CAP = 0.5;
+
 function jaccard(setA, setB) {
   if (setA.size === 0 || setB.size === 0) return 0;
   let intersect = 0;
@@ -105,7 +175,7 @@ function jaccard(setA, setB) {
   return intersect / union;
 }
 
-function unitsCompatible(a, b) {
+function unitsCompatible(a, b, listHasUnits = false) {
   // Map superscripts to their ASCII token so area / volume / length stay DISTINCT:
   // 'm²'→'m2', 'm³'→'m3', 'm'→'m'. (2026-06-19 hunt: the old code stripped ²³
   // FIRST, collapsing 'm²' and 'm³' to 'm', so a €/m linear price could be matched
@@ -114,7 +184,13 @@ function unitsCompatible(a, b) {
     .replace(/²/g, '2').replace(/³/g, '3').replace(/[\s.]/g, '');
   const ua = norm(a);
   const ub = norm(b);
-  if (!ua || !ub) return true;  // benefit-of-the-doubt when unspecified
+  if (!ua && !ub) return true;
+  // A price line with no unit, in a list that quotes units elsewhere, is a
+  // rate whose unit nobody knows — „Dažymas 5 €" priced m rows (skirting,
+  // LED niches, reveals) with what was an m² rate (exports-money-6). Only a
+  // list with no units at all keeps the benefit of the doubt.
+  if (!ub) return !listHasUnits;
+  if (!ua) return true;          // the row states no unit: as before
   return ua === ub;
 }
 
@@ -123,17 +199,24 @@ function unitOf(row) {
   return row?.vnt || row?.mato_vnt || '';
 }
 
-export function scorePair(pozAprasymas, itemAprasymas) {
+/** Raw text score plus the sibling verdict (see siblingConflict). */
+function pairScore(pozAprasymas, itemAprasymas) {
   const a = normalize(pozAprasymas);
   const b = normalize(itemAprasymas);
-  if (!a || !b) return 0;
-  if (a === b) return 1.0;
-  if (a.includes(b) || b.includes(a)) return 0.92;
+  if (!a || !b) return { score: 0, conflict: 'none' };
+  if (a === b) return { score: 1.0, conflict: 'none' };
+  const conflict = siblingConflict(a, b);
+  if (a.includes(b) || b.includes(a)) return { score: 0.92, conflict };
   const ta = tokens(a);
   const tb = tokens(b);
   // Full stemmed coverage sits just under the substring tier: a wordier line
   // that carries every word of ours is „similar", never „exact".
-  return Math.max(jaccard(ta, tb), covered(stemmed(ta), stemmed(tb)) ? 0.9 : 0);
+  return { score: Math.max(jaccard(ta, tb), covered(stemmed(ta), stemmed(tb)) ? 0.9 : 0), conflict };
+}
+
+export function scorePair(pozAprasymas, itemAprasymas) {
+  const { score, conflict } = pairScore(pozAprasymas, itemAprasymas);
+  return conflict === 'none' ? score : Math.min(score, SIBLING_CAP);
 }
 
 /**
@@ -146,13 +229,31 @@ export function scorePair(pozAprasymas, itemAprasymas) {
  *   null — nothing crossed the threshold
  */
 export function bestMatchForPozicija(poz, priceItems) {
+  const list = priceItems || [];
+  const listHasUnits = list.some(it => unitOf(it));
   let best = null;
   let bestScore = 0;
   let runnerUp = null;
   let runnerUpScore = 0;
-  for (const item of priceItems || []) {
-    if (!unitsCompatible(unitOf(poz), unitOf(item))) continue;
-    const score = scorePair(poz?.aprasymas, item?.aprasymas);
+  // More specific sibling lines (see siblingConflict 'item'): never a winner,
+  // but a rival — the row does not say which of them it is.
+  let sib = null;
+  let sibScore = 0;
+  let sib2 = null;
+  let sib2Score = 0;
+  for (const item of list) {
+    if (!unitsCompatible(unitOf(poz), unitOf(item), listHasUnits)) continue;
+    const { score, conflict } = pairScore(poz?.aprasymas, item?.aprasymas);
+    if (conflict === 'row') continue;
+    if (conflict === 'item') {
+      if (score > sibScore) {
+        sib2 = sib; sib2Score = sibScore;
+        sib = item; sibScore = score;
+      } else if (score > sib2Score) {
+        sib2 = item; sib2Score = score;
+      }
+      continue;
+    }
     if (score > bestScore) {
       runnerUp = best; runnerUpScore = bestScore;
       best = item; bestScore = score;
@@ -160,19 +261,35 @@ export function bestMatchForPozicija(poz, priceItems) {
       runnerUp = item; runnerUpScore = score;
     }
   }
-  if (!best || bestScore < MIN_SCORE) return null;
+  const differentPrice = (x, y) => (Number(x.kaina) || 0) !== (Number(y.kaina) || 0);
+  const ambiguousPair = (x, y) => ({
+    ambiguous: true,
+    candidates: [
+      { aprasymas: x.aprasymas, kaina: Number(x.kaina) || 0 },
+      { aprasymas: y.aprasymas, kaina: Number(y.kaina) || 0 },
+    ],
+  });
+  if (!best || bestScore < MIN_SCORE) {
+    // Nothing quotes this row as it stands. Two more specific lines at
+    // different prices that both fit it („… Q2" / „… Q4") are named, not
+    // guessed between; a single one is simply not this row's price.
+    if (sib && sib2 && sib2Score >= MIN_SCORE && sibScore - sib2Score < AMBIGUITY_MARGIN
+        && differentPrice(sib, sib2)) {
+      return ambiguousPair(sib, sib2);
+    }
+    return null;
+  }
   // Two candidates within a hair of each other quoting DIFFERENT prices: the
   // matcher has no basis to pick one. Identical prices are not ambiguous —
   // a duplicated line in the kainynas gives the same answer either way.
-  if (runnerUp && bestScore - runnerUpScore < AMBIGUITY_MARGIN
-      && (Number(runnerUp.kaina) || 0) !== (Number(best.kaina) || 0)) {
-    return {
-      ambiguous: true,
-      candidates: [
-        { aprasymas: best.aprasymas, kaina: Number(best.kaina) || 0 },
-        { aprasymas: runnerUp.aprasymas, kaina: Number(runnerUp.kaina) || 0 },
-      ],
-    };
+  if (runnerUp && bestScore - runnerUpScore < AMBIGUITY_MARGIN && differentPrice(best, runnerUp)) {
+    return ambiguousPair(best, runnerUp);
+  }
+  // A more specific sibling as close as the winner: the plain row may be
+  // either one („Sienų dažymas" vs „… iki 3 m" / „… virš 3 m").
+  if (sib && sibScore >= MIN_SCORE && Math.abs(bestScore - sibScore) < AMBIGUITY_MARGIN
+      && differentPrice(best, sib)) {
+    return ambiguousPair(best, sib);
   }
   // 'exact' means the DESCRIPTIONS are the same once folded — not merely that
   // the score reached 1.0, which token overlap can also do.

@@ -238,10 +238,12 @@ def test_excel_nbsp_thousands_and_negative_price_are_numeric():
 
 
 def test_excel_unparseable_quantity_stays_text_and_is_named_in_pastabos():
-    r = client.post("/generate-excel", json=_excel_rows_payload([
+    # The note is for the contractor: since 2026-09-30 (exports-money-5) the
+    # Pastabos sheet exists only in the internal copy he asks for.
+    r = client.post("/generate-excel", json={**_excel_rows_payload([
         {"nr": "1", "aprasymas": "Neaiškus kiekis", "kiekis": "pagal poreikį",
          "kaina": 10},
-    ]))
+    ]), "vidine_kopija": True})
     assert r.status_code == 200, r.text[:300]
     wb, ws = _load_samata(r.content)
     row = _row_by_label(ws, "Neaiškus kiekis")

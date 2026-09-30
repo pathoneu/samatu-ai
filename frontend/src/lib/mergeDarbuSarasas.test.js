@@ -8,6 +8,9 @@ import {
   tierBaseLabel,
   normLabel,
   hasUserEdit,
+  staleRowsForExport,
+  staleRowCarryTargets,
+  resolveStaleRows,
 } from './mergeDarbuSarasas.js';
 
 const SNAPSHOT = new URL(
@@ -638,4 +641,136 @@ test('tierBaseLabel strips the tier suffix and keeps the case', () => {
   assert.equal(tierBaseLabel('Lubų glaistymas/dažymas (virš 3m aukščio)'), 'Lubų glaistymas/dažymas');
   assert.equal(tierBaseLabel('GKP lubų montavimas (standartinis aukštis)'), 'GKP lubų montavimas');
   assert.equal(tierBaseLabel('Sienų glaistymas/dažymas'), 'Sienų glaistymas/dažymas');
+});
+
+// ── Stale rows at export (audit exports-money-4, 2026-09-30) ─────────────────
+// A room crossed 3 m: the painting line changed tier label. His hand-priced
+// „iki 3m" row is carried as a stale row next to the new „virš 3m" row, and the
+// export printed both — the same walls billed twice.
+const WALLS_LOW = 'Sienų glaistymas/dažymas (iki 3m aukščio)';
+const WALLS_HIGH = 'Sienų glaistymas/dažymas (virš 3m aukščio)';
+
+function reTieredProject({ highPrice, highSource } = {}) {
+  const old = [
+    { aprasymas: WALLS_LOW, mato_vnt: 'm²', kiekis: 250, kaina: 12, skyrius: 'Apdaila' },
+    { aprasymas: 'Grindų gruntavimas', mato_vnt: 'm²', kiekis: 80, kaina: 2, skyrius: 'Apdaila' },
+  ];
+  if (highPrice != null && highSource == null) {
+    old.push({ aprasymas: WALLS_HIGH, mato_vnt: 'm²', kiekis: 60, kaina: highPrice, skyrius: 'Apdaila' });
+  }
+  const rebuilt = [
+    { aprasymas: WALLS_HIGH, mato_vnt: 'm²', kiekis: 310, skyrius: 'Apdaila',
+      ...(highSource ? { kaina: highPrice, kaina_source: highSource } : {}) },
+    { aprasymas: 'Grindų gruntavimas', mato_vnt: 'm²', kiekis: 80, skyrius: 'Apdaila' },
+  ];
+  return mergeDarbuSarasasEdits(rebuilt, old);
+}
+
+const wallsQty = (rows) => rows
+  .filter((r) => tierKey(r.aprasymas) === tierKey(WALLS_LOW))
+  .reduce((s, r) => s + (Number(r.kiekis) || 0), 0);
+
+test('export: a stale priced row left beside its successor is detected and counted', () => {
+  const merged = reTieredProject({ highPrice: 17 });
+  // The bug as measured: 310 m² new + 250 m² stale = walls billed twice.
+  assert.equal(wallsQty(merged), 560);
+  const stale = staleRowsForExport(merged);
+  assert.equal(stale.length, 1);
+  assert.equal(stale[0].aprasymas, WALLS_LOW);
+  assert.equal(stale[0].kaina, 12);
+});
+
+test('export: a stale row with no quantity is not counted (it is not printed)', () => {
+  const rows = [
+    { aprasymas: 'A', kiekis: 0, kaina: 5, _orphaned_after_rebuild: true },
+    { aprasymas: 'B', kiekis: 3, kaina: 5 },
+  ];
+  assert.equal(staleRowsForExport(rows).length, 0);
+  assert.equal(staleRowsForExport(null).length, 0);
+});
+
+test('export: removing stale rows leaves one walls row with its quantity once', () => {
+  const merged = reTieredProject({ highPrice: 17 });
+  const out = resolveStaleRows(merged, 'remove');
+  const walls = out.filter((r) => tierKey(r.aprasymas) === tierKey(WALLS_LOW));
+  assert.equal(walls.length, 1);
+  assert.equal(walls[0].aprasymas, WALLS_HIGH);
+  assert.equal(walls[0].kiekis, 310);      // the quantity is the rebuilt one, untouched
+  assert.equal(walls[0].kaina, 17);        // his own „virš 3m" price, untouched
+  assert.equal(wallsQty(out), 310);
+  assert.equal(staleRowsForExport(out).length, 0);
+  // Nothing else moved.
+  assert.deepEqual(out.find((r) => r.aprasymas === 'Grindų gruntavimas'),
+    merged.find((r) => r.aprasymas === 'Grindų gruntavimas'));
+});
+
+test('export: „keep" changes nothing', () => {
+  const merged = reTieredProject({ highPrice: 17 });
+  assert.equal(resolveStaleRows(merged, 'keep'), merged);
+});
+
+test('export: the successor already carries HIS own price — no price carry is offered', () => {
+  const merged = reTieredProject({ highPrice: 17 });
+  assert.equal(staleRowCarryTargets(merged).size, 0);
+  // …and „carry" then touches nothing.
+  const out = resolveStaleRows(merged, 'carry');
+  assert.equal(wallsQty(out), 560);
+  assert.equal(out.find((r) => r.aprasymas === WALLS_HIGH).kaina, 17);
+});
+
+test('export: carrying the price moves his old price onto the new row and drops the stale one', () => {
+  // The new row was priced by the price list, his hand-typed 12 € sits on the
+  // stale row: same work, only the height tier changed.
+  const merged = reTieredProject({ highPrice: 15, highSource: 'kainynas' });
+  assert.equal(staleRowsForExport(merged).length, 1);
+  assert.equal(staleRowCarryTargets(merged).size, 1);
+  const out = resolveStaleRows(merged, 'carry');
+  const walls = out.filter((r) => tierKey(r.aprasymas) === tierKey(WALLS_LOW));
+  assert.equal(walls.length, 1);
+  assert.equal(walls[0].aprasymas, WALLS_HIGH);
+  assert.equal(walls[0].kiekis, 310);          // quantity unchanged
+  assert.equal(walls[0].kaina, 12);            // his price
+  assert.equal(walls[0].suma, 310 * 12);
+  // The price is his hand now — the price-list label must not stick to it, or
+  // the next „Taikyti kainyną" would overwrite it.
+  assert.equal(walls[0].kaina_source, undefined);
+  assert.equal(staleRowsForExport(out).length, 0);
+});
+
+test('export: an unpriced successor also takes the stale row price', () => {
+  const rows = [
+    { aprasymas: WALLS_HIGH, mato_vnt: 'm²', kiekis: 310 },
+    { aprasymas: WALLS_LOW, mato_vnt: 'm²', kiekis: 250, kaina: 12,
+      kaina_source: 'rankinis', _orphaned_after_rebuild: true },
+  ];
+  const out = resolveStaleRows(rows, 'carry');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].kaina, 12);
+  assert.equal(out[0].kaina_source, 'rankinis');
+  assert.equal(out[0].kiekis, 310);
+});
+
+test('export: no price carry when it is not clear where the price belongs', () => {
+  const premium = 'Sienų glaistymas/dažymas — papildomas darbas dėl aukščio';
+  // A height-premium line is extra work, not the same work at another tier.
+  assert.equal(staleRowCarryTargets([
+    { aprasymas: 'Sienų glaistymas/dažymas', mato_vnt: 'm²', kiekis: 300 },
+    { aprasymas: premium, mato_vnt: 'm²', kiekis: 40, kaina: 5, _orphaned_after_rebuild: true },
+  ]).size, 0);
+  // Different unit.
+  assert.equal(staleRowCarryTargets([
+    { aprasymas: WALLS_HIGH, mato_vnt: 'm²', kiekis: 310 },
+    { aprasymas: WALLS_LOW, mato_vnt: 'm', kiekis: 25, kaina: 12, _orphaned_after_rebuild: true },
+  ]).size, 0);
+  // Two stale rows would both land on the same new row.
+  assert.equal(staleRowCarryTargets([
+    { aprasymas: 'GK pertvaros (standartinis aukštis)', mato_vnt: 'm²', kiekis: 90 },
+    { aprasymas: 'GK pertvaros (iki 3m aukščio)', mato_vnt: 'm²', kiekis: 50, kaina: 30, _orphaned_after_rebuild: true },
+    { aprasymas: 'GK pertvaros (virš 3m aukščio)', mato_vnt: 'm²', kiekis: 40, kaina: 38, _orphaned_after_rebuild: true },
+  ]).size, 0);
+  // A stale row without a price has nothing to carry.
+  assert.equal(staleRowCarryTargets([
+    { aprasymas: WALLS_HIGH, mato_vnt: 'm²', kiekis: 310 },
+    { aprasymas: WALLS_LOW, mato_vnt: 'm²', kiekis: 250, _orphaned_after_rebuild: true },
+  ]).size, 0);
 });

@@ -7,80 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import {
   getPriceLists, createPriceList, deletePriceList,
   setDefaultPriceList, pullPriceListsFromBackend,
 } from '@/lib/projectStore';
 import { API_BASE as API } from '@/lib/apiBase';
+import { parseCsv, describeUnreadablePrices } from '@/lib/priceListCsv';
 
-// Sprint §30 (2026-04-29): CSV parser. Supports both `,` and `;` separators
-// (LT Excel uses `;` by default). Quoted fields with embedded commas. UTF-8 BOM
-// stripped. First row treated as headers.
-function parseCsv(text) {
-  // Detect separator from first non-empty line
-  const cleaned = text.replace(/^﻿/, '');
-  const firstLine = cleaned.split(/\r?\n/).find(l => l.trim()) || '';
-  const sep = firstLine.includes(';') && !firstLine.includes(',') ? ';'
-            : firstLine.split(',').length >= firstLine.split(';').length ? ','
-            : ';';
-
-  const rows = [];
-  let cur = [];
-  let field = '';
-  let inQuotes = false;
-  for (let i = 0; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (inQuotes) {
-      if (ch === '"' && cleaned[i + 1] === '"') { field += '"'; i++; }
-      else if (ch === '"') { inQuotes = false; }
-      else { field += ch; }
-    } else {
-      if (ch === '"') inQuotes = true;
-      else if (ch === sep) { cur.push(field); field = ''; }
-      else if (ch === '\n' || ch === '\r') {
-        if (field || cur.length) { cur.push(field); rows.push(cur); cur = []; field = ''; }
-        if (ch === '\r' && cleaned[i + 1] === '\n') i++;
-      }
-      else { field += ch; }
-    }
-  }
-  if (field || cur.length) { cur.push(field); rows.push(cur); }
-  if (rows.length < 2) throw new Error('CSV neturi duomenų eilučių');
-
-  const headers = rows[0].map(h => h.trim().toLowerCase());
-  const headerMap = {
-    'skyrius': 'skyrius', 'kategorija': 'skyrius',
-    'aprasymas': 'aprasymas', 'aprašymas': 'aprasymas', 'pavadinimas': 'aprasymas',
-    'vnt': 'mato_vnt', 'mato_vnt': 'mato_vnt', 'matas': 'mato_vnt', 'unit': 'mato_vnt',
-    'kaina': 'kaina', 'kaina_eur': 'kaina', 'price': 'kaina',
-  };
-  const colIdx = {};
-  headers.forEach((h, i) => {
-    const m = headerMap[h];
-    if (m) colIdx[m] = i;
-  });
-  if (colIdx.aprasymas == null || colIdx.kaina == null) {
-    throw new Error('Reikalingi stulpeliai: skyrius, aprasymas, vnt, kaina (suderinama su „Excel“ ar atsisiųstu CSV)');
-  }
-
-  const items = [];
-  for (let r = 1; r < rows.length; r++) {
-    const row = rows[r];
-    if (!row || row.every(c => !c.trim())) continue;
-    const aprasymas = (row[colIdx.aprasymas] || '').trim();
-    if (!aprasymas) continue;
-    const kainaRaw = (row[colIdx.kaina] || '').trim().replace(',', '.').replace(/[^\d.\-]/g, '');
-    const kaina = parseFloat(kainaRaw);
-    if (!isFinite(kaina)) continue;
-    items.push({
-      skyrius: colIdx.skyrius != null ? (row[colIdx.skyrius] || '').trim() : 'Kiti darbai',
-      aprasymas,
-      mato_vnt: colIdx.mato_vnt != null ? (row[colIdx.mato_vnt] || '').trim() : '',
-      kaina,
-    });
-  }
-  return items;
-}
+// The CSV reader lives in lib/priceListCsv.js (tested there, beside the
+// .xlsx reader's twin rules in backend/api/price_lists.py).
 
 // Task 5 (2026-09-02): .xlsx goes to the backend (openpyxl), because the
 // contractor keeps his kainynas in Excel and a browser-side xlsx reader would
@@ -110,6 +46,7 @@ async function parseXlsxViaBackend(file) {
 }
 
 export default function PriceLists() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
@@ -156,7 +93,7 @@ export default function PriceLists() {
       : `„${pl.name}“ — numatytasis kainynas. Kainos bus užpildomos automatiškai po naujos analizės.`);
   };
 
-  const saveImported = (items, file, skipped = 0) => {
+  const saveImported = (items, file, skipped = 0, problems = []) => {
     const safeName = file.name.replace(/\.(csv|xlsx|xls)$/i, '').slice(0, 60)
       || 'Importuotas kainynas';
     createPriceList({
@@ -170,6 +107,15 @@ export default function PriceLists() {
       `Importuota ${items.length} eil. iš „${file.name}“`
       + (skipped ? ` (praleista ${skipped} eil. be aprašymo arba be kainos)` : ''),
     );
+    // Rows whose price cell held something that is not a price („sutartinė",
+    // „15–20 €") are named, so he can fix the cell instead of hunting for them.
+    const unreadable = describeUnreadablePrices(problems, t);
+    if (unreadable) {
+      toast.warning(t('priceLists.unreadableTitle', { count: problems.length }), {
+        description: unreadable,
+        duration: 20000,
+      });
+    }
   };
 
   // Sprint §30 + Task 5: bulk import — CSV parsed here, .xlsx by the backend.
@@ -180,7 +126,7 @@ export default function PriceLists() {
       setIsImporting(true);
       try {
         const parsed = await parseXlsxViaBackend(file);
-        saveImported(parsed.items, file, parsed.skipped_rows || 0);
+        saveImported(parsed.items, file, parsed.skipped_rows || 0, parsed.problem_rows || []);
       } catch (e) {
         toast.error(`„Excel“ klaida: ${e.message}`);
       } finally {
@@ -191,12 +137,14 @@ export default function PriceLists() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const items = parseCsv(reader.result);
+        const { items, skippedRows, problemRows } = parseCsv(reader.result);
         if (items.length === 0) {
           toast.error('CSV neturi tinkamų eilučių');
+          const unreadable = describeUnreadablePrices(problemRows, t);
+          if (unreadable) toast.warning(t('priceLists.unreadableTitle', { count: problemRows.length }), { description: unreadable, duration: 20000 });
           return;
         }
-        saveImported(items, file);
+        saveImported(items, file, skippedRows, problemRows);
       } catch (e) {
         toast.error(`CSV klaida: ${e.message}`);
       }

@@ -10,6 +10,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ltCount } from '@/lib/ltPlural';
 import { VAT_REVERSE, VAT_STANDARD, vatChoice } from '@/lib/vatMode';
+import { staleRowsForExport, staleRowCarryTargets } from '@/lib/mergeDarbuSarasas';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import {
   exportSelectionKey,
@@ -52,6 +53,9 @@ export default function ExportFilterModal({
   // PVM (audit 2026-09-29): called with 'standard' | 'reverse_vat' when he
   // picks one; the parent stores it on the project as `vat_mode`.
   onVatModeChange,
+  // Stale rows (audit exports-money-4, 2026-09-30): called with 'remove' |
+  // 'carry' when he answers the stale-row line; the parent edits the sąmata.
+  onStaleChoice,
 }) {
   const { t } = useTranslation();
   // Build unique-skyrius list with row count + total kiekis per skyrius.
@@ -95,6 +99,21 @@ export default function ExportFilterModal({
     onVatModeChange?.(mode);
   };
 
+  // A row the last recompute could not reproduce keeps its OLD quantity; beside
+  // its re-tiered successor the export billed the same work twice. He answers
+  // once per dialog: remove / keep (or carry the price when it clearly belongs
+  // to the new row). Export waits for the answer; nothing changes without it.
+  const staleCount = useMemo(
+    () => staleRowsForExport(project.darbu_sarasas).length, [project.darbu_sarasas]);
+  const carryCount = useMemo(
+    () => staleRowCarryTargets(project.darbu_sarasas).size, [project.darbu_sarasas]);
+  const [staleKept, setStaleKept] = useState(false);
+  const staleOpen = staleCount > 0 && !staleKept;
+
+  // „Vidinė kopija" (audit exports-money-5): the notes sheet is for him, so the
+  // client workbook leaves it out unless he ticks this. Excel only, never kept.
+  const [internalCopy, setInternalCopy] = useState(false);
+
   const allChecked = selected.size === sections.length;
   const noneChecked = selected.size === 0;
 
@@ -119,6 +138,7 @@ export default function ExportFilterModal({
       uzsakovas: uzsakovas.trim(),
       objektas: objektas.trim(),
       vat_mode: vatMode,
+      vidine_kopija: format !== 'pdf' && internalCopy,
     });
   };
 
@@ -140,6 +160,41 @@ export default function ExportFilterModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {staleCount > 0 && (
+          <div className="px-5 py-3 border-b border-border" role="status">
+            {staleOpen ? (
+              <>
+                <p className="text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
+                  {t('project.exportStale.line', { count: staleCount })}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {carryCount > 0 && onStaleChoice && (
+                    <button type="button" onClick={() => onStaleChoice('carry')} disabled={loading}
+                      title={t('project.exportStale.carryTitle')}
+                      className="px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-muted disabled:opacity-50">
+                      {t('project.exportStale.carry', { count: carryCount })}
+                    </button>
+                  )}
+                  {onStaleChoice && (
+                    <button type="button" onClick={() => onStaleChoice('remove')} disabled={loading}
+                      title={t('project.exportStale.removeTitle')}
+                      className="px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-muted disabled:opacity-50">
+                      {t('project.exportStale.remove')}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setStaleKept(true)} disabled={loading}
+                    title={t('project.exportStale.keepTitle')}
+                    className="px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-muted disabled:opacity-50">
+                    {t('project.exportStale.keep')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">{t('project.exportStale.kept')}</p>
+            )}
+          </div>
+        )}
 
         <div className="px-5 py-3 border-b border-border grid grid-cols-2 gap-2">
           <div>
@@ -197,6 +252,23 @@ export default function ExportFilterModal({
           )}
         </div>
 
+        {format !== 'pdf' && (
+          <div className="px-5 py-3 border-b border-border">
+            <label className="flex items-start gap-2.5 px-2 py-1.5 rounded hover:bg-muted/40 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={internalCopy}
+                onChange={e => setInternalCopy(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-foreground"
+              />
+              <span className="flex-1">
+                <span className="block text-sm text-foreground">{t('project.exportInternal.label')}</span>
+                <span className="block text-[12px] text-muted-foreground">{t('project.exportInternal.desc')}</span>
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <button
             onClick={toggleAll}
@@ -251,8 +323,10 @@ export default function ExportFilterModal({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={loading || noneChecked}
-            title={noneChecked
+            disabled={loading || noneChecked || staleOpen}
+            title={staleOpen
+              ? t('project.exportStale.blockedTitle')
+              : noneChecked
               ? 'Pažymėkite bent vieną skyrių'
               : `Sugeneruoti ir atsisiųsti ${format !== 'pdf' ? 'Excel' : 'PDF'} failą su pažymėtais skyriais`}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-foreground text-background rounded text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"

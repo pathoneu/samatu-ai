@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
@@ -16,6 +17,7 @@ import { ensureSettingsPulled } from '@/lib/projectStore';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
 import { exportRows as templateExportRows, lacksPrice, scaleExportRow } from '@/lib/samataTemplate';
+import { resolveStaleRows } from '@/lib/mergeDarbuSarasas';
 
 // "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
 // warning doesn't read like machine output.
@@ -148,10 +150,17 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   };
   // PVM (audit 2026-09-29): the mode the export dialog showed him — his pick or,
   // untouched, what lib/vatMode.js derives. Explicit, so the file prints it.
+  // „Vidinė kopija" (audit exports-money-5, 2026-09-30): the notes are for him;
+  // unless he ticked the option they are not even sent, so no server version
+  // can put them into the file his client gets.
+  const base = payloadOverride || buildPayload(project, allowedSkyriai);
+  const internalCopy = extra.vidine_kopija === true;
   const payload = {
-    ...(payloadOverride || buildPayload(project, allowedSkyriai)),
+    ...base,
+    ...(base.perspejimani && !internalCopy ? { perspejimani: [] } : {}),
     ...branding,
     vat_mode: extra.vat_mode || project.vat_mode || '',
+    vidine_kopija: internalCopy,
   };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
@@ -172,6 +181,11 @@ export default function ExportDropdown({ project, onProjectChange }) {
   const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | 'excel-template' | null
   const ref = useRef(null);
   const confirm = useConfirm();
+  const { t } = useTranslation();
+  // The latest project for the undo of a stale-row choice (the toast outlives
+  // this render).
+  const latestProject = useRef(project);
+  useEffect(() => { latestProject.current = project; });
   // His own layout (2026-09-05): offered only when the account has a template.
   // The rows are rendered ONCE when the menu item is chosen and reused for the
   // section list and the file, so the modal and the workbook agree.
@@ -193,27 +207,52 @@ export default function ExportDropdown({ project, onProjectChange }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
+  // Render the rows in his own layout; false when it failed (already told).
+  const renderTemplate = async (rows) => {
+    setLoading('excel-template');
+    try {
+      const body = await renderSamata(project.id, {
+        rows: rows || [], rooms: roomsForRender(project),
+      });
+      setTemplateRows(body.eilutes || []);
+      return true;
+    } catch (e) {
+      toast.error(`Nepavyko sudaryti sąmatos jūsų išdėstymu: ${e.message}`);
+      return false;
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handle = async (action) => {
     setOpen(false);
     if (action === 'excel-template') {
-      setLoading('excel-template');
-      try {
-        const body = await renderSamata(project.id, {
-          rows: project.darbu_sarasas || [], rooms: roomsForRender(project),
-        });
-        setTemplateRows(body.eilutes || []);
-        setFilterFor(action);
-      } catch (e) {
-        toast.error(`Nepavyko sudaryti sąmatos jūsų išdėstymu: ${e.message}`);
-      } finally {
-        setLoading(null);
-      }
+      if (await renderTemplate(project.darbu_sarasas)) setFilterFor(action);
       return;
     }
     setFilterFor(action);
   };
 
-  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode }) => {
+  // His answer to the stale-row line in the export dialog (audit
+  // exports-money-4): the sąmata itself changes — the same edit as the row's own
+  // „pašalinti" — so the screen and every later export agree. Undo in the toast.
+  const applyRows = (rows) => {
+    const next = { ...latestProject.current, darbu_sarasas: rows };
+    onProjectChange?.(next);
+    if (filterFor === 'excel-template') renderTemplate(rows);
+  };
+  const handleStaleChoice = (mode) => {
+    const before = project.darbu_sarasas || [];
+    const after = resolveStaleRows(before, mode);
+    if (after === before) return;
+    applyRows(after);
+    toast.success(t(mode === 'carry' ? 'project.exportStale.carried' : 'project.exportStale.removed'), {
+      duration: 6000,
+      action: { label: t('project.exportStale.undo'), onClick: () => applyRows(before) },
+    });
+  };
+
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija }) => {
     // Guard: exporting a sąmata where every line is 0,00 € sends the client a
     // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
     // Check ALL candidate lists, not just pozicijos: interior prices live in
@@ -256,7 +295,7 @@ export default function ExportDropdown({ project, onProjectChange }) {
     setLoading(format);
     try {
       const safeName = sanitizeExportFilename(project.name);
-      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode };
+      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'excel-template') {
@@ -360,6 +399,7 @@ export default function ExportDropdown({ project, onProjectChange }) {
           onCancel={() => { if (loading == null) setFilterFor(null); }}
           onConfirm={handleConfirm}
           onVatModeChange={(mode) => onProjectChange?.({ ...project, vat_mode: mode })}
+          onStaleChoice={onProjectChange ? handleStaleChoice : undefined}
         />
       )}
     </div>

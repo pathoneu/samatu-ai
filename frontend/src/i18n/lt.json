@@ -1423,6 +1423,28 @@
       "reverseDesc": "Užsakovas — PVM mokėtojas ir PVM apskaičiuoja pats (PVMĮ 96 str.). PVM eilutė dokumente nespausdinama.",
       "fromLabel": "Atvirkštinį PVM parinko programa, nes projektas atpažintas kaip renovacija. Patikrinkite ir pasirinkite patys."
     },
+    "exportStale": {
+      "line_one": "Sąmatoje liko {{count}} senesnė eilutė su senu kiekiu. Jei tą patį darbą jau turi nauja eilutė, dokumente jis būtų įskaičiuotas du kartus.",
+      "line_few": "Sąmatoje liko {{count}} senesnės eilutės su senais kiekiais. Jei tą patį darbą jau turi naujos eilutės, dokumente jis būtų įskaičiuotas du kartus.",
+      "line_other": "Sąmatoje liko {{count}} senesnių eilučių su senais kiekiais. Jei tą patį darbą jau turi naujos eilutės, dokumente jis būtų įskaičiuotas du kartus.",
+      "remove": "Pašalinti",
+      "removeTitle": "Pašalinti senesnes eilutes iš sąmatos. Naujų eilučių kiekiai nesikeičia.",
+      "keep": "Palikti",
+      "keepTitle": "Palikti jas dokumente, jei tai atskiri darbai",
+      "carry_one": "Perkelti kainą į naują eilutę",
+      "carry_few": "Perkelti {{count}} kainas į naujas eilutes",
+      "carry_other": "Perkelti {{count}} kainų į naujas eilutes",
+      "carryTitle": "Tas pats darbas, pasikeitė tik aukščio riba: jūsų senoji kaina pereina į naują eilutę, senesnė eilutė pašalinama. Kiekis lieka naujas.",
+      "kept": "Senesnės eilutės paliktos dokumente.",
+      "blockedTitle": "Pirma pasirinkite, ką daryti su senesnėmis eilutėmis",
+      "removed": "Senesnės eilutės pašalintos",
+      "carried": "Kaina perkelta į naują eilutę",
+      "undo": "Atšaukti"
+    },
+    "exportInternal": {
+      "label": "Vidinė kopija su pastabomis",
+      "desc": "Prideda lapą su programos pastabomis jums. Klientui siųskite failą be jo."
+    },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",
       "layoutPathon": "Pathon",
@@ -2244,6 +2266,12 @@
       "studio": "Studio",
       "oneoff": "Vienkartinis"
     }
+  },
+  "priceLists": {
+    "unreadableTitle": "Neįkelta eilučių: {{count}} — kainos nepavyko perskaityti",
+    "unreadableDescription": "Kainos langelyje turi būti skaičius, pvz. 12,50 arba 12,50 €/m². Pataisykite šias eilutes ir įkelkite failą dar kartą: {{rows}}",
+    "unreadableRow": "{{row}} eil. „{{name}}“ („{{value}}“)",
+    "unreadableMore": "ir dar {{count}}"
   },
   "legal": {
     "backHome": "Grįžti į pradžią",

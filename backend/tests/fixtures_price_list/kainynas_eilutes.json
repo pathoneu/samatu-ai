@@ -1,0 +1,41 @@
+{
+  "_about": "A made-up finishing contractor's price list, written the ways people really type prices. Every name is invented. 'kaina' is the cell as typed: a JSON number becomes an Excel number cell, a string becomes a text cell. 'csv' is the same cell as an LT Excel CSV export writes it. 'expect' is what the import must produce: kaina + mato_vnt + skyrius for an imported row; skip = section | empty | unreadable for a row that is not imported.",
+  "title": "Apdailos darbų kainynas, 2026 m.",
+  "header": [
+    "Darbas",
+    "Mato vnt.",
+    "Kaina"
+  ],
+  "rows": [
+    {"darbas": "Dažymo ir glaistymo darbai", "vnt": "", "kaina": null, "csv": "", "expect": {"skip": "section"}},
+    {"darbas": "Sienų gruntavimas", "vnt": "m²", "kaina": 2, "csv": "2", "expect": {"kaina": 2.0, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Lubų gruntavimas", "vnt": "m²", "kaina": "2,20", "csv": "2,20", "expect": {"kaina": 2.2, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Sienų glaistymas/dažymas", "vnt": "m²", "kaina": "15", "csv": "15", "expect": {"kaina": 15.0, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Sienų glaistymas/dažymas virš 3 m", "vnt": "", "kaina": "18 €/m2", "csv": "18 €/m2", "expect": {"kaina": 18.0, "mato_vnt": "m2", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Lubų glaistymas/dažymas", "vnt": "m²", "kaina": "16,50", "csv": "16,50", "expect": {"kaina": 16.5, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Lubų glaistymas/dažymas virš 3 m", "vnt": "m²", "kaina": 19.8, "csv": "19,8", "expect": {"kaina": 19.8, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Sienų glaistymas Q4", "vnt": "m²", "kaina": "22.50", "csv": "22.50", "expect": {"kaina": 22.5, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Sienų dažymas dviem sluoksniais", "vnt": "m²", "kaina": "7 €", "csv": "7 €", "expect": {"kaina": 7.0, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Lubų dažymas dviem sluoksniais", "vnt": "", "kaina": "8,5 Eur/m²", "csv": "8,5 Eur/m²", "expect": {"kaina": 8.5, "mato_vnt": "m²", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Angokraščių glaistymas-dažymas", "vnt": "m", "kaina": "6,50 €", "csv": "6,50 €", "expect": {"kaina": 6.5, "mato_vnt": "m", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Grindjuosčių dažymas", "vnt": "m", "kaina": "3 €/m", "csv": "3 €/m", "expect": {"kaina": 3.0, "mato_vnt": "m", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Durų staktų dažymas", "vnt": "", "kaina": 5.75, "csv": "5,75", "expect": {"kaina": 5.75, "mato_vnt": "", "skyrius": "Dažymo ir glaistymo darbai"}},
+    {"darbas": "Gipso kartono darbai", "vnt": "", "kaina": null, "csv": "", "expect": {"skip": "section"}},
+    {"darbas": "GKP sienų montavimas ant metalinio karkaso", "vnt": "m²", "kaina": "18,00 €", "csv": "18,00 €", "expect": {"kaina": 18.0, "mato_vnt": "m²", "skyrius": "Gipso kartono darbai"}},
+    {"darbas": "GKP lubų montavimas", "vnt": "m²", "kaina": "22 EUR", "csv": "22 EUR", "expect": {"kaina": 22.0, "mato_vnt": "m²", "skyrius": "Gipso kartono darbai"}},
+    {"darbas": "GKP lubų montavimas virš 3 m", "vnt": "m²", "kaina": "26 eur/m2", "csv": "26 eur/m2", "expect": {"kaina": 26.0, "mato_vnt": "m²", "skyrius": "Gipso kartono darbai"}},
+    {"darbas": "Kampų armavimas kampuočiais", "vnt": "m", "kaina": "3,20 €/m", "csv": "3,20 €/m", "expect": {"kaina": 3.2, "mato_vnt": "m", "skyrius": "Gipso kartono darbai"}},
+    {"darbas": "Plytelių ir hidroizoliacijos darbai", "vnt": "", "kaina": null, "csv": "", "expect": {"skip": "section"}},
+    {"darbas": "Hidroizoliacija dviem sluoksniais", "vnt": "m²", "kaina": "12 €/m²", "csv": "12 €/m²", "expect": {"kaina": 12.0, "mato_vnt": "m²", "skyrius": "Plytelių ir hidroizoliacijos darbai"}},
+    {"darbas": "Sienų plytelių klijavimas", "vnt": "m²", "kaina": "32", "csv": "32", "expect": {"kaina": 32.0, "mato_vnt": "m²", "skyrius": "Plytelių ir hidroizoliacijos darbai"}},
+    {"darbas": "Grindų plytelių klijavimas", "vnt": "m²", "kaina": 28, "csv": "28", "expect": {"kaina": 28.0, "mato_vnt": "m²", "skyrius": "Plytelių ir hidroizoliacijos darbai"}},
+    {"darbas": "Plytelių fugavimas", "vnt": "m²", "kaina": null, "csv": "", "expect": {"skip": "empty"}},
+    {"darbas": "Grindjuosčių montavimas", "vnt": "m", "kaina": "4,5 €/m", "csv": "4,5 €/m", "expect": {"kaina": 4.5, "mato_vnt": "m", "skyrius": "Plytelių ir hidroizoliacijos darbai"}},
+    {"darbas": "Kiti darbai", "vnt": "", "kaina": null, "csv": "", "expect": {"skip": "section"}},
+    {"darbas": "Šiukšlių išvežimas", "vnt": "", "kaina": "8 €/m3", "csv": "8 €/m3", "expect": {"kaina": 8.0, "mato_vnt": "m3", "skyrius": "Kiti darbai"}},
+    {"darbas": "Pastolių nuoma visam objektui", "vnt": "kompl.", "kaina": "1 234,56 €", "csv": "1 234,56 €", "expect": {"kaina": 1234.56, "mato_vnt": "kompl.", "skyrius": "Kiti darbai"}},
+    {"darbas": "Pastolių montavimas ir demontavimas", "vnt": "kompl.", "kaina": "1.480,50", "csv": "1.480,50", "expect": {"kaina": 1480.5, "mato_vnt": "kompl.", "skyrius": "Kiti darbai"}},
+    {"darbas": "Palangių montavimas", "vnt": "vnt.", "kaina": "sutartinė", "csv": "sutartinė", "expect": {"skip": "unreadable"}},
+    {"darbas": "Vonios silikono siūlės", "vnt": "m", "kaina": "15–20 €", "csv": "15–20 €", "expect": {"skip": "unreadable"}}
+  ]
+}

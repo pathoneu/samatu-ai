@@ -5419,7 +5419,11 @@ def generate_excel(request: Request, data: dict):
     # ─────────────────────────────────────────────────────────────────────────
     # Sheet: Pastabos (Task 7) — forgotten items warnings
     # ─────────────────────────────────────────────────────────────────────────
-    if perspejimani:
+    # exports-money-5 (2026-09-30 audit): these are notes for HIM (level names,
+    # room checks, „Nepamirškite patikrinti"), and this is the workbook he sends
+    # his client. Only the explicit „vidinė kopija" option in the export dialog
+    # adds the sheet; the default file carries what the client should see.
+    if perspejimani and data.get("vidine_kopija") is True:
         ws_past = wb.create_sheet(title="Pastabos")
         ws_past.merge_cells("A1:C1")
         t = ws_past["A1"]

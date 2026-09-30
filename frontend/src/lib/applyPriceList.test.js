@@ -16,7 +16,12 @@ test('scorePair: exact match → 1.0', () => {
 });
 
 test('scorePair: substring → 0.92', () => {
-  assert.equal(scorePair('Sienų dažymas', 'Sienų dažymas, 2 sluoksniai'), 0.92);
+  assert.equal(scorePair('Sienų dažymas', 'Sienų dažymas, vidaus patalpose'), 0.92);
+});
+
+test('scorePair: a substring that adds a coat count is a different line, not 0.92', () => {
+  // Was 0.92 — the plain line priced the two-coat one (exports-money-6).
+  assert.ok(scorePair('Sienų dažymas', 'Sienų dažymas, 2 sluoksniai') < 0.78);
 });
 
 test('scorePair: Jaccard on shared tokens', () => {
@@ -484,10 +489,133 @@ test('scorePair: a wordier sąmata line that covers every word of ours is simila
   assert.ok(scorePair('Sienų glaistymas 2 sluoksniais Q2', 'Sienų glaistymas 2 sluoksniais Q4') < 0.78, 'Q levels');
   assert.ok(scorePair('Lubų glaistymas/dažymas (standartinis aukštis)', 'Sienų glaistymas/dažymas (standartinis aukštis)') < 0.78, 'ceiling vs walls');
   assert.ok(scorePair('GKP lubų montavimas ant metalinio karkaso', 'GKP sienų montavimas ant metalinio karkaso') < 0.78, 'GKP ceiling vs walls');
-  // …while one sąmata line that carries every word of ours prices both our tiers
+  // …while one sąmata line that carries every word of ours prices our ordinary-height tier
+  // (the above-3m tier needs a line of its own — see the sibling tests below)
   assert.ok(scorePair('Sienų glaistymas/dažymas (iki 3m aukščio)', 'Sienų glaistymas/dažymas') >= 0.78);
   // two-token labels are not overlapped at all
   assert.ok(scorePair('Durų montavimas', 'Durų dažymas') < 0.78);
   assert.ok(scorePair('Grindjuosčių sumontavimas', 'Grindjuosčių dažymas') < 0.78);
   assert.ok(scorePair('Vonios sienų plytelių fugavimas', 'Plytelių klijavimas ant sienų ir grindų') < 0.78, 'fugavimas is not klijavimas');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// exports-money-6 (2026-09-30): a line that adds a height tier, a Q-level, a
+// coat count or a surface is a SIBLING, not the same work — and a price-list
+// line with no unit never prices a row that has one when the list quotes
+// units elsewhere. Every description is invented.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const fill = (rows, list) => applyPriceListToPositions(
+  rows.map(([aprasymas, vnt]) => ({ aprasymas, vnt, kiekis: 10 })), list,
+);
+
+test('sibling: the plain line prices the up-to-3m row, never the above-3m row', () => {
+  const out = fill(
+    [['Sienų glaistymas/dažymas (iki 3m aukščio)', M2], ['Sienų glaistymas/dažymas (virš 3m aukščio)', M2]],
+    [{ aprasymas: 'Sienų glaistymas/dažymas', vnt: M2, kaina: 12 }],
+  );
+  assert.equal(out.items[0].kaina, 12);
+  assert.equal(out.items[1].kaina, undefined, 'the above-3m row took the plain rate');
+});
+
+test('sibling: the contractor\'s own „virš 3 m" line prices our above-3m row', () => {
+  const out = fill(
+    [['Sienų glaistymas/dažymas (iki 3m aukščio)', M2], ['Sienų glaistymas/dažymas (virš 3m aukščio)', M2]],
+    [{ aprasymas: 'Sienų glaistymas/dažymas', vnt: M2, kaina: 12 },
+     { aprasymas: 'Sienų glaistymas/dažymas virš 3 m', vnt: M2, kaina: 15 }],
+  );
+  assert.deepEqual(out.items.map(i => i.kaina), [12, 15]);
+});
+
+test('sibling: a ceiling row above 3 m is not priced from the plain ceiling line', () => {
+  const out = fill([['GKP lubų montavimas (virš 3m aukščio)', M2]],
+    [{ aprasymas: 'GKP lubų montavimas', vnt: M2, kaina: 18 }]);
+  assert.equal(out.applied, 0);
+});
+
+test('sibling: Q-level, coat count and surface each keep a row from the base rate', () => {
+  const list = [
+    { aprasymas: 'Sienų glaistymas', vnt: M2, kaina: 6 },
+    { aprasymas: 'Sienų dažymas', vnt: M2, kaina: 7 },
+    { aprasymas: 'GKP montavimas', vnt: M2, kaina: 15 },
+  ];
+  const out = fill([
+    ['Sienų glaistymas Q3', M2],
+    ['Sienų dažymas dviem sluoksniais', M2],
+    ['Sienų dažymas (2 sluoksniai)', M2],
+    ['GKP lubų montavimas', M2],
+  ], list);
+  assert.deepEqual(out.items.map(i => i.kaina), [undefined, undefined, undefined, undefined]);
+});
+
+test('sibling: a premium list line never prices a plain row', () => {
+  const out = fill([['Sienų dažymas', M2]],
+    [{ aprasymas: 'Sienų dažymas virš 3 m', vnt: M2, kaina: 9 }]);
+  assert.equal(out.applied, 0);
+  assert.equal(out.ambiguous.length, 0);
+});
+
+test('sibling: his one walls-and-ceilings line still prices our walls row', () => {
+  const out = fill([['Sienų glaistymas/dažymas', M2]],
+    [{ aprasymas: 'Sienų, lubų glaistymas/dažymas', vnt: M2, kaina: 11 }]);
+  assert.equal(out.items[0].kaina, 11);
+});
+
+test('units: a unitless list line never prices an m row when the list quotes units', () => {
+  const out = fill(
+    [['Grindjuosčių dažymas', 'm'], ['LED nišų glaistymas/dažymas', 'm'], ['Angokraščių glaistymas-dažymas', 'm']],
+    [{ aprasymas: 'Dažymas', kaina: 5 },
+     { aprasymas: 'Sienų glaistymas/dažymas', vnt: M2, kaina: 12 }],
+  );
+  assert.equal(out.applied, 0, 'an m row took a rate whose unit is unknown');
+});
+
+test('units: a list with no units at all still prices by description', () => {
+  const out = fill([['Grindjuosčių montavimas', 'm']],
+    [{ aprasymas: 'Grindjuosčių montavimas', kaina: 4 }]);
+  assert.equal(out.items[0].kaina, 4);
+});
+
+// ── the made-up price list (backend/tests/fixtures_price_list/) on a small
+// made-up sąmata: every priced row gets ITS line, the rest stay empty ───────
+
+test('made-up list on a made-up sąmata: expected prices, uncovered rows stay unpriced', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseCsv } = await import('./priceListCsv.js');
+  const csv = readFileSync(new URL('../../../backend/tests/fixtures_price_list/bandomasis_kainynas.csv', import.meta.url), 'utf8');
+  const { items: list } = parseCsv(csv);
+  const SAMATA = [
+    ['Sienų gruntavimas', M2, 2],
+    ['Lubų gruntavimas (virš 3m aukščio)', M2, null],                  // no above-3m priming line
+    ['Sienų glaistymas/dažymas (iki 3m aukščio)', M2, 15],
+    ['Sienų glaistymas/dažymas (virš 3m aukščio)', M2, 18],            // his „virš 3 m" line, not the base 15
+    ['Lubų glaistymas/dažymas (iki 3m aukščio)', M2, 16.5],
+    ['Lubų glaistymas/dažymas (virš 3m aukščio)', M2, 19.8],
+    ['Sienų, lubų glaistymas/dažymas (iki 3m aukščio)', M2, null],     // no line quotes walls AND ceilings
+    ['Sienų glaistymas Q4', M2, 22.5],
+    ['Sienų glaistymas Q3', M2, null],                                  // Q4 is not Q3
+    ['Sienų dažymas dviem sluoksniais', M2, 7],
+    ['Sienų dažymas vienu sluoksniu', M2, null],                        // one coat is not two
+    ['Lubų dažymas', M2, null],                                         // his line says two coats; ours does not say
+    ['GKP lubų montavimas (iki 3m aukščio)', M2, 22],
+    ['GKP lubų montavimas (virš 3m aukščio)', M2, 26],
+    ['GKP lubų montavimas (standartinis aukštis)', M2, 22],
+    ['GKP sienų montavimas', M2, 18],                                   // his line only adds how it is fixed: same work
+    ['Kampų armavimas kampuočiais', 'm', 3.2],
+    ['Grindjuosčių montavimas', 'm', 4.5],
+    ['Grindjuosčių dažymas', 'm', 3],
+    ['LED nišų glaistymas/dažymas', 'm', null],                         // not in the list
+    ['Durų staktų dažymas', 'm', null],                                 // his line states no unit
+    ['Angokraščių glaistymas-dažymas', 'm', 6.5],
+    ['Hidroizoliacija dviem sluoksniais', M2, 12],
+    ['Hidroizoliacija dviem sluoksniais', 'm', null],                   // m² rate, m row
+    ['Palangių montavimas', 'vnt.', null],                              // „sutartinė" in the list
+    ['Plytelių fugavimas', M2, null],                                   // empty price in the list
+    ['Šiukšlių išvežimas (statybinės atliekos)', 'm³', 8],
+  ];
+  const out = fill(SAMATA.map(([a, v]) => [a, v]), list);
+  SAMATA.forEach(([aprasymas, vnt, want], k) => {
+    assert.equal(out.items[k].kaina, want === null ? undefined : want, `${aprasymas} (${vnt})`);
+  });
+  assert.deepEqual(out.ambiguous.map(a => a.aprasymas), []);
 });

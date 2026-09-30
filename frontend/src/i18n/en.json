@@ -1387,6 +1387,26 @@
       "reverseDesc": "The customer is VAT-registered and accounts for VAT themselves (Law on VAT, Art. 96). No VAT line is printed.",
       "fromLabel": "Reverse-charge VAT was picked by the app because the project was recognised as a renovation. Please check and choose yourself."
     },
+    "exportStale": {
+      "line_one": "The estimate still has {{count}} older row with an old quantity. If a new row already covers the same work, the document would count it twice.",
+      "line_other": "The estimate still has {{count}} older rows with old quantities. If new rows already cover the same work, the document would count it twice.",
+      "remove": "Remove",
+      "removeTitle": "Remove the older rows from the estimate. Quantities of the new rows do not change.",
+      "keep": "Keep",
+      "keepTitle": "Keep them in the document if they are separate work",
+      "carry_one": "Move the price to the new row",
+      "carry_other": "Move {{count}} prices to the new rows",
+      "carryTitle": "Same work, only the height band changed: your old price moves to the new row and the older row is removed. The quantity stays the new one.",
+      "kept": "The older rows are kept in the document.",
+      "blockedTitle": "First choose what to do with the older rows",
+      "removed": "Older rows removed",
+      "carried": "Price moved to the new row",
+      "undo": "Undo"
+    },
+    "exportInternal": {
+      "label": "Internal copy with notes",
+      "desc": "Adds a sheet with the app's notes for you. Send your client the file without it."
+    },
     "samataTemplate": {
       "layoutLabel": "Layout",
       "layoutPathon": "Pathon",
@@ -2197,6 +2217,12 @@
       "studio": "Studio",
       "oneoff": "One-off"
     }
+  },
+  "priceLists": {
+    "unreadableTitle": "Rows not imported: {{count}} — the price could not be read",
+    "unreadableDescription": "A price cell must hold a number, e.g. 12.50 or 12.50 €/m². Fix these rows and upload the file again: {{rows}}",
+    "unreadableRow": "row {{row}} “{{name}}” (“{{value}}”)",
+    "unreadableMore": "and {{count}} more"
   },
   "legal": {
     "backHome": "Back to home",
