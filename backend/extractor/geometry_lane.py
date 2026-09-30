@@ -326,6 +326,17 @@ def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, 
         meta["ribos"].append({"nariai": members, "pagal": cut["pagal"]})
 
 
+def geometry_dimension_strings(pdf_bytes: bytes) -> list[dict]:
+    """The ONE source of the dimension strings the geometry reading receives —
+    the paid reading, the free re-read, the room-outline click and the eval all
+    come through here: every page, slanted strings included (audit 2026-09-30,
+    geometry-lanes-2: the paid reading passed its classified-page text scan,
+    which reads no slanted string, so objektas_h's room 09 got 16,02 m as an
+    outline estimate after the paid reading and 16,01 m from strings after the
+    free re-read)."""
+    return read_dimension_strings(pdf_bytes, pages=None)
+
+
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
@@ -339,7 +350,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         if not plan_pages:
             plan_pages = sorted({int(r["puslapio_nr"]) for r in rooms if r.get("puslapio_nr")}) or [1]
         if dims is None:
-            dims = read_dimension_strings(pdf_bytes, pages=None)
+            dims = geometry_dimension_strings(pdf_bytes)
         # Which sheets belong to the plan is decided by ALIGNMENT — the same walls in the same place —
         # not by the page classifier (objektas_g, 2026-09-10: the dimensioned sheet was called something
         # else and every wall was lost; two of its outlines were traced on the plumbing plan). So every

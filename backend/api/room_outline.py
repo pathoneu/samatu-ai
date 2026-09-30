@@ -32,9 +32,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.free_reread import NO_PDF, _project_for
-from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry
+from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry, geometry_dimension_strings
 from extractor.pdf_vectors import page_geometry
-from extractor.plan_dimensions import read_dimension_strings
 from extractor.vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, joined_space, outline_at, propose_split, split_space
 
 log = logging.getLogger("samatu.room_outline")
@@ -119,7 +118,7 @@ def _todays_reading(request: Request, project_id: str, room_nr: str, page: int, 
         raise HTTPException(status_code=400, detail="Tokio lapo brėžinyje nėra")
 
     parsed = copy.deepcopy(project)
-    dims = read_dimension_strings(pdf_bytes, pages=None)
+    dims = geometry_dimension_strings(pdf_bytes)   # read once, reused below
     apply_geometry(parsed, pdf_bytes, dims)
     geo = (parsed.get("_meta") or {}).get("geometrija") or {}
     scale = ((geo.get("masteliai") or {}).get(str(page)) or {}).get("m_per_pt")

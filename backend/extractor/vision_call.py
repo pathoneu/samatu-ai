@@ -5938,7 +5938,11 @@ def extract_interior(
         # with the reason and the outline's estimate (extractor/geometry_lane.py).
         try:
             from .geometry_lane import apply_geometry
-            _gl = apply_geometry(parsed, pdf_bytes, list(_scan.get("dimensions") or []))
+            # No strings of our own: the lane reads them from its one source
+            # (every page, slanted strings too), exactly as the free re-read
+            # does — the text scan above covers classified pages only and no
+            # slanted string (audit 2026-09-30, geometry-lanes-2).
+            _gl = apply_geometry(parsed, pdf_bytes)
             _emit({"event": "geometry_lane", "status": _gl.get("status"),
                    "konturai": len(_gl.get("konturai") or []),
                    "atviros_erdves": len(_gl.get("atviros_erdves") or []),
