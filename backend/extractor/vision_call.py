@@ -6,6 +6,7 @@ Canonical prompt from extractor.prompt (never modified here).
 from __future__ import annotations
 
 import base64
+import contextvars
 import io
 import json
 import logging
@@ -27,6 +28,7 @@ from .prompt import (
 )
 from models_config import model_for
 from . import ledger as _ledger
+from . import run_usage as _run_usage
 from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units
 from . import scope as _scope
 from .position_id import assign_position_ids
@@ -143,6 +145,7 @@ def _append_extra_call(parsed: dict, reader_meta: dict | None,
       * all token counts zero/None (reader errored before the API call).
     None token values (readers use ``getattr(usage, ..., None)``) coerce to 0.
     """
+    _run_usage.note(reader_meta)  # the run's side tally, read only if the run dies
     if not reader_meta:
         return
     model = reader_meta.get("model")
@@ -5022,6 +5025,7 @@ def _run_pass1_once(client, system, pages, *,
             }
             if experiment_meta:
                 meta["experiment"] = experiment_meta
+            _run_usage.note(meta)  # the run's side tally, read only if the run dies
 
             if resp.stop_reason == "refusal":
                 return {"status": "error", "_error": "model_refused", "_stop_reason": "refusal",
@@ -5191,7 +5195,8 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
                   f"(solo_first={_solo_first} warm={_warm})")
             with _cf.ThreadPoolExecutor(max_workers=len(rest)) as ex:
                 futs = {
-                    ex.submit(_one, i,
+                    # copy_context: the round reports its paid usage into this run's tally
+                    ex.submit(contextvars.copy_context().run, _one, i,
                               dict(native_pdf) if native_pdf else None): i
                     for i in rest
                 }
@@ -5470,6 +5475,7 @@ def extract_interior(
     try:
         from .eksplikacija_reader import read_eksplikacija
         eks = read_eksplikacija(pdf_bytes, client)
+        _run_usage.note((eks or {}).get("_meta"))  # paid before Pass-1 — tally it now
     except Exception as exc:
         print(f"[extractor] eksplikacija pre-pass failed: {exc}")
         eks = {"patalpos": [], "schedule_tables": {"durys": [], "langai": []}}
@@ -5518,10 +5524,12 @@ def extract_interior(
         # callers see the same payloads as before.
         err = (parsed or {}).get("_error", "Unknown error")
         _emit({"event": "error", "message": str(err)})
-        if parsed and parsed.get("_meta"):
-            # The eksplikacija pre-pass was paid for too (audit 2026-09-29).
-            _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
-        return parsed or {"status": "error", "_error": "Unknown error"}
+        parsed = parsed or {"status": "error", "_error": "Unknown error"}
+        # The eksplikacija pre-pass was paid for too (audit 2026-09-29) — also
+        # when every Pass-1 attempt raised and the error has no `_meta` of its
+        # own (2026-09-30); db.record_usage prices an extra_calls-only result.
+        _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
+        return parsed
 
     # `_meta.pages_sent` alone can't be audited — it says how many pages the
     # model saw but not how many existed or what we withheld. Record the full

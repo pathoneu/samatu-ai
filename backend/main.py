@@ -6087,8 +6087,14 @@ async def extract_interior_endpoint(
     log.info("extract-interior: ip=%s file=%s size=%dKB pages=%d has_overrides=%s",
              client_ip, files[0].filename, len(pdf_bytes) // 1024,
              validation.get("page_count", 0), overrides_dict is not None)
-    from extractor import extract_interior
-    result = await asyncio.to_thread(extract_interior, pdf_bytes, overrides_dict)
+    from extractor import extract_interior, run_usage as _run_usage
+    _usage = _run_usage.RunUsage()
+    try:
+        result = await asyncio.to_thread(_run_usage.run_with, _usage, extract_interior,
+                                         pdf_bytes, overrides_dict)
+    except Exception:
+        _record_dead_run(_user, _usage, "extract-interior-failed")
+        raise
 
     # Propagate large-PDF warning into result.warnings[] so SanityWarningsBanner shows it.
     if isinstance(result, dict) and validation.get("warning"):
@@ -6171,6 +6177,22 @@ def _is_done_event(ev) -> bool:
     """A terminal SSE event carrying the finished extraction result."""
     return (isinstance(ev, dict) and ev.get("event") == "done"
             and isinstance(ev.get("result"), dict))
+
+
+def _record_dead_run(user: dict | None, usage, kind: str) -> None:
+    """Meter what an extraction that DIED had already paid for — it raised, or
+    the stream ended without a done event — under a failed kind the hourly
+    and daily caps still count. At most once per run (`usage.recorded`), and
+    never after the result's own usage row. Best-effort. (Audit 2026-09-30.)"""
+    try:
+        if not user or usage is None or usage.recorded:
+            return
+        usage.recorded = True
+        paid = usage.meta()
+        if paid:
+            db.record_usage(user.get("id"), {"status": "error", "_meta": paid}, kind=kind)
+    except Exception as exc:  # noqa: BLE001 — metering never breaks the response
+        log.warning("record_usage failed (%s): %r", kind, exc)
 
 
 _UPLOAD_PREFIX_RE = re.compile(r"^[0-9a-f]{6,12}-")
@@ -6300,7 +6322,10 @@ async def extract_interior_stream_endpoint(
     log.info("extract-interior-stream: ip=%s file=%s size=%dKB pages=%d",
              client_ip, pdf_name, len(pdf_bytes) // 1024,
              validation.get("page_count", 0))
-    from extractor import extract_interior_stream
+    from extractor import extract_interior_stream, run_usage as _run_usage
+    # This run's paid calls, tallied on the side: read only if the run dies
+    # (exception, no done event), never next to the done result's own row.
+    _usage = _run_usage.RunUsage()
 
     def _format_sse(ev: dict) -> bytes:
         return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8")
@@ -6326,7 +6351,7 @@ async def extract_interior_stream_endpoint(
             })
 
         loop = asyncio.get_event_loop()
-        gen = extract_interior_stream(pdf_bytes, overrides_dict)
+        gen = _run_usage.run_with(_usage, extract_interior_stream, pdf_bytes, overrides_dict)
 
         # Bridge the sync generator to async — pull items in a worker thread
         # one-at-a-time so cancellations propagate quickly.
@@ -6380,6 +6405,7 @@ async def extract_interior_stream_endpoint(
                     done = next((e for e in events if _is_done_event(e)), None)
                     if done is None:
                         log.warning("stream orphan drain: no done event (pipeline died)")
+                        _record_dead_run(_user, _usage, "extract-interior-stream-failed")
                         return
                     result = done["result"]
                     try:
@@ -6390,6 +6416,7 @@ async def extract_interior_stream_endpoint(
                                           project_id=recovery_id)
                 except Exception:  # noqa: BLE001 — never let the drain thread blow up
                     log.exception("stream orphan drain failed")
+                    _record_dead_run(_user, _usage, "extract-interior-stream-failed")
                 finally:
                     _close_gen()
             _threading.Thread(target=_run, daemon=True,
@@ -6446,6 +6473,7 @@ async def extract_interior_stream_endpoint(
             try:
                 if _user:
                     _failed = result.get("status") == "error"
+                    _usage.recorded = True   # this run's row is the result's own
                     db.record_usage(_user.get("id"), result,
                                     kind="extract-interior-stream-failed" if _failed
                                     else "extract-interior-stream")
@@ -6475,6 +6503,7 @@ async def extract_interior_stream_endpoint(
                 # SHAPE (error → done{status:error,_error}) is unchanged so the
                 # frontend contract holds. (audit 2026-07-27)
                 log.exception("/extract-interior-stream failed")
+                _record_dead_run(_user, _usage, "extract-interior-stream-failed")
                 _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
                 yield _format_sse({"event": "error", "message": _msg})
                 yield _format_sse({"event": "done", "result": {
@@ -6513,6 +6542,7 @@ async def extract_interior_stream_endpoint(
             # asyncio.CancelledError is a BaseException — a client disconnect
             # still propagates untouched.
             log.exception("/extract-interior-stream: stream loop failed")
+            _record_dead_run(_user, _usage, "extract-interior-stream-failed")
             _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
             yield _format_sse({"event": "error", "message": _msg})
             yield _format_sse({"event": "done", "result": {

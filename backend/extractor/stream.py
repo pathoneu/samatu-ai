@@ -11,6 +11,7 @@ import queue
 import threading
 from typing import Iterator
 
+from . import run_usage
 from .vision_call import extract_interior
 
 
@@ -21,6 +22,19 @@ def extract_interior_stream(
     pdf_bytes: bytes,
     rules_override: dict | None = None,
 ) -> Iterator[dict]:
+    """Return the event generator. The run's paid-usage tally is taken from the
+    caller NOW (the endpoint binds it with run_usage.run_with), before any
+    thread hop — the generator body runs on executor threads that do not see
+    the caller's context. A caller that binds none gets a private tally."""
+    usage = run_usage.current() or run_usage.RunUsage()
+    return _stream(pdf_bytes, rules_override, usage)
+
+
+def _stream(
+    pdf_bytes: bytes,
+    rules_override: dict | None,
+    usage: run_usage.RunUsage,
+) -> Iterator[dict]:
     """Yield progress events while extract_interior runs on a worker thread.
 
     Sequence (best case):
@@ -30,7 +44,8 @@ def extract_interior_stream(
 
     On failure: a single `error` event followed by `done` carrying a
     {"status":"error", "_error":...} payload, so the client always sees a
-    terminal `done` it can react to.
+    terminal `done` it can react to. That payload carries the `_meta` of every
+    call the run had already paid for, so the endpoint meters it (2026-09-30).
     """
     q: queue.Queue = queue.Queue()
 
@@ -39,13 +54,16 @@ def extract_interior_stream(
 
     def worker() -> None:
         try:
-            result = extract_interior(pdf_bytes, rules_override, progress_cb=cb)
+            result = run_usage.run_with(usage, extract_interior, pdf_bytes,
+                                        rules_override, progress_cb=cb)
             q.put({"event": "done", "result": result})
         except Exception as exc:
             q.put({"event": "error", "message": str(exc)})
-            q.put({"event": "done", "result": {
-                "status": "error", "_error": str(exc),
-            }})
+            failed = {"status": "error", "_error": str(exc)}
+            paid = usage.meta()
+            if paid:
+                failed["_meta"] = paid
+            q.put({"event": "done", "result": failed})
         finally:
             q.put(_EOF)
 

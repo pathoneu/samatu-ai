@@ -515,7 +515,16 @@ def record_usage(user_id: str | None, response: dict | None,
     cache_w = int(meta.get("cache_write_tokens") or 0)
     model = meta.get("model") or "claude-opus-4-8"
     if in_t == 0 and out_t == 0 and cache_t == 0 and cache_w == 0:
-        return 0.0  # nothing billable to record
+        # A run that died before any Pass-1 answer can still have paid its
+        # readers (the room-table pre-pass, …): its `_meta` is extra_calls only.
+        # The token columns then carry their sum; pricing below is unchanged,
+        # each call at its own model. (Audit 2026-09-30.)
+        extras = [e for e in (meta.get("extra_calls") or []) if isinstance(e, dict)]
+        in_t, out_t, cache_t, cache_w = (sum(int(e.get(k) or 0) for e in extras) for k in (
+            "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens"))
+        if in_t == 0 and out_t == 0 and cache_t == 0 and cache_w == 0:
+            return 0.0  # nothing billable to record
+        model = extras[0].get("model") or model
     # 2026-07-04: voting_models-aware — mixed-model rounds priced per-round
     # at each round's model rates; identical result when the key is absent.
     cost_eur = calc_meta_cost_usd(meta, default_model="claude-opus-4-8") * 0.93
