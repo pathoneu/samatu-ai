@@ -449,6 +449,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                                       "plotas_nesutampa": hit["plotas_nesutampa"], "sujungta": hit["sujungta"],
                                       "durys_m": hit["durys_m"], "saltinis": VECTOR_SOURCE}
                     r.pop("_konturo_priezastis", None)
+                    r.pop("_atvira_erdve", None)       # its own face today: an open space it was part of before is gone
                     # the openings the wall solid shows in this room's walls — evidence for the
                     # door-and-window fact, never a quantity on their own (2026-09-20)
                     r["_angos_sienose"] = {"page": page, "angos": hit.get("angos") or []}
@@ -493,6 +494,12 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                                                    f"{g['perimetras_m']:.2f} m padalytas pagal plotą").replace(".", ",")
                     meta["perimetrai_tusti"].append(_nr(r))
             _divide_shared_spaces(rooms, res["groups"], todo, everyone, areas, pdf_bytes, page, scale[page], (W, H), meta)
+        # an outline of this lane's that never reached today's trace — the room is not placed today, or its plan
+        # sheet has no scale — is no more confirmed than one the trace could not find (2026-09-29)
+        confirmed = set(meta["konturai"])
+        for r in rooms:
+            if str(r.get("polygon_source") or "") == VECTOR_SOURCE and _nr(r) not in confirmed and not _his(r):
+                _forget_outline(r)
 
         for r in rooms:                                        # a room with a trusted outline needs no proposal
             if str(r.get("polygon_source") or "") in KEEP_POLYGONS:

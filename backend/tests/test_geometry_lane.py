@@ -504,3 +504,107 @@ def test_a_room_the_lane_outlines_on_both_runs_is_unchanged():
     once = copy.deepcopy(parsed["patalpos"])
     gl.apply_geometry(parsed, pdf)
     assert parsed["patalpos"] == once
+
+
+# ── 2026-09-29 (2): the rooms that never reach the trace on the later run ────────────────────────────────────
+# A room this lane outlined before that today's reading does not even place, or whose plan sheet has no scale
+# today, was never traced — and so kept the old outline, its walls and the summed perimeter.
+
+_OUTLINE_KEYS = ("polygon_pct", "polygon_source", "_konturas", "perimetras_m", "perimetras_saltinis", "_sienos", "_perimetras_suma")
+
+
+def _not_placed(monkeypatch, parsed, nr="01"):
+    """Today's reading does not place room `nr` (and the room carries no position from before)."""
+    real = gl.locate_rooms
+    monkeypatch.setattr(gl, "locate_rooms", lambda b, rooms, pages: {k: v for k, v in real(b, rooms, pages).items() if k != nr})
+    for r in parsed["patalpos"]:
+        if r["nr"] == nr:
+            r.pop("_vieta", None)
+
+
+def _no_scale(pdf):
+    """Today's strings carry no scale for the plan's sheets."""
+    return [{**d, "scale_m_per_pt": None} for d in gl.read_dimension_strings(pdf, pages=None)]
+
+
+def test_a_room_outlined_before_that_is_not_placed_today_loses_the_outline_and_gets_its_earlier_perimeter(monkeypatch):
+    import copy
+    parsed, pdf = _outlined_once()
+    r1, r2 = parsed["patalpos"]
+    neighbour = {k: copy.deepcopy(r2.get(k)) for k in _OUTLINE_KEYS}
+    _not_placed(monkeypatch, parsed)
+    out = gl.apply_geometry(parsed, pdf)
+    assert [k for k in _FROM_THE_OUTLINE if k in r1] == []
+    assert r1["perimetras_m"] == 13.9 and "perimetras_saltinis" not in r1 and "_perimetras_pries_geometrija" not in r1
+    assert "01" not in out["konturai"] and "01" not in out["perimetrai_sudeti"]
+    assert {k: r2.get(k) for k in _OUTLINE_KEYS} == neighbour             # the room confirmed today is untouched
+
+
+def test_rooms_outlined_before_on_a_sheet_without_a_scale_today_lose_their_outlines():
+    parsed, pdf = _outlined_once()
+    r1, r2 = parsed["patalpos"]
+    assert r2["_perimetras_pries_geometrija"] == 12.3
+    out = gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf))
+    for r, earlier in ((r1, 13.9), (r2, 12.3)):
+        assert [k for k in _FROM_THE_OUTLINE if k in r] == [], r["nr"]
+        assert r["perimetras_m"] == earlier and "perimetras_saltinis" not in r and "_perimetras_pries_geometrija" not in r
+    assert out["konturai"] == []
+
+
+@pytest.mark.parametrize("today", ["not_placed", "no_scale"])
+@pytest.mark.parametrize("his", [
+    {"user_verified_at": "2026-09-29T10:00:00+00:00"},
+    {"_angos_user_at": "2026-09-29T10:00:00+00:00"},
+    {"perimetras_m": 15.5, "perimetras_saltinis": "user_override"},
+    {"polygon_source": "corrected"},
+])
+def test_a_room_he_worked_on_keeps_everything_when_it_is_not_traced_today(monkeypatch, his, today):
+    import copy
+    parsed, pdf = _outlined_once()
+    r1 = parsed["patalpos"][0]
+    r1.update(his)
+    # (the openings read in its walls are evidence the openings reader redoes on every run, and drops for any
+    # outline on a sheet it cannot measure — not part of this reset)
+    kept = {k: copy.deepcopy(r1.get(k)) for k in _FROM_THE_OUTLINE + ("perimetras_m", "perimetras_saltinis", "_perimetras_pries_geometrija")
+            if not (today == "no_scale" and k == "_angos_sienose")}
+    if today == "not_placed":
+        _not_placed(monkeypatch, parsed)
+        gl.apply_geometry(parsed, pdf)
+    else:
+        gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf))
+    assert {k: r1.get(k) for k in kept} == kept
+
+
+def test_a_room_that_gets_its_own_outline_today_drops_the_open_space_it_was_part_of():
+    """The pocket joined to its neighbour on the first run (table 4,5 / 13,5); the table is corrected to what
+    the walls close (3 / 15): each room is outlined on its own, and neither is part of an open space any more."""
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    parsed["patalpos"][0].update({"plotas_m2": 4.5, "bbox_pct": {"x": 0.1, "y": 0.1, "w": 0.05, "h": 0.1},
+                                  "polygon_pct": [[0.1, 0.1], [0.15, 0.1], [0.15, 0.2], [0.1, 0.2]]})
+    parsed["patalpos"][1]["plotas_m2"] = 13.5
+    pdf = build_plan([pocket_and_room()])
+    gl.apply_geometry(parsed, pdf)
+    r1, r2 = parsed["patalpos"]
+    assert r1["_atvira_erdve"]["kisene"] == "01" and r2["_atvira_erdve"]["nariai"] == ["01", "02"]
+    r1["plotas_m2"], r2["plotas_m2"] = 3.0, 15.0
+    out = gl.apply_geometry(parsed, pdf)
+    assert set(out["konturai"]) == {"01", "02"} and out["atviros_erdves"] == [] and out["ribos"] == []
+    for r in (r1, r2):
+        assert r["polygon_source"] == "vektoriniai_konturai" and r["_konturas"]["saltinis"] == "vektoriniai_konturai"
+        assert "_atvira_erdve" not in r, r["nr"]
+
+
+def test_a_room_placed_in_an_open_space_today_carries_todays_record_of_it(monkeypatch):
+    monkeypatch.setattr(gl, "propose_split", lambda *a, **k: {"status": "no_proposal"})
+    a = two_rooms()
+    a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]       # no partition: one space
+    parsed = _parsed()
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    stale = {"nariai": ["01", "02", "03"], "polygon_pct": [[0, 0], [1, 0], [1, 1]], "plotas_m2": 99.0, "perimetras_m": 40.0, "page": 1}
+    for r in parsed["patalpos"]:
+        r["_atvira_erdve"] = dict(stale)
+    out = gl.apply_geometry(parsed, build_plan([a]))
+    assert out["atviros_erdves"] == [["01", "02"]]
+    for r in parsed["patalpos"]:
+        assert r["_atvira_erdve"]["nariai"] == ["01", "02"] and r["_atvira_erdve"]["plotas_m2"] != 99.0
