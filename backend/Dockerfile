@@ -32,6 +32,9 @@ COPY prompts/ prompts/
 # blank cells in production only — the worst kind of difference from dev.
 # (Railway's nixpacks build copies the whole repo, so it already had it.)
 COPY scripts/reconcile_samata_lines.py scripts/reconcile_samata_lines.py
+# Read-only report of files left by deleted projects. It has to run where the
+# production database and side stores live, i.e. inside this container.
+COPY scripts/report_orphaned_files.py scripts/report_orphaned_files.py
 
 WORKDIR /app/backend
 

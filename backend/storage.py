@@ -70,6 +70,12 @@ class _Backend:
     def delete(self, key: str) -> None:
         raise NotImplementedError
 
+    def list_keys(self, prefix: str = ""):
+        """Yield (key, size_bytes) for every stored object whose key starts
+        with `prefix`. Read-only — used by scripts/report_orphaned_files.py
+        (2026-09-30) to find drawings of projects that no longer exist."""
+        raise NotImplementedError
+
     @property
     def name(self) -> str:
         return type(self).__name__
@@ -116,6 +122,16 @@ class LocalDiskStorage(_Backend):
         p = self._path(key)
         if p.exists():
             p.unlink()
+
+    def list_keys(self, prefix: str = ""):
+        # Not through _path(): that creates directories, and listing writes nothing.
+        if not self.root.is_dir():
+            return
+        for p in sorted(self.root.rglob("*")):
+            if p.is_file():
+                key = p.relative_to(self.root).as_posix()
+                if key.startswith(prefix):
+                    yield key, p.stat().st_size
 
 
 class R2Storage(_Backend):
@@ -190,6 +206,17 @@ class R2Storage(_Backend):
             self._client.delete_object(Bucket=self.bucket, Key=self._k(key))
         except Exception as exc:  # noqa: BLE001 — best effort, but never silent
             log.warning("R2 delete failed for %s: %r", key, exc)
+
+    def list_keys(self, prefix: str = ""):
+        # Keys come back without this deployment's R2_KEY_PREFIX, the same
+        # shape put/get take. A listing error is raised, never read as "empty".
+        paginator = self._client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=self._k(prefix)):
+            for obj in page.get("Contents") or []:
+                key = obj["Key"]
+                if self.key_prefix and key.startswith(self.key_prefix):
+                    key = key[len(self.key_prefix):]
+                yield key, int(obj.get("Size") or 0)
 
 
 _lock = threading.Lock()
