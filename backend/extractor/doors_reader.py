@@ -149,13 +149,19 @@ def read_doors_from_plan(
     rooms: list[dict],
     page_classifications: Optional[list] = None,
     client=None,
+    page: Optional[int] = None,
 ) -> dict:
     """Count all doors via focused Vision call on the floor_plan page.
+
+    ``page`` (1-based, original numbering) reads that sheet; without it the
+    first floor_plan page is located as before. ``rooms`` are the rooms listed
+    to the reader — pass only the rooms drawn on that sheet.
 
     Returns {status, page, doors, total_count, interior_count, exterior_count,
     _elapsed_s, _meta}."""
     t0 = time.time()
-    page = _find_floor_plan_page(pdf_bytes, page_classifications)
+    if page is None:
+        page = _find_floor_plan_page(pdf_bytes, page_classifications)
     if not page:
         return {"status": "skipped", "page": None, "doors": [], "total_count": 0,
                 "_error": "no floor_plan page found", "_elapsed_s": round(time.time() - t0, 2)}
@@ -212,6 +218,105 @@ def read_doors_from_plan(
         "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
                   "output_tokens": getattr(usage, "output_tokens", None), "model": model},
     }
+
+
+def rooms_by_plan_page(rooms: list[dict]) -> dict[int, list[dict]]:
+    """Rooms grouped by the sheet the first pass placed them on (`puslapio_nr`,
+    ORIGINAL 1-based numbering — the numbering `pdf_bytes` is rendered in).
+    Rooms that name no sheet are left out."""
+    out: dict[int, list[dict]] = {}
+    for r in rooms:
+        try:
+            p = int(r.get("puslapio_nr"))
+        except (TypeError, ValueError):
+            continue
+        if p > 0:
+            out.setdefault(p, []).append(r)
+    return dict(sorted(out.items()))
+
+
+def read_doors_from_plan_pages(
+    pdf_bytes: bytes,
+    rooms: list[dict],
+    page_classifications: Optional[list] = None,
+    client=None,
+) -> dict:
+    """One focused door read per plan sheet that holds rooms (audit
+    2026-09-30, vision-pipeline-6).
+
+    The single read of the first floor_plan page used to replace the doors of
+    EVERY room, so on a project whose rooms sit on two sheets (two storeys)
+    the rooms on the sheet it did not read lost their doors. The sheets come
+    from the rooms themselves — the same `puslapio_nr` the adjacency pass
+    resolves its floor page from (`vision_call._resolve_floor_b64`), taken
+    per sheet instead of the modal one. Each read lists only that sheet's
+    rooms. One paid call per sheet.
+
+    When no room names its sheet, the old single read of the first
+    floor_plan page runs and applies to all rooms (`_all_rooms`).
+
+    Returns {status, page, pages_read, pages_unread, page_results, doors,
+    total_count, interior_count, exterior_count, _elapsed_s, _round_metas}.
+    ``status`` is "ok" when at least one sheet was read."""
+    t0 = time.time()
+    groups = rooms_by_plan_page(rooms)
+    if groups:
+        page_results = [read_doors_from_plan(pdf_bytes, page_rooms, page_classifications,
+                                             client=client, page=p)
+                        for p, page_rooms in groups.items()]
+    else:
+        single = read_doors_from_plan(pdf_bytes, rooms, page_classifications, client=client)
+        single["_all_rooms"] = True
+        page_results = [single]
+    ok = [r for r in page_results if r.get("status") == "ok"]
+    out = {
+        "status": "ok" if ok else (page_results[0].get("status") or "error"),
+        "page": ok[0].get("page") if ok else page_results[0].get("page"),
+        "pages_read": [r.get("page") for r in ok],
+        "pages_unread": [r.get("page") for r in page_results if r.get("status") != "ok"],
+        "page_results": page_results,
+        "doors": [d for r in ok for d in (r.get("doors") or [])],
+        "total_count": sum(int(r.get("total_count") or 0) for r in ok),
+        "exterior_count": sum(int(r.get("exterior_count") or 0) for r in ok),
+        "interior_count": sum(int(r.get("interior_count") or 0) for r in ok),
+        "_elapsed_s": round(time.time() - t0, 2),
+        # every billed call, for vision_call._reader_call_metas
+        "_round_metas": [r["_meta"] for r in page_results if r.get("_meta")],
+    }
+    if not ok:
+        out["_error"] = "; ".join(f"{r.get('page')}: {r.get('_error')}" for r in page_results)
+    return out
+
+
+def merge_doors_by_page(rooms: list[dict], result: dict) -> int:
+    """Merge each sheet's doors into the rooms ON THAT SHEET only.
+
+    Rooms on a sheet that was not read (its call failed, or no read ran) keep
+    the doors the first pass gave them. Per-sheet `_unattributed` counts are
+    summed into ``result["_unattributed"]``; ``result["_kept_pass1_pages"]``
+    lists the sheets whose answer was too unplaceable to trust (see
+    merge_doors_into_rooms). Returns the count of rooms that gained a door."""
+    if result.get("status") != "ok":
+        return 0
+    groups = rooms_by_plan_page(rooms)
+    gained = 0
+    unattributed = 0
+    kept: list = []
+    for pr in result.get("page_results") or []:
+        if pr.get("status") != "ok":
+            continue
+        page_rooms = rooms if pr.get("_all_rooms") else groups.get(pr.get("page")) or []
+        if not page_rooms:
+            continue
+        gained += merge_doors_into_rooms(page_rooms, pr)
+        unattributed += int(pr.get("_unattributed") or 0)
+        if pr.get("_kept_pass1_doors"):
+            kept.append(pr.get("page"))
+    result["_unattributed"] = unattributed
+    if kept:
+        result["_kept_pass1_pages"] = kept
+        result["_kept_pass1_doors"] = True
+    return gained
 
 
 def _room_resolver(rooms: list[dict]):

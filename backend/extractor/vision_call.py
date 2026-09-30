@@ -6549,17 +6549,32 @@ def extract_interior(
     # misses. Objektas A fixture: pass-1 found 9 doors, truth = 14. With doors_reader
     # paint area gap closes from -1.2% to ±0.5% (to the dot).
     try:
-        from .doors_reader import read_doors_from_plan, merge_doors_into_rooms
+        from .doors_reader import read_doors_from_plan_pages, merge_doors_by_page
         _emit({"event": "doors_started"})
-        doors_result = read_doors_from_plan(
+        # One read per plan sheet that holds rooms; each sheet's doors replace
+        # only the doors of the rooms on that sheet (audit 2026-09-30,
+        # vision-pipeline-6 — a two-storey project lost the other storey's doors).
+        doors_result = read_doors_from_plan_pages(
             pdf_bytes,
             parsed.get("patalpos") or [],
             page_classifications=parsed.get("puslapiai") or [],
         )
-        _append_extra_call(parsed, doors_result.get("_meta"), reader="doors")  # roll tokens into cost
+        for _dm in _reader_call_metas(doors_result):  # one billed call per sheet
+            _append_extra_call(parsed, _dm, reader="doors")
+        _doors_unread = [p for p in (doors_result.get("pages_unread") or []) if p]
+        if _doors_unread:
+            parsed.setdefault("_meta", {})["doors_pages_unread"] = _doors_unread
+            parsed.setdefault("warnings", []).append({
+                "level": "WARN", "code": "doors_page_unread", "severity": "med",
+                "message": ((f"Brėžinio {_doors_unread[0]} puslapio" if len(_doors_unread) == 1 else
+                             f"Brėžinio {', '.join(str(p) for p in _doors_unread)} puslapių")
+                            + " durys nebuvo perskaičiuotos — tose patalpose paliktas pirmo "
+                            "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
+            })
         if doors_result.get("status") == "ok":
-            n_updated = merge_doors_into_rooms(parsed.get("patalpos") or [], doors_result)
+            n_updated = merge_doors_by_page(parsed.get("patalpos") or [], doors_result)
             parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
+            parsed["_meta"]["doors_pages"] = doors_result.get("pages_read")
             parsed["_meta"]["doors_total_count"] = doors_result.get("total_count")
             parsed["_meta"]["doors_interior_count"] = doors_result.get("interior_count")
             parsed["_meta"]["doors_exterior_count"] = doors_result.get("exterior_count")
@@ -6577,6 +6592,7 @@ def extract_interior(
             _emit({
                 "event": "doors_completed",
                 "page": doors_result.get("page"),
+                "pages": doors_result.get("pages_read"),
                 "total": doors_result.get("total_count"),
                 "interior": doors_result.get("interior_count"),
                 "exterior": doors_result.get("exterior_count"),
