@@ -21,7 +21,7 @@ import {
 import { autoFillFromDefaultPriceList, describeAmbiguous } from '@/lib/applyPriceList';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
-import { postSse } from '@/lib/sseFetch';
+import { runExtraction, runEndText, ExtractionStopped, HARD_ABORT_MS } from '@/lib/extractionRun';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 import { API_BASE as API } from '@/lib/apiBase';
@@ -139,53 +139,16 @@ function appendRulesOverride(fd, scope) {
   if (Object.keys(overrides).length) fd.append('rules_override', JSON.stringify(overrides));
 }
 
-// SM01: streaming variant for interior projects. Wires SSE events to onProgress
-// and resolves with the same {json, projType} shape the non-streaming path
-// returned, so downstream code can keep its branching.
-async function streamInteriorExtract(file, signal, opts, onProgress) {
+// SM01: the interior upload goes over the stream (lib/extractionRun.js owns the
+// stream, its timers, the hand-off and the wait — shared with the re-read).
+function interiorStreamForm(file, opts) {
   const fd = new FormData();
   fd.append('files', file);
   fd.append('interior_subtype', opts.interiorSubtype || 'naujas');
   appendRulesOverride(fd, opts.scope);
-
-  let finalResult = null;
-  await postSse(`${API}/extract-interior-stream`, fd, {
-    signal,
-    onEvent: (ev) => {
-      if (ev.event === 'done') {
-        finalResult = ev.result;
-      }
-      onProgress?.(ev);
-    },
-  });
-
-  if (!finalResult) throw new Error('Extraction stream ended without result');
-  return { json: finalResult, projType: 'interior' };
+  return fd;
 }
 
-/**
- * waitForRecoveredProject — poll for a project the SERVER is still finishing.
- *
- * The extraction outlives its SSE connection (backend drains it detached and
- * saves under the announced id), so a dropped socket is a WAIT, not a failure.
- * Polls every 10 s and gives up quietly, leaving the on-screen message that the
- * analysis continues.
- *
- * WINDOW SIZING (2026-07-29, measured on the first successful recovery). The
- * old 15 min was justified by "comfortably past the longest observed extraction
- * (~21 min)". That estimate was wrong: the real run took 26 min 53 s
- * (16:55:00 → 17:21:53), of which 12 min 40 s fell AFTER the 840 s handoff — so
- * it consumed 84% of the window and landed with 2 min 7 s to spare. Three
- * slower minutes and the user would have watched the poller give up on a
- * project that was about to exist.
- *
- * 40 min is sized off what the wait actually costs: an authenticated GET
- * against an indexed lookup every 10 s, which stops the instant the project
- * appears, the user navigates away, or isCancelled fires. Waiting too long is
- * nearly free; giving up too early looks like data loss. Do not tighten this
- * back toward the extraction time — it must clear the SLOWEST run, not the
- * typical one.
- */
 /**
  * notifyAnalysisDone — the 27-minute wait's missing ending (2026-08-11).
  *
@@ -246,36 +209,6 @@ async function withAutoPrices(payload, t) {
     console.warn('Automatinis kainų užpildymas nepavyko:', e);
     return payload;
   }
-}
-
-/**
- * @param {string} projectId
- * @param {{onTick?:Function, isCancelled?:Function, limitMs?:number}} opts
- *   `limitMs` comes from the preflight (see lib/preflight.pollLimitMs). A
- *   60-page project runs past the historical fixed 40 min, and the browser
- *   giving up first meant telling the user his run had failed while the server
- *   was still working and about to save the project. Defaults to 40 min when
- *   there was no preflight, so nothing changes for an unmeasured upload.
- */
-async function waitForRecoveredProject(projectId, { onTick, isCancelled, limitMs } = {}) {
-  const started = Date.now();
-  const LIMIT_MS = limitMs || 40 * 60 * 1000;
-  while (Date.now() - started < LIMIT_MS) {
-    if (isCancelled?.()) return null;
-    try {
-      const res = await fetch(`${API}/api/projects/${projectId}`, { credentials: 'include' });
-      if (res.ok) {
-        const p = await res.json();
-        // status 'empty' = a saved zero-room run (2026-08-11): the server now
-        // persists those instead of dropping them, so the poller must accept
-        // them or it would wait 40 min on a project that already exists.
-        if (p && (p.patalpos?.length || p.darbu_sarasas?.length || p.status === 'empty')) return p;
-      }
-    } catch { /* offline blip — keep waiting, the server does not care */ }
-    onTick?.(Math.round((Date.now() - started) / 1000));
-    await new Promise(r => setTimeout(r, 10000));
-  }
-  return null;
 }
 
 export default function NewProject() {
@@ -357,13 +290,10 @@ export default function NewProject() {
   useEffect(() => () => {
     if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
   }, []);
+  // Why a request stopped on THIS side: 'timeout' (the non-streaming paths'
+  // ceiling) or 'user' (the cancel button). The interior stream keeps its own
+  // reasons — stall, ceiling, edge hand-off — in lib/extractionRun.js.
   const abortReasonRef = useRef(null);
-  // True once the SSE stream has begun — read in the catch block, where the
-  // `streamPhase` STATE is stale (captured at click time). See the assignment.
-  const streamStartedRef = useRef(false);
-  // Project id the server announces at stream start; used to WAIT for the
-  // result when the connection drops mid-extraction instead of erroring out.
-  const recoveryIdRef = useRef(null);
 
   /**
    * Look at the PDF the moment it is chosen. Free (no Vision), ~1-3 s, and it
@@ -424,7 +354,6 @@ export default function NewProject() {
     setStatus(t('newProject.statusUploading'));
     setIsProcessing(true);
     setStreamPhase(null);
-    streamStartedRef.current = false;
     setStreamProgress({
       rooms: [], zoomDone: 0, zoomTotal: 0, pageCount: null, validationWarning: null,
     });
@@ -435,7 +364,7 @@ export default function NewProject() {
     // Naujas controller — vartotojas gali atšaukti su mygtuku
     const controller = new AbortController();
     setAbortController(controller);
-    abortReasonRef.current = null; // 'stalled' | 'timeout' | null (= user cancel)
+    abortReasonRef.current = null; // 'timeout' | 'user' | null
 
     // Generic per-second elapsed counter (also used by streaming UI).
     const elapsedStart = Date.now();
@@ -443,36 +372,72 @@ export default function NewProject() {
       setStreamElapsed(Math.floor((Date.now() - elapsedStart) / 1000));
     }, 1000);
 
+    // A project the SERVER built and saved after the connection went (the
+    // disconnect path): attach the drawing the browser still holds and land on
+    // it, exactly as a healthy run would.
+    const landRecoveredProject = async (p) => {
+      stopElapsed();
+      try { await savePdf(p.id, file); } catch { /* IndexedDB best-effort */ }
+      uploadPdfToBackend(p.id, file).catch(() => {});
+      // This project was built and saved SERVER-side, so it never passed
+      // through the payload-level auto price fill below. Hand the job to
+      // the project page. (2026-09-02)
+      markPriceFillPending(p.id);
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      notifyAnalysisDone(t);
+      navigate(`/project/${p.id}`);
+    };
+
+    // Every progress event of the interior stream → the progress screen.
+    const onStreamEvent = (ev) => {
+      if (ev.event === 'validation_warning') {
+        // The backend has emitted this since the streaming endpoint
+        // shipped and NOTHING listened — the one message that says
+        // "your PDF is longer than we will read" was thrown away at
+        // the exact moment the user was watching the screen.
+        setStreamProgress(p => ({
+          ...p,
+          validationWarning: ev.message || null,
+          pageCount: ev.page_count || p.pageCount,
+        }));
+      } else if (ev.event === 'started') {
+        setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
+      } else if (ev.event === 'pass1_started') {
+        setStreamPhase('pass1');
+      } else if (ev.event === 'pass1_completed') {
+        setStreamProgress(p => ({
+          ...p,
+          rooms: (ev.patalpos || []).map(r => ({ ...r, refined: false })),
+        }));
+      } else if (ev.event === 'zoom_started') {
+        setStreamPhase('zoom');
+        setStreamProgress(p => ({ ...p, zoomTotal: ev.total || 0, zoomDone: 0 }));
+      } else if (ev.event === 'zoom_room_completed') {
+        setStreamProgress(p => {
+          const rooms = p.rooms.map(r => r.nr === ev.room_nr
+            ? { ...r, refined: ev.applied === true,
+                plotas_m2: ev.plotas_m2 ?? r.plotas_m2 }
+            : r);
+          return { ...p, rooms, zoomDone: ev.idx ?? (p.zoomDone + 1) };
+        });
+      } else if (ev.event === 'post_processing') {
+        setStreamPhase('post');
+      } else if (ev.event === 'error') {
+        // Surface mid-stream error message; the final 'done' event
+        // still drives the error result branch below.
+        setError(ev.message || t('newProject.errGeneric'));
+      }
+    };
+
     try {
       // Extraction time scales with project size — a real Objektas A-class drawing
       // runs ~19 min, well past the old fixed 600 s cap that made contractors
       // watch the browser abort a HEALTHY extraction (pre-prod QA 2026-07-15).
-      // The streaming path emits progress events throughout, so abort only when
-      // progress STALLS (idle), with a generous absolute ceiling as a backstop
-      // for a trickle-but-stuck stream and the non-streaming (KŽ) path.
-      const IDLE_ABORT_MS = 420_000;    // 7 min with no progress event → hung
-      const HARD_ABORT_MS = 2_700_000;  // 45 min absolute ceiling
-      let idleTimer = null;
-      const bumpIdle = () => {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => { abortReasonRef.current = 'stalled'; controller.abort(); }, IDLE_ABORT_MS);
-      };
-      const timeoutId = setTimeout(() => { abortReasonRef.current = 'timeout'; controller.abort(); }, HARD_ABORT_MS);
-      // EDGE DEADLINE (2026-07-29). Railway's edge terminates the HTTP request
-      // at exactly 900 s — measured three times on the same 17-page project,
-      // the last one failing at 899 s with a bare "TypeError: network error"
-      // while the SERVER kept extracting for another five minutes. Waiting for
-      // that cut means the user always eats a scary error on a healthy run.
-      // So we let go FIRST, at 840 s, and switch to polling for the project id
-      // the stream announced — same ending, no error, no lost work. Only armed
-      // once the stream is actually running and has given us an id to poll.
-      const EDGE_DEADLINE_MS = 840_000;   // 14 min < the 900 s edge cut
-      const edgeTimer = setTimeout(() => {
-        if (streamStartedRef.current && recoveryIdRef.current) {
-          abortReasonRef.current = 'edge_deadline';
-          controller.abort();
-        }
-      }, EDGE_DEADLINE_MS);
+      // The interior stream's three timers — stall, absolute ceiling, and the
+      // 840 s edge hand-off before Railway's 900 s cut — live in
+      // lib/extractionRun.js. The non-streaming paths keep only the ceiling.
+      const timeoutId = projTypeChoice === 'interior' ? null
+        : setTimeout(() => { abortReasonRef.current = 'timeout'; controller.abort(); }, HARD_ABORT_MS);
       let json, res, projType;
 
       // Status text fallback only when NOT streaming (KŽ + construction types).
@@ -488,64 +453,40 @@ export default function NewProject() {
       try {
         if (projTypeChoice === 'interior') {
           // SM01: stream the extraction so user sees progress in real time.
-          // The REF (not the state) is what the catch block below reads: this
-          // async function closes over the render in which the user clicked, so
-          // `streamPhase` is frozen at null there forever and a mid-run drop
-          // would report "check your connection" instead of the truth.
-          streamStartedRef.current = true;
-          recoveryIdRef.current = null;
           setStreamPhase('rendering');
-          bumpIdle();  // arm the stall detector before the first event arrives
-          ({ json, projType } = await streamInteriorExtract(
-            file, controller.signal,
-            { interiorSubtype, scope: scopeChoice() },
-            (ev) => {
-              bumpIdle();  // every progress event resets the stall timer
-              // First event of every stream: the id the server will save under
-              // if this connection dies. Held so the catch block can wait for
-              // the project instead of dead-ending the user. (2026-07-28)
-              if (ev.event === 'recovery_id' && ev.project_id) {
-                recoveryIdRef.current = ev.project_id;
-              }
-              if (ev.event === 'validation_warning') {
-                // The backend has emitted this since the streaming endpoint
-                // shipped and NOTHING listened — the one message that says
-                // "your PDF is longer than we will read" was thrown away at
-                // the exact moment the user was watching the screen.
-                setStreamProgress(p => ({
-                  ...p,
-                  validationWarning: ev.message || null,
-                  pageCount: ev.page_count || p.pageCount,
-                }));
-              } else if (ev.event === 'started') {
-                setStreamProgress(p => ({ ...p, pageCount: ev.page_count }));
-              } else if (ev.event === 'pass1_started') {
-                setStreamPhase('pass1');
-              } else if (ev.event === 'pass1_completed') {
-                setStreamProgress(p => ({
-                  ...p,
-                  rooms: (ev.patalpos || []).map(r => ({ ...r, refined: false })),
-                }));
-              } else if (ev.event === 'zoom_started') {
-                setStreamPhase('zoom');
-                setStreamProgress(p => ({ ...p, zoomTotal: ev.total || 0, zoomDone: 0 }));
-              } else if (ev.event === 'zoom_room_completed') {
-                setStreamProgress(p => {
-                  const rooms = p.rooms.map(r => r.nr === ev.room_nr
-                    ? { ...r, refined: ev.applied === true,
-                        plotas_m2: ev.plotas_m2 ?? r.plotas_m2 }
-                    : r);
-                  return { ...p, rooms, zoomDone: ev.idx ?? (p.zoomDone + 1) };
-                });
-              } else if (ev.event === 'post_processing') {
-                setStreamPhase('post');
-              } else if (ev.event === 'error') {
-                // Surface mid-stream error message; the final 'done' event
-                // still drives the error result branch below.
-                setError(ev.message || t('newProject.errGeneric'));
-              }
+          const run = await runExtraction(
+            interiorStreamForm(file, { interiorSubtype, scope: scopeChoice() }),
+            {
+              controller,
+              onEvent: onStreamEvent,
+              // The socket is gone — or we let go before the proxy's 900 s
+              // cut — and the server keeps reading. The extraction is HEALTHY,
+              // so the screen stays alive: the step animation, the room list
+              // and the running clock, just in the 'finishing' phase. The cancel
+              // button goes: there is no request left to cancel.
+              onHandoff: () => {
+                setStreamPhase('finishing');
+                setRecovering(true);
+                setAbortController(null);
+              },
+              onPollTick: (s) => setRecoverySec(s),
+              isCancelled: () => abortReasonRef.current === 'user',
+              // Scaled to the size the preflight measured: a 60-page project
+              // outlives the historical fixed 40 min, and the client giving up
+              // first turns a healthy run into a reported failure.
+              waitLimitMs: pollLimitMs(preflight),
             },
-          ));
+          );
+          if (run.status === 'recovered' && run.project) {
+            await landRecoveredProject(run.project);
+            return;
+          }
+          // Interrupted (the server restarted under it), failed, lost, or a
+          // run the server still reports as running after the wait — the
+          // catch below says which, honestly (lib/extractionRun.runEndText).
+          if (run.status !== 'done') throw Object.assign(new Error(run.status), { runEnd: run.status });
+          json = run.result;
+          projType = 'interior';
           res = { ok: true };
         } else {
           ({ json, res, projType } = await detectAndExtract(
@@ -555,20 +496,13 @@ export default function NewProject() {
         }
         setStatus(t('newProject.statusSaving'));
       } finally {
-        clearTimeout(timeoutId);
-        clearTimeout(edgeTimer);
-        if (idleTimer) clearTimeout(idleTimer);
+        if (timeoutId) clearTimeout(timeoutId);
         if (statusTimer) clearInterval(statusTimer);
-        // THE CLOCK OUTLIVES THE CONNECTION (2026-07-29). This block runs before
-        // the catch that polls for a handed-off extraction, so stopping the
-        // counter here froze it at 839 s while the server worked on for another
-        // ~13 minutes. Keep it running whenever a recovery is still possible —
-        // the catch owns stopping it once the project lands or the wait is
-        // genuinely over. elapsedStart is wall-clock, so it stays accurate
-        // across the handoff.
-        if (!(streamStartedRef.current && recoveryIdRef.current)) {
-          stopElapsed();
-        }
+        // THE CLOCK OUTLIVED THE CONNECTION (2026-07-29) and still does: the
+        // post-hand-off wait now happens INSIDE runExtraction, so by the time
+        // this block runs the run is over one way or the other. elapsedStart
+        // is wall-clock, so the counter stayed accurate across the hand-off.
+        stopElapsed();
         setAbortController(null);
       }
 
@@ -764,98 +698,29 @@ export default function NewProject() {
       // User-friendly error mapping. Stack only kept in console for debugging.
       console.error('Upload pipeline failed:', e);
       let userMessage;
-      if (e.name === 'AbortError') {
-        // Honest message per abort cause (pre-prod QA: a STALLED extraction
-        // used to read as if the USER cancelled it). 'edge_deadline' is OUR
-        // deliberate hand-off before the proxy's 900 s cut — the extraction is
-        // healthy and continues server-side, so it must never read as an error.
-        userMessage = abortReasonRef.current === 'edge_deadline'
-            ? t('newProject.errStreamLostButRunning')
-          : abortReasonRef.current === 'stalled' ? t('newProject.errStalled')
-          : abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
+      const ended = e?.runEnd || (e instanceof ExtractionStopped ? e.reason : null);
+      if (ended) {
+        // The interior run ended with nothing to show. Honest per ending
+        // (lib/extractionRun.runEndText): a STALLED stream is not the user's
+        // cancel; and only a run the SERVER still reports as running may be
+        // described as continuing — one the server reports interrupted (a
+        // redeploy killed it), failed or lost says it stopped and can be
+        // started again, instead of „nekartokite įkėlimo" about a project that
+        // will never appear. A drop before the run's id arrived means nothing
+        // started on the server: that is a connection problem, said as one.
+        const { key, defaultValue } = runEndText('new', ended);
+        userMessage = defaultValue ? t(key, { defaultValue }) : t(key);
+      } else if (e.name === 'AbortError') {
+        // The non-streaming paths: their ceiling, or the cancel button.
+        userMessage = abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
+          : abortReasonRef.current === 'user' ? t('newProject.abortedByUser')
           : t('newProject.errAborted');
-        // Hand straight to the poller — same path a real drop takes.
-        if (abortReasonRef.current === 'edge_deadline' && recoveryIdRef.current) {
-          // The extraction is HEALTHY, so the screen must stay alive: keep the
-          // step animation, the room list and the running clock, and just move
-          // to the 'finishing' phase. Dropping to a static line here made a
-          // normal run look hung for its last third.
-          setStreamPhase('finishing');
-          setRecovering(true);
-          const ok = await waitForRecoveredProject(recoveryIdRef.current, {
-            onTick: (s) => setRecoverySec(s),
-            isCancelled: () => abortReasonRef.current === 'user',
-            // Scaled to the size the preflight measured: a 60-page project
-            // outlives the historical fixed 40 min, and the client giving up
-            // first turns a healthy run into a reported failure.
-            limitMs: pollLimitMs(preflight),
-          });
-          if (ok) {
-            stopElapsed();
-            try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
-            uploadPdfToBackend(ok.id, file).catch(() => {});
-            // This project was built and saved SERVER-side, so it never passed
-            // through the payload-level auto price fill above. Hand the job to
-            // the project page. (2026-09-02)
-            markPriceFillPending(ok.id);
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-            notifyAnalysisDone(t);
-            navigate(`/project/${ok.id}`);
-            return;
-          }
-          setRecovering(false);
-        }
-        stopElapsed();
-      } else if (/network|fetch/i.test(e.message) || e.name === 'TypeError'
-                 || /stream ended without result/i.test(e.message)) {
-        // Connection-level failure. If the stream had already STARTED (we saw
-        // progress events), the backend keeps extracting after a drop and
-        // saves the finished project server-side (disconnect survival,
-        // 2026-07-28 — Railway's edge cut a live prod stream ~10 min in).
-        // Tell the truth instead of "check your connection": the work is
-        // continuing and the project will appear in the list.
-        userMessage = streamStartedRef.current
-          ? t('newProject.errStreamLostButRunning')
-          : t('newProject.errNetwork');
-        // THE CONNECTION DIED, NOT THE WORK. The server finishes the extraction
-        // detached and saves it under the id it announced at stream start, so
-        // instead of dead-ending the user we WAIT for that project to appear,
-        // attach the PDF the browser still holds, and land them in the
-        // workspace — the pre-prod experience, over a connection that dropped.
-        // (2026-07-28: Railway's edge cut two consecutive 17-page runs.)
-        if (streamStartedRef.current && recoveryIdRef.current) {
-          // Same live-screen treatment as the deliberate handoff above: an
-          // unplanned drop is equally survivable, so it gets the same UI.
-          setStreamPhase('finishing');
-          setRecovering(true);
-          const ok = await waitForRecoveredProject(recoveryIdRef.current, {
-            onTick: (s) => setRecoverySec(s),
-            isCancelled: () => abortReasonRef.current === 'user',
-            // Scaled to the size the preflight measured: a 60-page project
-            // outlives the historical fixed 40 min, and the client giving up
-            // first turns a healthy run into a reported failure.
-            limitMs: pollLimitMs(preflight),
-          });
-          if (ok) {
-            stopElapsed();
-            try { await savePdf(ok.id, file); } catch { /* IndexedDB best-effort */ }
-            uploadPdfToBackend(ok.id, file).catch(() => {});
-            // This project was built and saved SERVER-side, so it never passed
-            // through the payload-level auto price fill above. Hand the job to
-            // the project page. (2026-09-02)
-            markPriceFillPending(ok.id);
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-            notifyAnalysisDone(t);
-            navigate(`/project/${ok.id}`);
-            return;
-          }
-          setRecovering(false);
-        }
-        stopElapsed();
+      } else if (/network|fetch/i.test(e.message) || e.name === 'TypeError') {
+        userMessage = t('newProject.errNetwork');
       } else {
         userMessage = e.message || t('newProject.errUnknown');
       }
-      stopElapsed();   // idempotent — covers the branches that never polled
+      stopElapsed();   // idempotent — covers every branch
       setRecovering(false);
       setError(userMessage);
       setIsProcessing(false);
@@ -890,6 +755,7 @@ export default function NewProject() {
               size="sm"
               title={t('newProject.cancelTitle')}
               onClick={() => {
+                abortReasonRef.current = 'user';
                 abortController.abort();
                 setError(t('newProject.abortedByUser'));
                 setIsProcessing(false);

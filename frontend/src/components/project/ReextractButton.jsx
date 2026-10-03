@@ -6,26 +6,49 @@
  * - Original extraction had errors / missing rooms
  * - Switching rules_override drastically (full re-extract vs cheap recompute)
  *
- * Flow: confirm → load PDF blob from IndexedDB → POST /extract-interior →
- * MERGE the fresh read into the stored project (lib/mergeReextract.js: verified
- * rooms and the facts he set himself stay, prices ride on the rebuilt rows,
- * the diff is recorded) → rebuild the rows on the merged rooms through the
- * same /recompute-interior path a room edit uses → save. The diff shows up as
+ * Flow: confirm → load PDF blob from IndexedDB → the free preflight (time
+ * estimate) → POST /extract-interior-stream with `reread_of` → MERGE the fresh
+ * read into the stored project (lib/mergeReextract.js: verified rooms and the
+ * facts he set himself stay, prices ride on the rebuilt rows, the diff is
+ * recorded) → rebuild the rows on the merged rooms through the same
+ * /recompute-interior path a room edit uses → save. The diff shows up as
  * `RereadDiffBanner` on the project page until he dismisses it.
- * Cost: same as original extract (~$0.40-2 + 90-500s).
+ *
+ * THE STREAM, NOT THE BLOCKING CALL (2026-10-03, audit frontend-architecture-4).
+ * This used to POST the blocking /extract-interior with a 600 s client timeout,
+ * while real reads take 13–27 min — and Railway's edge cuts any request at
+ * 900 s anyway. It now runs through lib/extractionRun.js, the same stream,
+ * edge hand-off and wait a new project uses. If the connection goes, the
+ * server finishes the read and HOLDS it on the run's record (a re-read is never
+ * a second project); the wait takes it from there and merges it here exactly
+ * as a read that arrived over the stream. A read the server reports stopped
+ * (restart, failure) leaves the project untouched and says so.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
 import { getProject, updateProject } from '@/lib/projectStore';
-import { API_BASE as API } from '@/lib/apiBase';
 import { mergeReextract } from '@/lib/mergeReextract';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { saveRoomEdit } from '@/lib/roomSheetApi';
 import { recordPilot } from '@/lib/telemetry';
+import { fetchPreflight, pollLimitMs } from '@/lib/preflight';
+import {
+  runExtraction, runEndText, ExtractionStopped, reduceStreamProgress, progressLine,
+} from '@/lib/extractionRun';
+
+// The preflight is a convenience (an estimate on screen, a wait sized to the
+// file): it never holds the paid read back for more than this.
+const PREFLIGHT_WAIT_MS = 20_000;
+
+// Re-reads in flight on this page load, per project id → Promise<{error}>.
+// The button lives inside the Prielaidos panel; closing and reopening the
+// panel mid-read mounts a fresh button, which must show the read that is
+// running instead of offering a second paid one.
+const inflight = new Map();
 
 /**
  * The stored project after a fresh read: merged, then its rows rebuilt on the
@@ -57,6 +80,20 @@ export async function projectAfterReread(base, result) {
   }
 }
 
+/** The preflight of the stored PDF, or null after PREFLIGHT_WAIT_MS. */
+async function quickPreflight(blob, name) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), PREFLIGHT_WAIT_MS);
+  try {
+    const file = new File([blob], `${name || 'brezinys'}.pdf`, { type: 'application/pdf' });
+    return await fetchPreflight(file, { signal: ctl.signal });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default function ReextractButton({ project, onComplete }) {
   // This component carried a complete set of i18n keys that nothing used: the
   // strings were hard-coded LT, so no vocabulary pass could reach them.
@@ -64,20 +101,46 @@ export default function ReextractButton({ project, onComplete }) {
   const [confirming, setConfirming] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [progress, setProgress] = useState('');
+  const [elapsed, setElapsed] = useState(null);
+  const [estimate, setEstimate] = useState('');
   const [error, setError] = useState(null);
 
-  const handleReextract = async () => {
-    setError(null);
+  // A read already running for this project (started before this button was
+  // mounted): show it, and its ending, instead of the start button.
+  useEffect(() => {
+    const running = inflight.get(project.id);
+    if (!running) return undefined;
+    let live = true;
     setExtracting(true);
-    setProgress(t('project.reextract.loadingPdf'));
+    running.then(({ error: err }) => {
+      if (!live) return;
+      setExtracting(false);
+      if (err) { setConfirming(true); setError(err); }
+    });
+    return () => { live = false; };
+  }, [project.id]);
 
+  const endMessage = (why) => {
+    const { key, defaultValue } = runEndText('reread', why);
+    return defaultValue ? t(key, { defaultValue }) : t(key);
+  };
+
+  const readAgain = async () => {
+    const t0 = Date.now();
+    const clock = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
     try {
+      setProgress(t('project.reextract.loadingPdf'));
       const blob = await getPdfBlob(project.id);
       if (!blob) {
         throw new Error(t('project.reextract.pdfNotFound'));
       }
 
-      setProgress(t('project.reextract.analyzing'));
+      // The free five-second look at the same PDF: its estimate replaces a
+      // hard-coded range, and its page tier sizes the wait after a hand-off.
+      setProgress(t('newProject.preflight.checking'));
+      const pre = await quickPreflight(blob, project.name);
+      if (pre?.est_minutes) setEstimate(pre.est_minutes);
+
       const fd = new FormData();
       fd.append('files', blob, project.name + '.pdf');
       // Forward existing rules_override so user's prefs aren't lost. Read them
@@ -88,67 +151,78 @@ export default function ReextractButton({ project, onComplete }) {
       if (overrides) {
         fd.append('rules_override', JSON.stringify(overrides));
       }
+      // The server checks it is his, and if the connection goes it holds the
+      // read for this project instead of saving a second one.
+      fd.append('reread_of', project.id);
 
-      const t0 = Date.now();
-      // Sprint §AUDIT (2026-04-29): wrap setInterval in try/finally so it
-      // always cleared on error/abort. Previously, network/parse failures
-      // skipped clearInterval at L60 and the timer leaked indefinitely.
-      let ti = null;
-      try {
-        ti = setInterval(() => {
-          const sec = Math.floor((Date.now() - t0) / 1000);
-          if (sec < 60) setProgress(t('project.reextract.pass1', { sec }));
-          else if (sec < 200) setProgress(t('project.reextract.pass2', { sec }));
-          else setProgress(t('project.reextract.complex', { sec }));
-        }, 1000);
+      let step = null;
+      setProgress(t(...progressLine(step)));
+      const run = await runExtraction(fd, {
+        kind: 'reread',
+        onEvent: (ev) => {
+          step = reduceStreamProgress(step, ev);
+          setProgress(t(...progressLine(step)));
+        },
+        onHandoff: () => setProgress(t(...progressLine({ step: 'finishing' }))),
+        waitLimitMs: pollLimitMs(pre),
+      });
 
-        const res = await fetch(`${API}/extract-interior`, {
-          method: 'POST',
-          credentials: 'include',
-          body: fd,
-          signal: AbortSignal.timeout(600_000),
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.detail || `HTTP ${res.status}`);
-        }
-
-        const result = await res.json();
-        if (result?.status === 'error') {
-          throw new Error(result._error || 'Pipeline klaida');
-        }
-        if (!result.patalpos) {
-          throw new Error(t('project.reextract.badFormat'));
-        }
-        if (ti != null) { clearInterval(ti); ti = null; }
-
-        // 2026-07-28 audit: the base of the merge used to be the `project`
-        // PROP — a render-time snapshot taken up to 10 minutes before the
-        // extraction returned. Everything the user changed while it ran
-        // (prices, measurements, polygons, per-room overrides, the name) was
-        // silently rolled back to that snapshot. Re-read the CURRENT stored
-        // project first; same idiom as InteriorWorkspace.jsx.
-        //
-        // 2026-09-13: no longer a wholesale replace — see projectAfterReread.
-        setProgress(t('project.reextract.rebuilding'));
-        const base = getProject(project.id) || project;
-        const merged = await projectAfterReread(base, result);
-        recordPilot(project.id, 'reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
-        updateProject(project.id, merged);
-        setProgress(t('project.reextract.updated'));
-        setTimeout(() => {
-          onComplete?.(merged);
-          setExtracting(false);
-          setConfirming(false);
-        }, 800);
-      } finally {
-        if (ti != null) clearInterval(ti);
+      // The stream's own result, or the read the server held after the
+      // connection went — merged the same way either way.
+      const result = (run.status === 'done' || run.status === 'recovered') ? run.result : null;
+      if (!result) return { error: endMessage(run.status) };
+      if (result.status === 'error') {
+        throw new Error(result._error || t('project.reextract.pipelineErr'));
       }
+      if (!result.patalpos) {
+        throw new Error(t('project.reextract.badFormat'));
+      }
+
+      // 2026-07-28 audit: the base of the merge used to be the `project`
+      // PROP — a render-time snapshot taken up to 10 minutes before the
+      // extraction returned. Everything the user changed while it ran
+      // (prices, measurements, polygons, per-room overrides, the name) was
+      // silently rolled back to that snapshot. Re-read the CURRENT stored
+      // project first; same idiom as InteriorWorkspace.jsx.
+      //
+      // 2026-09-13: no longer a wholesale replace — see projectAfterReread.
+      setProgress(t('project.reextract.rebuilding'));
+      const base = getProject(project.id) || project;
+      const merged = await projectAfterReread(base, result);
+      recordPilot(project.id, 'reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
+      updateProject(project.id, merged);
+      setProgress(t('project.reextract.updated'));
+      setTimeout(() => {
+        onComplete?.(merged);
+        setExtracting(false);
+        setConfirming(false);
+      }, 800);
+      return { error: null };
     } catch (e) {
       console.error('Re-extract failed:', e);
-      setError(e.message || t('project.reextract.error'));
-      setExtracting(false);
+      if (e instanceof ExtractionStopped) return { error: endMessage(e.reason) };
+      return { error: e.message || t('project.reextract.error') };
+    } finally {
+      clearInterval(clock);
+    }
+  };
+
+  const handleReextract = async () => {
+    if (inflight.has(project.id)) return;
+    setError(null);
+    setEstimate('');
+    setElapsed(null);
+    setExtracting(true);
+    const running = readAgain();
+    inflight.set(project.id, running);
+    try {
+      const { error: err } = await running;
+      if (err) {
+        setError(err);
+        setExtracting(false);
+      }
+    } finally {
+      inflight.delete(project.id);
     }
   };
 
@@ -158,7 +232,15 @@ export default function ReextractButton({ project, onComplete }) {
         <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">{t('project.reextract.inProgress')}</p>
-          <p className="text-xs text-muted-foreground truncate">{progress}</p>
+          {progress && <p className="text-xs text-muted-foreground truncate">{progress}</p>}
+          {/* Elapsed + the honest horizon, as on the new-project screen:
+              „praėjo 6 min · numatyta apie iki 30 min", never a countdown. */}
+          {elapsed != null && (
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {t('upload.stream.elapsedMin', { min: Math.floor(elapsed / 60), sec: elapsed % 60 })}
+              {estimate && <> · {t('upload.stream.estimate', { value: estimate })}</>}
+            </p>
+          )}
         </div>
       </div>
     );

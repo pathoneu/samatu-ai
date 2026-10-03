@@ -1382,6 +1382,135 @@ def _migrate_schema() -> None:
                 data       TEXT NOT NULL,      -- JSON object, stored as given
                 updated_at TEXT NOT NULL
             )""")
+        # extraction_jobs (2026-10-03): one row per /extract-interior-stream
+        # run, so a run that dies WITH THE PROCESS (redeploy, crash) is on
+        # record instead of leaving the browser waiting on a project that will
+        # never appear. See the block above `create_extraction_job`.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS extraction_jobs (
+                id          TEXT PRIMARY KEY,   -- the recovery_id the browser holds
+                user_id     TEXT,
+                kind        TEXT NOT NULL DEFAULT 'new',   -- 'new' | 'reread'
+                project_id  TEXT,
+                filename    TEXT,
+                boot_id     TEXT NOT NULL,
+                status      TEXT NOT NULL,      -- running | done | failed | interrupted
+                error       TEXT,               -- short code, never a message
+                result      TEXT,               -- reread only: the held read (JSON)
+                started_at  TEXT NOT NULL,
+                finished_at TEXT
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_extraction_jobs_status "
+                  "ON extraction_jobs(status)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_extraction_jobs_user "
+                  "ON extraction_jobs(user_id, started_at DESC)")
+
+
+# ── Extraction jobs: the record that outlives the process (2026-10-03) ───────
+#
+# A long read runs 13-27 min inside the web process. When that process dies — a
+# push to main redeploys it, or it crashes — every run in flight dies with it,
+# and before this table nothing knew: the browser kept saying the work was
+# still running and not to upload again, for up to 40 minutes, about a project
+# that would never exist.
+#
+# Each run gets a row under the id the browser already holds (the recovery_id
+# from the stream's first event). Every ending the process LIVES to see writes
+# its terminal status; the one it does not live to see is written by the next
+# boot (`mark_interrupted_extraction_jobs`), which is the only status a dead
+# process can still be given. Statuses only move OUT of 'running' — the first
+# ending recorded wins, so a late duplicate never rewrites what happened.
+#
+# `project_id` means: for kind 'new', the project the server saved itself (the
+# disconnect path) — NULL when the browser received the result and saved its
+# own; for kind 'reread', the stored project being read again. `result` is only
+# ever written for a re-read whose browser was gone at the end: the read is held
+# here for that browser to merge into the project it belongs to (a re-read is
+# never a new project). Held reads are dropped after HELD_RESULT_DAYS.
+
+EXTRACTION_JOB_STATUSES = ("running", "done", "failed", "interrupted")
+HELD_RESULT_DAYS = 3
+
+
+def create_extraction_job(job_id: str, user_id: str | None, boot_id: str, *,
+                          kind: str = "new", project_id: str | None = None,
+                          filename: str | None = None) -> None:
+    """Record a run as 'running' the moment its stream starts."""
+    if kind not in ("new", "reread"):
+        raise ValueError(f"unknown extraction job kind: {kind!r}")
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO extraction_jobs (id, user_id, kind, project_id, filename, "
+            "boot_id, status, started_at) VALUES (?, ?, ?, ?, ?, ?, 'running', ?)",
+            (job_id, user_id, kind, project_id,
+             (filename or "")[:200] or None, boot_id, _now_iso()))
+
+
+def finish_extraction_job(job_id: str, status: str, *, error: str | None = None,
+                          project_id: str | None = None,
+                          result: dict | None = None) -> bool:
+    """Move a running job to its ending. True when this call recorded it;
+    False when the job is unknown or already ended (the first ending wins)."""
+    if status not in EXTRACTION_JOB_STATUSES or status == "running":
+        raise ValueError(f"not an ending: {status!r}")
+    held = json.dumps(result, ensure_ascii=False) if result is not None else None
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE extraction_jobs SET status = ?, error = ?, finished_at = ?, "
+            "project_id = COALESCE(?, project_id), result = COALESCE(?, result) "
+            "WHERE id = ? AND status = 'running'",
+            (status, (error or "")[:40] or None, _now_iso(), project_id, held, job_id))
+        return cur.rowcount == 1
+
+
+def get_extraction_job(job_id: str, user_id: str | None = None) -> dict | None:
+    """One job, scoped to its owner (user_id=None = unscoped, for admins —
+    the same convention as `get_project`). The held read comes back parsed
+    under "result" (None when nothing is held)."""
+    sql = "SELECT * FROM extraction_jobs WHERE id = ?"
+    args: tuple = (job_id,)
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        args = (job_id, user_id)
+    with _conn() as c:
+        row = c.execute(sql, args).fetchone()
+    if not row:
+        return None
+    job = dict(row)
+    held = job.pop("result", None)
+    try:
+        job["result"] = json.loads(held) if held else None
+    except (json.JSONDecodeError, TypeError, ValueError):
+        job["result"] = None
+    return job
+
+
+def mark_interrupted_extraction_jobs(boot_id: str) -> int:
+    """At startup: every job still 'running' under ANOTHER boot belonged to a
+    process that is gone, so it can never finish. Returns how many were marked.
+
+    One process owns the database in production (a single uvicorn worker on
+    one volume). Two local processes on one DB file — a second dev server,
+    the test suite next to a dev server — will mark each other's live runs;
+    that only mislabels a dev run, never a production one."""
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE extraction_jobs SET status = 'interrupted', error = 'restart', "
+            "finished_at = ? WHERE status = 'running' AND boot_id != ?",
+            (_now_iso(), boot_id))
+        return cur.rowcount
+
+
+def prune_held_extraction_results(days: int = HELD_RESULT_DAYS) -> int:
+    """Drop held re-read results older than `days` — a read nobody came back
+    for is not kept indefinitely. The job row itself stays."""
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - days * 86400))
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE extraction_jobs SET result = NULL "
+            "WHERE result IS NOT NULL AND finished_at IS NOT NULL AND finished_at < ?",
+            (cutoff,))
+        return cur.rowcount
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────

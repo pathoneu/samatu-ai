@@ -431,6 +431,27 @@ app = FastAPI(
 
 import backup_scheduler
 
+# This process's identity in the extraction_jobs table. A job row still
+# 'running' under any other boot id belongs to a process that no longer exists.
+import uuid as _uuid_boot
+_BOOT_ID = _uuid_boot.uuid4().hex
+
+
+@app.on_event("startup")
+async def _startup_mark_interrupted_extractions() -> None:
+    # A redeploy or crash kills every long read in flight, and the dying process
+    # cannot write its own ending. Write it here, before the first request, so a
+    # browser still waiting on one of those runs is told it stopped instead of
+    # being told for 40 more minutes that it is still running. (2026-10-03)
+    try:
+        n = await asyncio.to_thread(db.mark_interrupted_extraction_jobs, _BOOT_ID)
+        if n:
+            log.warning("startup: %d extraction(s) were running when the previous "
+                        "process stopped — marked interrupted", n)
+        await asyncio.to_thread(db.prune_held_extraction_results)
+    except Exception as exc:  # noqa: BLE001 — never block startup on bookkeeping
+        log.warning("extraction job sweep skipped: %r", exc)
+
 
 @app.on_event("startup")
 async def _startup_scrub_legacy_prose() -> None:
@@ -6225,7 +6246,7 @@ def _clean_pdf_stem(pdf_name: str) -> str:
 
 def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
                           pdf_bytes: bytes | None = None,
-                          project_id: str | None = None) -> None:
+                          project_id: str | None = None) -> str | None:
     """Persist a finished extraction whose CLIENT vanished mid-stream.
 
     Mirrors what NewProject.jsx's createProject() builds from the done event
@@ -6234,11 +6255,13 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     a healthy stream. Saves only real results — errors and zero-room reads are
     dropped, matching the frontend's own guards. (2026-07-28 disconnect
     survival; born from the first production run, where Railway's edge cut a
-    live stream ~10 min in and 20 minutes of paid Opus work evaporated.)"""
+    live stream ~10 min in and 20 minutes of paid Opus work evaporated.)
+
+    Returns the saved project's id, or None when nothing was saved."""
     if not user or not user.get("id"):
-        return
+        return None
     if result.get("status") == "error":
-        return
+        return None
     # ZERO-ROOM RESULTS ARE SAVED, NOT DROPPED (2026-08-11). This guard used
     # to also require non-empty patalpos, mirroring a frontend throw that has
     # since been fixed: a paid run that found no rooms was discarded entirely,
@@ -6292,6 +6315,7 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     db.upsert_project(project_id, blob, user_id=user["id"])
     log.info("stream orphan drain: saved project %s (%d rooms, pdf=%s) for user %s",
              project_id, blob["total_rows"], bool(blob.get("has_pdf")), user["id"])
+    return project_id
 
 
 @app.post("/extract-interior-stream")
@@ -6299,6 +6323,7 @@ async def extract_interior_stream_endpoint(
     request: Request,
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
+    reread_of: str | None = Form(None),
 ):
     _user = _billable_user(request)
     # Billing parity with /extract-interior (pre-prod audit 2026-07-25): this
@@ -6309,6 +6334,21 @@ async def extract_interior_stream_endpoint(
     _check_trial_gate(_user["id"])
     client_ip = _client_key(request)
     _check_rate_limit(client_ip, "extract-interior")
+
+    # RE-READ OF A STORED PROJECT (2026-10-03). ReextractButton now reads
+    # through this endpoint too: the blocking /extract-interior it used had a
+    # 600 s client timeout against 13-27 min runs. A re-read is never a new
+    # project — if its browser is gone at the end, the read is HELD on the job
+    # row for that browser to merge, not saved as a second project. Owner-only,
+    # 404 for a missing or foreign id like every per-project route. (Called
+    # directly — tests do — the default is a FieldInfo, not a string.)
+    if not isinstance(reread_of, str) or not reread_of.strip():
+        reread_of = None
+    if reread_of is not None:
+        reread_of = reread_of.strip()
+        _owner_filter = None if _user.get("is_admin") else _user["id"]
+        if not db.project_exists(reread_of, user_id=_owner_filter):
+            raise HTTPException(status_code=404, detail=f"Project {reread_of} not found")
 
     if not files:
         raise HTTPException(status_code=400, detail="Nepateikta jokio failo")
@@ -6344,15 +6384,48 @@ async def extract_interior_stream_endpoint(
     import uuid as _uuid_mod
     recovery_id = str(_uuid_mod.uuid4())
 
+    # THE JOB ROW (2026-10-03): `recovery_id` is also this run's extraction_jobs
+    # id, so the browser that lost its connection can ask how the run ENDED —
+    # including the one ending this process cannot write itself (killed by a
+    # redeploy; the next boot marks it interrupted). Bookkeeping only: a failed
+    # write is logged and never touches the stream or the paid work.
+    def _job_finish(status: str, error: str | None = None, **kw) -> bool:
+        try:
+            return db.finish_extraction_job(recovery_id, status, error=error, **kw)
+        except Exception:  # noqa: BLE001
+            log.warning("extraction job %s: recording %s failed", recovery_id, status,
+                        exc_info=True)
+            return False
+
+    def _job_finish_with(result) -> None:
+        """The ending a delivered result means: done, or failed when the
+        pipeline's own answer is an error."""
+        if isinstance(result, dict) and result.get("status") == "error":
+            _job_finish("failed", "pipeline_error")
+        else:
+            _job_finish("done")
+
     async def event_source():
-        yield _format_sse({"event": "recovery_id", "project_id": recovery_id})
-        # Push file-validation warning early so the UI can show it before pass-1.
-        if validation.get("warning"):
-            yield _format_sse({
-                "event": "validation_warning",
-                "message": validation["warning"],
-                "page_count": validation.get("page_count", 0),
-            })
+        try:
+            db.create_extraction_job(recovery_id, _user.get("id"), _BOOT_ID,
+                                     kind="reread" if reread_of else "new",
+                                     project_id=reread_of, filename=pdf_name)
+        except Exception:  # noqa: BLE001 — the run must not depend on its record
+            log.warning("extraction job %s: insert failed", recovery_id, exc_info=True)
+        try:
+            yield _format_sse({"event": "recovery_id", "project_id": recovery_id})
+            # Push file-validation warning early so the UI can show it before pass-1.
+            if validation.get("warning"):
+                yield _format_sse({
+                    "event": "validation_warning",
+                    "message": validation["warning"],
+                    "page_count": validation.get("page_count", 0),
+                })
+        except BaseException:
+            # The client left before any work began: nothing runs (the drain
+            # below is armed only once the extraction is under way).
+            _job_finish("failed", "not_started")
+            raise
 
         loop = asyncio.get_event_loop()
         gen = _run_usage.run_with(_usage, extract_interior_stream, pdf_bytes, overrides_dict)
@@ -6410,17 +6483,35 @@ async def extract_interior_stream_endpoint(
                     if done is None:
                         log.warning("stream orphan drain: no done event (pipeline died)")
                         _record_dead_run(_user, _usage, "extract-interior-stream-failed")
+                        _job_finish("failed", "no_result")
                         return
                     result = done["result"]
                     try:
                         _augment_done_event(result)
                     except Exception:  # noqa: BLE001 — bookkeeping stays best-effort
                         log.exception("stream orphan drain: augmentation failed")
-                    _save_orphaned_result(result, _user, pdf_name, pdf_bytes,
-                                          project_id=recovery_id)
+                    if result.get("status") == "error":
+                        _job_finish("failed", "pipeline_error")
+                        return
+                    if reread_of:
+                        # A re-read belongs to the project it re-reads: hold it
+                        # on the job row for the browser to merge there.
+                        if _job_finish("done", result=result):
+                            return
+                        # Could not hold it (the row was never written): keep the
+                        # paid read anyway, as a project of its own.
+                        log.error("stream orphan drain: re-read %s could not be held; "
+                                  "saving it as a separate project", recovery_id)
+                    saved = _save_orphaned_result(result, _user, pdf_name, pdf_bytes,
+                                                  project_id=recovery_id)
+                    if saved:
+                        _job_finish("done", project_id=saved)
+                    else:
+                        _job_finish("failed", "not_saved")
                 except Exception:  # noqa: BLE001 — never let the drain thread blow up
                     log.exception("stream orphan drain failed")
                     _record_dead_run(_user, _usage, "extract-interior-stream-failed")
+                    _job_finish("failed", "drain_error")
                 finally:
                     _close_gen()
             _threading.Thread(target=_run, daemon=True,
@@ -6508,6 +6599,7 @@ async def extract_interior_stream_endpoint(
                 # frontend contract holds. (audit 2026-07-27)
                 log.exception("/extract-interior-stream failed")
                 _record_dead_run(_user, _usage, "extract-interior-stream-failed")
+                _job_finish("failed", "exception")
                 _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
                 yield _format_sse({"event": "error", "message": _msg})
                 yield _format_sse({"event": "done", "result": {
@@ -6515,6 +6607,9 @@ async def extract_interior_stream_endpoint(
                 }})
                 return
             if ev is sentinel:
+                # The pipeline ended. After a delivered `done` this is a no-op
+                # (the first ending wins); without one the run produced nothing.
+                _job_finish("failed", "no_result")
                 return
 
             # Augment terminal event with the page-count warning the same way
@@ -6534,6 +6629,11 @@ async def extract_interior_stream_endpoint(
                         "/extract-interior-stream: done-event augmentation failed")
 
             yield _format_sse(ev)
+            # Recorded only AFTER the yield returned, i.e. the result left for
+            # the browser. Had the socket died on that yield, the drain path
+            # owns this run's ending (and saves the result) instead.
+            if _is_done_event(ev):
+                _job_finish_with(ev["result"])
         except (asyncio.CancelledError, GeneratorExit):
             # Disconnect at an OUTER yield (event or heartbeat already left the
             # inner try) — same survival semantics as the inner handler.
@@ -6547,6 +6647,7 @@ async def extract_interior_stream_endpoint(
             # still propagates untouched.
             log.exception("/extract-interior-stream: stream loop failed")
             _record_dead_run(_user, _usage, "extract-interior-stream-failed")
+            _job_finish("failed", "stream_error")
             _msg = "Nenumatyta klaida apdorojant PDF. Bandykite dar kartą."
             yield _format_sse({"event": "error", "message": _msg})
             yield _format_sse({"event": "done", "result": {
@@ -6580,6 +6681,38 @@ async def extract_interior_stream_endpoint(
             "Connection": "keep-alive",
         },
     )
+
+
+# ── /api/extraction-jobs/{id} — how a handed-off run ended (2026-10-03) ─────
+# The browser that let go of (or lost) a stream polls here with the
+# recovery_id it was given. Owner-only with the same policy as every
+# per-project route: admins see all, anyone else gets 404 for a missing or
+# foreign id — never a hint that it exists.
+
+@app.get("/api/extraction-jobs/{job_id}")
+# Plain `def`: one indexed sqlite read, polled every 10 s by a waiting browser.
+def api_get_extraction_job(request: Request, job_id: str):
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    job = db.get_extraction_job(job_id, user_id=user_filter)
+    if not job:
+        raise HTTPException(status_code=404, detail="Skaitymas nerastas")
+    result = job.get("result")
+    # A held re-read is handed back only while the project it belongs to is
+    # still the caller's — a deleted project has nothing to merge into.
+    if result is not None and job.get("kind") == "reread" and not db.project_exists(
+            job.get("project_id") or "", user_id=user_filter):
+        result = None
+    return {
+        "id": job["id"],
+        "status": job["status"],
+        "kind": job.get("kind") or "new",
+        "project_id": job.get("project_id"),
+        "error": job.get("error"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "result": result,
+    }
 
 
 # ── /recompute-interior — pure-math recompute with new rules_override ───────
