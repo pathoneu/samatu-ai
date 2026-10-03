@@ -19,12 +19,33 @@ Three stacked signals, worst wins (žalia < geltona < raudona):
     partition walls at all.
 
 Lines not matched by any rule stay žalia — the class table is the contract:
-when an anchor project shows a class >10% off, it gets a row here.
+when an anchor project shows a class >10% off, it gets a row here. One
+exception does not need a measurement (2026-10-03): a line whose `saltinis`
+says the count is the ROOM TYPE's (`ROOM_DEFAULT_SOURCES`) is never green —
+nothing was read, so there is nothing to be confident about.
 """
 from __future__ import annotations
 
 ZALIA, GELTONA, RAUDONA = "zalia", "geltona", "raudona"
 _SEVERITY = {ZALIA: 0, GELTONA: 1, RAUDONA: 2}
+
+# What „Dažymo kampų montavimas" really adds up — one sentence, shared by the
+# row reason here and every other place the formula is told (2026-10-03).
+KAMPAI_REASON = (
+    "Kampų ilgis sudėtas iš patalpos perimetro (sienų ir lubų sandūra), vidinių "
+    "kampų (kampų skaičius × aukštis), angų kraštų (standartinio dydžio durys ir "
+    "langai, ne brėžinio matmenys) ir pertvarų sandūrų (× aukštis). Suskaičiuokite "
+    "dažomus kampus plane ir palyginkite.")
+
+# Row sources that mean „the count is the room type's, nothing was counted on
+# the drawing" (vision_call `saltinis`). Such a row is never green, whatever
+# the class table says: CLAUDE.md §7 — a value estimated from room-type
+# defaults is the fallback tier. (audit 2026-09-29 vision-pipeline-7: the
+# sanitary rows were room-type counts shown green.)
+ROOM_DEFAULT_SOURCES = frozenset({"paskirtis_default", "room_type_assumption"})
+ROOM_DEFAULT_REASON = (
+    "Kiekis priskirtas pagal patalpų paskirtį — brėžinyje nesuskaičiuotas. "
+    "Patikrinkite pagal santechnikos planą.")
 
 # (substring of aprasymas, confidence, measured reason) — 2-anchor calibration
 CLASS_RULES: list[tuple[str, str, str]] = [
@@ -57,8 +78,12 @@ CLASS_RULES: list[tuple[str, str, str]] = [
      "Pjovimo ilgis priklauso nuo vidinių kampų išdėstymo plytelių zonose — "
      "patikrinkite pagal išklotines."),
     # (calibration: symbol counts −20%/+33%)
+    # 2026-10-03: the number is a per-shower default (`lentyneliu_per_vonia`)
+    # times the showers — no shelf is read off the drawing, so the old „iš
+    # simbolių" wording claimed a reading that never happened.
     ("lentynėlių", GELTONA,
-     "Skaičius nustatytas iš simbolių dušo zonose — patikrinkite brėžinyje."),
+     "Lentynėlių skaičius priimtas po kelias kiekvienam dušui — patikrinkite "
+     "sienų išklotinėse."),
     # (calibration: ±40%)
     ("praustuvės", GELTONA,
      "Skaičius nustatytas iš simbolių plane — patikrinkite pagal santechnikos "
@@ -83,9 +108,12 @@ CLASS_RULES: list[tuple[str, str, str]] = [
     # (calibration: formula fitted to ONE contractor samata incl. the disputed
     #  half-corner + perimeter term; unvalidated beyond it — keep that fact
     #  here, not on the contractor's screen)
-    ("kampų montavimas", GELTONA,
-     "Kampų ilgis apskaičiuotas iš patalpų geometrijos (išoriniai kampai × "
-     "aukštis) — suskaičiuokite dažomus kampus plane ir palyginkite."),
+    # 2026-10-03 (audit calc-engine-5): the sentence used to say „išoriniai
+    # kampai × aukštis" — the math (universal_rules.calc_room_quantities) is
+    # the ceiling perimeter + the room's own corners × H (when counted) + every
+    # opening's edges at a FIXED door/window size + partition junctions × H.
+    # The words now name those four terms; the math is unchanged.
+    ("kampų montavimas", GELTONA, KAMPAI_REASON),
     ("rotband", GELTONA,
      "Apskaičiuota kaip dalis sienų ploto (30%) — faktinis kiekis priklauso "
      "nuo sienų būklės."),
@@ -192,8 +220,17 @@ def apply_confidence(parsed: dict) -> dict:
         # and precise than a static class-bias note. Preserve it and skip the
         # class rule for this line — the reconciliation already addressed the bias.
         upstream_reason = p.get("_confidence_reason")
+        # A room-type count („1 per bathroom") is not a reading: never green,
+        # and the class note — which for the fixture lines says the number came
+        # from symbols — would describe a reading that did not happen, so the
+        # room-type sentence stands in for it (2026-10-03).
+        room_default = str(p.get("saltinis") or "").lower() in ROOM_DEFAULT_SOURCES
+        if room_default:
+            conf = _worse(conf, GELTONA)
         if upstream_reason:
             reasons.append(upstream_reason)
+        elif room_default:
+            reasons.append(ROOM_DEFAULT_REASON)
         else:
             for needle, klass_conf, reason in CLASS_RULES:
                 if needle in label:

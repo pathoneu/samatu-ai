@@ -33,6 +33,9 @@ from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
+from .niche_inference import (
+    LED_ESTIMATE_ROOM_SENTENCE, estimated_niche_m, led_estimate_disclosure, led_estimated_rooms,
+)
 
 log = logging.getLogger(__name__)
 
@@ -1433,10 +1436,200 @@ def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
     plotas = float(room.get("plotas_m2") or 0)
     H = float(room.get("lubu_aukstis_m") or 2.82)
     drėgmės_zona = perim * 0.30
-    # Dušas: priimam 1.0 × 1.2 m zoną iki lubų aukščio (apytiksliai)
-    has_shower = paskirtis in ("vonia", "san")
+    # Dušas: priimam 1.0 × 1.2 m zoną iki lubų aukščio (apytiksliai) — unless
+    # the plumbing plan lists this room's fixtures and no shower among them
+    # (SHOWER_KEY False, 2026-10-03). Unread rooms keep the zone; the hydro
+    # row then says which rooms it was assumed for.
+    has_shower = room_has_shower(room)
     dušo_zona = (1.0 * 2 + 1.2) * H if has_shower else 0  # perimetras × H
     return round(plotas + drėgmės_zona + dušo_zona, 2)
+
+
+# ── Showers and the plumbing reading (2026-10-03) ───────────────────────────
+# Audit 2026-09-29 (calc-engine-6, vision-pipeline-7): every vonia/san got a
+# walk-in shower — the hydro shower zone, the slope, the drain, the mixer pair
+# and two tiled shelves — and every sanitary row was a room-type count, all of
+# it shown as read. The plumbing reader (sanitary_fixture_reader) point-lists
+# every fixture with WHERE it stands (`_sanitary_prietaisai`: {tipas, vieta})
+# and its counts land, reconciled, in `detected_symbols_summary`. Where that
+# reading exists the rows take its counts; where it does not, the room type
+# still decides — and the row says so (`saltinis` = paskirtis_default, which
+# `confidence.apply_confidence` never shows green).
+SHOWER_KEY = "_dusas"   # room flag: True — the plumbing plan lists a shower in this room; False — it lists
+                        # this room's fixtures and none is a shower; absent — nothing read (the room type decides)
+SHOWER_PASKIRTYS = frozenset({"vonia", "san"})
+SHOWER_ASSUMED_SENTENCE = ("Dušas priskirtas pagal patalpos paskirtį — brėžinyje nesuskaičiuotas. "
+                           "Patikrinkite, ar šioje patalpoje yra dušas.")
+SHOWER_READ_SENTENCE = "Dušas pažymėtas santechnikos plane"
+# The keys the plumbing reader itself counts (sanitary_fixture_reader._FIXTURE_KEYS).
+# `trapai` and `gyvatukai` are NOT among them — only the main pass glances at
+# those, so the drain and towel-rail rows never take them as a reading.
+_PLUMBING_READ_KEYS = ("praustuves", "plautuves", "klozetai", "vonios", "dusai", "wc_remai", "bide")
+
+
+def room_has_shower(room: dict) -> bool:
+    """A shower-type room has a shower unless the plumbing plan lists the room's
+    fixtures and no shower among them."""
+    return _pask(room) in SHOWER_PASKIRTYS and room.get(SHOWER_KEY) is not False
+
+
+def _count0(v) -> int:
+    try:
+        return max(0, int(float(v)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def plumbing_reading(parsed: dict) -> dict[str, int] | None:
+    """The fixture counts of the santechnikos plan when the plumbing reader read
+    one; None when no plumbing reading exists (no plumbing sheet, the reader
+    failed, an extract older than the reader) or it counted nothing at all.
+
+    Read from `_meta` + `detected_symbols_summary` only — both ride the
+    recompute context (frontend lib/recomputeContext.js), so the extraction,
+    the Prielaidos recompute and the room-sheet recompute all take the counts
+    from the same place. The counts are the RECONCILED ones (the reader raises
+    the main pass's glance, never lowers it), and a count he corrects on the
+    general page lands there too.
+    """
+    meta = parsed.get("_meta") if isinstance(parsed.get("_meta"), dict) else {}
+    status = meta.get("fixtures_status")
+    if status is None and isinstance(meta.get("fixtures_raised"), list):
+        status = "ok"   # extracts before 2026-10-03: `fixtures_raised` is written only on an ok read
+    if status != "ok":
+        return None
+    # a reader that ran and listed nothing is no reading — judged on its OWN
+    # counts where they were kept (2026-10-03 on), else on the reconciled ones
+    own = meta.get("fixtures_counts")
+    if isinstance(own, dict) and not any(_count0(v) for v in own.values()):
+        return None
+    summary = parsed.get("detected_symbols_summary")
+    summary = summary if isinstance(summary, dict) else {}
+    counts = {k: _count0(summary.get(k)) for k in _PLUMBING_READ_KEYS}
+    return counts if any(counts.values()) else None
+
+
+_VIETA_SPLIT = _re.compile(r"\s[–—-]\s")
+# where a room NUMBER stands in a `vieta`: leading („03 Miegamojo…", „05/06 zona"),
+# in brackets („San. mazgas (03)") or after „nr." / „patalpa". A number anywhere
+# else is a name's own digit („Vonios kambarys 1") or a height, never a room.
+_VIETA_LEAD = _re.compile(r"^\s*(\d+(?:\.\d+)?(?:\s*[/,]\s*\d+(?:\.\d+)?)*)(?![\w.,])")
+_VIETA_TAGGED = _re.compile(r"(?:\(|\bnr\.?\s*|\bpatalp\w*\s+)(\d+(?:\.\d+)?)(?![\w.,])", _re.IGNORECASE)
+
+
+def _rooms_named_in(vieta: Any, rooms: list[dict]) -> set[str]:
+    """Room numbers a reader fixture's `vieta` names. Only the part before the
+    first dash is read — the reader writes „03 Miegamojo san. mazgas – praustuvas,
+    h=1.070", room first, details after.
+
+    A room NAME no other room shares wins (the longest one when one name holds
+    another: „Vonios kambarys 1" over „Vonios kambarys"); failing that, a room
+    NUMBER where the reader puts one (`_VIETA_LEAD`, `_VIETA_TAGGED`), leading
+    zeros aside. Nothing recognisable → no room: the fixture stays counted,
+    unplaced."""
+    head = _VIETA_SPLIT.split(str(vieta or ""), maxsplit=1)[0].strip()
+    if not head:
+        return set()
+    low = head.lower()
+    names: dict[str, list[str]] = {}
+    for r in rooms:
+        name = " ".join(str(r.get("pavadinimas") or "").split()).lower()
+        nr = str(r.get("nr") or "").strip()
+        if len(name) >= 3 and nr:
+            names.setdefault(name, []).append(nr)
+    matched = [name for name, nrs in names.items()
+               if len(nrs) == 1 and _re.search(r"(?<!\w)" + _re.escape(name) + r"(?!\w)", low)]
+    matched = [n for n in matched if not any(n != o and n in o for o in matched)]
+    if matched:
+        return {names[n][0] for n in matched}
+    by_nr: dict[str, list[str]] = {}
+    for r in rooms:
+        nr = str(r.get("nr") or "").strip()
+        if nr:
+            by_nr.setdefault(nr.lstrip("0") or "0", []).append(nr)
+    tokens: list[str] = []
+    lead = _VIETA_LEAD.match(head)
+    if lead:
+        tokens += _re.split(r"\s*[/,]\s*", lead.group(1))
+    tokens += [m.group(1) for m in _VIETA_TAGGED.finditer(head)]
+    return {nr for tok in tokens for nr in by_nr.get(tok.lstrip("0") or "0", [])}
+
+
+def mark_shower_rooms(parsed: dict) -> int:
+    """Settle SHOWER_KEY from the plumbing reader's list: a room the list names
+    gets True when a shower stands in it, False when only other fixtures do; a
+    room it never names is left to its type. The flag is set on every named room
+    — whether a shower-type room HAS one is decided at use (`room_has_shower`),
+    so a room classified later keeps the reading. Without a list (no plumbing
+    reading) nothing changes. Runs once, at the reader step of the extraction;
+    the recompute paths read the flags off the stored rooms. Returns how many
+    rooms the list decided."""
+    listed = parsed.get("_sanitary_prietaisai")
+    if not isinstance(listed, list) or not listed or plumbing_reading(parsed) is None:
+        return 0
+    rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict)]
+    seen: dict[str, set[str]] = {}
+    for f in listed:
+        if not isinstance(f, dict):
+            continue
+        tipas = str(f.get("tipas") or "").strip().lower()
+        for nr in _rooms_named_in(f.get("vieta"), rooms):
+            seen.setdefault(nr, set()).add(tipas)
+    decided = 0
+    for r in rooms:
+        kinds = seen.get(str(r.get("nr") or "").strip())
+        if not kinds:
+            r.pop(SHOWER_KEY, None)
+            continue
+        r[SHOWER_KEY] = "dusas" in kinds
+        decided += 1
+    return decided
+
+
+def shower_count(rooms: list[dict], reading: dict | None) -> dict:
+    """How many showers the rows bill, and on what.
+
+    The plumbing reading's `dusai` when it counted any — the count is the
+    drawing's. Otherwise the shower-type rooms, less those the plumbing plan
+    lists without a shower — an assumption, and `assumed` names the rooms.
+    """
+    cand = [r for r in rooms if _pask(r) in SHOWER_PASKIRTYS]
+    read_n = _count0((reading or {}).get("dusai"))
+    if read_n > 0:
+        return {"n": read_n, "source": "simboliai_brezinyje", "assumed": []}
+    kept = [r for r in cand if r.get(SHOWER_KEY) is not False]
+    return {"n": len(kept), "source": "paskirtis_default", "assumed": kept}
+
+
+_TOILET_PASKIRTYS = frozenset({"vonia", "wc", "san"})
+
+
+def toilet_count(rooms: list[dict], reading: dict | None) -> tuple[int, str]:
+    """(toilets, saltinis) — the plumbing reading's enumerated `klozetai` when it
+    counted any, else one per wet room (vonia / wc / san), as an assumption.
+
+    `wc_remai` is deliberately not the driver: the reader's list has no frame
+    entry to stand behind that number (only `klozetas` is point-listed), and a
+    wall-hung bidė brings a frame of its own, so a frame count can exceed the
+    toilets it is billed for."""
+    read_n = _count0((reading or {}).get("klozetai"))
+    if read_n > 0:
+        return read_n, "simboliai_brezinyje"
+    return sum(1 for r in rooms if _pask(r) in _TOILET_PASKIRTYS), "paskirtis_default"
+
+
+def _room_labels(rooms: list[dict]) -> str:
+    """„03, 06 ir 07" — the rooms a sentence asks him to check."""
+    return _lt_join([str(r.get("nr") or r.get("pavadinimas") or "?").strip() for r in rooms])
+
+
+def shower_assumed_reason(rooms: list[dict]) -> str:
+    """The row-level form of SHOWER_ASSUMED_SENTENCE, naming the rooms."""
+    if len(rooms) == 1:
+        return SHOWER_ASSUMED_SENTENCE.replace("šioje patalpoje",
+                                               f"patalpoje {_room_labels(rooms)}")
+    return ("Dušai priskirti pagal patalpų paskirtį — brėžinyje nesuskaičiuoti. "
+            f"Patikrinkite, ar patalpose {_room_labels(rooms)} yra dušas.")
 
 
 def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) -> dict:
@@ -3043,7 +3236,8 @@ def _resolve_san_concealment(parsed: dict) -> tuple[dict[str, bool], dict[str, s
 def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
                       concealed: bool, source: str,
                       saltinis: str = "paskirtis_default",
-                      emitted: set | None = None) -> None:
+                      emitted: set | None = None,
+                      extra: dict | None = None) -> None:
     """Emit the LT-conventional line(s) for ONE mixer family.
 
     Concealed → the potinkinė + virštinkinė PAIR, both carrying the SAME
@@ -3053,7 +3247,8 @@ def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
 
     `kiekis=None` emits the honesty-checklist form (KŽ rule: user fills in).
     `emitted` (optional out-param) collects the families actually written, so
-    the caller discloses assumptions only for lines that exist.
+    the caller discloses assumptions only for lines that exist. `extra` is
+    copied onto every line written (e.g. the reason a room-type count carries).
     """
     if emitted is not None:
         emitted.add(family)
@@ -3061,7 +3256,7 @@ def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
     lt = _SAN_FAMILY_LT[family]
     checklist = kiekis is None
     base = {"skyrius": skyrius, "vnt": "vnt", "kiekis": kiekis,
-            "saltinis": "checklist" if checklist else saltinis}
+            "saltinis": "checklist" if checklist else saltinis, **(extra or {})}
     if checklist:
         base["confidence"] = "low"
     todo = " — suveskite kiekį" if checklist else ""
@@ -3247,6 +3442,19 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         def _one_if(pasks: set):
             return lambda r: 1.0 if _pask(r) in pasks else 0.0
 
+        # 2026-10-03: a shower row counts the bathrooms that have one — read off
+        # the plumbing plan where it names the room, the room type otherwise —
+        # and each room says which of the two it was.
+        def _one_if_shower(r: dict) -> float:
+            return 1.0 if room_has_shower(r) else 0.0
+
+        def _shower_why(r: dict) -> str:
+            return SHOWER_READ_SENTENCE if r.get(SHOWER_KEY) is True else SHOWER_ASSUMED_SENTENCE
+
+        # …and a niche length estimated from the room type says so in the room
+        def _led_why(r: dict) -> str:
+            return LED_ESTIMATE_ROOM_SENTENCE if estimated_niche_m(r) > 0 else "LED nišos lubose"
+
         rules: list[tuple[str, object, str, str, object]] = [
             ("Sienų lyginimas Knauf Rotband", None, "m2", "Dalis dažomų sienų", lambda r: _pask(r) is not None),
             ("Angokraščių glaistymas-dažymas", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink langus ir lauko duris", None),
@@ -3254,9 +3462,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             ("Durų angų paruošimas beapvadinėms durims", _hidden_door_reveal, "m", "Beapvadinės durys — anga paruošiama (2 × aukštis + plotis)", None),
             ("Lubų karnizo sumontavimas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
             ("Lubų karnizo dažymas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
-            ("Nišų formavimas GKP konstrukcijoje", _field("nisu_metrai"), "m", "LED nišos lubose", None),
-            ("LED nišų glaistymas", _field("nisu_metrai"), "m", "LED nišos lubose", None),
-            ("LED nišų dažymas", _field("nisu_metrai"), "m", "LED nišos lubose", None),
+            ("Nišų formavimas GKP konstrukcijoje", _field("nisu_metrai"), "m", _led_why, None),
+            ("LED nišų glaistymas", _field("nisu_metrai"), "m", _led_why, None),
+            ("LED nišų dažymas", _field("nisu_metrai"), "m", _led_why, None),
             ("GKP lubų montavimas (standartinis aukštis)", _field("gkp_lubu_standart_m2"), "m2", "GKP lubos", None),
             ("GKP lubų montavimas (virš 3 m aukščio)", _field("gkp_lubu_virs_3m_m2"), "m2", "GKP lubos virš 3 m", None),
             ("GKP siūlių glaistymas + armavimo juostelė",
@@ -3266,16 +3474,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             ("Silikonavimas tarp plytelių zonos ir sanitarinės įrangos", lambda r: float(r.get("perimetras_m") or 0) * 1.31 if _is_tiled_room(r) else 0.0, "m", "Plytelėmis dengta patalpa — perimetras × 1,31", _is_tiled_room),
             ("Plytelių vidinių kampų silikonavimas", lambda r: float(r.get("perimetras_m") or 0) * 0.99 if _is_tiled_room(r) else 0.0, "m", "Plytelėmis dengta patalpa — perimetras × 0,99", _is_tiled_room),
             ("Plytelių 45° pjovimas (vidiniai kampai)", _pjovimas_45, "m", "Drėgna patalpa — plytelių kampai", lambda r: _pask(r) in WET),
-            ("Nuolydžio formavimas dušo zonoje", _one_if(SHOWER), "vnt", "Dušo zona", lambda r: _pask(r) in SHOWER),
-            ("Lentynėlių iš plytelių įrengimas dušo kabinoje", None, "vnt", "Dušo kabina", lambda r: _pask(r) in SHOWER),
+            ("Nuolydžio formavimas dušo zonoje", _one_if_shower, "vnt", _shower_why, lambda r: _pask(r) in SHOWER),
+            ("Lentynėlių iš plytelių įrengimas dušo kabinoje", None, "vnt", _shower_why, lambda r: _pask(r) in SHOWER),
             ("Plytelių grindjuosčių supjovimas ir suklijavimas", _tile_plinth, "m", "Plytelių grindys prie dažomų sienų", lambda r: float(r.get("plyteles_grindys_m2") or 0) > 0 and _pask(r) not in WET),
             ("WC rėmo montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa su klozetu", lambda r: _pask(r) in WET_K),
             ("Klozeto montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa su klozetu", lambda r: _pask(r) in WET_K),
             ("Praustuvės montavimas", _one_if(WET_K), "vnt", "Drėgna patalpa", lambda r: _pask(r) in WET_K),
             ("Potinkinio praustuvės maišytuvo", _one_if(WET_K), "vnt", "Drėgna patalpa", lambda r: _pask(r) in WET_K),
-            ("Potinkinio dušo maišytuvo", _one_if(SHOWER), "vnt", "Dušas", lambda r: _pask(r) in SHOWER),
+            ("Potinkinio dušo maišytuvo", _one_if_shower, "vnt", _shower_why, lambda r: _pask(r) in SHOWER),
+            ("Dušo maišytuvo sistemos montavimas", _one_if_shower, "vnt", _shower_why, lambda r: _pask(r) in SHOWER),
             ("Gyvatuko montavimas", _one_if(SHOWER), "vnt", "Vonios kambarys", lambda r: _pask(r) in SHOWER),
-            ("Linijinio latako montavimas", _one_if(SHOWER), "vnt", "Dušo zona", lambda r: _pask(r) in SHOWER),
+            ("Linijinio latako montavimas", _one_if_shower, "vnt", _shower_why, lambda r: _pask(r) in SHOWER),
         ]
 
         for p in pozicijos:
@@ -3294,15 +3503,14 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 per_room = _field("walls_paintable_m2", share)
                 why = f"{int(round(share * 100))} % dažomų sienų"
             elif prefix == "Lentynėlių iš plytelių įrengimas dušo kabinoje":
-                n = sum(1 for r in rooms if _pask(r) in SHOWER)
+                n = sum(1 for r in rooms if room_has_shower(r))
                 each = (float(kiekis) / n) if n else 0.0
-                per_room = lambda r, each=each: each if _pask(r) in SHOWER else 0.0
-                why = "Dušo kabina"
+                per_room = lambda r, each=each: each if room_has_shower(r) else 0.0
             contribs = []
             for r in rooms:
                 v = round(float(per_room(r)), 2)
                 if v > 0:
-                    contribs.append(_ledger.contribution(r, v, unit, why))
+                    contribs.append(_ledger.contribution(r, v, unit, why(r) if callable(why) else why))
             if not contribs:
                 continue
             total = round(sum(c["value"] for c in contribs), 2)
@@ -3324,6 +3532,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 # the drawing's symbols counted more than the rooms alone
                 roll.append(_ledger.step("anchor", "Suskaičiuota plane", float(kiekis),
                                          f"{int(round(gap))} vnt. daugiau, nei patalpų šiai eilutei"))
+                _ledger.attach(p, contribs, excluded, roll)
+            elif unit == "vnt" and gap < 0 and p.get("saltinis") == "simboliai_brezinyje":
+                # 2026-10-03: the plumbing plan counted FEWER than the room
+                # types suggest (a san. mazgas with no shower) — the count is
+                # the drawing's, the rooms stay named for him to check
+                roll.append(_ledger.step("anchor", "Suskaičiuota plane", float(kiekis),
+                                         f"{int(round(-gap))} vnt. mažiau, nei patalpų šiai eilutei"))
                 _ledger.attach(p, contribs, excluded, roll)
             # else: the rooms do not explain this number — leave it unledgered
 
@@ -3744,6 +3959,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     nisu_total = _sum("nisu_metrai")
     if nisu_total > 0:
+        # 2026-10-03 (audit vision-pipeline-1): metres the niche locator did not
+        # read but `niche_inference` estimated from the room type are billed on
+        # all three rows below. They are never shown green, and every row says
+        # which rooms carry an estimate and that it was not measured.
+        _led_est = led_estimated_rooms(rooms)
+        _led_flags = led_estimate_disclosure(_led_est, nisu_total)
         # rangovas audit 2026-04-29: separate STRUCTURAL framing line (GKP karkasą
         # formuoja prieš glaistymą; tai 3/5 jo projektų atskira eilutė).
         pozicijos.extend([
@@ -3751,11 +3972,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL,
              "medziagos_aprasymas": "GKP profiliai + savisriegiai",
              "medziagos_kiekis": round(nisu_total * 2.5, 2),  # ~2.5 m profilio per ilgiui
-             "medziagos_vnt": "m"},
+             "medziagos_vnt": "m", **_led_flags},
             {"skyrius": SK_GD, "aprasymas": "LED nišų glaistymas",
-             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
-             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
         ])
 
     # ════════════════════════════════════════════════════════════════════════
@@ -4068,35 +4289,48 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "vnt": "vnt", "kiekis": n_holes * 4, "saltinis": SAL,
                     "confidence": "low",
                 })
-        # Dušo nuolydis — 1 vnt per vonia su dušu
-        n_showers = sum(1 for r in rooms
-                        if _pask(r) in {"vonia", "san"})
+        # Dušo nuolydis — 1 vnt per dušą. 2026-10-03 (audit calc-engine-6):
+        # the showers the plumbing plan counts; without a plumbing reading, the
+        # vonia/san rooms — as a disclosed assumption naming the rooms, never
+        # as a count read off the drawing (it used to say `SAL`).
+        _sh = shower_count(rooms, plumbing_reading(parsed))
+        n_showers = _sh["n"]
         if n_showers > 0:
-            pozicijos.append({
+            _nuolydis = {
                 "skyrius": SK_PL,
                 "aprasymas": "Nuolydžio formavimas dušo zonoje",
-                "vnt": "vnt", "kiekis": n_showers, "saltinis": SAL,
-            })
-        # Lentynėliai iš plytelių dušo kabinoje — default 2 per vonia.
+                "vnt": "vnt", "kiekis": n_showers, "saltinis": _sh["source"],
+            }
+            if _sh["assumed"]:
+                _nuolydis["_confidence_reason"] = shower_assumed_reason(_sh["assumed"])
+            pozicijos.append(_nuolydis)
+        # Lentynėliai iš plytelių dušo kabinoje — default 2 per dušą.
         # 2026-05-27 fix (Objektas A fixture): truth=5 vnt for 2 bathrooms (=2,5
         # per vonia). Anksčiau default 1 per vonia → 2 vnt (under by -60%).
-        # User gali override per `lentyneliu_per_vonia`.
-        n_full_vonia = sum(1 for r in rooms
-                           if _pask(r) in {"vonia", "san"})
-        if n_full_vonia > 0:
+        # User gali override per `lentyneliu_per_vonia`. The per-shower number
+        # stays an assumption even when the showers are counted.
+        if n_showers > 0:
             per_vonia = (parsed.get("_overrides") or {}).get("lentyneliu_per_vonia", 2)
             try:
                 per_vonia = max(0, int(per_vonia))
             except (ValueError, TypeError):
                 per_vonia = 2
-            pozicijos.append({
+            _shelves = {
                 "skyrius": SK_PL,
                 "aprasymas": "Lentynėlių iš plytelių įrengimas dušo kabinoje",
-                "vnt": "vnt", "kiekis": n_full_vonia * per_vonia,
-                "saltinis": "paskirtis_default",
+                "vnt": "vnt", "kiekis": n_showers * per_vonia,
+                # counted showers × an assumed number per shower: still an
+                # assumption, but not a room-type one
+                "saltinis": "paskirtis_default" if _sh["assumed"] else "project_assumption",
                 "confidence": "low",
-                "_assumption": f"{per_vonia} lentynėlės per vonią × {n_full_vonia} voniose.",
-            })
+                "_assumption": (
+                    f"{per_vonia} lentynėlės kiekvienam dušui; dušų: {n_showers} "
+                    + ("(pagal santechnikos planą)." if not _sh["assumed"]
+                       else f"(pagal patalpų paskirtį: {_room_labels(_sh['assumed'])}).")),
+            }
+            if _sh["assumed"]:
+                _shelves["_confidence_reason"] = shower_assumed_reason(_sh["assumed"])
+            pozicijos.append(_shelves)
 
         # PLYTELIŲ grindjuostės — the skirting CUT FROM TILES in tiled-floor
         # rooms (tambūras, katilinė/skalbykla, koridorius su plytelėmis).
@@ -4186,13 +4420,14 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # label are re-united with this one by `_LEGACY_LABEL_RENAMES` in
     # api/recompute_quantities.py — without that map the rebuild would show
     # the user BOTH rows.
-    n_wet_klozetas = sum(1 for r in rooms
-                          if _pask(r) in {"vonia", "wc", "san", "san_mazgas"})
+    # 2026-10-03: one per toilet the plumbing plan counts; the wet rooms only
+    # when no plumbing reading exists (then `paskirtis_default` — never green).
+    n_wet_klozetas, _kl_src = toilet_count(rooms, plumbing_reading(parsed))
     if n_wet_klozetas > 0:
         pozicijos.append({
             "skyrius": SK_GKP,
             "aprasymas": "Pertvaros sutvirtinimas WC mechanizmams montuoti (GKP dėžutė)",
-            "vnt": "vnt", "kiekis": n_wet_klozetas, "saltinis": "paskirtis_default",
+            "vnt": "vnt", "kiekis": n_wet_klozetas, "saltinis": _kl_src,
             "medziagos_aprasymas": "GKP plokštė + profiliai",
             "medziagos_kiekis": n_wet_klozetas, "medziagos_vnt": "vnt",
         })
@@ -4216,7 +4451,20 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         _h_contribs = [
             _ledger.contribution(r, 1, "vnt", "Drėgna patalpa — hidroizoliacija po plytelėmis")
             for r in rooms_pl if _pask(r) in WET]
+        # 2026-10-03 (audit calc-engine-6): the m² carry a full-height shower
+        # zone for every vonia/san the plumbing plan does not answer for — say
+        # which rooms, so the membrane is not shown as read.
+        _h_assumed = [r for r in rooms_pl
+                      if _pask(r) in SHOWER_PASKIRTYS and r.get(SHOWER_KEY) is None]
+        _h_disclosure = ({
+            "confidence": "medium",
+            "_confidence_reason": shower_assumed_reason(_h_assumed),
+            "_assumption": (f"Į plotą įskaičiuota dušo zona (1,0 × 1,2 m iki lubų) patalpose "
+                            f"{_room_labels(_h_assumed)} — dušas priskirtas pagal patalpos "
+                            "paskirtį, brėžinyje nesuskaičiuotas."),
+        } if _h_assumed else {})
         pozicijos.append(_family_ledger({
+            **_h_disclosure,
             "skyrius": SK_HI,
             "aprasymas": "Hidroizoliacijos įrengimas (paruošimas + 2 sluoksniai + sandarinimo juostelė)",
             "vnt": "vnt", "kiekis": n_wet_zones, "saltinis": SAL,
@@ -4314,12 +4562,30 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     # Pilnos drėgnos patalpos (vonia + wc + san) — turi klozetą + WC rėmą
     n_wet_with_klozetas = n_vonia + n_wc + n_san
-    # Vonios — turi dušą + gyvatuką + dušo maišytuvą + lataką
+    # Vonios — turi gyvatuką (the towel rail stays a room-type count: the
+    # plumbing reader does not count it)
     n_full_bathroom = n_vonia + n_san
+    # 2026-10-03 (audit vision-pipeline-7 / calc-engine-6): toilets, basins and
+    # showers come from the plumbing plan when a plumbing reading exists
+    # (`plumbing_reading`); the room types only when it does not — or when it
+    # counted none of that fixture — and then the row's `saltinis` says so.
+    _plumb = plumbing_reading(parsed)
+    n_toilets, _toilet_src = toilet_count(rooms, _plumb)
+    _sh_san = shower_count(rooms, _plumb)
+    n_showers_san = _sh_san["n"]
+    _shower_extra = ({"_confidence_reason": shower_assumed_reason(_sh_san["assumed"])}
+                     if _sh_san["assumed"] else {})
     # 2026-06-06 (RC1): basins are NOT 1-per-wet-room — decouple from toilet count;
     # use the detected praustuvė symbol count when higher (Objektas A: 3 vs 2).
-    n_praustuves = max(n_wet_with_klozetas,
-                       int((parsed.get("detected_symbols_summary") or {}).get("praustuves") or 0))
+    # With a plumbing reading the plan's own count stands, also when it is lower.
+    _basins_read = _count0((_plumb or {}).get("praustuves"))
+    if _basins_read > 0:
+        n_praustuves, _basin_src = _basins_read, "simboliai_brezinyje"
+    else:
+        _basins_sym = _count0((parsed.get("detected_symbols_summary") or {}).get("praustuves"))
+        n_praustuves = max(n_wet_with_klozetas, _basins_sym)
+        _basin_src = ("simboliai_brezinyje" if _basins_sym > n_wet_with_klozetas
+                      else "paskirtis_default")
     # Plautuvės (virtuvės/skalbyklos kriauklės) — a SEPARATE contractor line
     # from the praustuvė (objektas_d nr 32 "Plautuvės montavimas" alongside nr 33
     # "Praustuvės montavimas"), so it needs a count of its own.
@@ -4365,40 +4631,48 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     san_concealed, san_source = _resolve_san_concealment(parsed)
     san_emitted: set[str] = set()
 
-    if n_wet_with_klozetas > 0 or n_plautuves > 0 or n_skalbykla > 0:
+    if n_toilets > 0 or n_showers_san > 0 or n_plautuves > 0 or n_skalbykla > 0:
         # WC rėmas + Klozetas + praustuvė — single-visit jobs, one line each.
-        if n_wet_with_klozetas > 0:
+        if n_toilets > 0:
             pozicijos.extend([
                 {"skyrius": SK_SAN, "aprasymas": "WC rėmo montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default",
+                 "vnt": "vnt", "kiekis": n_toilets, "saltinis": _toilet_src,
                  "medziagos_aprasymas": "WC potinkinis rėmas",
-                 "medziagos_kiekis": n_wet_with_klozetas, "medziagos_vnt": "vnt"},
+                 "medziagos_kiekis": n_toilets, "medziagos_vnt": "vnt"},
                 {"skyrius": SK_SAN, "aprasymas": "Klozeto montavimas",
-                 "vnt": "vnt", "kiekis": n_wet_with_klozetas, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_toilets, "saltinis": _toilet_src},
             ])
             # Praustuvės MAIŠYTUVAS — potinkinis → pora; praustuvė pati (the
             # basin) stays one line. Both consume the same n_praustuves.
             _emit_mixer_lines(pozicijos, SK_SAN, "praustuve", n_praustuves,
                               san_concealed["praustuve"], san_source["praustuve"],
-                              emitted=san_emitted)
+                              saltinis=_basin_src, emitted=san_emitted)
             pozicijos.append(
                 {"skyrius": SK_SAN, "aprasymas": "Praustuvės montavimas",
-                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": "paskirtis_default"})
+                 "vnt": "vnt", "kiekis": n_praustuves, "saltinis": _basin_src})
             # Bidė dušiukai — pair when counted, checklist TODO when not.
             _emit_mixer_lines(pozicijos, SK_SAN, "bide", n_bide or None,
                               san_concealed["bide"], san_source["bide"],
                               saltinis="simboliai_brezinyje", emitted=san_emitted)
-        # Pilna vonia — dušas + gyvatukas + linijinis latakas
-        if n_full_bathroom > 0:
-            _emit_mixer_lines(pozicijos, SK_SAN, "dusas", n_full_bathroom,
+        # Dušas — maišytuvas + linijinis latakas, one per shower (2026-10-03:
+        # the plumbing plan's showers; the vonia/san rooms only as a disclosed
+        # assumption naming them)
+        # (Row order kept: mixer, gyvatukas, latakas.)
+        if n_showers_san > 0:
+            _emit_mixer_lines(pozicijos, SK_SAN, "dusas", n_showers_san,
                               san_concealed["dusas"], san_source["dusas"],
-                              emitted=san_emitted)
-            pozicijos.extend([
+                              saltinis=_sh_san["source"], emitted=san_emitted,
+                              extra=_shower_extra)
+        # Gyvatukas — one per bathroom (vonia/san), a room-type count
+        if n_full_bathroom > 0:
+            pozicijos.append(
                 {"skyrius": SK_SAN, "aprasymas": "Gyvatuko montavimas, teno pajungimas",
-                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
+                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"})
+        if n_showers_san > 0:
+            pozicijos.append(
                 {"skyrius": SK_SAN, "aprasymas": "Linijinio latako montavimas (dušo zonoje)",
-                 "vnt": "vnt", "kiekis": n_full_bathroom, "saltinis": "paskirtis_default"},
-            ])
+                 "vnt": "vnt", "kiekis": n_showers_san, "saltinis": _sh_san["source"],
+                 **_shower_extra})
         # Vonios (bathtub) maišytuvas — a real count only when a BATHTUB was
         # read; a tub-or-tray symbol with no reader evidence becomes a TODO.
         if n_vonios_sym > 0 or vonia_unknown:
@@ -4413,7 +4687,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # every project already quoted against that label (_merge_user_edits
         # matches on the label text).
         if n_plautuves > 0:
-            _plaut_src = ("simboliai_brezinyje" if n_plautuves > n_virtuve
+            # a sink the plumbing plan counts is read, also when the kitchen
+            # room type would have given the same number (2026-10-03)
+            _plaut_src = ("simboliai_brezinyje"
+                          if n_plautuves > n_virtuve or _count0((_plumb or {}).get("plautuves")) >= n_plautuves
                           else "paskirtis_default")
             pozicijos.extend([
                 {"skyrius": SK_SAN, "aprasymas": "Plautuvės montavimas",
@@ -6718,7 +6995,13 @@ def extract_interior(
         # Roll fixture-reader tokens into cost (voted: per-round; single: one).
         for _rm in _reader_call_metas(fx):
             _append_extra_call(parsed, _rm, reader="fixtures")
+        # Whether a plumbing reading EXISTS decides where every santechnika
+        # count comes from (`plumbing_reading`, 2026-10-03) — kept in `_meta`
+        # because `_meta` rides the recompute context and the rows must not
+        # change source when he touches a Prielaidos slider.
+        parsed.setdefault("_meta", {})["fixtures_status"] = fx.get("status") or "error"
         if fx.get("status") == "ok":
+            parsed["_meta"]["fixtures_counts"] = dict(fx.get("counts") or {})
             rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
                                            fx.get("counts") or {})
             parsed["detected_symbols_summary"] = rec["merged"]
@@ -6731,6 +7014,14 @@ def extract_interior(
             # against. Small (tens of short dicts) and already paid for.
             if fx.get("prietaisai"):
                 parsed["_sanitary_prietaisai"] = fx["prietaisai"]
+            # Which rooms the plumbing plan shows a shower in (2026-10-03) —
+            # attached to the ROOMS here, at read time, like the doors reader:
+            # the shower zone is a calculator input (Step 2.9 below), and the
+            # recompute paths get the rooms, not the fixture list.
+            try:
+                mark_shower_rooms(parsed)
+            except Exception as _exc:  # noqa: BLE001
+                print(f"[extractor] shower attribution failed (non-fatal): {_exc}")
             parsed.setdefault("_meta", {})["fixtures_raised"] = rec["raised"]
             parsed["_meta"]["fixtures_elapsed_s"] = fx.get("_elapsed_s")
             _emit({"event": "fixtures_completed", "raised": rec["raised"],
@@ -6739,6 +7030,7 @@ def extract_interior(
             _emit({"event": "fixtures_skipped", "reason": fx.get("_error")})
     except Exception as exc:  # noqa: BLE001
         print(f"[extractor] fixture read failed (non-fatal): {exc}")
+        parsed.setdefault("_meta", {})["fixtures_status"] = "error"
         _emit({"event": "fixtures_error", "message": str(exc)})
 
     # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page

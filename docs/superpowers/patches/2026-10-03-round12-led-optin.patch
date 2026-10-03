@@ -1,0 +1,292 @@
+Round 12, item 3 Part B (audit vision-pipeline-1) — NOT KEPT, saved for the founder.
+
+What it does: an LED niche length that niche_inference estimated from the room
+type is no longer billed by default. The three LED rows carry only the metres
+read off the drawing; one blank row („LED nišos — suveskite ilgį", kiekis null)
+names the rooms where no length was read with the estimate per room, and the
+Prielaidos panel offers „LED nišos be perskaityto ilgio: Palikti tuščią /
+Priimti įvertinimą" (`_overrides.led_nisu_ivertinimas`). Switch:
+niche_inference.LED_ESTIMATE_OPT_IN (True = this behaviour, False = Part A only).
+
+Why it is not in the tree — measured 2026-10-03, €0, `--recompute`, against the
+tree with items 1, 2, 3A, 4 applied (which itself equals the baseline):
+
+  totals --gate:  in-sample MAE 9.47 % -> 15.44 %, out-of-sample 7.06 % -> 8.67 %  (GATE FAIL, exit 1)
+    objektas_b LED  -18.2 % -> -51.6 %   project MAE 16.63 % -> 27.76 %
+    objektas_d LED   -2.5 % -> -46.7 %   project MAE  5.18 % -> 19.92 %
+    objektas_h LED   -8.5 % -> -16.5 %   project MAE  6.80 % ->  8.81 %
+    objektas_a / objektas_c / objektas_g unchanged (A has no estimate; C's two are
+    already dropped by the enumerated-room gate; G's LED is not scored)
+  rows --gate:    corpus within-10 % 27.5 % -> 26.5 %, € 32.3 % -> 31.4 %      (GATE FAIL, exit 1)
+    objektas_d 40.0 % -> 36.0 %, objektas_h 29.2 % -> 20.8 %
+
+i.e. on the projects in the corpus the estimate is closer to the contractor's
+billed length than a blank is. Part A (every row fed by an estimate is never
+green and names the rooms and metres) stays in the tree either way.
+
+Apply on top of the round-12 tree: git apply docs/superpowers/patches/2026-10-03-round12-led-optin.patch
+Strings in AssumptionsPanel are inline Lithuanian; move them to i18n keys if adopted.
+
+diff --git a/backend/extractor/niche_inference.py b/backend/extractor/niche_inference.py
+--- a/backend/extractor/niche_inference.py
++++ b/backend/extractor/niche_inference.py
+@@ -103,8 +103,26 @@
+ LED_ESTIMATE_ROOM_SENTENCE = (
+     "Nišos ilgis įvertintas pagal patalpos tipą — brėžinyje neišmatuotas. "
+     "Patikrinkite lubų plane, ar čia yra LED niša, ir įrašykite tikrą ilgį.")
++
++
++# ── Part B (2026-10-03, audit vision-pipeline-1): the estimate as HIS choice ──
++# On: an estimated length is NOT billed until he accepts it in Prielaidos
++# (`_overrides[LED_ESTIMATE_CHOICE_KEY] = True`); the sąmata carries a blank LED
++# row naming the rooms where no niche length was read, with the estimate shown
++# as the answer he can take. Off: the estimate is billed and disclosed (Part A).
++LED_ESTIMATE_OPT_IN = True
++LED_ESTIMATE_CHOICE_KEY = "led_nisu_ivertinimas"
++
+ 
++def estimate_accepted(overrides: dict | None) -> bool:
++    """Is an estimated niche length billed? Always with LED_ESTIMATE_OPT_IN off;
++    with it on, only once he chose „priimti įvertinimą"."""
++    if not LED_ESTIMATE_OPT_IN:
++        return True
++    v = overrides.get(LED_ESTIMATE_CHOICE_KEY) if isinstance(overrides, dict) else None
++    return v is True or str(v).strip().lower() in ("true", "1", "priimti")
+ 
++
+ def _lt(v: float) -> str:
+     return f"{float(v):.2f}".replace(".", ",")
+ 
+diff --git a/backend/extractor/vision_call.py b/backend/extractor/vision_call.py
+--- a/backend/extractor/vision_call.py
++++ b/backend/extractor/vision_call.py
+@@ -1385,7 +1385,7 @@
+     return round(perim * 1.05, 2)
+ 
+ 
+-def _calc_nisu_metrai_m(elementai: list) -> float:
++def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> float:
+     """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
+ 
+     ilgis_m = TOTAL niche length in this room across all segments.
+@@ -1395,9 +1395,15 @@
+ 
+     Fallback path (no ilgis_m, only plotis_mm) keeps kiekis as a multiplier
+     because plotis_mm is per-window and naturally pairs with a count.
++
++    `include_estimates=False` leaves out the niches `niche_inference` estimated
++    from the room type (Part B of the 2026-10-03 LED fix: billed only once he
++    accepts the estimate).
+     """
+     total = 0.0
+     for el in (elementai or []):
++        if not include_estimates and el.get("_source") == "statistical_inference":
++            continue
+         if (el.get("tipas") or "").lower() == "nisa_led":
+             ilgis = float(el.get("ilgis_m") or 0)
+             if ilgis > 0:
+@@ -1410,6 +1416,17 @@
+     return round(total, 2)
+ 
+ 
++def refresh_led_metres(room: dict, overrides: dict | None) -> None:
++    """The room's billed LED niche metres (`nisu_metrai`) and the estimate held
++    back from them (`_nisu_ivertinta_m`, 0 when nothing is held back) — Part B
++    of the 2026-10-03 LED fix: an estimated length waits for his „priimti"."""
++    from .niche_inference import estimate_accepted
++    accepted = estimate_accepted(overrides)
++    elementai = room.get("elementai") or []
++    room["nisu_metrai"] = _calc_nisu_metrai_m(elementai, include_estimates=accepted)
++    room["_nisu_ivertinta_m"] = 0.0 if accepted else estimated_niche_m(room)
++
++
+ def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
+     """LT STR 2.04.01:2018 — vonios/WC/san. mazgo hidroizoliacija.
+ 
+@@ -1834,7 +1851,7 @@
+         perim, room.get("paskirtis", ""), evidence=room.get(KARNIZAS_KEY))
+ 
+     # 4.5 LED nišų metrai
+-    room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
++    refresh_led_metres(room, rules_override)
+ 
+     # 5. Audit field
+     room["_computed_by"] = "python_deterministic"
+@@ -3978,6 +3995,26 @@
+             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
+              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
+         ])
++    # Part B (2026-10-03): rooms where no niche length was read and the estimate
++    # waits for his answer — one blank row naming them, the estimate offered.
++    _held = [(r, round(float(r.get("_nisu_ivertinta_m") or 0), 2)) for r in rooms
++             if float(r.get("_nisu_ivertinta_m") or 0) > 0]
++    if _held:
++        _held_m = round(sum(m for _, m in _held), 2)
++        _where = ", ".join(f"{str(r.get('nr') or r.get('pavadinimas') or '?').strip()} "
++                           f"(įvertinimas {_lt_num(m)} m)" for r, m in _held)
++        pozicijos.append({
++            "skyrius": SK_GKP, "aprasymas": "LED nišos — suveskite ilgį",
++            "vnt": "m", "kiekis": None, "saltinis": "checklist", "confidence": "low",
++            "_led_ivertinta_m": _held_m,
++            "_confidence_reason": (
++                f"Nišų ilgio brėžinyje neperskaičiau patalpose {_where}. Patikrinkite "
++                "lubų plane, ar jose yra LED nišos, ir įrašykite ilgį."),
++            "_assumption": (
++                f"Pagal patalpos tipą įvertinta iš viso {_lt_num(_held_m)} m. Jei tinka, "
++                "prielaidose pasirinkite „LED nišos be perskaityto ilgio: priimti "
++                "įvertinimą“ — tada šis ilgis pateks į nišų eilutes."),
++        })
+ 
+     # ════════════════════════════════════════════════════════════════════════
+     # GKP MONTAVIMAS (~5-9 lines)
+diff --git a/backend/api/recompute_quantities.py b/backend/api/recompute_quantities.py
+--- a/backend/api/recompute_quantities.py
++++ b/backend/api/recompute_quantities.py
+@@ -90,6 +90,9 @@
+     # vidaus_durys: bool}; read by universal_rules.settle_reveals_scope. Scope, not a reading: the drawing
+     # shows the openings, the contractor decides which reveals are his.
+     "angokrasciai_apimtis",
++    # 2026-10-03 (Part B, audit vision-pipeline-1): is an LED niche length estimated from the room type
++    # billed? True once he accepts it; read by niche_inference.estimate_accepted.
++    "led_nisu_ivertinimas",
+ }
+ _GESTURE_FIELDS = {
+     "add_symbol",        # G2
+@@ -1210,6 +1213,11 @@
+             if _apimtis:
+                 _scope.apply_ceiling_choice(rooms, _apimtis)
+                 parsed["_apimtis"] = _apimtis
++            # his answer to „LED nišos be perskaityto ilgio" moves every room's billed metres (Part B)
++            from extractor.vision_call import refresh_led_metres
++            for _r in rooms:
++                if isinstance(_r, dict):
++                    refresh_led_metres(_r, overrides)
+             rebuilt = _build_pozicijos_from_rooms(parsed)
+             if _apimtis:
+                 rebuilt["pozicijos"] = _scope.filter_rows_by_families(rebuilt.get("pozicijos"), _apimtis)
+diff --git a/frontend/src/components/project/AssumptionsPanel.jsx b/frontend/src/components/project/AssumptionsPanel.jsx
+--- a/frontend/src/components/project/AssumptionsPanel.jsx
++++ b/frontend/src/components/project/AssumptionsPanel.jsx
+@@ -637,6 +637,45 @@
+             </div>
+           </Row>
+ 
++          {/* LED nišos be perskaityto ilgio (2026-10-03, Part B of audit vision-pipeline-1). An estimate
++              from the room type is billed only once he accepts it — `_overrides.led_nisu_ivertinimas`,
++              read by niche_inference.estimate_accepted. Shown only when the project HAS such an estimate.
++              Strings inline until the choice is adopted (then: i18n keys). */}
++          {(rawData?.patalpos || []).some((r) => (r?.elementai || [])
++            .some((e) => e?._source === 'statistical_inference')) && (
++            <Row
++              label="LED nišos be perskaityto ilgio"
++              note="Kai kuriose patalpose nišų ilgio brėžinyje neperskaičiau. Įvertinimas pagal patalpos tipą — ne matmuo: priimkite jį tik patikrinę lubų planą."
++            >
++              <div className="flex gap-1">
++                {[['false', 'Palikti tuščią'], ['true', 'Priimti įvertinimą']].map(([val, lbl]) => {
++                  const on = String(safeAssumptions.led_nisu_ivertinimas === true) === val;
++                  return (
++                    <button
++                      key={val}
++                      type="button"
++                      onClick={() => {
++                        const v = val === 'true';
++                        setField('led_nisu_ivertinimas', v);
++                        handleRecompute('led_nisu_ivertinimas', v);
++                      }}
++                      aria-pressed={on}
++                      data-assumption={`led_nisu_ivertinimas:${val}`}
++                      className={`rounded border font-medium transition-colors ${
++                        on
++                          ? 'bg-primary/10 text-foreground border-primary'
++                          : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
++                      }`}
++                      style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
++                    >
++                      {lbl}
++                    </button>
++                  );
++                })}
++              </div>
++            </Row>
++          )}
++
+           {/* Sienos storis */}
+           <Row
+             label={t('project.assumptions.wallThickness')}
+diff --git a/backend/tests/test_led_estimate_choice_2026_10_03.py b/backend/tests/test_led_estimate_choice_2026_10_03.py
+new file mode 100644
+index 0000000..28d830a
+--- /dev/null
++++ b/backend/tests/test_led_estimate_choice_2026_10_03.py
+@@ -0,0 +1,71 @@
++"""Part B of the 2026-10-03 LED fix (audit vision-pipeline-1): an LED niche
++length estimated from the room type is not billed until he accepts it.
++
++Behind `niche_inference.LED_ESTIMATE_OPT_IN`. Measured on the corpus before it
++was kept or dropped — see docs/superpowers/patches/2026-10-03-round12-led-optin.patch.
++"""
++from __future__ import annotations
++
++import copy
++
++import pytest
++
++from extractor import niche_inference
++from extractor.vision_call import (
++    _build_pozicijos_from_rooms, _recompute_per_room_via_python,
++)
++
++
++def _parsed() -> dict:
++    return {
++        "patalpos": [
++            {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
++             "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.7,
++             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 8.0,
++                            "_source": "niche_locator"}]},
++            {"nr": "02", "pavadinimas": "Koridorius", "paskirtis": "koridorius",
++             "plotas_m2": 8.0, "perimetras_m": 12.0, "lubu_aukstis_m": 2.7,
++             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 6.6,
++                            "_source": "statistical_inference", "_confidence": "low"}]},
++        ],
++        "santrauka": {},
++    }
++
++
++def _rows(parsed: dict, overrides: dict | None = None) -> list[dict]:
++    p = copy.deepcopy(parsed)
++    if overrides:
++        p["_overrides"] = overrides
++    p = _recompute_per_room_via_python(p, overrides or {})
++    return _build_pozicijos_from_rooms(p)["pozicijos"]
++
++
++@pytest.fixture(autouse=True)
++def _opt_in(monkeypatch):
++    monkeypatch.setattr(niche_inference, "LED_ESTIMATE_OPT_IN", True)
++
++
++def test_the_estimate_waits_for_his_answer():
++    rows = _rows(_parsed())
++    framing = next(r for r in rows if r["aprasymas"] == "Nišų formavimas GKP konstrukcijoje")
++    assert framing["kiekis"] == 8.0                       # read metres only
++    blank = next(r for r in rows if r["aprasymas"] == "LED nišos — suveskite ilgį")
++    assert blank["kiekis"] is None and blank["saltinis"] == "checklist"
++    assert "02" in blank["_confidence_reason"] and "6,60" in blank["_confidence_reason"]
++    assert blank["_led_ivertinta_m"] == 6.6
++
++
++def test_accepting_the_estimate_bills_it_and_discloses_it():
++    rows = _rows(_parsed(), {niche_inference.LED_ESTIMATE_CHOICE_KEY: True})
++    framing = next(r for r in rows if r["aprasymas"] == "Nišų formavimas GKP konstrukcijoje")
++    assert framing["kiekis"] == pytest.approx(14.6)
++    assert framing["confidence"] != "zalia" and "02 (6,60 m)" in framing["_confidence_reason"]
++    assert not any(r["aprasymas"] == "LED nišos — suveskite ilgį" for r in rows)
++
++
++def test_off_bills_the_estimate_like_before(monkeypatch):
++    monkeypatch.setattr(niche_inference, "LED_ESTIMATE_OPT_IN", False)
++    rows = _rows(_parsed())
++    framing = next(r for r in rows if r["aprasymas"] == "Nišų formavimas GKP konstrukcijoje")
++    assert framing["kiekis"] == pytest.approx(14.6)
++    assert not any(r["aprasymas"] == "LED nišos — suveskite ilgį" for r in rows)

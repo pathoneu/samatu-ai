@@ -985,10 +985,16 @@ function FormulasCard({ sienosStorisM, glaistimoLygis }) {
             formula="l = (plotas × sluoksniai) / coverage_m²/l\ncoverage: glaistytas Q2 ~9 · šviežias tinkas ~4 · gruntas ~7"
             source="2 sluoksniai = ×1.8 (ne ×2 — pirmas sluoksnis sugeria daugiau)"
           />
+          {/* 2026-10-03 (audit calc-engine-5): the formula as the engine computes
+              it (universal_rules.calc_room_quantities) — it used to read
+              „išorinių kampų skaičius × lubų aukštis", which is not the math. */}
           <FormulaRow
             name="Glaistymo kampai"
-            formula="kampų_metrai = išorinių_kampų_skaičius × lubų_aukštis"
-            source="CLAUDE.md §1.3 — vidaus kampai paprastai be apkalo"
+            formula={'kampų_metrai = perimetras (sienų ir lubų sandūra)\n'
+              + '  + kampų_skaičius × lubų_aukštis (vidiniai kampai, jei skaičiuojami)\n'
+              + '  + durų_sk. × (0,9 + 2 × 2,05) + langų_sk. × (1,2 + 2 × 1,5) (angų kraštai)\n'
+              + '  + pertvarų_sandūrų_sk. × lubų_aukštis'}
+            source="Angų kraštai skaičiuojami pagal standartinį durų ir lango dydį, ne pagal brėžinio matmenis. Vidinius kampus įjungia arba išjungia „Ką skaičiuoti“ → „Dažymo kampai (kampuotės)“."
           />
           <FormulaRow
             name="Grindjuostės"

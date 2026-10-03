@@ -88,6 +88,88 @@ LED_RATIO_BY_PASKIRTIS: dict[str, float] = {
 
 MIN_INFERENCE_RATIO = 0.15  # below this, treat as "no LED expected"
 
+# The `_source` every inferred niche carries — the one marker the rows, the
+# gate below and the disclosure read (2026-10-03).
+INFERRED_SOURCE = "statistical_inference"
+
+# ── Disclosure on the billed rows (2026-10-03, audit vision-pipeline-1) ──────
+# The ratios above were fitted on one contractor's sąmata (that fact stays in
+# this file, never on his screen). An estimated length is billed on three rows
+# — GKP framing, putty, paint — and those rows used to show green like a
+# measured one. Every row fed by an estimate now says so, names the rooms and
+# their metres, and is never green: geltona when part of the length was read,
+# raudona when none of it was (CLAUDE.md §7 — a room-type default is the
+# fallback tier).
+LED_ESTIMATE_ROOM_SENTENCE = (
+    "Nišos ilgis įvertintas pagal patalpos tipą — brėžinyje neišmatuotas. "
+    "Patikrinkite lubų plane, ar čia yra LED niša, ir įrašykite tikrą ilgį.")
+
+
+def _lt(v: float) -> str:
+    return f"{float(v):.2f}".replace(".", ",")
+
+
+def estimated_niche_m(room: dict) -> float:
+    """Metres of LED niche in this room ESTIMATED from its room type (not read)."""
+    total = 0.0
+    for e in room.get("elementai") or []:
+        if (isinstance(e, dict) and (e.get("tipas") or "").lower() == "nisa_led"
+                and e.get("_source") == INFERRED_SOURCE):
+            try:
+                total += max(0.0, float(e.get("ilgis_m") or 0))
+            except (TypeError, ValueError):
+                continue
+    return round(total, 2)
+
+
+def led_estimated_rooms(rooms: list[dict]) -> list[tuple[dict, float]]:
+    """(room, estimated metres) for every room whose billed niche length
+    (`nisu_metrai`) holds an estimate. Capped at what the room bills, so a
+    room its scope zeroed is not named."""
+    out: list[tuple[dict, float]] = []
+    for r in rooms or []:
+        if not isinstance(r, dict):
+            continue
+        try:
+            billed = float(r.get("nisu_metrai") or 0)
+        except (TypeError, ValueError):
+            billed = 0.0
+        est = round(min(estimated_niche_m(r), billed), 2)
+        if est > 0:
+            out.append((r, est))
+    return out
+
+
+def _room_label(room: dict) -> str:
+    return str(room.get("nr") or room.get("pavadinimas") or "?").strip()
+
+
+def led_estimate_disclosure(estimated: list[tuple[dict, float]], total_m: float) -> dict:
+    """The fields every LED-niche row carries when part of its length is an
+    estimate: tier, the reason (what to check, in which rooms) and the
+    assumption. Empty dict when every metre was read."""
+    if not estimated:
+        return {}
+    est_m = round(sum(m for _, m in estimated), 2)
+    where = ", ".join(f"{_room_label(r)} ({_lt(m)} m)" for r, m in estimated)
+    all_estimated = est_m >= float(total_m or 0) - 0.005
+    check = ("Patikrinkite lubų plane, ar šiose patalpose yra LED nišos, ir "
+             "įrašykite tikrą ilgį.")
+    if all_estimated:
+        reason = (f"Nišų ilgis įvertintas pagal patalpos tipą, ne išmatuotas brėžinyje — "
+                  f"patalpose {where}. {check}")
+    else:
+        reason = (f"Dalis nišų ilgio — {_lt(est_m)} m iš {_lt(total_m)} m — įvertinta pagal "
+                  f"patalpos tipą, ne išmatuota brėžinyje: patalpose {where}. {check}")
+    return {
+        "confidence": "low" if all_estimated else "medium",
+        "_confidence_reason": reason,
+        "_assumption": (f"{_lt(est_m)} m nišų ilgio — įvertinimas pagal patalpos tipą "
+                        "(patalpos perimetras × tokio tipo patalpoms būdinga dalis), "
+                        "ne brėžinio matmuo."),
+        "_led_ivertinta_m": est_m,
+    }
+
 # ── Enumerated-exclusion gate (2026-08-04) ────────────────────────────────────
 # The docstring above asks for "a coverage map not yet persisted in the
 # extract" before inference can be suppressed safely. A cheaper anchor IS
@@ -150,7 +232,7 @@ def drop_unenumerated_inferred_niches(parsed: dict) -> int:
         keep = []
         for e in room.get("elementai") or []:
             if ((e.get("tipas") or "").lower() == "nisa_led"
-                    and e.get("_source") == "statistical_inference"):
+                    and e.get("_source") == INFERRED_SOURCE):
                 dropped += 1
                 continue
             keep.append(e)
@@ -203,7 +285,7 @@ def infer_missing_niches(rooms: list[dict]) -> int:
             "kiekis": 1,
             "ilgis_m": inferred_m,
             "_niche_type": "ceiling_led",
-            "_source": "statistical_inference",
+            "_source": INFERRED_SOURCE,
             "_confidence": "low",
             "_paskirtis_ratio": ratio,
         })
