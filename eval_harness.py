@@ -915,14 +915,31 @@ def _load_truth(project_id: str) -> dict:
         return json.load(f)
 
 
+def _billed_headline(parsed: dict, project_id: str) -> dict | None:
+    """The project's billed-lines headline (`score_billed_lines`) for a
+    single-project run, or None when its sąmata or our rows are missing."""
+    items = _contractor_samata(project_id)
+    sc = _score_rows_of(parsed, project_id) if items else None
+    if sc is None:
+        return None
+    return score_billed_lines(parsed, sc, items)
+
+
 def _append_drift_row(project_id: str, mode: str, summary: dict,
-                       results: list[MetricResult]) -> None:
+                       results: list[MetricResult], billed: dict | None = None) -> None:
     """Append-only per-run snapshot for cross-commit drift detection.
 
     Format: one JSON object per line in eval_runs/drift.jsonl. Each row
-    carries (timestamp, git_sha, project, mode, MAE, per-metric pct).
-    Append-only — never edit or compact this file. To inspect drift,
-    diff the last N rows or feed them to a notebook.
+    carries (timestamp, git_sha, project, mode, the legacy and billed
+    headlines, per-metric pct). Append-only — never edit or compact this
+    file. To inspect drift, diff the last N rows or feed them to a notebook.
+
+    Until 2026-10-05 the row read `summary["mae_pct"]`, a key `_summarize`
+    never writes, so every row logged `"mae_pct": null`. Now: the legacy
+    headline `_summarize` computes (`legacy_mae_pct`, `legacy_max_pct`,
+    `category_mae_pct`) and his billed lines (`billed_mae_pct` over
+    `billed_scored` families, `_billed_headline`) — null only when the project
+    has no sąmata to score against.
     """
     import subprocess
     try:
@@ -937,7 +954,11 @@ def _append_drift_row(project_id: str, mode: str, summary: dict,
         "git_sha": sha,
         "project_id": project_id,
         "mode": mode,
-        "mae_pct": summary.get("mae_pct"),
+        "legacy_mae_pct": summary.get("headline_mae_pct"),
+        "legacy_max_pct": summary.get("headline_max_pct"),
+        "category_mae_pct": summary.get("category_mae_pct"),
+        "billed_mae_pct": (billed or {}).get("billed_mae_pct"),
+        "billed_scored": (billed or {}).get("billed_scored"),
         "metrics": {r.label: r.pct_error for r in results
                     if r.tier == "headline" and r.pct_error is not None},
     }
@@ -1311,7 +1332,8 @@ def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
     print(f"\n  Report → {run_dir / 'report.html'}")
 
     if track_drift:
-        _append_drift_row(project_id, mode, summary, results)
+        _append_drift_row(project_id, mode, summary, results,
+                          billed=_billed_headline(parsed, project_id))
 
     # Exit code: 1 if any headline metric is "fail", 0 otherwise.
     failing = [r for r in results if r.tier == "headline" and r.status == "fail"]
@@ -2057,10 +2079,12 @@ def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
         fa = vc._floor_anchors_from_figures(scan["figures"])
         if fa:
             parsed["_floor_anchors"] = fa
-        # The stated height reaches the rooms whose STORED label is a default. At
-        # Step 2.44 a room still carries the model's own label, and whether that
-        # was a default for a room the name map later gave a height (`per_room`)
-        # is not stored — so such a room keeps its height here.
+        # A stated height reaches the one room it belongs to (2026-10-05:
+        # `_tie_statement` — never an element's stamp, never every room), when
+        # that room's STORED label is a default. At Step 2.44 a room still
+        # carries the model's own label, and whether that was a default for a
+        # room the name map later gave a height (`per_room`) is not stored — so
+        # such a room keeps its height here.
         hs = apply_height_statements(rooms, scan.get("heights") or [])
         meta["plan_height_statement"] = {k: v for k, v in hs.items() if k != "rooms"} | {"rooms": len(hs.get("rooms") or [])}
         lanes["plan height"] = hs.get("status")
@@ -2136,9 +2160,11 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
       2. height salvage from warnings[] (same gate as production — only when
          the model structured no per-room heights),
       3. height plausibility gate,
-      4. per-room recompute (calc_room_quantities via primitives),
-      5. santrauka recompute,
-      6. pozicijos rebuild.
+      4. the shower attribution from the stored plumbing list
+         (vision_call.mark_shower_rooms — production's fixture-reader step),
+      5. per-room recompute (calc_room_quantities via primitives),
+      6. santrauka recompute,
+      7. pozicijos rebuild.
 
     This is exactly what a saved run would produce under the CURRENT
     formula code — the honest way to measure formula fixes against
@@ -2244,6 +2270,22 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
         apply_height_plausibility_gate(rooms)
     except Exception as exc:
         print(f"  ⚠ plausibility gate failed during rescore: {exc}")
+
+    # The shower attribution (Step 2.866 in production, 2026-10-03): which rooms
+    # the plumbing plan shows a shower in, settled from the plumbing reader's own
+    # list. Production runs it once, at the fixture-reader step after the lanes,
+    # and the calculation reads the flags off the rooms; a frozen extract older
+    # than it carries the list but no flags, so the eval scored every wet room on
+    # its type alone (objektas_h „Hidroizoliacinė medžiaga" 97,44 kg against
+    # production's 70,38). Same function, same stored list — what production
+    # computes; on an extract production already marked it gives the same flags
+    # again. No list or no plumbing reading: nothing changes.
+    try:
+        n_marked = vc.mark_shower_rooms(parsed)
+        if n_marked:
+            print(f"  ⤴ shower attribution (plumbing list): {n_marked} room(s) decided")
+    except Exception as exc:
+        print(f"  ⚠ shower attribution failed during rescore: {exc}")
 
     parsed = vc._recompute_per_room_via_python(parsed, _harness_rules_override(parsed))
     parsed = vc._recompute_santrauka(parsed)

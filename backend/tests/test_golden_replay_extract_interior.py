@@ -25,17 +25,16 @@ machine: the real client class and every socket refuse while the stub is in.
     for call.
 (c) The totals are the eval's:
     · `--recompute --replay-geometry` on the frozen extract gives every metric
-      the eval scores, every santrauka total and every row exactly as
-      production, but for ONE step no eval path re-runs: the shower
-      attribution (`vision_call.mark_shower_rooms`, 2026-10-03) runs at the
-      fixture-reader step and the frozen extract is older. Production marks
-      room 07 (the plumbing plan lists a bathtub there, no shower), so its
-      waterproofing loses the shower zone — „Hidroizoliacinė medžiaga"
-      70,38 m² against the eval's 97,44 on 2026-10-05. Asserted exactly: with
-      the rooms marked first, the eval equals production row for row and room
-      for room — all but two notes no quantity reads, which the frozen extract
-      is older than and the eval never writes (`ROOM_KEYS_NOT_REPLAYED`,
-      `VOTE_KEYS_NOT_REPLAYED`).
+      the eval scores, every santrauka total, every row and every room exactly
+      as production — all but two notes no quantity reads, which the frozen
+      extract is older than and the eval never writes (`ROOM_KEYS_NOT_REPLAYED`,
+      `VOTE_KEYS_NOT_REPLAYED`). That includes the shower attribution
+      (`vision_call.mark_shower_rooms`, 2026-10-03): production runs it at the
+      fixture-reader step and the frozen extract is older, so the eval's tail
+      runs it on the stored plumbing list (2026-10-05). Before that, room 07
+      (the plumbing plan lists a bathtub there, no shower) kept the shower zone
+      — „Hidroizoliacinė medžiaga" 97,44 kg in the eval against production's
+      70,38; the test without the step holds that difference exactly.
     · plain `--recompute` does not run the drawing lanes (audit round 13):
       exactly the metrics in `LANES_MOVE` differ — on 2026-10-05 e.g. combined
       paint 473,18 → 441,26 m², angokraščiai 47,40 → 76,91 m — and the rest
@@ -237,30 +236,36 @@ def test_every_reader_ran_on_its_stored_answer(run):
 
 
 # ── (c) ──────────────────────────────────────────────────────────────────────
-def test_totals_equal_the_eval_replay_but_for_the_shower_attribution(run):
-    from extractor import vision_call as vc
-
+def test_totals_equal_the_eval_replay(run):
     prod, frozen = run["result"], run["frozen"]
+    assert not [r["nr"] for r in frozen["patalpos"] if "_dusas" in r], "the frozen extract predates the attribution"
     replayed = _eval_tail(run, frozen, replay=True)
     assert _metrics(run, replayed) == _metrics(run, prod)
     assert replayed["santrauka"] == prod["santrauka"]
-    # the documented difference, exactly: one room's waterproofing, one row
-    assert _room_diffs(replayed, prod) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
-    assert [r for r in _rows(replayed) if r not in _rows(prod)] == \
-        [r for r in _rows(replayed) if r[1] == "Hidroizoliacinė medžiaga (2 sluoksniai)"]
-    assert len(_rows(replayed)) == len(_rows(prod))
-    by_nr = {r["nr"]: r for r in prod["patalpos"]}
-    assert by_nr["07"]["_dusas"] is False and by_nr["08"]["_dusas"] is True
-    eval_07 = next(r for r in replayed["patalpos"] if r["nr"] == "07")
-    assert by_nr["07"]["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
-    # …and nothing else: with the rooms marked from the stored plumbing list, row for row
-    marked = copy.deepcopy(frozen)
-    assert vc.mark_shower_rooms(marked) == 3
-    marked = _eval_tail(run, marked, replay=True)
-    assert _metrics(run, marked) == _metrics(run, prod)
-    assert marked["santrauka"] == prod["santrauka"]
-    assert _rows(marked) == _rows(prod)
-    assert _room_diffs(marked, prod) == {}
+    assert _rows(replayed) == _rows(prod)
+    assert _room_diffs(replayed, prod) == {}
+    # the shower attribution is the eval's step too: room 07 (the plumbing plan lists
+    # a bathtub there, no shower) loses the shower zone, as in production
+    by_nr = {r["nr"]: r for r in replayed["patalpos"]}
+    assert (by_nr["04"]["_dusas"], by_nr["07"]["_dusas"], by_nr["08"]["_dusas"]) == (False, False, True)
+
+
+def test_without_the_shower_attribution_the_eval_scored_the_type_default(run, monkeypatch):
+    """What closed the gap (2026-10-05): before the eval's tail ran
+    `mark_shower_rooms`, every wet room kept its type's shower zone — room 07's
+    waterproofing larger and „Hidroizoliacinė medžiaga" 97,44 kg against
+    production's 70,38. The only difference was that one step."""
+    from extractor import vision_call as vc
+
+    prod = run["result"]
+    monkeypatch.setattr(vc, "mark_shower_rooms", lambda parsed: 0)
+    unmarked = _eval_tail(run, run["frozen"], replay=True)
+    assert _metrics(run, unmarked) == _metrics(run, prod)
+    assert _room_diffs(unmarked, prod) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
+    assert [r for r in _rows(unmarked) if r not in _rows(prod)] == \
+        [r for r in _rows(unmarked) if r[1] == "Hidroizoliacinė medžiaga (2 sluoksniai)"]
+    eval_07 = next(r for r in unmarked["patalpos"] if r["nr"] == "07")
+    assert next(r for r in prod["patalpos"] if r["nr"] == "07")["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
 
 
 def test_plain_recompute_misses_exactly_the_drawing_lanes(run):

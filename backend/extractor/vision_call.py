@@ -6165,8 +6165,11 @@ def extract_interior(
         if _fa:
             parsed["_floor_anchors"] = _fa
         parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
-        # The plan's own storey height („H - 2820") for rooms that carry only our
-        # default — the same number read, not assumed; a room's own reader wins.
+        # A height the plan states for ONE room („Lubų aukštis H=2700", or a stamp
+        # beside the room's own label inside its outline) for that room when it
+        # carries only our default — read, not assumed; a room's own reader wins.
+        # A stamp on an element („Kondicionierius h=2600 mm") or one no room
+        # claims sets nothing (2026-10-05, plan_area_annotations._tie_statement).
         _hs = apply_height_statements(parsed.get("patalpos") or [], _scan.get("heights") or [])
         parsed["_meta"]["plan_height_statement"] = {k: v for k, v in _hs.items() if k != "rooms"} | {"rooms": len(_hs.get("rooms") or [])}
         _merged_rooms = int((parsed.get("_meta") or {}).get("eksplikacija_merged_rooms") or 0)

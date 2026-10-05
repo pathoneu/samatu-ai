@@ -200,23 +200,24 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
     # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
     # models, and reading .text off it killed this reader mid-run.
     raw, stopped = read_answer(resp, reader="door_type_reader", page=rendered)
+    # Billed whatever the answer says: every return from here on carries the
+    # call's usage (2026-10-05: the no-JSON and broken-JSON returns did not).
+    meta = usage_meta(resp, model)
     if stopped:  # refused / cut off: named, billed tokens kept (2026-09-30)
-        u = usage_meta(resp, model)
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,
-                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": {"input_tokens": u["input_tokens"],
-                          "output_tokens": u["output_tokens"], "model": model}}
+                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,
-                "_error": "no JSON", "_raw": raw[:400], "_elapsed_s": round(time.time() - t0, 2)}
+                "_error": "no JSON", "_raw": raw[:400], "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": meta}
     try:
         parsed = json.loads(m.group(0))
     except json.JSONDecodeError as je:
         return {"status": "error", "pages": rendered, "beapvadines_count": 0,
-                "_error": f"JSON parse: {je}", "_raw": raw[:400], "_elapsed_s": round(time.time() - t0, 2)}
+                "_error": f"JSON parse: {je}", "_raw": raw[:400], "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": meta}
 
-    usage = getattr(resp, "usage", None)
     return {
         "status": "ok", "pages": rendered,
         "doors": parsed.get("doors") or [],
@@ -226,8 +227,7 @@ def read_door_types(pdf_bytes: bytes, rooms: list[dict],
         "bendras_tipas": parsed.get("bendras_tipas"),
         "pastabos": parsed.get("pastabos"),
         "_elapsed_s": round(time.time() - t0, 2),
-        "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
-                  "output_tokens": getattr(usage, "output_tokens", None), "model": model},
+        "_meta": meta,
     }
 
 
@@ -251,7 +251,7 @@ def _aggregate_door_votes(runs: list[dict]) -> dict:
     if not ok:
         if not runs:
             return {"status": "error", "beapvadines_count": 0}
-        stopped = stopped_round_metas(runs)  # billed refused / cut-off rounds
+        stopped = stopped_round_metas(runs)  # billed rounds without a usable answer
         return {**runs[0], "_round_metas": stopped} if stopped else runs[0]
     beap_vals = [int(r.get("beapvadines_count") or 0) for r in ok]
     beap = _mode_int(beap_vals)

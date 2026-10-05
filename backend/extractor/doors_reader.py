@@ -195,35 +195,41 @@ def read_doors_from_plan(
     # _meta (2026-09-30: page 2 of objektas_g was refused and read as
     # "no JSON in response", its 5,497 input tokens never counted).
     raw, stopped = read_answer(resp, reader="doors_reader", page=page)
+    # The call is billed whatever its answer says: every return from here on
+    # carries its usage, or the spend tally loses it (2026-10-05: an answer with
+    # no JSON, a broken one or one with unusable counts returned without it).
+    meta = usage_meta(resp, model)
     if stopped:
-        u = usage_meta(resp, model)
         return {"status": "error", "page": page, "doors": [], "total_count": 0,
-                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": {"input_tokens": u["input_tokens"],
-                          "output_tokens": u["output_tokens"], "model": model}}
+                "_error": stopped, "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
     m = re.search(r"\{.*\}", raw, re.DOTALL)
     if not m:
         return {"status": "error", "page": page, "doors": [], "total_count": 0,
                 "_error": "no JSON in response", "_raw_excerpt": raw[:500],
-                "_elapsed_s": round(time.time() - t0, 2)}
+                "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
     try:
         parsed = json.loads(m.group(0))
     except json.JSONDecodeError as je:
         return {"status": "error", "page": page, "doors": [], "total_count": 0,
                 "_error": f"JSON parse error: {je}", "_raw_excerpt": raw[:500],
-                "_elapsed_s": round(time.time() - t0, 2)}
+                "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
 
-    doors = parsed.get("doors") or []
-    total = int(parsed.get("total_count") or len(doors))
-    ext = int(parsed.get("exterior_count") or sum(
-        1 for d in doors if "exterior" in (d.get("between") or []) or (d.get("tipas") == "garazo")))
-    usage = getattr(resp, "usage", None)
+    try:
+        doors = parsed.get("doors") or []
+        total = int(parsed.get("total_count") or len(doors))
+        ext = int(parsed.get("exterior_count") or sum(
+            1 for d in doors if "exterior" in (d.get("between") or []) or (d.get("tipas") == "garazo")))
+    except (AttributeError, TypeError, ValueError) as exc:
+        # „total_count": "12+" or a door that is not an object: raised out of the
+        # per-sheet loop, this lost every sheet's doors and every sheet's billing
+        return {"status": "error", "page": page, "doors": [], "total_count": 0,
+                "_error": f"unusable answer: {exc}", "_raw_excerpt": raw[:500],
+                "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
     return {
         "status": "ok", "page": page, "doors": doors,
         "total_count": total, "exterior_count": ext, "interior_count": total - ext,
         "_elapsed_s": round(time.time() - t0, 2),
-        "_meta": {"input_tokens": getattr(usage, "input_tokens", None),
-                  "output_tokens": getattr(usage, "output_tokens", None), "model": model},
+        "_meta": meta,
     }
 
 

@@ -1070,12 +1070,29 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
 
 
 # ── the plan's own ceiling height („H - 2820") ───────────────────────────────
-# Some designers state the storey height once on the plan. When the rooms
-# carry only OUR default (2,82 m, `section_average`), that statement is the
-# drawing's number for the same thing: the room keeps the value the statement
-# gives and the sheet says „užrašytas plane" instead of „prielaida". A soffit
-# or fixture height („Kaktos pab. h - 2390", „spintoje h - 2,20 m") is not a
-# storey height and is skipped by its words.
+# Some designers write a room's height on the plan. When a room carries only
+# OUR default (2,82 m, `section_average`), that statement is the drawing's
+# number for the same thing: the room keeps the value the statement gives and
+# the sheet says „užrašytas plane" instead of „prielaida".
+#
+# A stamp is a ROOM ceiling height only when its surroundings say so
+# (2026-10-05). objektas_a's santechnikos sheet carries four bare
+# „h=2600 mm" — each under „Kondicionierius", the air-conditioner's mounting
+# height — and the lane used to give 2,6 m to EVERY room with a default label
+# (room 102 is 3,4 m on the drawing). Now:
+#   · its own line may hold only the stamp, numbers and ceiling words — a soffit
+#     or fixture height („Kaktos pab. h - 2390", „spintoje h - 2,20 m", a height
+#     inside a sentence) is skipped by its words, as before;
+#   · the words right around it (`context`, the annotation block) are read: a
+#     word that names no room and is no ceiling word — „Kondicionierius" — makes
+#     the stamp an annotation of something else, and it sets no height;
+#   · it sets the height of ONE room it is tied to: with ceiling words
+#     („Lubų aukštis H=2700", `ceiling`) the room its block names, else the one
+#     room whose outline holds it; a bare stamp only inside a room's outline next
+#     to that room's own label (its number or name in the block). A stamp tied
+#     to no room sets nothing — never the rooms elsewhere on the plan. objektas_d's
+#     „H - 2820" stands alone in the living room, with no label beside it: it is
+#     no longer spread over the flat (its value is our default anyway).
 
 HEIGHT_SOURCE = "plano_uzrasas"
 _HEIGHT_RE = re.compile(
@@ -1083,6 +1100,20 @@ _HEIGHT_RE = re.compile(
 _NOT_A_STOREY_WORDS = ("kakt", "niš", "nis", "spint", "sviest", "šviest", "bald", "lentyn",
                        "rozet", "jungik", "dus", "duš", "galv", "montuo", "isvad", "išvad",
                        "nuo", "iki", "pakab", "lub", "grind")
+# Words that make a stamp a ceiling height, on _fold-ed text: „lubų aukštis",
+# „patalpos aukštis", „aukštis (nuo grindų) iki lubų", „lubos". Taken out of the
+# text before the reject words above are looked for, so „lub" there still turns
+# away „lubų niša" / „pakabinamos lubos" but not „lubų aukštis".
+_CEILING_RE = re.compile(
+    r"(?<![^\W\d_])(?:(?:lubu|lubos|patalp\w*)\s+auksti\w*|auksti\w*\s+(?:nuo\s+grindu\s+)?iki\s+lubu"
+    r"|auksti\w*\s+patalp\w*|lubos|lubu)(?![^\W\d_])")
+# How far around the stamp its annotation block reaches, in the stamp's own
+# character heights: a label line just above it („Kondicionierius" sits 1 pt
+# over objektas_a's stamps) up to a room tag's number three lines up.
+_BLOCK_X_EM = 1.5
+_BLOCK_UP_EM = 4.5
+_BLOCK_DOWN_EM = 1.5
+_UNIT_WORDS = frozenset({"mm", "cm", "kv"})
 
 
 def _height_value(token: str) -> float | None:
@@ -1094,38 +1125,105 @@ def _height_value(token: str) -> float | None:
     return round(v, 3) if 2.2 <= v <= 4.5 else None
 
 
+def _line_text_mapped(line: list[dict]) -> tuple[str, list[dict | None]]:
+    """`_line_text(line)` and, for each of its characters, the char it was built
+    from (None for a space the gap rule put in) — so a match in the text has a
+    box of its own, not the whole baseline's."""
+    raw: list[tuple[str, dict | None]] = []
+    prev: dict | None = None
+    for c in line:
+        t = c["text"]
+        if prev is not None and float(c["x0"]) - float(prev["x1"]) > 0.35 * float(c.get("size") or 8):
+            raw.append((" ", None))
+        if t.isspace():
+            raw.append((" ", None))
+        else:
+            raw.extend((ch, c) for ch in t)
+        prev = c
+    text: list[str] = []
+    src: list[dict | None] = []
+    for ch, c in raw:
+        if ch.isspace():
+            if not text or text[-1] == " ":
+                continue
+            ch, c = " ", None
+        text.append(ch)
+        src.append(c)
+    while text and text[-1] == " ":
+        text.pop()
+        src.pop()
+    return "".join(text), src
+
+
+def _annotation_block(words: list[dict], box: list[float]) -> str:
+    """The words around a stamp's own box — the lines just above it up to a room
+    tag's height, the line below, the numbers beside it — as one text, line by
+    line, top to bottom. Not in it: the stamp's own words, and the words of its
+    own line (the caller lets that line hold ceiling words only — a window that
+    cut „Lubų aukštis" in half must not leave an „aukštis" behind)."""
+    x0, top, x1, bottom = box
+    em = max(bottom - top, 1.0)
+    wx0, wx1 = x0 - _BLOCK_X_EM * em, x1 + _BLOCK_X_EM * em
+    wy0, wy1 = top - _BLOCK_UP_EM * em, bottom + _BLOCK_DOWN_EM * em
+
+    def own_line(w: dict) -> bool:
+        return abs(w["top"] - top) <= _BASELINE_PT and (
+            any(ch.isalpha() for ch in w["text"]) or (w["x0"] >= x0 - 0.5 and w["x1"] <= x1 + 0.5))
+
+    near = [w for w in words
+            if w["x1"] >= wx0 and w["x0"] <= wx1 and w["bottom"] >= wy0 and w["top"] <= wy1
+            and not own_line(w)]
+    lines: list[list[dict]] = []
+    for w in sorted(near, key=lambda w: (w["top"], w["x0"])):
+        if lines and abs(w["top"] - lines[-1][0]["top"]) <= _BASELINE_PT:
+            lines[-1].append(w)
+        else:
+            lines.append([w])
+    return " ".join(" ".join(w["text"] for w in sorted(l, key=lambda w: w["x0"])) for l in lines)
+
+
 def _height_statements_on_page(pn: int, W: float, H: float, chars: list[dict], to_display=_identity) -> list[dict]:
     out: list[dict] = []
+    words: list[dict] | None = None          # built for the first stamp: most pages state none
     for line in _lines(chars):
-        txt = _line_text(line)
+        txt, src = _line_text_mapped(line)
         if not txt or len(txt) > 60:
             continue                      # a note paragraph, not a stamp
         folded = _fold(txt)
-        if any(w in folded for w in _NOT_A_STOREY_WORDS):
+        ceiling_line = bool(_CEILING_RE.search(folded))
+        unworded = _CEILING_RE.sub(" ", folded)
+        if any(w in unworded for w in _NOT_A_STOREY_WORDS):
+            continue
+        # A stamp stands alone on its line („H - 2820", possibly repeated) or
+        # with ceiling words; a height inside a sentence („ap. h - 2260 mm, kai
+        # …") describes a soffit, a niche or a fixture — its words give it away.
+        if any(ch.isalpha() for ch in _HEIGHT_RE.sub(" ", unworded)):
             continue
         for m in _HEIGHT_RE.finditer(txt):
             v = _height_value(m.group(1))
             if v is None:
                 continue
-            # A storey height is a bare stamp („H - 2820", possibly repeated on
-            # the line); a height inside a sentence („ap. h - 2260 mm, kai …")
-            # describes a soffit, a niche or a fixture and must not be taken for
-            # the storey — the words around the stamps give it away.
-            rest = _HEIGHT_RE.sub(" ", txt)
-            if any(ch.isalpha() for ch in rest):
-                continue
+            own = [c for c in src[m.start():m.end()] if c is not None]
+            box = [min(float(c["x0"]) for c in own), min(float(c["top"]) for c in own),
+                   max(float(c["x1"]) for c in own), max(float(c["bottom"]) for c in own)]
+            if words is None:
+                words = _words(chars)
+            context = _annotation_block(words, box)
             out.append({
                 "page": pn, "value_m": v, "text": m.group(0).strip()[:40],
-                "bbox": [round(x, 2) for x in to_display(
-                    [min(float(c["x0"]) for c in line), min(float(c["top"]) for c in line),
-                     max(float(c["x1"]) for c in line), max(float(c["bottom"]) for c in line)])],
+                "bbox": [round(x, 2) for x in to_display(box)],
                 "page_width": round(W, 2), "page_height": round(H, 2),
+                "ceiling": ceiling_line or bool(_CEILING_RE.search(_fold(context))),
+                "context": context[:80],
             })
     return out
 
 
 def read_height_statements(pdf_bytes: bytes, pages: Iterable[int] | None = None) -> list[dict]:
-    """Storey-height statements on the given pages: [{page, value_m, text, bbox, …}]."""
+    """Height stamps on the given pages: [{page, value_m, text, bbox, page_width,
+    page_height, ceiling, context}] — `bbox` is the stamp's own box, `ceiling`
+    whether ceiling words go with it, `context` the words around it. Which room
+    a stamp belongs to, if any, is `apply_height_statements`' question."""
     out: list[dict] = []
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
@@ -1139,31 +1237,118 @@ _DEFAULT_HEIGHT_SOURCES = ("section_average", "default_fallback", "height_gate_r
                            "height_gate_clamped", "")
 
 
-def apply_height_statements(rooms: Sequence[dict], statements: Sequence[dict]) -> dict:
-    """Give the rooms that carry only our default height the plan's stated
-    height. Applies only when the statements agree on ONE value (a plan that
-    states two heights needs the per-room readers, not this). Returns a
-    summary {status, value_m, rooms}."""
-    vals = sorted({float(s["value_m"]) for s in statements if _f(s.get("value_m")) is not None})
-    if not vals:
-        return {"status": "none", "value_m": None, "rooms": []}
-    if len(vals) > 1 and (max(vals) - min(vals)) > 0.011:
-        return {"status": "ambiguous", "value_m": None, "values": vals, "rooms": []}
-    value = vals[0]
-    first = next(s for s in statements if _f(s.get("value_m")) == value)
-    touched: list[str] = []
+def _room_outline(room: dict, page: Any) -> list[tuple[float, float]]:
+    """The room's outline in page fractions — its polygon, else its box — when
+    the room is drawn on `page`; [] when it is not, or has neither."""
+    if _f(room.get("puslapio_nr")) is None or _f(room.get("puslapio_nr")) != _f(page):
+        return []
+    poly = _polygon_pct(room)
+    if poly:
+        return poly
+    b = room.get("bbox_pct")
+    if isinstance(b, dict) and all(_f(b.get(k)) is not None for k in ("x", "y", "w", "h")):
+        x, y, w, h = (float(b[k]) for k in ("x", "y", "w", "h"))
+        if w > 0 and h > 0:
+            return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    return []
+
+
+def _nr_key(token: Any) -> str:
+    t = str(token or "").strip()
+    head, dot, tail = t.partition(".")
+    return (head.lstrip("0") or "0") + dot + tail if t else ""
+
+
+def _tie_statement(stmt: dict, rooms: Sequence[dict]) -> tuple[str, dict | None]:
+    """("element", None) — the words around the stamp name something that is not
+    a room; ("room", room) — the ONE room the stamp states the height of;
+    ("untied", None) — no such room."""
+    text = _fold(stmt.get("context") or "")
+    named: list[dict] = []
+    names: dict[str, list[dict]] = {}
     for r in rooms:
-        if not isinstance(r, dict):
+        name = " ".join(_fold(r.get("pavadinimas") or "").split())
+        if len(name) >= 2:                                   # „WC" is a room's whole name
+            names.setdefault(name, []).append(r)
+    for name in sorted(names, key=len, reverse=True):      # „vonios kambarys 1" before „vonios kambarys"
+        pattern = r"(?<![^\W_])" + re.escape(name) + r"(?![^\W_])"
+        if len(names[name]) == 1 and re.search(pattern, text):
+            named.append(names[name][0])
+            text = re.sub(pattern, " ", text)
+    text = re.sub(r"[²³]", " ", _CEILING_RE.sub(" ", text))        # „m²" is a unit, not a word
+    if [w for w in re.findall(r"[^\W\d_]{2,}", text) if w not in _UNIT_WORDS]:
+        return "element", None
+    by_nr: dict[str, list[dict]] = {}
+    for r in rooms:
+        if str(r.get("nr") or "").strip():
+            by_nr.setdefault(_nr_key(r.get("nr")), []).append(r)
+    # a room number stands on its own: not „25,30" (an area), not the „2" of „m2"
+    for tok in re.findall(r"(?<![\w.,])\d+(?:\.\d+)?(?![\w,])", text):
+        for r in by_nr.get(_nr_key(tok), []):
+            if not any(r is n for n in named):
+                named.append(r)
+    centre = _label_centre_pct(stmt)
+    inside = [r for r in rooms if centre is not None and _inside(centre, _room_outline(r, stmt.get("page")))]
+    if stmt.get("ceiling"):
+        if len(named) == 1:
+            return "room", named[0]
+        if not named and len(inside) == 1:
+            return "room", inside[0]
+        return "untied", None
+    if len(named) == 1 and any(named[0] is r for r in inside):
+        return "room", named[0]
+    return "untied", None
+
+
+def apply_height_statements(rooms: Sequence[dict], statements: Sequence[dict]) -> dict:
+    """Give a room that carries only our default height the height the plan
+    states FOR THAT ROOM (`_tie_statement`). A stamp that annotates something
+    else, or that no single room can claim, sets nothing; a room two different
+    stated heights claim is left to its readers. Returns {status, value_m,
+    rooms, statements, elements, untied} — `status` "none" (no stamp read),
+    "applied", "nothing_to_do" (the rooms it belongs to have their own height),
+    "ambiguous" or "not_tied" (no stamp belongs to a room)."""
+    stmts = [s for s in statements or [] if isinstance(s, dict) and _f(s.get("value_m")) is not None]
+    if not stmts:
+        return {"status": "none", "value_m": None, "rooms": []}
+    live = [r for r in rooms if isinstance(r, dict)]
+    claims: dict[int, list[dict]] = {}
+    elements = untied = 0
+    for s in stmts:
+        kind, room = _tie_statement(s, live)
+        if kind == "element":
+            elements += 1
+        elif room is None:
+            untied += 1
+        else:
+            claims.setdefault(id(room), []).append(s)
+    touched: list[str] = []
+    conflicting: list[str] = []
+    for r in live:
+        own = claims.get(id(r))
+        if not own:
             continue
+        vals = sorted({float(s["value_m"]) for s in own})
+        if vals[-1] - vals[0] > 0.011:
+            conflicting.append(str(r.get("nr")))
+            continue                       # two heights for one room: its readers decide
         src = str(r.get("lubu_aukstis_saltinis") or "").strip().lower()
         if src not in _DEFAULT_HEIGHT_SOURCES:
             continue                       # a reader or the user already said something
         if r.get("_height_marker_evidence"):
             continue
-        r["lubu_aukstis_m"] = value
+        first = own[0]
+        r["lubu_aukstis_m"] = vals[0]
         r["lubu_aukstis_saltinis"] = HEIGHT_SOURCE
         r["_lubu_aukstis_uzrasas"] = {"page": first.get("page"), "text": first.get("text"),
                                        "bbox": first.get("bbox"), "page_width": first.get("page_width"),
                                        "page_height": first.get("page_height")}
         touched.append(str(r.get("nr")))
-    return {"status": "applied" if touched else "nothing_to_do", "value_m": value, "rooms": touched}
+    tied_values = sorted({float(s["value_m"]) for own in claims.values() for s in own})
+    status = ("applied" if touched else "ambiguous" if conflicting
+              else "nothing_to_do" if claims else "not_tied")
+    out = {"status": status, "value_m": tied_values[0] if len(tied_values) == 1 else None,
+           "rooms": touched, "statements": len(stmts), "elements": elements, "untied": untied}
+    if conflicting:
+        out["conflicting"] = conflicting
+    return out

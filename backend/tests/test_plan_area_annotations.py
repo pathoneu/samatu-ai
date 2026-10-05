@@ -494,24 +494,37 @@ def test_the_plan_stated_height_is_read_and_fixture_heights_are_not():
     hs = read_height_statements(_pdf(_height_page))
     assert [(h["value_m"], h["text"]) for h in hs] == [(2.82, "H - 2820"), (2.82, "H - 2820")]
     assert hs[0]["page"] == 1 and hs[0]["bbox"][0] < 110
-    assert apply_height_statements([_room("01", 20.0, lubu_aukstis_saltinis="section_average")], hs)["status"] == "applied"
+    assert [(h["ceiling"], h["context"]) for h in hs] == [(False, ""), (False, "")]
+    # 2026-10-05: a lone stamp no room can claim sets nothing — never every room
+    room = _room("01", 20.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="section_average")
+    res = apply_height_statements([room], hs)
+    assert (res["status"], res["rooms"], res["untied"]) == ("not_tied", [], 2)
+    assert room["lubu_aukstis_saltinis"] == "section_average"
     assert scan_text_layer(_pdf(_height_page))["heights"] == hs
+
+
+def _stated(value, context, **kw):
+    """A stamp with ceiling words („Lubų aukštis H=…") whose block names a room."""
+    return {"page": 1, "value_m": value, "text": f"H - {int(value * 1000)}", "bbox": [1, 2, 3, 4],
+            "page_width": 842, "page_height": 1191, "ceiling": True, "context": context, **kw}
 
 
 def test_rooms_with_only_our_default_take_the_plan_height_readers_win():
     rooms = [_room("01", 20.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="section_average"),
              _room("02", 12.0, lubu_aukstis_m=3.1, lubu_aukstis_saltinis="section_pjuvis"),
              _room("03", 8.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="user_override")]
-    res = apply_height_statements(rooms, [{"page": 1, "value_m": 2.6, "text": "H - 2600",
-                                           "bbox": [1, 2, 3, 4], "page_width": 842, "page_height": 1191}])
-    assert res["status"] == "applied" and res["rooms"] == ["01"]
+    res = apply_height_statements(rooms, [_stated(2.6, "Patalpa 01"), _stated(2.6, "Patalpa 02"),
+                                          _stated(2.6, "Patalpa 03")])
+    assert res["status"] == "applied" and res["rooms"] == ["01"] and res["value_m"] == 2.6
     assert rooms[0]["lubu_aukstis_m"] == 2.6 and rooms[0]["lubu_aukstis_saltinis"] == "plano_uzrasas"
     assert rooms[0]["_lubu_aukstis_uzrasas"]["text"] == "H - 2600"
     assert rooms[1]["lubu_aukstis_m"] == 3.1 and rooms[2]["lubu_aukstis_saltinis"] == "user_override"
     assert apply_height_statements(rooms, [])["status"] == "none"
-    two = apply_height_statements([_room("04", 9.0, lubu_aukstis_saltinis="section_average")],
-                                  [{"value_m": 2.6}, {"value_m": 3.0}])
-    assert two["status"] == "ambiguous", "two stated heights need the per-room readers, not a guess"
+    four = _room("04", 9.0, lubu_aukstis_m=2.82, lubu_aukstis_saltinis="section_average")
+    two = apply_height_statements([four], [_stated(2.6, "Patalpa 04"), _stated(3.0, "Patalpa 04")])
+    assert two["status"] == "ambiguous" and two["conflicting"] == ["04"], \
+        "two stated heights for one room need the per-room readers, not a guess"
+    assert four["lubu_aukstis_m"] == 2.82
 
 
 

@@ -88,7 +88,9 @@ def test_step_2_44_then_2_45_keeps_the_plan_statement():
     from extractor.plan_area_annotations import apply_height_statements
     rooms = [{"nr": "01", "pavadinimas": "Kambarys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "default_fallback"},
              {"nr": "02", "pavadinimas": "Vonia", "lubu_aukstis_m": 2.5, "lubu_aukstis_saltinis": "section_pjuvis"}]
-    apply_height_statements(rooms, [{"value_m": 2.7, "page": 1, "text": "H - 2700"}])
+    # a stamp with ceiling words whose block names room 01 (2026-10-05: a stamp no room claims sets nothing)
+    apply_height_statements(rooms, [{"value_m": 2.7, "page": 1, "text": "H - 2700",
+                                     "ceiling": True, "context": "Kambarys"}])
     out = _apply_per_room_heights(rooms, {"Kambarys": 2.82, "Vonia": 2.82}, 2.82, name_key="pavadinimas")
     assert (out[0]["lubu_aukstis_m"], out[0]["lubu_aukstis_saltinis"]) == (2.7, "plano_uzrasas")
     assert (out[1]["lubu_aukstis_m"], out[1]["lubu_aukstis_saltinis"]) == (2.5, "section_pjuvis")
