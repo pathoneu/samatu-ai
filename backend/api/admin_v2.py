@@ -91,33 +91,18 @@ def cost_monitor(request: Request, days: int = 30) -> dict:
 
 # ── 3. User management ───────────────────────────────────────────────────────
 
-def _with_deletion_dates(rows: list[dict]) -> list[dict]:
-    """Add `deleted_at` to directory rows (None for a live account).
-
-    A deleted account stays as a tombstone row — placeholder email, no name,
-    is_active 0 — for the invoices that still point at it (db.delete_account),
-    and without this it looked like any switched-off customer. The directory
-    query does not carry the column; a tombstone is always inactive (the
-    deletion switches it off and _toggle_active refuses to switch it back on),
-    so only inactive rows are looked up."""
-    for row in rows:
-        row["deleted_at"] = None
-        if not row.get("is_active"):
-            row["deleted_at"] = (db.get_user_by_id(row["id"]) or {}).get("deleted_at")
-    return rows
-
-
 @router.get("/users")
 def list_users(request: Request, search: str = "", page: int = 1,
                limit: int = 25) -> dict:
-    """Paginated + searchable user directory. Each row carries project_count,
-    total_spend_eur (SUM usage_events) and deleted_at (set = a deleted
-    account's tombstone). {rows, total, page, limit}."""
+    """Paginated + searchable user directory (limit clamped to 200). Each row
+    carries project_count, total_spend_eur (SUM usage_events) and deleted_at.
+    deleted_at set = a deleted account's tombstone (placeholder email, no
+    name, is_active 0), kept for the invoices that still point at it
+    (db.delete_account) — the date tells it apart from a switched-off
+    customer. {rows, total, page, limit}."""
     _auth.require_admin(request)
-    data = db.admin_list_users_paginated(
+    return db.admin_list_users_paginated(
         search=search.strip() or None, page=page, limit=limit)
-    _with_deletion_dates(data["rows"])
-    return data
 
 
 _DELETED_ENABLE_LT = "Ši paskyra ištrinta. Ištrintos paskyros vėl įjungti negalima."
@@ -283,14 +268,11 @@ _USERS_CSV_COLUMNS = [
 
 @router.get("/export/users.csv")
 def export_users_csv(request: Request, search: str = "") -> Response:
-    """All users (respecting an optional search) as a sanitized CSV download."""
+    """All users (respecting an optional search) as a sanitized CSV download.
+    The full set, not one page: the directory's 200 cap is for the screen."""
     _auth.require_admin(request)
-    # limit high enough to export everything in one file (pagination is a UI
-    # concern; the export is the full set).
-    data = db.admin_list_users_paginated(
-        search=search.strip() or None, page=1, limit=100000)
-    _with_deletion_dates(data["rows"])
-    rows = [[u.get(col) for col in _USERS_CSV_COLUMNS] for u in data["rows"]]
+    users = db.admin_export_users(search=search.strip() or None)
+    rows = [[u.get(col) for col in _USERS_CSV_COLUMNS] for u in users]
     return _csv_response(_USERS_CSV_COLUMNS, rows, "pathon-users.csv")
 
 

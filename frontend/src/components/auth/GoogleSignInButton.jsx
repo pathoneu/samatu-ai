@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { API_BASE } from '@/lib/apiBase';
 import { noteSignInStarted } from '@/lib/signInHint';
+import { googleSignInPath } from '@/lib/returnPath';
 
 export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su Google' }) {
   const [enabled, setEnabled] = useState(null);
@@ -27,7 +28,9 @@ export default function GoogleSignInButton({ next = '/', label = 'Prisijungti su
 
   if (!enabled) return null;
 
-  const href = `${API_BASE}/api/auth/google?next=${encodeURIComponent(next)}`;
+  // `next` is a whole same-site address — path, query and hash, encoded into
+  // one parameter (lib/returnPath.js); the backend checks it again.
+  const href = `${API_BASE}${googleSignInPath(next)}`;
   return (
     <>
       <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">

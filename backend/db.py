@@ -2101,24 +2101,50 @@ def admin_avg_cost_per_extraction_eur(days: int = 30) -> float:
     return round(float(row["cost"] or 0) / n, 4) if n else 0.0
 
 
+# The admin user directory: its columns, filter and order, shared by the paged
+# list and the CSV export. deleted_at set = a deleted account's tombstone (kept
+# for the invoices pointing at it). Newest first; the id breaks a tie between
+# accounts created in the same second, so paging never repeats or skips one.
+_ADMIN_USERS_SELECT = """
+    SELECT u.id, u.email, u.name, u.company_name, u.company_code,
+           u.plan, u.plan_status, u.is_admin, u.is_active,
+           u.created_at, u.last_login_at, u.deleted_at,
+           (SELECT COUNT(*) FROM projects p WHERE p.user_id = u.id) AS project_count,
+           (SELECT COALESCE(SUM(ue.cost_eur),0) FROM usage_events ue
+              WHERE ue.user_id = u.id) AS total_spend_eur
+      FROM users u"""
+_ADMIN_USERS_ORDER = "ORDER BY u.created_at DESC, u.id"
+
+
+def _admin_users_where(search: str | None) -> tuple[str, list]:
+    """The directory's WHERE clause and its bound params. `search` (when set)
+    matches email / name / company_name via a PARAMETERIZED LIKE
+    (case-insensitive) — the pattern is bound, never interpolated."""
+    if not search:
+        return "", []
+    pat = f"%{search.lower()}%"
+    return ("WHERE (LOWER(u.email) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ? "
+            "OR LOWER(COALESCE(u.company_name,'')) LIKE ?)"), [pat, pat, pat]
+
+
+def _admin_user_row(r) -> dict:
+    d = dict(r)
+    d["total_spend_eur"] = round(float(d.get("total_spend_eur") or 0), 4)
+    d["project_count"] = int(d.get("project_count") or 0)
+    return d
+
+
 def admin_list_users_paginated(search: str | None = None, page: int = 1,
                                limit: int = 25) -> dict:
     """Paginated + searchable user directory for admin management. Returns
-    {rows, total, page, limit}. Each row includes project_count and
-    total_spend_eur (SUM usage_events for that user — the true spend).
-
-    `search` (when set) matches email / name / company_name via a PARAMETERIZED
-    LIKE (case-insensitive) — the pattern is bound, never interpolated."""
+    {rows, total, page, limit}; `limit` is clamped to 1..200. Each row includes
+    project_count, total_spend_eur (SUM usage_events for that user — the true
+    spend) and deleted_at (None for a live account). The full set for a
+    download is admin_export_users()."""
     page = max(1, int(page or 1))
     limit = max(1, min(int(limit or 25), 200))
     offset = (page - 1) * limit
-    where = ""
-    params: list = []
-    if search:
-        where = ("WHERE (LOWER(u.email) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ? "
-                 "OR LOWER(COALESCE(u.company_name,'')) LIKE ?)")
-        pat = f"%{search.lower()}%"
-        params = [pat, pat, pat]
+    where, params = _admin_users_where(search)
     with _conn() as c:
         # SAFE: {where} is a hardcoded literal template (only `?` placeholders,
         # never user input); every value flows through the bound `params` list.
@@ -2126,24 +2152,23 @@ def admin_list_users_paginated(search: str | None = None, page: int = 1,
         total = c.execute(
             f"SELECT COUNT(*) AS n FROM users u {where}", params).fetchone()["n"]
         rows = c.execute(
-            f"""SELECT u.id, u.email, u.name, u.company_name, u.company_code,
-                       u.plan, u.plan_status, u.is_admin, u.is_active,
-                       u.created_at, u.last_login_at,
-                       (SELECT COUNT(*) FROM projects p WHERE p.user_id = u.id) AS project_count,
-                       (SELECT COALESCE(SUM(ue.cost_eur),0) FROM usage_events ue
-                          WHERE ue.user_id = u.id) AS total_spend_eur
-                  FROM users u
-                  {where}
-              ORDER BY u.created_at DESC
-                 LIMIT ? OFFSET ?""",
+            f"{_ADMIN_USERS_SELECT} {where} {_ADMIN_USERS_ORDER} LIMIT ? OFFSET ?",
             params + [limit, offset]).fetchall()
-    out = []
-    for r in rows:
-        d = dict(r)
-        d["total_spend_eur"] = round(float(d.get("total_spend_eur") or 0), 4)
-        d["project_count"] = int(d.get("project_count") or 0)
-        out.append(d)
-    return {"rows": out, "total": int(total or 0), "page": page, "limit": limit}
+    return {"rows": [_admin_user_row(r) for r in rows], "total": int(total or 0),
+            "page": page, "limit": limit}
+
+
+def admin_export_users(search: str | None = None) -> list[dict]:
+    """EVERY user matching `search` — the same rows, columns and order as the
+    paged list, without its 200 cap — for the admin CSV export. (2026-10-05:
+    the export asked the paged list for limit=100000, which clamped it to 200,
+    so the file silently stopped at 200 users.)"""
+    where, params = _admin_users_where(search)
+    with _conn() as c:
+        # SAFE: same literal template as admin_list_users_paginated.
+        rows = c.execute(f"{_ADMIN_USERS_SELECT} {where} {_ADMIN_USERS_ORDER}",
+                         params).fetchall()
+    return [_admin_user_row(r) for r in rows]
 
 
 def set_user_active(user_id: str, active: bool) -> bool:

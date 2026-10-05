@@ -1,6 +1,7 @@
 /**
  * Login — email + password (Phase 13).
- * On success → redirect to / (or `from` if user came from protected route).
+ * On success → redirect to / (or `from` if user came from protected route —
+ * the whole address, query and hash included, since 2026-10-05).
  *
  * 2026-07-05 dark graphite rebuild: two-column branded layout (form + a
  * dark blueprint panel with the detection motif), matching the landing
@@ -20,6 +21,7 @@ import Logo from '@/components/layout/Logo';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 import LanguageToggle from '@/components/LanguageToggle';
+import { returnPathFrom } from '@/lib/returnPath';
 
 // The Google callback bounces failures back to /login?oauth_error=<code>.
 // Codes come from backend main.py (api_google_callback) plus whatever Google
@@ -39,7 +41,9 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  // The whole address that sent the visitor here — path, ?step=… / ?kambarys=…
+  // and hash — for both the password and the Google sign-in (lib/returnPath.js).
+  const from = returnPathFrom(location.state);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

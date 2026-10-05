@@ -30,7 +30,7 @@ Crown-jewel data (projects, PDFs, corrections, extractions, share links, admin) 
 - **Session invalidation:** logout and change-password bump `session_version`, invalidating **every** outstanding cookie for that user (F2) — not just the current browser.
 - Session lifetime: 30 days idle.
 - Dev bypass `SAMATU_AUTH_DISABLED=1` short-circuits to a default admin user; **hard-fails if combined with `ENV=production`**.
-- **OAuth:** Google `state` is stored, compared, single-use-popped; `next` path guarded by `_safe_next_path` (no open redirect / SSRF).
+- **OAuth:** Google `state` is stored, compared, single-use-popped; `next` path guarded by `_safe_next_path` (no open redirect / SSRF). Since 2026-10-05 the frontend sends the whole address the user was on, so the guard keeps a same-site path WITH its query and hash (`/project/x/patikra?kambarys=02#a`) and turns everything else into `/`: absolute URLs, `//host`, a backslash in the path, the same percent-encoded once or more (`%2F%2F`, `%5C`, `%252F`), dot segments, control characters, spaces and non-ASCII (raw, or encoded in the path), and anything over 2000 characters (it rides in the session cookie). Pinned by `backend/tests/test_oauth_next_path.py`.
 
 ## 3. Authorization model
 
@@ -54,7 +54,7 @@ Crown-jewel data (projects, PDFs, corrections, extractions, share links, admin) 
 | F5 | LOW | `/extract` masked validation errors as 200 + echoed exception text | `9891205` |
 | F6 | LOW | CSV/Excel formula injection on exports (`= + - @`) | `78041cd` |
 | F7 | LOW | `/api/log-error` unauth, unbounded logging → rate-limit + truncate + strip | `d92850e` |
-| F8 | HIGH-ish | Dependency CVEs (starlette/multipart/pdfminer; frontend react-router) | `ea2e7f0`, `ff8bf90` |
+| F8 | HIGH-ish | Dependency CVEs (starlette/multipart/pdfminer; frontend react-router). **2026-10-05:** the frontend is on `react-router` 7.18.4 (`react-router-dom` 6 is gone — v7 folds it into `react-router`), and both remaining router advisories are resolved: GHSA-wrjc-x8rr-h8h6 (open redirect) and GHSA-337j-9hxr-rhxg (SSR deserialize) | `ea2e7f0`, `ff8bf90`, `2918ff4` |
 
 **Red-team pass 2 — N-series (residual same-class gaps)**
 

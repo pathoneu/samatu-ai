@@ -1100,22 +1100,55 @@ async def api_google_oauth_status():
     return {"enabled": GOOGLE_OAUTH_ENABLED}
 
 
+# The longest `next` kept through a Google sign-in. It rides in the signed
+# session cookie until the callback, and a cookie past the browser's ~4 KB limit
+# is dropped — the sign-in would then fail on its state check.
+_NEXT_PATH_MAX = 2000
+
+
 def _safe_next_path(raw: str | None) -> str:
-    """Only allow a same-origin RELATIVE redirect target after OAuth, to block the
-    open-redirect via ?next=https://evil.example (2026-06-19 security hunt). Accept
-    a single-leading-slash path; reject absolute URLs, scheme-relative '//host',
-    backslash tricks, and anything carrying a scheme or netloc."""
+    """Where the browser goes after Google sign-in: a path on THIS site, with its
+    query and hash (``/project/x/patikra?kambarys=02#a``), or "/".
+
+    Open-redirect guard (2026-06-19 security hunt; tightened 2026-10-05, when
+    the frontend started sending the query and hash too). Refused:
+      · absolute URLs and anything carrying a scheme or a host;
+      · protocol-relative ``//host``, and a backslash anywhere in the path
+        (browsers read ``/\\host`` as ``//host``);
+      · the same tricks percent-encoded, once or more (``/%2F%2Fhost``,
+        ``/%5Chost``, ``/%252F%252Fhost``) — the path is judged fully decoded —
+        and dot segments (``/.//host`` normalises to ``//host``);
+      · control characters, spaces and anything outside printable ASCII, raw or
+        encoded in the path (a browser drops a tab or newline, so ``/<TAB>/host``
+        is ``//host``). The frontend sends the browser's own percent-encoded
+        address, so nothing legitimate is lost;
+      · anything longer than _NEXT_PATH_MAX."""
     if not raw or not isinstance(raw, str):
         return "/"
     raw = raw.strip()
-    if not raw.startswith("/") or raw.startswith("//") or raw.startswith("/\\") or raw.startswith("/%2f"):
+    if not raw.startswith("/") or len(raw) > _NEXT_PATH_MAX:
+        return "/"
+    if any(not ("!" <= ch <= "~") for ch in raw):
+        return "/"
+    from urllib.parse import unquote, urlparse
+    # Only the path (up to the first "?" or "#") can turn into a host.
+    path = re.split(r"[?#]", raw, maxsplit=1)[0]
+    for _ in range(4):
+        decoded = unquote(path)
+        if decoded == path:
+            break
+        path = decoded
+    else:
+        return "/"   # still encoded after four rounds: no address the app builds
+    if ("//" in path or "\\" in path
+            or any(ch < " " or ch == "\x7f" for ch in path)
+            or any(seg in (".", "..") for seg in path.split("/"))):
         return "/"
     try:
-        from urllib.parse import urlparse
         p = urlparse(raw)
-        if p.scheme or p.netloc:
-            return "/"
-    except Exception:
+    except ValueError:
+        return "/"
+    if p.scheme or p.netloc:
         return "/"
     return raw
 
