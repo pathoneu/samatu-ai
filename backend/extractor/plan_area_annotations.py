@@ -49,6 +49,7 @@ __all__ = [
 
 CONFIRM_TOL = 0.03      # a Vision area this close to a label IS that label
 ADOPT_TOL = 0.20        # this close to one unclaimed label → take the label's value
+FRAME_ADOPT_TOL = 0.25  # a label inside the room's outline is its area this close — or when the words beside it name the room
 MIN_CANDIDATES = 3      # fewer standalone labels than this is not „the table"
 SOURCE_LABEL = "plano_uzrasas"   # plotas_saltinis written by this lane
 
@@ -489,7 +490,12 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
     label of the lubų planas falls inside a room outline of the pertvarų planas.
     When at least _SHARED_FRAME_SHARE of the labels fall inside some outline:
       · a label inside exactly one room IS that room's area — confirmed when
-        within ±3 %, otherwise adopted (any distance; the Vision figure is kept);
+        within ±3 %, adopted within ±FRAME_ADOPT_TOL or when the words beside
+        the label name the room; a label further off is NOT taken (audit
+        2026-09-29, geometry-lanes-7: Vision's box drifted onto the next room's
+        label and the room took its area, at any distance) — it stays
+        unclaimed with `patalpoje` = the room it lies in, and the room goes on
+        to the value rule (`reason = "label_differs"` if nothing else fits);
       · a label inside several rooms means the outlines overlap — the closest
         by value takes it, the others are the same room drawn twice
         (`_area_unconfirmed_reason = "duplicate_of:<nr>"`), kept, never deleted;
@@ -498,6 +504,9 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
     Without a shared frame (or without outlines) the value rule alone applies:
     within ±3 % → confirmed, one unclaimed label within ±20 % → adopted, else
     `_area_unconfirmed` (`reason = "no_label"`).
+
+    Confirmed or adopted, the room's area becomes the LABEL's value — the label
+    is the fact; Vision's figure is kept beside it when it differs.
 
     Mutates `rooms` (the pipeline's own list) and returns a summary:
       status       "insufficient" (fewer than MIN_CANDIDATES labels — nothing
@@ -512,8 +521,10 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
 
     Rooms whose area came from a table or from the user are never touched.
     A confirmed or adopted room gets `plotas_saltinis = "plano_uzrasas"` and
-    `_plotas_uzrasas` {page, value_m2, bbox, page_width, page_height}; an
-    adopted one also keeps `_plotas_pries_uzrasa_m2` (what Vision read).
+    `_plotas_uzrasas` {page, value_m2, bbox, page_width, page_height}, and
+    keeps `_plotas_pries_uzrasa_m2` (what Vision read) whenever that differs.
+    A room whose own outline holds a label too far off to take carries it as
+    `_plotas_uzrasas_kitas` {page, value_m2, bbox, page_width, page_height}.
     """
     cands, skipped_pages = _candidate_labels(annotations)
     summary: dict[str, Any] = {
@@ -540,16 +551,13 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
         a = cands[idx]
         claimed.add(idx)
         settled.add(id(room))
-        if adopted:
-            room["_plotas_pries_uzrasa_m2"] = round(float(room.get("plotas_m2") or 0), 2)
-            room["plotas_m2"] = float(a["value_m2"])
+        # the label is the fact — confirmed or adopted, the room's area is the label's
+        _take_label_value(room, float(a["value_m2"]))
         room["plotas_saltinis"] = SOURCE_LABEL
         room.pop("_area_unconfirmed", None)
         room.pop("_area_unconfirmed_reason", None)
-        room["_plotas_uzrasas"] = {
-            "page": a.get("page"), "value_m2": a["value_m2"], "bbox": a.get("bbox"),
-            "page_width": a.get("page_width"), "page_height": a.get("page_height"),
-        }
+        room.pop("_plotas_uzrasas_kitas", None)
+        room["_plotas_uzrasas"] = _label_record(a)
         (summary["adopted"] if adopted else summary["confirmed"]).append(room.get("nr"))
 
     def _flag(room: dict, reason: str) -> None:
@@ -572,6 +580,7 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
         if inside_any / len(cands) >= _SHARED_FRAME_SHARE:
             summary["geometry"] = "shared_frame"
 
+    far: dict[int, dict] = {}          # label → the room it lies in but is too far from to be its area
     if summary["geometry"] == "shared_frame":
         # labels inside exactly one room first (unambiguous), then shared ones
         for i, a in sorted(containing.items(), key=lambda kv: (len(kv[1]) != 1, kv[0])):
@@ -580,7 +589,16 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
                 continue
             val = float(cands[i]["value_m2"])
             hosts.sort(key=lambda r: _rel(val, _f(r.get("plotas_m2")) or 0.0) if _f(r.get("plotas_m2")) else float("inf"))
-            host = hosts[0]
+            # The label is the room's when its value is near the room's, or the words beside it name the room —
+            # never by position alone: Vision's box may have drifted onto the neighbour's label.
+            host = next((r for r in hosts if not (_f(r.get("plotas_m2")) or 0) > 0
+                         or _rel(val, float(r["plotas_m2"])) <= FRAME_ADOPT_TOL
+                         or _names_room(cands[i], r, live)), None)
+            if host is None:
+                far[i] = hosts[0]
+                hosts[0]["_plotas_uzrasas_kitas"] = _label_record(cands[i])
+                continue
+            hosts = [host] + [r for r in hosts if r is not host]
             v = _f(host.get("plotas_m2"))
             _claim(host, i, adopted=not (v and v > 0 and _rel(val, v) <= confirm_tol))
             for other in hosts[1:]:
@@ -609,16 +627,75 @@ def reconcile_rooms_with_annotations(rooms: Sequence[dict],
         if best is not None and best[0] <= adopt_tol:
             _claim(r, best[1], adopted=True)
         else:
-            _flag(r, "no_label")
+            _flag(r, "label_differs" if r.get("_plotas_uzrasas_kitas") else "no_label")
+    for i, host in far.items():
+        if i in claimed:                   # another room's value took it: it was that room's label after all
+            _release_far_label(host, cands[i], [cands[j] for j, h in far.items() if h is host and j not in claimed])
 
     # An unclaimed label carries its position too, so the sheet can offer
-    # „pridėti kaip patalpą" with the crop and the room lands on the right spot.
-    summary["unclaimed"] = [{"page": cands[i].get("page"), "value_m2": cands[i]["value_m2"],
-                             "bbox": cands[i].get("bbox"), "page_width": cands[i].get("page_width"),
-                             "page_height": cands[i].get("page_height")}
+    # „pridėti kaip patalpą" with the crop and the room lands on the right spot;
+    # one that lies inside a room whose area it is too far from names that room.
+    summary["unclaimed"] = [{**_label_record(cands[i]),
+                             **({"patalpoje": far[i].get("nr")} if i in far else {})}
                             for i in range(len(cands)) if i not in claimed]
     summary["status"] = "applied"
     return summary
+
+
+_GENERIC_NAME_WORDS = ("kambarys", "patalpa", "patalpos", "zona", "erdve", "vieta")
+
+
+def _label_record(a: dict) -> dict:
+    return {"page": a.get("page"), "value_m2": a["value_m2"], "bbox": a.get("bbox"),
+            "page_width": a.get("page_width"), "page_height": a.get("page_height")}
+
+
+def _release_far_label(room: dict, taken: dict, still_far: Sequence[dict]) -> None:
+    """A label that lay in `room`'s outline, too far from its area to be its own, was another room's after all:
+    the room's record of it goes — to the next such label in its outline nobody took, if there is one — and
+    with none left there, its question is the plain „no label" again."""
+    if room.get("_plotas_uzrasas_kitas") != _label_record(taken):
+        return
+    if still_far:
+        room["_plotas_uzrasas_kitas"] = _label_record(still_far[0])
+        return
+    room.pop("_plotas_uzrasas_kitas", None)
+    if room.get("_area_unconfirmed_reason") == "label_differs":
+        room["_area_unconfirmed_reason"] = "no_label"
+
+
+def _take_label_value(room: dict, value: float) -> None:
+    """The room's area becomes the label's; Vision's figure is kept beside it when it differs."""
+    old = _f(room.get("plotas_m2"))
+    if old and old > 0 and round(old, 2) != round(value, 2):
+        room["_plotas_pries_uzrasa_m2"] = round(old, 2)
+    room["plotas_m2"] = value
+
+
+def _name_tokens(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]{4,}", _fold(text)) if w not in _GENERIC_NAME_WORDS}
+
+
+def _same_word(a: str, b: str) -> bool:
+    """One word in two endings („vonia" / „vonios"): a common stem of all but the last two letters, at least four."""
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n >= max(4, min(len(a), len(b)) - 2)
+
+
+def _names_room(label: dict, room: dict, live: Sequence[dict]) -> bool:
+    """The words written beside the label name this room — and no other room of the drawing carries that word
+    (two „Miegamasis" cannot be told apart by name)."""
+    near = _name_tokens(str(label.get("context") or ""))
+    own = _name_tokens(str(room.get("pavadinimas") or ""))
+    words = {w for w in own if any(_same_word(w, c) for c in near)}
+    if not words:
+        return False
+    others = [r for r in live if r is not room]
+    return not any(_same_word(w, o) for w in words for r in others for o in _name_tokens(str(r.get("pavadinimas") or "")))
 
 
 def most_common_page(annotations: Sequence[dict]) -> int | None:
@@ -810,6 +887,7 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
     figs: list[dict] = []
     heights: list[dict] = []
     dimensions: list[dict] = []
+    stated: dict[int, set[int]] = {}
     seen: set[tuple] = set()
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
@@ -819,9 +897,11 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
         annotations.extend(ann)
         try:
             # the wall lengths the plan states (plan_dimensions) — same pass,
-            # same frames, so a dimension and a label never disagree on where
-            from .plan_dimensions import _dimensions_on_page
+            # same frames, so a dimension and a label never disagree on where —
+            # and the scale the sheet writes, which the strings' scale must match
+            from .plan_dimensions import _dimensions_on_page, stated_scales_on_page
             dimensions.extend(_dimensions_on_page(pn, W, H, chars, to_display))
+            stated.setdefault(pn, set()).update(stated_scales_on_page(chars))
         except Exception:  # noqa: BLE001
             pass
         if figures:
@@ -839,7 +919,7 @@ def scan_text_layer(pdf_bytes: bytes, pages: Iterable[int] | None = None, *,
             # the hairline under each string — what makes a string a wall
             # length rather than a mounting height (plan_dimensions module doc)
             from .plan_dimensions import attach_dimension_lines
-            attach_dimension_lines(pdf_bytes, dimensions)
+            attach_dimension_lines(pdf_bytes, dimensions, stated)
         except Exception:  # noqa: BLE001
             pass
     annotations.sort(key=lambda a: (a["page"], a["bbox"][1], a["bbox"][0]))
@@ -915,10 +995,16 @@ def reclaim_after_refinement(rooms: Sequence[dict], lane: dict,
         if not scored or scored[0][0] > confirm_tol:
             continue
         u = unclaimed.pop(scored[0][1])
+        _take_label_value(r, float(u["value_m2"]))           # the label is the fact
         r["plotas_saltinis"] = SOURCE_LABEL
         r["_plotas_uzrasas"] = {k: u.get(k) for k in ("page", "value_m2", "bbox", "page_width", "page_height")}
         r.pop("_area_unconfirmed", None)
         r.pop("_area_unconfirmed_reason", None)
+        r.pop("_plotas_uzrasas_kitas", None)
+        # the label lay in ANOTHER room's outline, too far from its area to be its own — it was this room's
+        host = by_nr.get(str(u.get("patalpoje") or ""))
+        if host is not None and host is not r:
+            _release_far_label(host, u, [x for x in unclaimed if str(x.get("patalpoje") or "") == str(u.get("patalpoje"))])
         lane["unconfirmed"] = [x for x in lane["unconfirmed"] if str(x) != str(nr)]
         lane.setdefault("confirmed", []).append(nr)
         claimed.append(str(nr))
@@ -944,6 +1030,12 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
             msg = (f"Patalpa „{name}\" ({_lt_num(r.get('plotas_m2'))} m²) plane persidengia su "
                    f"patalpa „{of_name}\" ir savo ploto užrašo neturi – greičiausiai ta pati "
                    "patalpa įskaičiuota du kartus. Patikrinkite ir nereikalingą išjunkite.")
+        elif reason == "label_differs" and isinstance(r.get("_plotas_uzrasas_kitas"), dict):
+            other = r["_plotas_uzrasas_kitas"]
+            msg = (f"Patalpos „{name}\" vietoje plane (psl. {other.get('page')}) užrašyta "
+                   f"{_lt_num(other.get('value_m2'))} m², o skaičiuoju su {_lt_num(r.get('plotas_m2'))} m² – "
+                   "skirtumas per didelis, kad būtų tas pats plotas. Patikrinkite, kurios patalpos tai "
+                   "užrašas, ir įrašykite tikrą plotą.")
         else:
             msg = (f"Patalpos „{name}\" ({_lt_num(r.get('plotas_m2'))} m²) ploto užrašo plane "
                    "neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia patalpa yra "
@@ -951,7 +1043,21 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
         out.append({"level": "WARN", "code": "room_area_unconfirmed", "severity": "high",
                     "room": nr, "message": msg})
     shared = lane.get("geometry") == "shared_frame"
+    flagged = {str(nr) for nr in lane.get("unconfirmed") or []}
     for u in lane.get("unclaimed") or []:
+        inside = str(u.get("patalpoje") or "")
+        if inside:
+            if inside in flagged:
+                continue                   # the room's own warning above already says it
+            name = (by_nr.get(inside) or {}).get("pavadinimas") or inside
+            out.append({
+                "level": "WARN", "code": "plan_area_unclaimed", "severity": "med", "room": inside,
+                "message": (f"Plane (psl. {u.get('page')}) užrašytas plotas {_lt_num(u.get('value_m2'))} m² "
+                            f"stovi patalpos „{name}\" vietoje, bet jos plotas "
+                            f"{_lt_num((by_nr.get(inside) or {}).get('plotas_m2'))} m² – patikrinkite, kuriai "
+                            "patalpai šis užrašas priklauso."),
+            })
+            continue
         out.append({
             "level": "WARN" if shared else "INFO", "code": "plan_area_unclaimed",
             "severity": "med" if shared else "low",

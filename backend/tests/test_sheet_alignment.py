@@ -102,3 +102,41 @@ def test_a_sheet_that_draws_one_partition_more_is_still_the_same_plan():
     b.walls = b.walls + [(0.2, 1.6, 3.2, 1.8)]            # 0,6 m² of wall more: the solids overlap ≈ 0,88
     al = sa.align_sheets(build_plan([a, b]), plan_pages=[1, 2])
     assert al["groups"] == [[1, 2]]
+
+
+# ── typical floors (audit 2026-09-29, geometry-lanes-3) ──────────────────────
+# The 1st and the 2nd storey of a block are drawn to the millimetre alike: their walls cannot tell them apart.
+# The rooms' own seats (a number badge, an area label) can — another room's number on the very spot.
+
+def _seat(nr, x_m, y_m):
+    """A room's seat in a sheet's points, from metres (synthetic_plan's frame)."""
+    return (nr, 60.0 + x_m * PT_PER_M, 80.0 + y_m * PT_PER_M)
+
+
+def test_two_storeys_drawn_alike_are_not_one_plan():
+    pdf = build_plan([two_rooms(), two_rooms()])
+    seats = {1: [_seat("101", 2.2, 1.5), _seat("102", 5.7, 1.5)], 2: [_seat("201", 2.2, 1.5), _seat("202", 5.7, 1.5)]}
+    al = sa.align_sheets(pdf, plan_pages=[1, 2], seats=seats)
+    assert al["groups"] == [[1], [2]] and al["transform"][2]["base"] == 2
+    assert al["storeys"] == [[2, 1, "201", "101"]]
+    # without the seats the walls alone lay them over each other, as before
+    assert sa.align_sheets(pdf, plan_pages=[1, 2])["groups"] == [[1, 2]]
+
+
+def test_the_sheets_of_one_storey_are_still_one_plan_whichever_sheet_seats_which_room():
+    # room 101 is found on the layout sheet, room 102 by its area label on the ceiling plan: other spots
+    pdf = build_plan([two_rooms(), two_rooms()])
+    seats = {1: [_seat("101", 2.2, 1.5)], 2: [_seat("102", 5.7, 1.5)]}
+    al = sa.align_sheets(pdf, plan_pages=[1, 2], seats=seats)
+    assert al["groups"] == [[1, 2]] and al["storeys"] == []
+
+
+def test_a_sheet_without_seats_between_two_storeys_stays_alone():
+    # a wall-painting plan with no numbers on it, drawn like both storeys: either storey's — neither is told
+    pdf = build_plan([two_rooms(), two_rooms(), two_rooms()])
+    seats = {1: [_seat("101", 2.2, 1.5)], 3: [_seat("201", 2.2, 1.5)]}
+    al = sa.align_sheets(pdf, plan_pages=[1, 2, 3], seats=seats)
+    assert sorted(al["groups"]) == [[1], [2], [3]] and al["storeys"] == [[3, 1, "201", "101"]]
+    # one storey only: the sheet without numbers joins it
+    al = sa.align_sheets(pdf, plan_pages=[1, 2, 3], seats={1: [_seat("101", 2.2, 1.5)]})
+    assert al["groups"] == [[1, 2, 3]]

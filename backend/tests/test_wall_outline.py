@@ -114,6 +114,24 @@ def test_a_stated_perimeter_keeps_its_figure_but_still_gets_the_outline():
     assert rooms[0]["_konturas"]["perimetras_m"] == pytest.approx(14.0, rel=0.03)
 
 
+def test_a_bounding_box_pair_the_outline_is_as_long_as_becomes_the_perimeter():
+    """Audit 2026-09-29 (geometry-lanes-6): two strings whose product exceeds the area are a bounding box —
+    plan_dimensions only PROPOSES 2 × (w + l). An outline as long as it says the room is orthogonally convex:
+    the pair is the perimeter. One that is not (a notch in a wall) leaves the proposal and takes its own length."""
+    pdf, centres = _plan()
+    prop = {"page": 1, "plotis_m": 3.0, "ilgis_m": 4.0, "sandauga_m2": 12.0, "plotas_m2": 11.8, "perimetras_m": 14.0}
+    rooms = [_room("A", 12.0, centres["A"], perim=12.5, _perimetras_matmenys_siulymas=dict(prop)),
+             _room("B", 7.5, centres["B"], perim=11.1, _perimetras_matmenys_siulymas={**prop, "perimetras_m": 12.0})]
+    s = apply_wall_outlines(rooms, pdf, scale_by_page={1: M_PER_PT})
+    a, b = rooms
+    assert s["pairs_confirmed"] == ["A"] and s["traced"] == ["A", "B"]
+    assert a["perimetras_m"] == 14.0 and a["perimetras_saltinis"] == "plano_matmenys"
+    assert a["_perimetras_pries_matmenis"] == 12.5 and "_perimetras_matmenys_siulymas" not in a
+    assert a["_perimetras_matmenys"]["konturas_m"] == pytest.approx(14.0, rel=0.01)
+    assert b["perimetras_saltinis"] == "sienu_konturas" and b["perimetras_m"] == pytest.approx(11.0, rel=0.01)
+    assert b["_perimetras_matmenys_siulymas"]["perimetras_m"] == 12.0
+
+
 def test_an_open_plan_that_swallows_the_next_room_is_refused():
     pdf, centres = _plan(partition=False)
     rooms = [_room("A", 12.0, centres["A"], perim=14.0), _room("B", 7.5, centres["B"], perim=11.0)]

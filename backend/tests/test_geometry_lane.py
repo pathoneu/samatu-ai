@@ -608,3 +608,134 @@ def test_a_room_placed_in_an_open_space_today_carries_todays_record_of_it(monkey
     assert out["atviros_erdves"] == [["01", "02"]]
     for r in parsed["patalpos"]:
         assert r["_atvira_erdve"]["nariai"] == ["01", "02"] and r["_atvira_erdve"]["plotas_m2"] != 99.0
+
+
+# ── audit round 13 (2026-10-03): typical floors, two-string rectangles, implausible sums ──────────────────
+
+def _storeys(dx: float = 0.0, dy: float = 0.0) -> bytes:
+    """Two storeys drawn to the millimetre alike, one per sheet; the upper one's rooms are numbered 3 and 4
+    and its badges sit `dx`, `dy` metres from where the lower one's are."""
+    ground = two_rooms()
+    upper = two_rooms()
+    upper.badges = [("3", 2.2 + dx, 1.5 + dy), ("4", 5.7 + dx, 1.5 + dy)]
+    return build_plan([ground, upper])
+
+
+def _four_rooms() -> dict:
+    rooms = [{"nr": nr, "pavadinimas": f"P{nr}", "plotas_m2": area, "plotas_saltinis": "eksplikacija",
+              "puslapio_nr": page, "perimetras_m": 13.0}
+             for nr, area, page in (("01", 12.0, 1), ("02", 9.0, 1), ("03", 12.0, 2), ("04", 9.0, 2))]
+    return {"puslapiai": [{"nr": 1, "tipas": "floor_plan"}, {"nr": 2, "tipas": "floor_plan"}], "patalpos": rooms}
+
+
+def test_typical_floors_drawn_alike_are_two_plans_and_every_room_keeps_its_own_walls():
+    """Audit 2026-09-29 (geometry-lanes-3): the walls of two typical floors coincide, so they were laid over each
+    other as ONE plan — room 01 and room 03 above it shared a face, became an „open space" and got half of its
+    walls each. Another room's number on the very spot says it is another storey: the sheets stay apart."""
+    parsed = _four_rooms()
+    out = gl.apply_geometry(parsed, _storeys())
+    assert out["grupes"] == [[1], [2]] and out["kiti_aukstai"] and out["atviros_erdves"] == []
+    by = {r["nr"]: r for r in parsed["patalpos"]}
+    for nr, walls in (("01", 14.0), ("02", 12.0), ("03", 14.0), ("04", 12.0)):
+        assert by[nr]["polygon_source"] == "vektoriniai_konturai", nr
+        assert by[nr]["perimetras_m"] == walls and by[nr]["perimetras_saltinis"] == "matmenu_eilutes", nr
+    assert by["03"]["_konturas"]["page"] == 2
+
+
+def test_rooms_seated_on_two_sheets_are_never_one_open_space():
+    """The badges of the upper storey stand 0,5 m off the lower one's — not on the same spot, so the two sheets
+    ARE laid over each other — but two rooms numbered on different sheets in one face are still two storeys,
+    not a shared space: neither is outlined, each keeps what it had, and the reason says why."""
+    parsed = _four_rooms()
+    out = gl.apply_geometry(parsed, _storeys(dx=0.5, dy=0.4))
+    assert out["grupes"] == [[1, 2]] and out["kiti_aukstai"] == [] and out["atviros_erdves"] == []
+    assert sorted(out["skirtingu_lapu_erdves"]) == [["01", "03"], ["02", "04"]]
+    for r in parsed["patalpos"]:
+        assert "polygon_source" not in r and r["perimetras_m"] == 13.0 and "perimetras_saltinis" not in r, r["nr"]
+        assert "kitas aukštas" in r["_konturo_priezastis"]
+    from extractor.user_text import is_banned
+    assert not [r["_konturo_priezastis"] for r in parsed["patalpos"] if is_banned(r["_konturo_priezastis"])]
+
+
+def _pair(perimetras_m: float, w: float, l: float, area: float = 12.0) -> dict:
+    return {"page": 2, "plotis_m": w, "ilgis_m": l, "sandauga_m2": round(w * l, 2), "plotas_m2": area,
+            "bboxes": [], "rect": [0, 0, 1, 1], "mastelis": 100, "page_width": 595.0, "page_height": 842.0,
+            "perimetras_m": perimetras_m}
+
+
+def test_a_two_string_rectangle_the_rooms_walls_do_not_add_up_to_gives_way_to_the_walls():
+    """Audit 2026-09-29 (geometry-lanes-6): two strings closing a rectangle assume the room IS one. Its walls, read
+    one by one along the traced outline, are the better reading when they come to another figure."""
+    rec = {k: v for k, v in _pair(13.0, 3.0, 3.5).items() if k != "perimetras_m"}
+    parsed = _parsed(perimetras_m=13.0, perimetras_saltinis="plano_matmenys", _perimetras_matmenys=rec)
+    out = gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert out["poros_atmestos"] == ["01"] and "01" in out["perimetrai_sudeti"]
+    assert r1["perimetras_m"] == 14.0 and r1["perimetras_saltinis"] == "matmenu_eilutes"
+    assert r1["_perimetras_matmenys"]["sienu_suma_m"] == 14.0 and r1["_perimetras_pries_geometrija"] == 13.0
+
+
+def test_a_two_string_rectangle_its_walls_agree_with_stays():
+    rec = {k: v for k, v in _pair(14.0, 3.0, 4.0).items() if k != "perimetras_m"}
+    parsed = _parsed(perimetras_m=14.0, perimetras_saltinis="plano_matmenys", _perimetras_matmenys=rec)
+    out = gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert out["poros_atmestos"] == [] and "01" not in out["perimetrai_sudeti"]
+    assert r1["perimetras_m"] == 14.0 and r1["perimetras_saltinis"] == "plano_matmenys"
+    assert "sienu_suma_m" not in r1["_perimetras_matmenys"] and "_sienos" not in r1
+
+
+def test_a_bounding_box_pair_the_traced_outline_is_as_long_as_becomes_the_perimeter():
+    """An L-room's extents (w × l over the area) state its perimeter only when the room is orthogonally convex —
+    the traced outline as long as 2 × (w + l) says so. A longer outline (a notch) leaves the pair a proposal."""
+    parsed = _parsed(_perimetras_matmenys_siulymas=_pair(14.0, 3.0, 4.0, area=11.8))
+    out = gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert out["poros_patvirtintos"] == ["01"]
+    assert r1["perimetras_m"] == 14.0 and r1["perimetras_saltinis"] == "plano_matmenys"
+    assert r1["_perimetras_matmenys"]["konturas_m"] == pytest.approx(14.0, abs=0.15)
+    assert "_perimetras_matmenys_siulymas" not in r1
+    parsed = _parsed(_perimetras_matmenys_siulymas=_pair(15.2, 3.4, 4.2, area=11.8))
+    out = gl.apply_geometry(parsed, _two_sheets())
+    r1 = parsed["patalpos"][0]
+    assert out["poros_patvirtintos"] == [] and r1["perimetras_saltinis"] == "matmenu_eilutes" and r1["perimetras_m"] == 14.0
+
+
+def test_walls_adding_up_to_less_than_any_room_of_that_area_are_not_taken():
+    """Audit 2026-09-29 (geometry-lanes-4): a 1:200 sheet written in CENTIMETRES with no scale in its title agrees
+    with its hairlines at 1:20 — a plan's scale — and every wall comes out 10× short. 1,4 m around 12 m² is
+    shorter than any room of that area could have (3,5·√A): the room keeps what it had."""
+    a = two_rooms()
+    a.scale = 0.5                                                   # drawn at 1:200…
+    a.title = "PLANAS"                                              # …with no scale written…
+    a.dims = [(str(int(text) // 10), *line) for text, *line in a.dims]   # …and every length in centimetres
+    k = 28.3465 * 0.5
+    corrected = [[(60 + x * k) / 595.2756, (80 + y * k) / 841.8898] for x, y in ((0.2, 0.2), (4.2, 0.2), (4.2, 3.2), (0.2, 3.2))]
+    parsed = _parsed(polygon_pct=corrected, polygon_source="corrected")
+    parsed["puslapiai"] = [{"nr": 1, "tipas": "floor_plan"}]
+    out = gl.apply_geometry(parsed, build_plan([a]))
+    r1 = parsed["patalpos"][0]
+    assert out["masteliai"]["1"]["mastelis"] == 20                  # the gate cannot tell: 1:20 is a plan's scale
+    assert out["perimetrai_atmesti"] == ["01"] and "01" not in out["perimetrai_sudeti"]
+    assert r1["perimetras_m"] == 13.9 and "perimetras_saltinis" not in r1 and "_sienos" not in r1
+
+
+def test_a_share_of_another_storeys_space_written_on_an_earlier_run_is_taken_back():
+    """A project read before the fix carries what the lane wrote then: each storey's room half of a face it
+    „shared" with the room above, outlined by the lane's own boundary. Re-read, that goes — outline, record and
+    share — and the perimeter is the figure kept before."""
+    parsed = _four_rooms()
+    for r, other in zip(parsed["patalpos"], ("03", "04", "01", "02")):
+        r.update({"perimetras_m": 7.0, "perimetras_saltinis": "atviros_erdves_ivertis", "_perimetras_pries_geometrija": 13.0,
+                  "_perimetras_ivertis_m": 7.0, "_perimetras_ivertis_saltinis": "atviros_erdves_konturas",
+                  "_perimetras_priezastis": f"atvira erdvė su {other}", "polygon_source": "vektoriniai_konturai",
+                  "polygon_pct": [[0.1, 0.1], [0.3, 0.1], [0.3, 0.2], [0.1, 0.2]],
+                  "_konturas": {"page": 1, "saltinis": "padalinta_programos", "perimetras_m": 7.0},
+                  "_atvira_erdve": {"nariai": sorted([r["nr"], other]), "perimetras_m": 14.0, "page": 1}})
+    out = gl.apply_geometry(parsed, _storeys(dx=0.5, dy=0.4))
+    assert out["atviros_erdves"] == [] and out["konturai"] == []
+    for r in parsed["patalpos"]:
+        for gone in ("_atvira_erdve", "polygon_source", "_konturas", "perimetras_saltinis", "_perimetras_ivertis_m",
+                     "_perimetras_priezastis", "_perimetras_pries_geometrija"):
+            assert gone not in r, (r["nr"], gone)
+        assert r["perimetras_m"] == 13.0 and "kitas aukštas" in r["_konturo_priezastis"]

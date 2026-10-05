@@ -26,8 +26,11 @@ with `polygon_source = "sienu_konturas"`, `_konturas` {page, plotas_m2,
 perimetras_m, plotas_uzrasas_m2, paklaida, durys_m, dpi}; and, when nobody
 STATED the perimeter (plan dimensions, table, user), `perimetras_m` becomes the
 outline's with `perimetras_saltinis = "sienu_konturas"` and the read figure kept
-as `_perimetras_pries_kontura`. Areas are never touched — the printed label is
-the area, the outline is checked against it.
+as `_perimetras_pries_kontura` — unless the room carries a bounding-box pair of
+dimension strings the outline confirms (as long as 2 × (plotis + ilgis) within
+1 %, plan_dimensions.confirm_pair_by_outline): then the pair is the stated
+perimeter. Areas are never touched — the printed label is the area, the
+outline is checked against it.
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from .plan_area_annotations import _f, _rel
-from .plan_dimensions import _label_position, frame_groups
+from .plan_dimensions import _label_position, confirm_pair_by_outline, frame_groups
 
 DPI = 200
 WALL_GREY = 245            # darker than this on the walls-only render = wall (fills are grey)
@@ -257,7 +260,7 @@ def apply_wall_outlines(rooms: Sequence[dict], pdf_bytes: bytes, dims: Sequence[
     Mutates rooms in place; returns {status, pages, traced, confirmed,
     corrected, unmatched, skipped, dpi}."""
     summary: dict[str, Any] = {"status": "insufficient", "pages": [], "traced": [], "confirmed": [],
-                               "corrected": [], "unmatched": [], "skipped": [], "dpi": dpi}
+                               "corrected": [], "unmatched": [], "skipped": [], "pairs_confirmed": [], "dpi": dpi}
     scales = _scales(dims, scale_by_page)
     if not scales:
         return summary
@@ -355,6 +358,11 @@ def apply_wall_outlines(rooms: Sequence[dict], pdf_bytes: bytes, dims: Sequence[
                 "paklaida": round(found["paklaida"], 4), "durys_m": found["durys_m"], "dpi": dpi,
             }
             summary["traced"].append(nr)
+            # a bounding-box pair of dimension strings (plan_dimensions: w × l over the area) is the room's
+            # perimeter when the outline is as long as it — the room is an L, not a notched one
+            if confirm_pair_by_outline(room, found["perimetras_m"]):
+                summary["pairs_confirmed"].append(nr)
+                continue
             if str(room.get("perimetras_saltinis") or "").lower() in _STATED_PERIMETERS or room.get("manual_override"):
                 continue
             old = _f(room.get("perimetras_m"))

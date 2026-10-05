@@ -274,16 +274,121 @@ def _lab(value, cx, cy, page=4):
             "page_width": 1000, "page_height": 1000}
 
 
-def test_a_label_inside_the_room_outline_is_that_rooms_area_whatever_the_value():
+def test_a_label_inside_the_room_outline_is_that_rooms_area_when_the_value_is_near():
     rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
-             _room("02", 9.0, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),     # Vision read 9,0 — label says 14,26
+             _room("02", 12.0, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),    # Vision read 12,0 — label says 14,26 (19 %)
              _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1))]
     ann = [_lab(37.86, 0.25, 0.25), _lab(14.26, 0.6, 0.2), _lab(3.52, 0.55, 0.45)]
     res = reconcile_rooms_with_annotations(rooms, ann)
     assert res["geometry"] == "shared_frame"
     assert res["confirmed"] == ["01"] and sorted(res["adopted"]) == ["02", "03"]
-    assert rooms[1]["plotas_m2"] == 14.26 and rooms[1]["_plotas_pries_uzrasa_m2"] == 9.0, \
-        "58 % off, but the label stands inside the outline: the drawing wins, the Vision figure is kept"
+    assert rooms[1]["plotas_m2"] == 14.26 and rooms[1]["_plotas_pries_uzrasa_m2"] == 12.0, \
+        "the label stands inside the outline and is near: the drawing wins, the Vision figure is kept"
+
+
+def test_a_far_label_inside_the_outline_is_not_taken_by_position_alone():
+    """Audit 2026-09-29 (geometry-lanes-7): Vision's box drifted onto the neighbour's label and the room took
+    that area at ANY distance. 9,0 against a 14,26 label inside its outline is not adopted: the room keeps its
+    figure, is flagged with what the plan says there, and the label is left for the room it belongs to."""
+    rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
+             _room("02", 9.0, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),
+             _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1))]
+    ann = [_lab(37.86, 0.25, 0.25), _lab(14.26, 0.6, 0.2), _lab(3.52, 0.55, 0.45)]
+    res = reconcile_rooms_with_annotations(rooms, ann)
+    assert res["confirmed"] == ["01"] and res["adopted"] == ["03"] and res["unconfirmed"] == ["02"]
+    assert rooms[1]["plotas_m2"] == 9.0 and rooms[1].get("plotas_saltinis") != "plano_uzrasas"
+    assert rooms[1]["_area_unconfirmed_reason"] == "label_differs"
+    assert rooms[1]["_plotas_uzrasas_kitas"]["value_m2"] == 14.26
+    assert [(u["value_m2"], u.get("patalpoje")) for u in res["unclaimed"]] == [(14.26, "02")]
+    from extractor.plan_area_annotations import lane_warnings
+    from extractor.user_text import is_banned
+    warns = lane_warnings(res, rooms)
+    said = [w["message"] for w in warns]
+    assert len(said) == 1 and "užrašyta 14,26 m²" in said[0] and "9,00 m²" in said[0], said
+    assert not [s for s in said if is_banned(s)]
+
+
+def test_a_far_label_that_names_the_room_is_its_area():
+    rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
+             {"nr": "02", "pavadinimas": "Miegamasis", "plotas_m2": 9.0, "polygon_pct": _sq(0.5, 0.1, 0.2, 0.2)},
+             _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1))]
+    ann = [_lab(37.86, 0.25, 0.25), {**_lab(14.26, 0.6, 0.2), "context": "MIEGAMASIS"}, _lab(3.52, 0.55, 0.45)]
+    res = reconcile_rooms_with_annotations(rooms, ann)
+    assert sorted(res["adopted"]) == ["02", "03"] and rooms[1]["plotas_m2"] == 14.26
+    # …but a name two rooms share cannot tell them apart
+    rooms = [{"nr": "01", "pavadinimas": "Miegamasis", "plotas_m2": 37.86, "polygon_pct": _sq(0.1, 0.1, 0.3, 0.3)},
+             {"nr": "02", "pavadinimas": "Miegamasis", "plotas_m2": 9.0, "polygon_pct": _sq(0.5, 0.1, 0.2, 0.2)},
+             _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1))]
+    res = reconcile_rooms_with_annotations(rooms, ann)
+    assert "02" in res["unconfirmed"] and rooms[1]["plotas_m2"] == 9.0
+
+
+def test_a_far_label_another_room_owns_by_value_goes_to_that_room():
+    # 02's outline lies over 04's label (16,0); 04 itself has no outline — the value rule gives it the label
+    rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
+             _room("02", 9.0, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),
+             _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1)),
+             _room("04", 15.8)]
+    ann = [_lab(37.86, 0.25, 0.25), _lab(16.0, 0.6, 0.2), _lab(3.52, 0.55, 0.45)]
+    res = reconcile_rooms_with_annotations(rooms, ann)
+    assert rooms[3]["plotas_m2"] == 16.0 and "04" in res["confirmed"]
+    assert rooms[1]["plotas_m2"] == 9.0 and rooms[1]["_area_unconfirmed_reason"] == "no_label"
+    assert "_plotas_uzrasas_kitas" not in rooms[1] and res["unclaimed"] == []
+
+
+def test_a_room_whose_outline_holds_two_far_labels_keeps_the_one_nobody_took():
+    # Vision's outline of 02 spreads over 04's label (16,0 — 04 takes it by value) and a 20,0 nobody's figure
+    # is near: 02's question names the 20,0 still standing in its place
+    for far in ([_lab(16.0, 0.6, 0.2), _lab(20.0, 0.8, 0.3)], [_lab(20.0, 0.8, 0.3), _lab(16.0, 0.6, 0.2)]):
+        rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
+                 _room("02", 9.0, polygon_pct=_sq(0.5, 0.1, 0.4, 0.3)),
+                 _room("03", 3.11, polygon_pct=_sq(0.5, 0.6, 0.1, 0.1)),
+                 _room("04", 15.8)]
+        res = reconcile_rooms_with_annotations(rooms, [_lab(37.86, 0.25, 0.25), *far, _lab(3.52, 0.55, 0.65)])
+        assert rooms[3]["plotas_m2"] == 16.0 and "02" in res["unconfirmed"]
+        assert rooms[1]["_plotas_uzrasas_kitas"]["value_m2"] == 20.0 and rooms[1]["_area_unconfirmed_reason"] == "label_differs"
+        assert [(u["value_m2"], u.get("patalpoje")) for u in res["unclaimed"]] == [(20.0, "02")]
+
+
+def test_a_confirmed_room_takes_the_labels_value():
+    """The label is the fact: within ±3 % the room is confirmed AND carries the label's number, Vision's beside."""
+    rooms = [_room("01", 37.5, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)), _room("02", 14.26, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),
+             _room("03", 3.5)]
+    ann = [_lab(37.86, 0.25, 0.25), _lab(14.26, 0.6, 0.2), _lab(3.52, 0.9, 0.9)]
+    res = reconcile_rooms_with_annotations(rooms, ann)
+    assert sorted(res["confirmed"]) == ["01", "02", "03"]
+    assert rooms[0]["plotas_m2"] == 37.86 and rooms[0]["_plotas_pries_uzrasa_m2"] == 37.5
+    assert rooms[1]["plotas_m2"] == 14.26 and "_plotas_pries_uzrasa_m2" not in rooms[1]
+    assert rooms[2]["plotas_m2"] == 3.52 and rooms[2]["_plotas_pries_uzrasa_m2"] == 3.5
+
+
+def test_a_room_confirmed_after_the_zoom_takes_the_labels_value():
+    """The second look (reclaim_after_refinement) confirms within ±3 % — and, like the first, writes the LABEL's
+    number, keeping the zoomed figure beside it."""
+    from extractor.plan_area_annotations import reclaim_after_refinement
+    rooms = [_room("01", 37.86), _room("02", 14.26), _room("03", 3.11), _room("07", 9.0)]
+    lane = reconcile_rooms_with_annotations(rooms, _ann(37.86, 14.26, 3.52, 6.90))
+    assert "07" in lane["unconfirmed"]
+    rooms[3]["plotas_m2"] = 6.85                       # Step 2.5's zoomed re-read
+    assert reclaim_after_refinement(rooms, lane) == ["07"]
+    assert rooms[3]["plotas_m2"] == 6.9 and rooms[3]["_plotas_pries_uzrasa_m2"] == 6.85
+    assert rooms[3]["plotas_saltinis"] == "plano_uzrasas" and "_area_unconfirmed" not in rooms[3]
+
+
+def test_a_far_label_another_room_takes_after_the_zoom_is_no_longer_the_first_rooms_question():
+    # 02's outline lies over 04's 16,0 label; on the first pass 04's Vision figure (12,0) was too far to take it
+    rooms = [_room("01", 37.86, polygon_pct=_sq(0.1, 0.1, 0.3, 0.3)),
+             _room("02", 9.0, polygon_pct=_sq(0.5, 0.1, 0.2, 0.2)),
+             _room("03", 3.11, polygon_pct=_sq(0.5, 0.4, 0.1, 0.1)),
+             _room("04", 12.0)]
+    lane = reconcile_rooms_with_annotations(rooms, [_lab(37.86, 0.25, 0.25), _lab(16.0, 0.6, 0.2), _lab(3.52, 0.55, 0.45)])
+    assert rooms[1]["_area_unconfirmed_reason"] == "label_differs" and rooms[1]["_plotas_uzrasas_kitas"]["value_m2"] == 16.0
+    rooms[3]["plotas_m2"] = 15.9                       # the zoom reads 04 again: it is 04's label
+    from extractor.plan_area_annotations import lane_warnings, reclaim_after_refinement
+    assert reclaim_after_refinement(rooms, lane) == ["04"] and rooms[3]["plotas_m2"] == 16.0
+    assert "_plotas_uzrasas_kitas" not in rooms[1] and rooms[1]["_area_unconfirmed_reason"] == "no_label"
+    said = " ".join(w["message"] for w in lane_warnings(lane, rooms))
+    assert "16,00" not in said and "16,0 " not in said
 
 
 def test_two_outlines_over_one_label_are_the_same_room_drawn_twice():

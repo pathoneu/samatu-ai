@@ -8,10 +8,18 @@ string („3.400", „4.235", „530" mm) over a hairline dimension LINE, so a
 rectangular room's perimeter is 2 × (plotis + ilgis) — and the pair is
 self-checking twice over: the room's area label must sit inside BOTH
 dimension lines' extents (its walls span the room, the two lines close a
-rectangle around the label), and plotis × ilgis must equal the label — up
-to 5 % over (an L-room's bounding box, whose perimeter is still right) and
-2 % under (two walls that do not span the room are not its walls). No pair
-passes ⇒ the room keeps whatever it had (Vision's read), and says so.
+rectangle around the label), and plotis × ilgis must equal the label — no
+more over it than the label's rounding, and 2 % under (two walls that do not
+span the room are not its walls). Up to 5 % over is a bounding box: the
+perimeter of an L-room, but not of a room with a notch in a wall, so it is
+only PROPOSED until a traced outline is as long as 2 × (plotis + ilgis)
+(2026-10-03, audit geometry-lanes-6). No pair passes ⇒ the room keeps
+whatever it had (Vision's read), and says so.
+
+The page's scale must be a plan's (1:20..1:500) and the one the sheet writes
+in its title when it writes one (audit geometry-lanes-4: centimetre strings
+read as millimetres agree with their lines at 1:5, and every length came out
+10× short). A page that fails backs no string — nothing on it is used.
 
 Why the lines matter (2026-09-10, fresh objektas_g runs): the same storey's
 sheets pool ~300 strings, and a product alone cannot tell a room's own walls
@@ -25,9 +33,11 @@ Shapes: `read_dimension_strings` → dicts {page, text, value_m, bbox (display
 frame, PDF points from the top-left), page_width, page_height, orientation
 "h" | "v"} plus, when the vector layer backs the string, {span: [a0, a1]
 along the string's axis, line_pos: the line's other coordinate, span_source:
-"line", scale_m_per_pt, mastelis}. `apply_dimension_strings` mutates rooms in
-place and returns a summary {status, dimensions, lines, confirmed, corrected,
-unmatched, skipped, pages, mastelis}.
+"line", scale_m_per_pt, mastelis}; on a page whose scale is refused, every
+string carries `mastelis_atmestas` {ismatuota, uzrasyta, priezastis} instead.
+`apply_dimension_strings` mutates rooms in place and returns a summary
+{status, dimensions, lines, confirmed, corrected, unmatched, skipped,
+proposed, pages, mastelis, mastelis_atmestas}.
 """
 
 from __future__ import annotations
@@ -37,15 +47,22 @@ import statistics
 from typing import Any, Iterable, Sequence
 
 from .plan_area_annotations import (
-    _CHAR_OVERLAP_PT, _NUM_CHARS, _f, _gap_limit, _identity, _iter_pages, _lines, _rel, _turn_box,
+    _CHAR_OVERLAP_PT, _NUM_CHARS, _f, _gap_limit, _identity, _iter_pages, _line_text, _lines, _rel, _turn_box,
 )
 
 _DIM_M_RE = re.compile(r"^\d{1,2}[.,]\d{3}$")   # „3.400" — metres, millimetre precision
 _DIM_MM_RE = re.compile(r"^\d{3,5}$")           # „530", „3400", „12500" — millimetres
 MIN_DIM_M = 0.30
 MAX_DIM_M = 30.0
-PRODUCT_TOL = 0.05      # plotis × ilgis may EXCEED the label by this much — an L-room's bounding box
-EXACT_TOL = 0.02        # ...and fall SHORT by only this; a looser pair is taken only when it is the only one
+PRODUCT_TOL = 0.05      # plotis × ilgis may EXCEED the label by this much — an L-room's bounding box…
+EXACT_TOL = 0.02        # ...and fall SHORT by only this
+OVER_SLACK_M2 = 0.005   # the label is written to the cent: a product half a cent over it is still the room's area
+# A pair whose product EXCEEDS the area is the bounding box of a room that is not a rectangle. Its 2 × (w + l)
+# is the perimeter only for an orthogonally convex room (an L, a cut corner) — a notch in the middle of a wall
+# adds two walls the pair never sees (audit 2026-09-29, geometry-lanes-6). Such a pair is kept as a PROPOSAL
+# and becomes the perimeter only when a traced outline is as long as it (`confirm_pair_by_outline`).
+CONVEX_TOL = 0.01
+PROPOSAL_KEY = "_perimetras_matmenys_siulymas"
 CONFIRM_TOL = 0.02      # the read perimeter already agreed with the dimensions
 MIN_DIMENSIONS = 4      # fewer line-backed strings than this is not a dimensioned plan
 SOURCE = "plano_matmenys"
@@ -61,6 +78,62 @@ MIN_SCALED_SHARE = 0.4  # ...and they must be this share of its strings, or the 
 CLOSE_PT = 45.0         # a dimension line sits at most this far outside the other wall's extent (one exterior chain)
 _PT_M = 25.4 / 72 / 1000   # metres per PDF point at 1:1
 _STANDARD_SCALES = (1, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250, 500, 1000)
+
+# Is the page's scale a plan's at all? (audit 2026-09-29, geometry-lanes-4.) Strings in CENTIMETRES read as
+# millimetres agree with their hairlines just as well — at 1:5 instead of 1:50 — and every length the sheet
+# gives is then 10× too short. A derived scale outside 1:20..1:500 is no plan's; a sheet that STATES its scale
+# („M 1:50" in the title, „1:25" under a detail) is held to it: what the strings measure must lie within
+# STATED_TOL of one stated scale, and the stated one is then the sheet's scale (exact — PDFium's bounds carry the
+# stroke and the caps, a median of them does not). „What the strings measure" is the UPPER end of their scales
+# (the 90th percentile): a dimension line drawn past its extension lines only ever makes a string measure a
+# smaller 1:N than the sheet's — objektas_b's 1:100 sheets measure a median of 1:94,5–98,5 but an upper end of
+# 1:96,8–99,3 (2026-10-05), and the median refused its dimensioned plan. A page that fails keeps its strings
+# unbacked: nothing on it pairs, adds up or measures, and the rooms keep what they had — never a guessed correction.
+MIN_SCALE_DENOM = 20
+MAX_SCALE_DENOM = 500
+SCALE_RANGE_TOL = 0.03      # PDFium's bounds: a 1:20 plan may measure 1:19,6
+STATED_TOL = 0.05
+_STATED_RE = re.compile(r"(?<![\d.,:/])1\s*:\s*(\d{2,3})(?![\d.,:])")
+# Any room's perimeter is at least that of the circle of its area, 2·√(π·A) ≈ 3,54·√A (a rectangle's at least
+# 4·√A). A figure below this cannot be the room's — the strings or the scale are not what they seem.
+ISO_MIN_FACTOR = 3.5
+
+
+def plausible_perimeter(perimeter_m: float | None, area_m2: float | None) -> bool:
+    """False only when both are known and the perimeter is shorter than any room of that area could have."""
+    p, a = _f(perimeter_m), _f(area_m2)
+    if not p or not a or a <= 0:
+        return True
+    return p >= ISO_MIN_FACTOR * a ** 0.5
+
+
+def stated_scales_on_page(chars: list[dict]) -> set[int]:
+    """The drawing scales a page states in its text („M 1:50", „M1:100", „1:25" under a detail) — standard
+    plan scales between 1:20 and 1:500 only, so a mix ratio („1:3") or a time is never one."""
+    out: set[int] = set()
+    for line in _lines(chars):
+        for m in _STATED_RE.finditer(_line_text(line)):
+            n = int(m.group(1))
+            if n in _STANDARD_SCALES and MIN_SCALE_DENOM <= n <= MAX_SCALE_DENOM:
+                out.add(n)
+    return out
+
+
+def _scale_verdict(scale_m_per_pt: float, stated: set[int] | None,
+                   upper_m_per_pt: float | None = None) -> tuple[float | None, int | None, str | None]:
+    """(scale to use, its 1:N, None) — or (None, None, the reason) when the page's scale is refused.
+    `scale_m_per_pt` is the strings' median, `upper_m_per_pt` the upper end of what they measure — the figure a
+    stated scale is held to (see STATED_TOL)."""
+    denom = scale_m_per_pt / _PT_M
+    if not (MIN_SCALE_DENOM * (1 - SCALE_RANGE_TOL) <= denom <= MAX_SCALE_DENOM * (1 + SCALE_RANGE_TOL)):
+        return None, None, "ne_plano_mastelis"
+    if stated:
+        top = (upper_m_per_pt or scale_m_per_pt) / _PT_M
+        best = min(sorted(stated), key=lambda s: abs(s - top) / s)
+        if abs(best - top) / best > STATED_TOL:
+            return None, None, "nesutampa_su_uzrasytu"
+        return best * _PT_M, int(best), None
+    return scale_m_per_pt, _mastelis(scale_m_per_pt), None
 
 
 def _dimension_runs(chars: list[dict]) -> list[dict]:
@@ -204,12 +277,15 @@ def _mastelis(scale_m_per_pt: float) -> int:
     return int(best) if abs(best - denom) / denom <= 0.03 else int(round(denom))
 
 
-def _attach_lines_on_page(dims: list[dict], lines: dict) -> int:
+def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None = None) -> int:
     """Give each string on one page its dimension line: the hairline under it
     whose length, at the page's scale, is the string's value. The scale is
     the median over the strings with exactly one hairline under them (a
     wall or grid line passing near a string is the ambiguity), refined over
-    every accepted string. Returns the number of line-backed strings."""
+    every accepted string, and then held to what a plan's scale can be and
+    to the scale the page states (`stated`, `_scale_verdict`) — a page that
+    fails is marked `mastelis_atmestas` and backs nothing. Returns the number
+    of line-backed strings."""
     cands = [_line_candidates(d, lines) for d in dims]
     votes = [d["value_m"] / c[0][3] for d, c in zip(dims, cands) if len(c) == 1]
     if len(votes) < MIN_SCALED:
@@ -238,8 +314,14 @@ def _attach_lines_on_page(dims: list[dict], lines: dict) -> int:
             accepted.append((d, best[1], best[2]))
     if len(accepted) < MIN_SCALED or len(accepted) < MIN_SCALED_SHARE * len(dims):
         return 0
-    scale = statistics.median(r for _, _, r in accepted)
-    mastelis = _mastelis(scale)
+    ratios = [r for _, _, r in accepted]
+    measured = statistics.median(ratios)
+    scale, mastelis, refused = _scale_verdict(measured, stated, statistics.quantiles(ratios, n=10, method="inclusive")[-1])
+    if refused:
+        record = {"ismatuota": int(round(measured / _PT_M)), "uzrasyta": sorted(stated or ()), "priezastis": refused}
+        for d in dims:
+            d["mastelis_atmestas"] = record
+        return 0
     for d in dims:
         d["scale_m_per_pt"] = round(scale, 6)
         d["mastelis"] = mastelis
@@ -250,10 +332,12 @@ def _attach_lines_on_page(dims: list[dict], lines: dict) -> int:
     return len(accepted)
 
 
-def attach_dimension_lines(pdf_bytes: bytes, dims: list[dict]) -> int:
+def attach_dimension_lines(pdf_bytes: bytes, dims: list[dict], stated: dict[int, set[int]] | None = None) -> int:
     """Back the strings with the vector layer's hairlines (module doc).
-    Mutates in place; returns the number of line-backed strings. Without
-    pypdfium2, or on a raster sheet, nothing is backed and nothing pairs."""
+    `stated`: the scales each page writes (`stated_scales_on_page`), which
+    its derived scale must agree with. Mutates in place; returns the number
+    of line-backed strings. Without pypdfium2, or on a raster sheet, nothing
+    is backed and nothing pairs."""
     by_page: dict[int, list[dict]] = {}
     for d in dims:
         by_page.setdefault(int(d["page"]), []).append(d)
@@ -266,7 +350,7 @@ def attach_dimension_lines(pdf_bytes: bytes, dims: list[dict]) -> int:
     n = 0
     for pn, page_dims in by_page.items():
         if pn in lines:
-            n += _attach_lines_on_page(page_dims, lines[pn])
+            n += _attach_lines_on_page(page_dims, lines[pn], (stated or {}).get(pn))
     return n
 
 
@@ -420,12 +504,14 @@ def read_dimension_strings(pdf_bytes: bytes, pages: Iterable[int] | None = None)
     `line` = the dimension line's two ends in the display frame — they have no
     `span` / `line_pos`, so the rectangle pairing above never sees them)."""
     out: list[dict] = []
+    stated: dict[int, set[int]] = {}
     for pn, W, H, chars, to_display in _iter_pages(pdf_bytes, pages):
         try:
             out.extend(_dimensions_on_page(pn, W, H, chars, to_display))
+            stated.setdefault(pn, set()).update(stated_scales_on_page(chars))
         except Exception:  # noqa: BLE001 — a broken page is not a lane failure
             continue
-    attach_dimension_lines(pdf_bytes, out)
+    attach_dimension_lines(pdf_bytes, out, stated)
     scale_by_page: dict[int, float] = {}
     for d in out:
         if d.get("scale_m_per_pt"):
@@ -548,9 +634,45 @@ def _pairs_around(area: float, Lx: float, Ly: float, pool: Sequence[dict], tol: 
             if rel < -EXACT_TOL or rel > tol:
                 continue
             dist = abs(a["line_pos"] - Ly) + abs(b["line_pos"] - Lx)
-            cands.append(((round(abs(rel), 4), round(dist, 2)), a, b))
+            cands.append(((round(abs(rel), 4), round(dist, 2)), a, b, rel))
     cands.sort(key=lambda c: c[0])
     return cands
+
+
+def _is_exact(rel: float, area: float) -> bool:
+    """plotis × ilgis IS the room's area: at most EXACT_TOL short, and over it by no more than the label's own
+    rounding (it is written to the cent). Only then is the room the rectangle the two lines close."""
+    return -EXACT_TOL <= rel <= OVER_SLACK_M2 / area + 1e-9
+
+
+def _pair_record(a: dict, b: dict, area: float, page: int) -> dict:
+    w, l = sorted((a["value_m"], b["value_m"]))
+    return {"page": page, "plotis_m": w, "ilgis_m": l,
+            "sandauga_m2": round(w * l, 2), "plotas_m2": round(area, 2),
+            "bboxes": [a["bbox"], b["bbox"]], "rect": _room_rect(a, b),
+            "mastelis": a.get("mastelis") or b.get("mastelis"),
+            "page_width": a["page_width"], "page_height": a["page_height"]}
+
+
+def confirm_pair_by_outline(room: dict, outline_perimeter_m: float | None) -> bool:
+    """A bounding-box pair (`PROPOSAL_KEY`: plotis × ilgis over the area — an L-room's extents) states the
+    room's perimeter only when the room is orthogonally convex, and a traced outline is what can say so: its
+    length is 2 × (plotis + ilgis) within CONVEX_TOL. Then the pair becomes the stated figure (`SOURCE`), the
+    outline's length kept beside it. A table's, a person's or an added-up perimeter is never replaced."""
+    prop = room.get(PROPOSAL_KEY)
+    if not isinstance(prop, dict) or _untouchable(room) or str(room.get("perimetras_saltinis") or "") in (SOURCE, "matmenu_eilutes"):
+        return False
+    perim, outline = _f(prop.get("perimetras_m")), _f(outline_perimeter_m)
+    if not perim or not outline or abs(outline - perim) / perim > CONVEX_TOL:
+        return False
+    old = _f(room.get("perimetras_m"))
+    room["_perimetras_pries_matmenis"] = round(old, 2) if old is not None else None
+    room["perimetras_m"] = perim
+    room["perimetras_saltinis"] = SOURCE
+    room["_perimetras_matmenys"] = {**{k: v for k, v in prop.items() if k != "perimetras_m"},
+                                    "konturas_m": round(outline, 2)}
+    room.pop(PROPOSAL_KEY, None)
+    return True
 
 
 def _page_for_crop(a: dict, b: dict, by_page: dict[int, list[dict]], dims_per_page: dict[int, int]) -> int:
@@ -585,18 +707,24 @@ def apply_dimension_strings(rooms: Sequence[dict], dims: Sequence[dict],
     For each room whose area label is placed on a plan page, the line-backed
     width strings whose extent covers the label's x and the height strings
     whose extent covers its y are paired; a pair whose two lines close a
-    rectangle around the label and whose product is the room's area (module
-    doc) is the room's plotis × ilgis, and the perimeter becomes
-    2 × (plotis + ilgis) with `perimetras_saltinis = "plano_matmenys"`. The
-    read figure is kept as `_perimetras_pries_matmenis`. Rooms whose
-    perimeter came from the eksplikacija or from the user are never touched."""
+    rectangle around the label and whose product IS the room's area (−2 % …
+    the label's rounding) is the room's plotis × ilgis, and the perimeter
+    becomes 2 × (plotis + ilgis) with `perimetras_saltinis = "plano_matmenys"`.
+    The read figure is kept as `_perimetras_pries_matmenis`. A pair whose
+    product exceeds the area (up to `tol`) — a bounding box — is only proposed
+    (`PROPOSAL_KEY`, summary `proposed`) until a traced outline confirms it
+    (`confirm_pair_by_outline`). Rooms whose perimeter came from the
+    eksplikacija or from the user are never touched."""
     lines = sum(1 for d in dims if d.get("span_source") == "line")
     summary: dict[str, Any] = {
         "status": "insufficient", "dimensions": len(dims), "lines": lines,
-        "confirmed": [], "corrected": [], "unmatched": [], "skipped": [],
+        "confirmed": [], "corrected": [], "unmatched": [], "skipped": [], "proposed": [],
         "pages": sorted({int(d["page"]) for d in dims}),
         "mastelis": {str(p): m for p, m in sorted({int(d["page"]): int(d["mastelis"])
                                                     for d in dims if d.get("mastelis")}.items())},
+        # pages whose strings agree with their hairlines at no plan's scale, or at another than the one written
+        "mastelis_atmestas": {str(p): rec for p, rec in sorted({int(d["page"]): d["mastelis_atmestas"]
+                                                                 for d in dims if d.get("mastelis_atmestas")}.items())},
     }
     if lines < MIN_DIMENSIONS:
         return summary
@@ -614,6 +742,7 @@ def apply_dimension_strings(rooms: Sequence[dict], dims: Sequence[dict],
         if _untouchable(room):
             summary["skipped"].append(nr)
             continue
+        room.pop(PROPOSAL_KEY, None)                 # a proposal of an earlier reading is this reading's to make
         if not area or area <= 0:
             continue
         pos = _label_position(room, annotations, dims_per_page)
@@ -624,18 +753,25 @@ def apply_dimension_strings(rooms: Sequence[dict], dims: Sequence[dict],
             pool.extend(by_page.get(p, []))
         Lx, Ly = pos["cx"] * pos["W"], pos["cy"] * pos["H"]
         cands = _pairs_around(area, Lx, Ly, pool, tol)
-        if not cands:
-            summary["unmatched"].append(nr)
-            continue
-        best = cands[0]
-        if best[0][0] > EXACT_TOL:
-            # an inexact pair is taken only when every passing pair states the same two walls
+        exact = [c for c in cands if _is_exact(c[3], area)]
+        if exact:
+            best = exact[0]
+        else:
+            # a bounding box is proposed only when every passing pair states the same two walls
             walls = {(round(min(a["value_m"], b["value_m"]), 3), round(max(a["value_m"], b["value_m"]), 3))
-                     for _, a, b in cands}
-            if len(walls) > 1:
+                     for _, a, b, _rel_ in cands}
+            if len(walls) != 1:
                 summary["unmatched"].append(nr)
                 continue
-        _, a, b = best
+            _, a, b, _ = cands[0]
+            w, l = sorted((a["value_m"], b["value_m"]))
+            room[PROPOSAL_KEY] = {**_pair_record(a, b, area, _page_for_crop(a, b, by_page, dims_per_page)),
+                                  "perimetras_m": round(2 * (w + l), 2)}
+            summary["proposed"].append(nr)
+            continue
+        # (no isoperimetric check here: a pair within −2 % of the area has 2 × (w + l) ≥ 4·√(0,98·A) — it cannot
+        # be shorter than a room of that area; geometry_lane holds the ADDED-UP walls to plausible_perimeter)
+        _, a, b, _ = best
         w, l = sorted((a["value_m"], b["value_m"]))
         perim = round(2 * (w + l), 2)
         old = _f(room.get("perimetras_m"))
@@ -643,18 +779,12 @@ def apply_dimension_strings(rooms: Sequence[dict], dims: Sequence[dict],
         room["_perimetras_pries_matmenis"] = round(old, 2) if old is not None else None
         room["perimetras_m"] = perim
         room["perimetras_saltinis"] = SOURCE
-        room["_perimetras_matmenys"] = {
-            "page": page, "plotis_m": w, "ilgis_m": l,
-            "sandauga_m2": round(w * l, 2), "plotas_m2": round(area, 2),
-            "bboxes": [a["bbox"], b["bbox"]], "rect": _room_rect(a, b),
-            "mastelis": a.get("mastelis") or b.get("mastelis"),
-            "page_width": a["page_width"], "page_height": a["page_height"],
-        }
+        room["_perimetras_matmenys"] = _pair_record(a, b, area, page)
         (summary["confirmed"] if (old and _rel(old, perim) <= CONFIRM_TOL)
          else summary["corrected"]).append(nr)
     if summary["confirmed"] or summary["corrected"]:
         summary["status"] = "applied"
-    elif summary["unmatched"]:
+    elif summary["unmatched"] or summary["proposed"]:
         summary["status"] = "no_match"
     return summary
 

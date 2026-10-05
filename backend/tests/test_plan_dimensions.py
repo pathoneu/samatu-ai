@@ -108,14 +108,56 @@ def test_a_pair_whose_product_falls_short_of_the_label_is_refused():
     assert s["unmatched"] == ["01"] and rooms[0]["perimetras_m"] == 11.4
 
 
-def test_an_l_rooms_bounding_box_is_its_perimeter():
-    # the two full extents multiply to 3 % MORE than the label (the notch) —
-    # an orthogonal room's perimeter is still its bounding box's
-    dims = [_dim(4, "4.000", 4.0, 0.50, 0.30), _dim(4, "3.000", 3.0, 0.42, 0.36, "v"),
+def _l_room_dims():
+    # the two full extents multiply to 3 % MORE than the label — the room is not the rectangle they close
+    return [_dim(4, "4.000", 4.0, 0.50, 0.30), _dim(4, "3.000", 3.0, 0.42, 0.36, "v"),
             _dim(4, "0.900", 0.9, 0.50, 0.44), _dim(4, "2.000", 2.0, 0.60, 0.44, "v")]
+
+
+def test_a_bounding_box_pair_is_only_proposed():
+    """Audit 2026-09-29 (geometry-lanes-6): 2 × (w + l) of a bounding box is the perimeter of an L-room, but
+    not of a room with a notch in a wall — the pair alone cannot tell, so it is proposed, not stated."""
     rooms = [_room("05", 11.65, 0.50, 0.35, perim=13.0)]
+    s = apply_dimension_strings(rooms, _l_room_dims())
+    assert s["proposed"] == ["05"] and not s["corrected"] and not s["confirmed"] and s["status"] == "no_match"
+    r = rooms[0]
+    assert r["perimetras_m"] == 13.0 and "perimetras_saltinis" not in r and "_perimetras_matmenys" not in r
+    prop = r["_perimetras_matmenys_siulymas"]
+    assert prop["perimetras_m"] == 14.0 and prop["sandauga_m2"] == 12.0 and prop["plotas_m2"] == 11.65
+
+
+def test_an_outline_as_long_as_the_bounding_box_confirms_the_pair():
+    """An L-room (a corner cut out) is orthogonally convex: its outline is as long as its bounding box."""
+    from extractor.plan_dimensions import confirm_pair_by_outline
+    rooms = [_room("05", 11.65, 0.50, 0.35, perim=13.0)]
+    apply_dimension_strings(rooms, _l_room_dims())
+    assert confirm_pair_by_outline(rooms[0], 14.08) is True
+    r = rooms[0]
+    assert r["perimetras_m"] == 14.0 and r["perimetras_saltinis"] == "plano_matmenys"
+    assert r["_perimetras_pries_matmenis"] == 13.0 and r["_perimetras_matmenys"]["konturas_m"] == 14.08
+    assert "_perimetras_matmenys_siulymas" not in r
+
+
+def test_a_notched_rooms_longer_outline_refuses_the_pair():
+    """A notch in the middle of a wall adds two walls the pair never sees: the outline is longer than 2 × (w + l)."""
+    from extractor.plan_dimensions import confirm_pair_by_outline
+    rooms = [_room("05", 11.65, 0.50, 0.35, perim=13.0)]
+    apply_dimension_strings(rooms, _l_room_dims())
+    assert confirm_pair_by_outline(rooms[0], 15.2) is False
+    assert rooms[0]["perimetras_m"] == 13.0 and "perimetras_saltinis" not in rooms[0]
+    # a table's or a person's perimeter is never replaced by a pair
+    rooms[0]["perimetras_saltinis"] = "user_override"
+    assert confirm_pair_by_outline(rooms[0], 14.0) is False and rooms[0]["perimetras_m"] == 13.0
+
+
+def test_a_pair_a_hair_over_the_label_is_still_exact():
+    # 3,05 × 3,29 = 10,0345 written „10.03": over by the label's own rounding
+    dims = [_dim(4, "3.050", 3.05, 0.50, 0.30), _dim(4, "3.290", 3.29, 0.44, 0.36, "v"),
+            _dim(4, "0.900", 0.9, 0.50, 0.44), _dim(4, "2.000", 2.0, 0.60, 0.44, "v")]
+    rooms = [_room("04", 10.03, 0.50, 0.35, perim=12.0)]
     s = apply_dimension_strings(rooms, dims)
-    assert s["corrected"] == ["05"] and rooms[0]["perimetras_m"] == 14.0
+    assert s["corrected"] == ["04"] and rooms[0]["perimetras_saltinis"] == "plano_matmenys"
+    assert rooms[0]["perimetras_m"] == pytest.approx(12.68, abs=0.01)
 
 
 def test_an_ambiguous_inexact_match_is_left_alone():
@@ -240,6 +282,98 @@ def test_dimension_lines_are_read_from_the_vector_layer():
     s = apply_dimension_strings([room], dims)
     assert s["corrected"] == ["01"] and room["perimetras_m"] == 11.0
     assert room["_perimetras_matmenys"]["mastelis"] == 50
+
+
+def _sheet_at(denom: float, values, title: str | None = None, text=lambda v: f"{v:.3f}", past: float = 0.0) -> bytes:
+    """One page drawn at 1:`denom`: a horizontal dimension line per value with its string over it, and the
+    title block's text (`title`) at the foot of the sheet. `past`: points each line runs past its ends."""
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    c.setFont("Helvetica", 8)
+    m_per_pt = 25.4 / 72 / 1000 * denom
+    for i, v in enumerate(values):
+        y = H - 200 - i * 60
+        c.line(100 - past, y, 100 + v / m_per_pt + past, y)
+        c.drawCentredString(100 + v / m_per_pt / 2, y + 3, text(v))
+    if title:
+        c.drawString(100, 40, title)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def test_the_scales_a_sheet_states_are_plan_scales_only():
+    from extractor.plan_dimensions import stated_scales_on_page
+    def chars_of(*texts):
+        out = []
+        for row, text in enumerate(texts):
+            for i, ch in enumerate(text):
+                out.append({"text": ch, "x0": 100 + i * 4, "x1": 103.5 + i * 4, "top": 100 + row * 30,
+                            "bottom": 106 + row * 30, "size": 6.0})
+        return out
+    assert stated_scales_on_page(chars_of("1A. PERTVARŲ PLANAS M 1:50")) == {50}
+    assert stated_scales_on_page(chars_of("Grindų planas M1:100 10")) == {100}
+    assert stated_scales_on_page(chars_of("S-15 1:25S-14 1:25", "KAMBARIO IŠKLOTINĖS M 1:50")) == {25, 50}
+    # a mix ratio, a time, a site plan's scale and a non-drawing ratio are none of a plan's
+    assert stated_scales_on_page(chars_of("skiedinys 1:3", "11:30", "M 1:1000", "nuolydis 1:33")) == set()
+
+
+def test_a_sheet_drawn_near_its_stated_scale_takes_the_stated_one():
+    """Audit 2026-09-29 (geometry-lanes-4): the stated „M 1:50" is the sheet's scale when the strings agree with it
+    within 5 % — the hairlines' bounds carry the stroke, their median does not make an exact scale."""
+    dims = read_dimension_strings(_sheet_at(49.0, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2], "PLANAS M 1:50"))
+    assert all(d.get("span_source") == "line" for d in dims) and len(dims) == 6
+    assert {d["mastelis"] for d in dims} == {50}
+    assert {d["scale_m_per_pt"] for d in dims} == {round(25.4 / 72 / 1000 * 50, 6)}
+    assert not any("mastelis_atmestas" in d for d in dims)
+
+
+def test_a_sheet_whose_dimension_lines_run_past_their_ends_keeps_its_stated_scale():
+    """objektas_b (measured 2026-10-05): its dimension lines run past the extension lines, so every string
+    measures a smaller 1:N than the sheet's — the shorter, the smaller. Here the median is 1:93,7, 6 % off the
+    stated 1:100; the upper end of the strings (their 90th percentile, 1:96,2) is not: the stated scale holds.
+    Held to the median, objektas_b's dimensioned plan was refused."""
+    vals = [1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.4, 2.8, 3.2, 3.6, 4.0]
+    dims = read_dimension_strings(_sheet_at(100, vals, "PLANAS M 1:100", past=1.8))
+    assert sum(1 for d in dims if d.get("span_source") == "line") >= 10
+    assert {d["mastelis"] for d in dims} == {100} and not any("mastelis_atmestas" in d for d in dims)
+    # …but lines so long that even the longest strings measure 1:94,8 are not the stated scale's
+    dims = read_dimension_strings(_sheet_at(100, vals, "PLANAS M 1:100", past=2.2))
+    assert not any(d.get("span_source") for d in dims) and dims[0]["mastelis_atmestas"]["priezastis"] == "nesutampa_su_uzrasytu"
+
+
+def test_centimetre_strings_give_no_plans_scale_and_nothing_on_the_sheet_is_used():
+    """Strings written in CENTIMETRES read as millimetres agree with their hairlines at 1:5 — every length
+    10× short. No plan is drawn at 1:5: the sheet's strings back nothing, nothing pairs or adds up."""
+    sheet = _sheet_at(50, [3.5, 4.0, 4.5, 5.0, 5.5, 6.0], text=lambda v: str(round(v * 100)))
+    dims = read_dimension_strings(sheet)
+    assert len(dims) == 6 and dims[0]["value_m"] == 0.35
+    assert not any(d.get("span_source") or d.get("mastelis") for d in dims)
+    assert {d["mastelis_atmestas"]["priezastis"] for d in dims} == {"ne_plano_mastelis"}
+    assert dims[0]["mastelis_atmestas"]["ismatuota"] == 5
+    room = _room("01", 14.0, 0.3, 0.3, perim=15.0, page=1)
+    s = apply_dimension_strings([room], dims)
+    assert s["status"] == "insufficient" and s["mastelis"] == {} and s["mastelis_atmestas"]["1"]["ismatuota"] == 5
+    assert room["perimetras_m"] == 15.0 and "perimetras_saltinis" not in room
+
+
+def test_a_sheet_whose_strings_disagree_with_its_stated_scale_is_refused():
+    # drawn at 1:100, titled „M 1:50": one of the two is not what it seems — nothing is guessed
+    dims = read_dimension_strings(_sheet_at(100, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2], "PLANAS M 1:50"))
+    assert not any(d.get("span_source") for d in dims)
+    rec = dims[0]["mastelis_atmestas"]
+    assert rec == {"ismatuota": 100, "uzrasyta": [50], "priezastis": "nesutampa_su_uzrasytu"}
+    # the same sheet without a title keeps its own scale
+    dims = read_dimension_strings(_sheet_at(100, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2]))
+    assert {d["mastelis"] for d in dims} == {100} and all(d.get("span_source") == "line" for d in dims)
+
+
+def test_a_perimeter_shorter_than_any_room_of_that_area_is_implausible():
+    from extractor.plan_dimensions import plausible_perimeter
+    assert plausible_perimeter(14.0, 12.0) and plausible_perimeter(12.3, 12.0)      # a circle's: 12,28
+    assert not plausible_perimeter(1.4, 12.0) and not plausible_perimeter(11.9, 12.0)
+    assert plausible_perimeter(None, 12.0) and plausible_perimeter(5.0, None) and plausible_perimeter(5.0, 0)
 
 
 def test_a_string_takes_the_hairline_it_is_written_on_not_an_equal_one_nearby():

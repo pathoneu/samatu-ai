@@ -41,14 +41,18 @@ quantity on their own.
 """
 from __future__ import annotations
 
+import copy
 import time
 from typing import Sequence
 
-from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, SOURCE as SUMMED, sum_perimeters
+from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, SOURCE as SUMMED, WALL_OUTLINES, sum_perimeters
 from .floor_coverings import find_floor_sheets, read_floor_coverings
 from .pdf_vectors import page_geometry
 from .plan_area_annotations import plan_pages_from_classification
-from .plan_dimensions import read_dimension_strings
+from .plan_dimensions import (
+    CONVEX_TOL as PAIR_WALLS_TOL, PROPOSAL_KEY as PAIR_PROPOSAL, SOURCE as PAIR_SOURCE, confirm_pair_by_outline,
+    plausible_perimeter, read_dimension_strings,
+)
 from .room_locator import locate_rooms
 from .sheet_alignment import align_sheets, from_base, to_base
 from .vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, propose_split, trace_vector_rooms, wall_openings
@@ -95,6 +99,31 @@ def _forget_outline(room: dict) -> None:
             room.pop(key, None)
 
 
+# What sum_perimeters may write on a room — taken before, put back exactly when its result is not kept.
+PERIMETER_KEYS = ("perimetras_m", "perimetras_saltinis", "_sienos", "_perimetras_suma", "_perimetras_pries_geometrija") + PERIMETER_ESTIMATE_KEYS
+
+
+def _perimeter_snapshot(room: dict) -> dict:
+    return {k: copy.deepcopy(room[k]) for k in PERIMETER_KEYS if k in room}
+
+
+def _restore_perimeter(room: dict, snap: dict) -> None:
+    for k in PERIMETER_KEYS:
+        room.pop(k, None)
+    room.update(copy.deepcopy(snap))
+
+
+def _forget_open_space(room: dict) -> None:
+    """The room is no longer part of a shared space this lane recorded: the record and the share of the
+    space's walls it wrote go, and the perimeter goes back to the figure kept before."""
+    room.pop("_atvira_erdve", None)
+    if str(room.get("perimetras_saltinis") or "") == OPEN_PLAN_ESTIMATE:
+        if room.get("_perimetras_pries_geometrija") is not None:
+            room["perimetras_m"] = room["_perimetras_pries_geometrija"]
+        for key in ("perimetras_saltinis", "_perimetras_pries_geometrija") + PERIMETER_ESTIMATE_KEYS:
+            room.pop(key, None)
+
+
 # What the lane reads, as a number a stored project can be compared against
 # (api/free_reread.py offers a free re-read when the project's is lower):
 # 1 — outlines + summed perimeters; 2 — positions for the check sheet (line_pct,
@@ -110,7 +139,14 @@ def _forget_outline(room: dict) -> None:
 # with, else by the table's area ratio), so each room's walls are read instead of a
 # share by floor area (objektas_h 04/05: estimates 16,08 / 21,69 → read 17,93 / 19,82).
 # RAISE it when the lane starts reading something a stored project would gain from.
-LANE_VERSION = 9                # 9 (2026-09-25): openings carry what the drawing shows in them — glazing → langas, swing arc → durys; doors drawn where the wall is not cut
+# 9 (2026-09-25): openings carry what the drawing shows in them — glazing → langas, swing arc → durys; doors drawn
+# where the wall is not cut. 10 (2026-10-05, audit round 13): a sheet's scale must be a plan's and the one its title
+# writes; typical floors are no longer laid over each other as one plan (a share of another storey's space written
+# before is taken back); a two-string rectangle gives way to the room's walls added up when they differ, and a
+# bounding-box pair the outline is as long as becomes the perimeter; walls adding up to less than any room of that
+# area could have are not taken; the door schedule (it rides along with the free re-read) reads „be apvadų" as
+# frameless and „910x2100" sizes, and a row naming both frame types is left to him.
+LANE_VERSION = 10
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -342,7 +378,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
                   "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "nupiesta": {"langai": 0, "durys": 0, "be_tarpo": 0}, "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
-                  "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []}, "seconds": 0.0}
+                  "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []},
+                  "kiti_aukstai": [], "skirtingu_lapu_erdves": [], "masteliai_atmesti": {}, "poros_patvirtintos": [], "poros_atmestos": [],
+                  "perimetrai_atmesti": [], "seconds": 0.0}
     status = "insufficient"
     try:
         rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict) and _nr(r)]
@@ -351,6 +389,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
             plan_pages = sorted({int(r["puslapio_nr"]) for r in rooms if r.get("puslapio_nr")}) or [1]
         if dims is None:
             dims = geometry_dimension_strings(pdf_bytes)
+        for d in dims:                     # sheets whose scale is no plan's, or not the one they write (plan_dimensions)
+            if d.get("mastelis_atmestas"):
+                meta["masteliai_atmesti"].setdefault(str(d["page"]), d["mastelis_atmestas"])
         # Which sheets belong to the plan is decided by ALIGNMENT — the same walls in the same place —
         # not by the page classifier (objektas_g, 2026-09-10: the dimensioned sheet was called something
         # else and every wall was lost; two of its outlines were traced on the plumbing plan). So every
@@ -369,10 +410,18 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
             if v:
                 r["_vieta"] = v
                 meta["vietos"][v["saltinis"]] = meta["vietos"].get(v["saltinis"], 0) + 1
+        # the rooms' reliable seats per sheet — what tells two typical floors apart when their walls coincide
+        seats: dict[int, list[tuple[str, float, float]]] = {}
+        for nr, v in where.items():
+            if v.get("saltinis") in STRONG and v.get("W") and v.get("H"):
+                seats.setdefault(int(v["page"]), []).append((str(nr), float(v["cx"]) * float(v["W"]), float(v["cy"]) * float(v["H"])))
 
         def lay_over(pages: Sequence[int]) -> dict:
             """Align these sheets; a sheet without strings of its own takes its plan's scale."""
-            al = align_sheets(pdf_bytes, sorted(pages))
+            al = align_sheets(pdf_bytes, sorted(pages), seats=seats)
+            for clash in al.get("storeys") or []:
+                if clash not in meta["kiti_aukstai"]:
+                    meta["kiti_aukstai"].append(clash)
             for group in al["groups"]:
                 known = next((p for p in group if p in scale), None)
                 if known is None:
@@ -445,6 +494,25 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     standing[_nr(r)] = ring
             res = trace_vector_rooms(pdf_bytes, page, everyone, areas, scale[page], (W, H), solved_pct=standing)
             meta["lapai"].append(page)
+            # Two rooms seated reliably on DIFFERENT sheets standing in one face are not one open space — they are
+            # two storeys laid over each other (audit 2026-09-29, geometry-lanes-3: halving each room's walls
+            # between them was a guess presented as a share). Neither is outlined; each keeps what it had.
+            seated_on = {nr: int(v["page"]) for nr, v in where.items() if v.get("saltinis") in STRONG}
+            kept = []
+            for g in res["groups"]:
+                sheets_of = {seated_on[n] for n in g["nariai"] if n in seated_on}
+                if len(sheets_of) > 1:
+                    meta["skirtingu_lapu_erdves"].append(sorted(g["nariai"]))
+                    for n in g["nariai"]:
+                        others = ", ".join(o for o in g["nariai"] if o != n)
+                        res["reasons"][n] = (f"toje pačioje plano vietoje kitame lape pažymėta patalpa {others} — "
+                                             "tikriausiai kitas aukštas, todėl kontūras nenustatytas")
+                        r = next((x for x in rooms if _nr(x) == n), None)
+                        if r is not None and n in todo and not _his(r):
+                            _forget_open_space(r)       # a share this lane wrote on an earlier run goes too
+                    continue
+                kept.append(g)
+            res["groups"] = kept
             for r in rooms:
                 nr = _nr(r)
                 if nr not in todo:
@@ -537,8 +605,50 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # and never the door itself, so a wall's chain of strings has a hole exactly where the room's own
         # opening is (objektas_h bedroom 09: „660" | door 1,40 m | „1538") — dimension_sum fills it and says so.
         _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta)
+        # Two dimension strings closing a rectangle (plan_dimensions, `plano_matmenys`) assume the room IS one.
+        # A wall outline checks it: a bounding-box pair it is as long as becomes the perimeter, and an exact
+        # pair whose walls — added up one by one — come to another figure gives way to them (audit 2026-09-29,
+        # geometry-lanes-6). An outline's own length never overrules a pair: it is an estimate, the pair is read.
+        for r in rooms:
+            k = r.get("_konturas") if isinstance(r.get("_konturas"), dict) else {}
+            if (isinstance(r.get(PAIR_PROPOSAL), dict) and not _his(r) and not k.get("plotas_nesutampa")
+                    and str(r.get("polygon_source") or "") in WALL_OUTLINES
+                    and confirm_pair_by_outline(r, k.get("perimetras_m"))):
+                meta["poros_patvirtintos"].append(_nr(r))
+        held = {}
+        for r in rooms:
+            if (r.get("perimetras_saltinis") == PAIR_SOURCE and r.get("perimetras_m") and not _his(r)
+                    and not r.get("manual_override") and str(r.get("polygon_source") or "") in WALL_OUTLINES
+                    and isinstance(r.get("polygon_pct"), list) and len(r["polygon_pct"]) >= 3
+                    and not (r.get("_konturas") or {}).get("plotas_nesutampa")):
+                held[_nr(r)] = _perimeter_snapshot(r)
+                r["perimetras_saltinis"] = None            # for this one pass: its walls are added up too
         before = {_nr(r): (r.get("perimetras_m") if r.get("perimetras_saltinis") not in ESTIMATES else None) for r in rooms}
+        kept_as_was = {_nr(r): _perimeter_snapshot(r) for r in rooms}
         done = sum_perimeters(rooms, dims, alignment, scale, page_sizes=sizes)
+        for nr, snap in held.items():
+            r = next(x for x in rooms if _nr(x) == nr)
+            pair = float(snap["perimetras_m"])
+            if nr in done["stated"] and abs(float(r["perimetras_m"]) - pair) / pair > PAIR_WALLS_TOL:
+                if isinstance(r.get("_perimetras_matmenys"), dict):
+                    r["_perimetras_matmenys"] = {**r["_perimetras_matmenys"], "sienu_suma_m": r["perimetras_m"]}
+                meta["poros_atmestos"].append(nr)
+                continue
+            _restore_perimeter(r, snap)
+            done["stated"] = [x for x in done["stated"] if x != nr]
+            done["blank"] = [x for x in done["blank"] if x != nr]
+        # Any room's perimeter is at least the circle's of its area (plan_dimensions.plausible_perimeter): a sum
+        # or an outline below that is strings or a scale that are not what they seem — the room keeps what it had.
+        # Not for a side of a shared space: the boundary through it is an edge of the room and a wall of neither.
+        for r in rooms:
+            nr = _nr(r)
+            open_side = bool((r.get("_konturas") or {}).get("menamos")) or isinstance(r.get("_atvira_erdve"), dict)
+            if ((nr in done["stated"] or nr in done["blank"]) and not open_side
+                    and not plausible_perimeter(r.get("perimetras_m"), areas.get(nr))):
+                _restore_perimeter(r, held.get(nr) or kept_as_was[nr])
+                done["stated"] = [x for x in done["stated"] if x != nr]
+                done["blank"] = [x for x in done["blank"] if x != nr]
+                meta["perimetrai_atmesti"].append(nr)
         meta["perimetrai_sudeti"] = done["stated"]
         meta["perimetrai_tusti"] = sorted(set(meta["perimetrai_tusti"]) | set(done["blank"]))
         for r in rooms:
