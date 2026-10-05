@@ -4,12 +4,24 @@
 # eval_harness.py + validate_truth_files.py read this to enumerate the
 # contractor-validated benchmark set.
 #
-# Contractor notes: ALL six projects are from Rangovas A (Rangovas
+# Contractor notes: EVERY project below is from Rangovas A (Rangovas
 # Rangovas A). This is a single-contractor cross-project benchmark.
 # Cross-contractor calibration needs at least one non-Rangovas A truth
 # file before the calibration_learner's promotion gate has industry-
 # wide signal — until then, factors reflect Rangovas A scope
 # conventions only.
+#
+# In-sample vs blind (2026-10-05, audit testing-eval-1): every project
+# below has been developed against, so every eval number is in-sample.
+#   blind: true        — nobody has opened its drawing, read or sąmata; its
+#                        files live outside the repository and only
+#                        `eval_harness.py --blind-once` scores it. Protocol:
+#                        docs/superpowers/plans/2026-10-05-blind-batch-protocol.md
+#   blind_until: DATE  — it WAS blind until DATE and has been worked on since;
+#                        scored in-sample (the flag only keeps the legacy
+#                        totals pooled the way they were printed before).
+# `out_of_sample` is retired: the eval warns and scores such a project
+# in-sample.
 
 schema_version: 1
 projects:
@@ -108,11 +120,14 @@ projects:
     height_note_2026_09_05: "The lubų planas drops the san. mazgas ceiling to 2390 mm ('Kaktos pab. h - 2390'); the cached extract carries 2.39 as plyteles_sienos_aukstis_m while the room height stays the 2.82 default — so the bathroom is in fact tiled to ITS ceiling (full tile), which his tile row (32.97 m² walls+floors) fits. After the 2026-09-05 tile-band rule the combined paint reads −15 %: the old +3 % was the bathroom's phantom paint compensating an under-count elsewhere (soffit 'kaktos' faces at 2390/2510 mm and niche walls are not read)."
     notes: "APARTMENT (butas), smallest scope. 2026-06-06: bundled 4 of the split single-page Layout4 sheets (Apmatavimai dimensions + Naujai montuojamu pertvaru floor plan + Pakabinamu lubu ceiling + Sviestuvu lighting) into objektas_d_TP_bundled.pdf and re-entered MAE scoring (was blocked_partial_input)."
 
-  # ── SECOND BATCH (2026-09-05) — OUT-OF-SAMPLE. Same contractor, two NEW
-  # architects/designers. Rule: never tune a rule, prompt, concept mapping or
-  # calibration factor while looking at these; measure first, diagnose second,
-  # fix on the in-sample corpus, re-measure here. `out_of_sample: true` keeps
-  # them out of the in-sample corpus mean (reported in their own block).
+  # ── SECOND BATCH (2026-09-05) — IN-SAMPLE since its one blind run. Same
+  # contractor, two NEW architects/designers. They were blind for the single
+  # run recorded in `blind_result` (2026-09-05); every round since has been
+  # diagnosed and fixed against them, so they are in-sample (audit
+  # testing-eval-1). `blind_until` keeps them in their own legacy-totals line
+  # only, so the figure printed as "out-of-sample" before 2026-10-05 still
+  # compares. The only out-of-sample numbers this corpus ever produced are
+  # the two `blind_result` lines below.
   - slug: objektas_g
     name: "Objektas G (Butas, naujas namas)"
     truth_path: ground_truth/objektas_g/truth.json
@@ -122,7 +137,7 @@ projects:
     has_gt_dimensions: false
     has_cached_extract: true
     samata_parsed_by_hand: true
-    out_of_sample: true
+    blind_until: "2026-09-05"   # in-sample since (audit testing-eval-1)
     blind_result: "Blind 2026-09-05 (runner est. $12.91, 25 min): headline MAE 49.98 %, 2.5 % of his € within ±10 %; 9 rooms read (one phantom bathroom); paint +71 % (ceilings out of scope + tiled walls also painted), corners +122 %; 12/20 rows unmapped by wording (tiles by format)."
     notes: "16-page interior of a flat in a new-build, vector PDF with text layer. NO eksplikacija table (dimensions on the pertvarų planas; apdailos legend gives 220 m² of painted walls). Truth is an atliktų darbų aktas: bathroom prep + tiles + WALL paint only — ceilings, floors and wooden skirting are outside his scope here. Parsed by hand from the act (parse_all_samatas.py does not read its group-column layout)."
 
@@ -135,7 +150,7 @@ projects:
     has_gt_dimensions: false
     has_cached_extract: true
     samata_parsed_by_hand: true
-    out_of_sample: true
+    blind_until: "2026-09-05"   # in-sample since (audit testing-eval-1)
     blind_result: "Blind 2026-09-05 (runner est. $8.10, 12 min): headline MAE 14.19 %, 31.8 % of his € within ±10 %; 11/11 rooms exact from the table; GKP ceilings −1 %, corners +6 %; paint +24 % (tiled bathroom walls also painted, default window sizes, 2.82 m default height); Rotband −34 %."
     notes: "8 A4 pages by a designer studio: išdėstymo planas WITH eksplikacija (11 rooms, 143,27 m²), rozečių, apšvietimo, vandens, lubų, sienų dažymo (designer: 320 m²), grindų dangų, pertvarų planai; no išklotinės, no door/window schedule. Truth is an xlsx pasiūlymas (GKP, glaistymas/dažymas, santechnika quantified; tiles + site costs priced without quantities) — parsed by hand (xlsx, not PDF)."
 

@@ -25,42 +25,80 @@
       "Dažymo plotas (samata items 16+17, excl garažas)": 9.67,
       "LED nišų ilgis": 0.993,
       "Lubų dažomas plotas": 0.0,
-      "MAE": 3.06,
-      "Sienų dažomas plotas": 11.228
+      "Sienų dažomas plotas": 11.228,
+      "billed MAE": 6.208,
+      "billed · Angokraščiai": 4.094,
+      "billed · Dažymas (sienos+lubos)": 1.748,
+      "billed · Dažymo kampai": 10.429,
+      "billed · GKP lubos": 6.419,
+      "billed · Plytelės": 3.019,
+      "billed · Rotband": 11.537,
+      "legacy MAE": 3.06
     },
     "objektas_b": {
       "Dažymo plotas (samata items 16+17, excl garažas)": 20.12,
       "LED nišų ilgis": 18.207,
       "Lubų dažomas plotas": 0.0,
-      "MAE": 16.632,
-      "Sienų dažomas plotas": 31.69
+      "Sienų dažomas plotas": 31.69,
+      "billed MAE": 18.07,
+      "billed · Angokraščiai": 22.94,
+      "billed · Dažymas (sienos+lubos)": 20.12,
+      "billed · Dažymo kampai": 19.265,
+      "billed · GKP lubos": 25.707,
+      "billed · Plytelės": 9.555,
+      "billed · Rotband": 10.83,
+      "legacy MAE": 16.632
     },
     "objektas_c": {
       "Dažymo plotas (samata items 16+17, excl garažas)": 19.52,
       "LED nišų ilgis": 7.957,
       "Lubų dažomas plotas": 16.845,
-      "MAE": 15.135,
-      "Sienų dažomas plotas": 20.603
+      "Sienų dažomas plotas": 20.603,
+      "billed MAE": 36.291,
+      "billed · Angokraščiai": 7.732,
+      "billed · Dažymas (sienos+lubos)": 19.52,
+      "billed · Dažymo kampai": 32.215,
+      "billed · GKP lubos": 16.845,
+      "billed · Plytelės": 63.651,
+      "billed · Rotband": 77.784,
+      "legacy MAE": 15.135
     },
     "objektas_d": {
       "Dažymo plotas (samata items 16+17, excl garažas)": 9.491,
       "LED nišų ilgis": 2.457,
       "Lubų dažomas plotas": 0.0,
-      "MAE": 5.177,
-      "Sienų dažomas plotas": 13.075
+      "Sienų dažomas plotas": 13.075,
+      "billed MAE": 16.221,
+      "billed · Angokraščiai": 6.384,
+      "billed · Dažymas (sienos+lubos)": 9.491,
+      "billed · Dažymo kampai": 6.7,
+      "billed · GKP lubos": 0.0,
+      "billed · Plytelės": 46.466,
+      "billed · Rotband": 12.064,
+      "legacy MAE": 5.177
     },
     "objektas_g": {
       "Dažymo plotas (samata items 16+17, excl garažas)": 60.434,
-      "MAE": 8.104,
-      "Sienų dažomas plotas": 8.104
+      "Sienų dažomas plotas": 8.104,
+      "billed MAE": 56.832,
+      "billed · Dažymas (sienos+lubos)": 8.104,
+      "billed · Dažymo kampai": 135.733,
+      "billed · Plytelės": 26.658,
+      "legacy MAE": 8.104
     },
     "objektas_h": {
       "Bendras plotas": 0.0,
       "Dažymo plotas (samata items 16+17, excl garažas)": 14.605,
       "LED nišų ilgis": 8.497,
       "Lubų dažomas plotas": 0.0,
-      "MAE": 6.797,
-      "Sienų dažomas plotas": 18.69
+      "Sienų dažomas plotas": 18.69,
+      "billed MAE": 17.122,
+      "billed · Angokraščiai": 25.036,
+      "billed · Dažymas (sienos+lubos)": 12.205,
+      "billed · Dažymo kampai": 6.015,
+      "billed · GKP lubos": 0.973,
+      "billed · Rotband": 41.379,
+      "legacy MAE": 6.797
     }
   }
 }

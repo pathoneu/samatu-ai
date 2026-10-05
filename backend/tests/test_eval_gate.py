@@ -112,7 +112,28 @@ def test_gate_numbers_keep_codenames_only(harness):
         {"slug": "objektas_x", "status": "no_ai_side", "metrics": []},
     ]
     assert harness.gate_numbers_totals(summary) == {
-        "objektas_a": {"MAE": 3.06, "Sienų dažomas plotas": 11.228}}
+        "objektas_a": {"legacy MAE": 3.06, "Sienų dažomas plotas": 11.228}}
+
+
+def test_gate_numbers_lead_with_the_billed_lines(harness):
+    """2026-10-05 (testing-eval-2): the headline is his billed lines. A copied
+    family is in no average but is still gated — a copy that stops matching is
+    a regression; a family whose units cannot be summed has no number."""
+    summary = [{
+        "slug": "objektas_a", "status": "ok", "mae_pct": 3.06, "billed_mae_pct": 6.208,
+        "billed_families": [
+            {"family": "Dažymas (sienos+lubos)", "status": "measured", "pct_error": -1.7478},
+            {"family": "GKP lubos", "status": "copied", "pct_error": 0.0},
+            {"family": "Dažymo kampai", "status": "not_produced", "pct_error": -100.0},
+            {"family": "Plytelės", "status": "unit_mismatch", "pct_error": None}],
+        "metrics": [{"label": "Lubų dažomas plotas", "pct_error": 0.0}]}]
+    assert harness.gate_numbers_totals(summary) == {"objektas_a": {
+        "billed MAE": 6.208,
+        "billed · Dažymas (sienos+lubos)": 1.748,
+        "billed · GKP lubos": 0.0,
+        "billed · Dažymo kampai": 100.0,
+        "legacy MAE": 3.06,
+        "Lubų dažomas plotas": 0.0}}
 
 
 def test_gate_exit_codes(harness, tmp_path, capsys):

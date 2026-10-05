@@ -38,6 +38,9 @@ REGISTRY: dict[str, dict[str, str]] = {
         "replay_path": "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
     },
 }
+# Registry slugs marked `blind: true` — scored only by `--blind-once`, refused
+# by every mode that prints per-project detail (see `_refuse_blind`).
+BLIND_SLUGS: set[str] = set()
 
 # Backend import path setup
 sys.path.insert(0, str(REPO_ROOT / "backend"))
@@ -60,6 +63,10 @@ def _merge_registry_yaml() -> None:
         return
     for entry in reg.get("projects") or []:
         slug = entry.get("slug")
+        # Before the truth_path check: a blind project's files live outside
+        # the repository, so its entry carries no truth_path at all.
+        if slug and entry.get("blind"):
+            BLIND_SLUGS.add(slug)
         if not slug or slug in REGISTRY or not entry.get("truth_path"):
             continue
         merged: dict[str, str] = {
@@ -74,7 +81,7 @@ def _merge_registry_yaml() -> None:
         # registry-excluded score got hand-averaged into a "corpus MAE".
         for flag in ("scope_mismatch", "scope_mismatch_reason",
                      "blocked_for_vision_extraction", "blocked_partial_input",
-                     "blocked_reason", "ablation_of", "out_of_sample"):
+                     "blocked_reason", "ablation_of", "blind", "blind_until"):
             if entry.get(flag):
                 merged[flag] = entry[flag]
         REGISTRY[slug] = merged
@@ -713,9 +720,11 @@ def print_report(project_id: str, mode: str, results: list[MetricResult],
               "extractor — see _summarize)")
 
     print()
-    print("  ── Summary ────────────────────────────────────────────────────────────────")
-    print(f"    Headline MAE %:        {summary['headline_mae_pct']:6.3f}%")
-    print(f"    Headline max |error| %:{summary['headline_max_pct']:6.3f}%")
+    # "Legacy": since 2026-10-05 the corpus headline is his billed lines
+    # (--totals-only); this walls / ceilings / LED / floor figure is the old one.
+    print("  ── Summary (legacy totals — the corpus headline is --totals-only) ─────────")
+    print(f"    Legacy headline MAE %: {summary['headline_mae_pct']:6.3f}%")
+    print(f"    Legacy max |error| %:  {summary['headline_max_pct']:6.3f}%")
     print(f"    Headline rooms ok:     {summary['headline_ok']} / {summary['headline_total']}")
     print(f"    Category MAE %:        {summary['category_mae_pct']:6.3f}%")
     print("═" * 96)
@@ -880,8 +889,8 @@ def write_html_report(out_path: Path, project_id: str, mode: str,
 <h1>Eval report — {project_id}</h1>
 <div class="meta">mode={mode} &middot; generated {_dt.datetime.now().isoformat(timespec='seconds')}</div>
 <div class="summary">
-  Headline MAE: <b>{summary['headline_mae_pct']:.3f}%</b> &middot;
-  Max headline |Δ|: <b>{summary['headline_max_pct']:.3f}%</b> &middot;
+  Legacy headline MAE: <b>{summary['headline_mae_pct']:.3f}%</b> &middot;
+  Max legacy |Δ|: <b>{summary['headline_max_pct']:.3f}%</b> &middot;
   Headline ok: <b>{summary['headline_ok']}/{summary['headline_total']}</b> &middot;
   Category MAE: <b>{summary['category_mae_pct']:.3f}%</b>
 </div>
@@ -1328,58 +1337,91 @@ def _print_collapsed_footnote(per_project_summary: list[dict]) -> None:
             print(f"      🔴 {slug}: {lab}")
 
 
-def _print_summary_table(per_project_summary: list[dict], overall_mae) -> None:
-    """Compact 5-line table — the default for multi-project mode.
+def _legacy_mae_lines(per_project_summary: list[dict], overall_mae,
+                      formerly_blind_mae=None, *, digits: int = 2) -> list[str]:
+    """The legacy totals MAE pooled exactly as it was before 2026-10-05, so a
+    figure in an old doc or commit message still compares: the original
+    projects together, and the projects that were blind until 2026-09-05
+    apart (they were printed as the out-of-sample figure and have been tuned
+    on since — audit testing-eval-1). Each line counts its copied points.
+    `overall_mae` / `formerly_blind_mae` are the observation-pooled values the
+    caller computed; a missing one is pooled from the per-project figures."""
+    lines: list[str] = []
+    ok = [s for s in per_project_summary
+          if s.get("status") == "ok" and s.get("mae_pct") is not None]
+    for formerly, given in ((False, overall_mae), (True, formerly_blind_mae)):
+        group = [s for s in ok if bool(s.get("blind_until")) == formerly]
+        n = sum(s.get("metrics_scored") or 0 for s in group)
+        if not n:
+            continue
+        mae = given if given is not None else (
+            sum(s["mae_pct"] * (s.get("metrics_scored") or 0) for s in group) / n)
+        copied = sum(s.get("legacy_copied_points") or 0 for s in group)
+        if formerly:
+            until = ", ".join(sorted({str(s["blind_until"]) for s in group}))
+            note = (f"blind until {until}, tuned on since; printed apart as the "
+                    f"out-of-sample figure before 2026-10-05")
+        else:
+            note = "the headline until 2026-10-05"
+        lines.append(f"  Legacy totals MAE {mae:6.{digits}f}%  "
+                     f"({', '.join(s['slug'] for s in group)}: n={n} obs., "
+                     f"{copied} copied; {note})")
+    return lines
+
+
+def _print_summary_table(per_project_summary: list[dict], overall_mae, *,
+                         formerly_blind_mae=None) -> None:
+    """The LEGACY totals table — walls / ceilings / LED / floor, the headline
+    until 2026-10-05, kept so history stays comparable. The headline is now
+    his billed lines (`_print_billed_headline`).
 
     Columns: Project | Combined Paint | Walls | Ceilings | MAE
     Where Combined Paint / Walls / Ceilings are signed % error vs truth
     and MAE is the mean absolute % error across the project's scored
     metrics. Skipped/blocked projects show '—' in every numeric column.
+    A cell marked * is copied, not measured (`copied_source`).
     """
     def _metric(s: dict, label_starts_with: str):
         for m in s.get("metrics", []):
             if (m.get("label") or "").startswith(label_starts_with):
-                return m.get("pct_error")
-        return None
+                return m.get("pct_error"), m.get("label")
+        return None, None
 
-    def _fmt(v):
-        return "—" if v is None else f"{v:+.2f}%"
+    starred = False
 
-    print(f"\n  {'Project':<14} {'Combined(info)':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}  {'engine':<9}")
+    def _fmt(s: dict, label_starts_with: str) -> str:
+        nonlocal starred
+        v, label = _metric(s, label_starts_with)
+        if v is None:
+            return "—"
+        copied = label in {c.get("label") for c in s.get("copied") or []}
+        starred = starred or copied
+        return f"{v:+.2f}%" + ("*" if copied else "")
+
+    print("\n  LEGACY totals — walls / ceilings / LED / floor: the headline until "
+          "2026-10-05, kept so history stays comparable")
+    print(f"  {'Project':<14} {'Combined(info)':>15} {'Walls':>9} {'Ceilings':>10} {'MAE':>8}  {'engine':<9}")
     print("  " + "─" * 71)
     for s in per_project_summary:
         if s.get("status") != "ok":
             print(f"  {s['slug']:<14} {'—':>15} {'—':>9} {'—':>10} {'—':>8}  {'—':<9}")
             continue
-        combined = _metric(s, "Dažymo plotas")
-        walls    = _metric(s, "Sienų dažomas plotas")
-        ceiling  = _metric(s, "Lubų dažomas plotas")
         mae      = s.get("mae_pct")
         # "live" = deterministic tail re-run against today's formulas.
         # "FROZEN" = the saved extract's own numbers, however old they are —
         # shouted, because a frozen row can neither show a fix nor catch a
         # regression (see run_totals_only_multi's docstring).
         engine = "live" if s.get("recomputed") else "FROZEN"
-        # Out-of-sample rows are scored like the rest but wear a tag and stay
-        # out of the Average below (see run_totals_only_multi).
-        if s.get("out_of_sample"):
-            engine += " OOS"
-        print(f"  {s['slug']:<14} {_fmt(combined):>15} {_fmt(walls):>9} "
-              f"{_fmt(ceiling):>10} "
+        print(f"  {s['slug']:<14} {_fmt(s, 'Dažymo plotas'):>15} "
+              f"{_fmt(s, 'Sienų dažomas plotas'):>9} "
+              f"{_fmt(s, 'Lubų dažomas plotas'):>10} "
               f"{('—' if mae is None else f'{mae:.2f}%'):>8}  {engine:<9}")
     print("  " + "─" * 71)
-    avg_line = "—" if overall_mae is None else f"{overall_mae:.2f}%"
-    print(f"  {'Average':<14} {'':>15} {'':>9} {'':>10} {avg_line:>8}  (in-sample; OOS rows excluded)")
-    # The generalisation number, from the same metric observations, never
-    # blended with the line above.
-    oos = [(s["mae_pct"], s.get("metrics_scored") or 0) for s in per_project_summary
-           if s.get("out_of_sample") and s.get("status") == "ok" and s.get("mae_pct") is not None]
-    n_oos = sum(n for _, n in oos)
-    if n_oos:
-        slugs = ", ".join(s["slug"] for s in per_project_summary if s.get("out_of_sample"))
-        pooled = sum(m * n for m, n in oos) / n_oos      # same pooling as the corpus MAE
-        print(f"  {'Out-of-sample':<14} {'':>15} {'':>9} {'':>10} {pooled:>7.2f}%  "
-              f"(n={n_oos} obs. on {slugs}; never tuned on)")
+    for line in _legacy_mae_lines(per_project_summary, overall_mae, formerly_blind_mae):
+        print(line)
+    if starred:
+        print("  * copied, not measured — see the COPIED list above; it is inside "
+              "this legacy figure only")
     if any(s.get("status") == "ok" and not s.get("recomputed")
            for s in per_project_summary):
         print("\n  ⚠ FROZEN rows score the numbers saved in ai_extract.json, not "
@@ -1455,9 +1497,12 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
     engine. The per-project mode is printed in the table so a frozen number
     can never again be mistaken for a live one.
 
-    Output: a compact 5-line table by default (one row per project with
-    combined paint / walls / ceilings / MAE percentages). Pass
-    ``detailed=True`` to print the legacy 5-column per-project table.
+    Output (2026-10-05): a banner saying no number is out of sample, the
+    HEADLINE — his billed lines (`score_billed_lines`) — the metrics that are
+    copied, not measured, then the LEGACY totals table (combined paint /
+    walls / ceilings / MAE, unchanged so history compares) and the rows block.
+    Pass ``detailed=True`` for the per-family detail and the legacy
+    5-column per-project table.
     """
     import yaml
 
@@ -1468,6 +1513,8 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         return 2
 
     per_project_summary: list[dict] = []
+    # LEGACY: the observations behind the pre-2026-10-05 headline, pooled as
+    # they always were (see `_legacy_mae_lines`).
     all_pct_errors: list[float] = []
     # Row scorecard, collected alongside the headline metrics off the SAME
     # `parsed` dicts (read-only) so both numbers describe one engine and the
@@ -1479,16 +1526,30 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
     run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # OUT-OF-SAMPLE (2026-09-05): projects the engine was never tuned on. They
-    # are scored exactly like the others but their errors never enter the
-    # corpus mean — that mean is the in-sample number a rule change is gated
-    # on, and folding a fresh project into it would let one bad new PDF look
-    # like a regression of the fix and one lucky one hide a real regression.
-    # Their own mean is printed as a separate line: the generalisation number.
-    oos_pct_errors: list[float] = []
-    oos_slugs: list[str] = []
+    # NO OUT-OF-SAMPLE PROJECT (2026-10-05, audit testing-eval-1). objektas_g/h
+    # were blind for one run on 2026-09-05 and have been tuned on ever since,
+    # so they are scored in-sample like the rest. A project nobody has looked
+    # at carries `blind: true`: it is skipped here and scored only by
+    # `--blind-once` (docs/superpowers/plans/2026-10-05-blind-batch-protocol.md).
+    # `blind_until` only keeps the legacy totals pooled the old way.
+    formerly_blind_pct_errors: list[float] = []
+    formerly_blind_slugs: list[str] = []
+    blind_slugs: list[str] = []
+    # THE HEADLINE: |error| of every family observation of his billed lines.
+    billed_abs: list[float] = []
     for entry in projects:
         slug = entry["slug"]
+        if entry.get("blind"):
+            # Nothing of it is read — no truth, no extract, no scorecard.
+            blind_slugs.append(slug)
+            per_project_summary.append({
+                "slug": slug, "status": "excluded_blind",
+                "reason": "blind — scored only by --blind-once",
+                "metrics": [], "excluded_from_mae": True,
+            })
+            continue
+        if entry.get("out_of_sample"):
+            _warn_retired_out_of_sample(slug)
         # Per-registry exclusions: scope_mismatch, blocked_for_vision_extraction,
         # blocked_partial_input projects are visible but NOT included in MAE.
         if entry.get("scope_mismatch"):
@@ -1606,27 +1667,37 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
                 for r in scored
             ],
         })
-        if entry.get("out_of_sample"):
-            per_project_summary[-1]["out_of_sample"] = True
-            per_project_summary[-1]["excluded_from_mae"] = True
-            oos_slugs.append(slug)
+        if entry.get("blind_until"):
+            per_project_summary[-1]["blind_until"] = str(entry["blind_until"])
+            formerly_blind_slugs.append(slug)
             for r in pooled:
-                oos_pct_errors.append(abs(r.pct_error))
+                formerly_blind_pct_errors.append(abs(r.pct_error))
         else:
             for r in pooled:
                 all_pct_errors.append(abs(r.pct_error))
 
         # Read-only second instrument on the same `parsed`. It cannot move the
-        # headline numbers above (already computed) and it never rebuilds rows.
+        # legacy numbers above (already computed) and it never rebuilds rows.
         sc = _score_rows_of(parsed, slug)
         if sc is not None:
             per_project_summary[-1]["row_scorecard"] = sc.as_dict()
-            if entry.get("out_of_sample"):
-                rows_excluded.append((slug, sc, "OUT-OF-SAMPLE — not in the mean"))
-            elif slug != ROW_SCORECARD_HOLDOUT:
+            if slug != ROW_SCORECARD_HOLDOUT:
                 rows_scored.append((slug, sc))
             else:
                 rows_excluded.append((slug, sc, "HOLDOUT"))
+
+        # The headline (testing-eval-2) off the same `parsed` and scorecard,
+        # read-only like the scorecard; plus the legacy metrics that are a
+        # copy of a printed figure, which no average may count as measured.
+        copied = copied_legacy_metrics(results, parsed)
+        per_project_summary[-1]["copied"] = copied
+        per_project_summary[-1]["legacy_copied_points"] = sum(
+            1 for c in copied if c["tier"] == "headline"
+            and c["truth_key"] not in INFORMATIONAL_METRICS)
+        billed = score_billed_lines(parsed, sc, _contractor_samata(slug))
+        per_project_summary[-1].update(billed)
+        billed_abs.extend(abs(f["pct_error"]) for f in billed["billed_families"]
+                          if f["status"] in BILLED_POOLED_STATUSES)
 
     # Projects the headline table skipped: named with their reason (outside the
     # mean) so a registry exclusion never silently hides a whole sąmata.
@@ -1637,11 +1708,15 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
         "excluded_blocked": "registry: blocked",
         "excluded_partial_input": "registry: partial input",
         "excluded_ablation": "ablation",
+        "excluded_blind": "blind — scored only by --blind-once",
         "missing_truth": "no truth",
         "no_ai_side": "no extract",
     }
     for s in per_project_summary:
-        if s.get("status") == "ok" or _contractor_samata(s["slug"]) is None:
+        if s.get("status") == "ok":
+            continue
+        # A blind project's sąmata is not opened — not even to check it exists.
+        if s["status"] != "excluded_blind" and _contractor_samata(s["slug"]) is None:
             continue
         note = _EXCL_NOTE.get(s["status"], s["status"])
         if s["slug"] == ROW_SCORECARD_HOLDOUT:
@@ -1650,30 +1725,45 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
 
     overall_mae = (sum(all_pct_errors) / len(all_pct_errors)
                    if all_pct_errors else None)
-    oos_mae = (sum(oos_pct_errors) / len(oos_pct_errors)
-               if oos_pct_errors else None)
+    formerly_blind_mae = (sum(formerly_blind_pct_errors) / len(formerly_blind_pct_errors)
+                          if formerly_blind_pct_errors else None)
+    billed_mae = sum(billed_abs) / len(billed_abs) if billed_abs else None
     baseline = {
         "ts": ts,
-        "registry": str(registry_path.relative_to(REPO_ROOT)),
+        "registry": str(registry_path.relative_to(REPO_ROOT)
+                        if registry_path.is_relative_to(REPO_ROOT) else registry_path),
+        # THE HEADLINE since 2026-10-05 (testing-eval-2): his billed lines.
+        "billed_lines_mae_pct": round(billed_mae, 3) if billed_mae is not None else None,
+        "n_billed_observations": len(billed_abs),
+        "blind_projects_skipped": blind_slugs,
+        # LEGACY totals, pooled as before 2026-10-05 so history compares.
+        # `overall_mae_pct` keeps its name for scripts/render_multi_report.py.
         "overall_mae_pct": round(overall_mae, 3) if overall_mae is not None else None,
+        "legacy_mae_pct": round(overall_mae, 3) if overall_mae is not None else None,
         "n_metric_observations": len(all_pct_errors),
-        # The generalisation number — never blended with the line above.
-        "out_of_sample_mae_pct": round(oos_mae, 3) if oos_mae is not None else None,
-        "out_of_sample_projects": oos_slugs,
-        "n_out_of_sample_observations": len(oos_pct_errors),
+        "legacy_formerly_blind_mae_pct": (round(formerly_blind_mae, 3)
+                                          if formerly_blind_mae is not None else None),
+        "legacy_formerly_blind_projects": formerly_blind_slugs,
+        "n_legacy_formerly_blind_observations": len(formerly_blind_pct_errors),
         # The contractor-facing number, alongside (never instead of) the MAE.
         "rows_within_10_share_mean": (
             round(sum(sc.within_10_share for _, sc in rows_scored)
                   / len(rows_scored), 2) if rows_scored else None),
         "rows_holdout": ROW_SCORECARD_HOLDOUT,
+        "rows_holdout_scored": any(slug == ROW_SCORECARD_HOLDOUT and sc is not None
+                                   for slug, sc, _ in rows_excluded),
         "projects": per_project_summary,
     }
     out_json = run_dir / "baseline_multi.json"
     out_json.write_text(json.dumps(baseline, ensure_ascii=False, indent=2),
                         encoding="utf-8")
 
+    _print_blindness_banner(blind_slugs)
+    _print_billed_headline(per_project_summary, billed_mae, len(billed_abs),
+                           recomputed=recompute, detailed=detailed)
+    _print_copied_block(per_project_summary)
     if detailed:
-        print(f"\n  Cross-project totals-only baseline — {len(projects)} project(s)")
+        print(f"\n  LEGACY totals per project — {len(projects)} project(s) in the registry")
         print(f"  {'slug':<14} {'AI side':<14} {'scored':>7} {'MAE %':>9} {'worst %':>10}")
         print("  " + "─" * 60)
         for s in per_project_summary:
@@ -1682,20 +1772,17 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
                 continue
             print(f"  {s['slug']:<14} {s['ai_mode']:<14} {s['metrics_scored']:>7} "
                   f"{s['mae_pct']:>8.3f} {s['worst_pct']:>9.3f}")
-        print(f"\n  overall MAE: {overall_mae if overall_mae is None else f'{overall_mae:.3f}%'}  "
-              f"(n={len(all_pct_errors)} metric observations)")
-        if oos_slugs:
-            print(f"  OUT-OF-SAMPLE MAE: {oos_mae if oos_mae is None else f'{oos_mae:.3f}%'}  "
-                  f"(n={len(oos_pct_errors)} observations on {', '.join(oos_slugs)} — "
-                  f"never in the corpus mean)")
-        _print_collapsed_footnote(per_project_summary)
-        _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
-        print(f"  Saved → {out_json}")
+        print()
+        for line in _legacy_mae_lines(per_project_summary, overall_mae,
+                                      formerly_blind_mae, digits=3):
+            print(line)
     else:
-        _print_summary_table(per_project_summary, overall_mae)
-        _print_collapsed_footnote(per_project_summary)
-        _print_rows_block(rows_scored, rows_excluded, recomputed=recompute)
-        print(f"  Saved → {out_json}")
+        _print_summary_table(per_project_summary, overall_mae,
+                             formerly_blind_mae=formerly_blind_mae)
+    _print_collapsed_footnote(per_project_summary)
+    _print_rows_block(rows_scored, rows_excluded, recomputed=recompute,
+                      formerly_blind=frozenset(formerly_blind_slugs))
+    print(f"  Saved → {out_json}")
 
     if collect is not None:  # --gate / --accept-baseline read the same numbers
         collect["projects"] = per_project_summary
@@ -1717,6 +1804,329 @@ def _infer_slug_from_run_name(name: str) -> str | None:
 GEOMETRY_LANE = False        # set by --geometry
 
 
+# ── --replay-geometry (audit round 13) ─────────────────────────────────────────
+# The €0 lanes that read the drawing's text layer and vector geometry run in the
+# paid pipeline right after the room table merge (vision_call Steps 2.44–2.44d)
+# and their output is FROZEN into ai_extract.json — or, for an extract older
+# than a lane, missing. A change to one of them was invisible here. The replay
+# runs them again on the frozen extract, after taking back what older versions
+# of them left on it. Not the default, and never accepted as the baseline: the
+# founder decides after reading the numbers with and without it.
+REPLAY_GEOMETRY = False      # set by --replay-geometry
+REPLAY_REPORT: dict[str, dict] = {}      # slug → what the replay changed (printed per project)
+
+# What the replay compares, room by room, before and after.
+_REPLAY_ROOM_FIELDS = ("plotas_m2", "plotas_saltinis", "perimetras_m", "perimetras_saltinis",
+                       "lubu_aukstis_m", "lubu_aukstis_saltinis", "polygon_source", "grindu_danga")
+_LANE_WARNING_CODES = ("room_area_unconfirmed", "plan_area_unclaimed")
+
+
+def _undo_lane_state(parsed: dict) -> list[str]:
+    """Take back what earlier versions of the €0 lanes left on a frozen extract,
+    newest lane first, each from the figure it kept of what was there before —
+    so today's lanes decide again from the model's own read. Also the steps
+    production runs after the lanes on their output: the polygons the prepass
+    drew from the boxes, the zoom re-read and the LED niches inferred from
+    perimeters. A room a person worked on is never touched. Returns what was
+    taken back."""
+    import re
+
+    from extractor import geometry_lane as gl
+    from extractor.niche_inference import INFERRED_SOURCE
+    from extractor.plan_area_annotations import HEIGHT_SOURCE, SOURCE_LABEL
+    from extractor.plan_dimensions import PROPOSAL_KEY, SOURCE as PAIR_SOURCE
+    from extractor.wall_outline import SOURCE as RASTER_SOURCE
+
+    notes: list[str] = []
+    rooms = [r for r in parsed.get("patalpos") or [] if isinstance(r, dict)]
+    meta = parsed.setdefault("_meta", {})
+    worked_on = {id(r) for r in rooms if gl._his(r) or r.get("polygon_source") in ("corrected", "manual")}
+    rooms = [r for r in rooms if id(r) not in worked_on]
+
+    def took(label: str, n: int) -> None:
+        if n:
+            notes.append(f"{label} ×{n}")
+
+    # Steps 2.44b–d — a perimeter a lane set goes back to the model's: the
+    # EARLIEST figure kept before a lane (the pair or the raster lane ran first
+    # and kept the model's; the geometry lane kept whatever stood before it).
+    # The lanes' outlines, the open spaces, the walls and floors they read go too.
+    lane_of = {PAIR_SOURCE: "rectangle pairs", RASTER_SOURCE: "raster outlines",
+               **{s: "geometry lane" for s in gl.LANE_PERIMETERS}}
+    taken: dict[str, int] = {}
+    for r in rooms:
+        lane = lane_of.get(str(r.get("perimetras_saltinis") or ""))
+        if lane:
+            before = next((r[k] for k in ("_perimetras_pries_matmenis", "_perimetras_pries_kontura",
+                                          "_perimetras_pries_geometrija") if r.get(k) is not None), None)
+            if before is not None:
+                r["perimetras_m"] = before
+            r.pop("perimetras_saltinis", None)
+            taken[lane] = taken.get(lane, 0) + 1
+        for key in ("_perimetras_pries_matmenis", "_perimetras_pries_kontura", "_perimetras_pries_geometrija",
+                    "_perimetras_matmenys", PROPOSAL_KEY, *gl.PERIMETER_ESTIMATE_KEYS):
+            r.pop(key, None)
+        if r.get("polygon_source") in (gl.VECTOR_SOURCE, RASTER_SOURCE):
+            for key in gl.FROM_THE_OUTLINE:
+                r.pop(key, None)
+        if r.get("grindu_danga_saltinis") == gl.FLOOR_PLAN_SOURCE:
+            for key in (*gl.FLOOR_KEYS, "_grindu_dangos_dvi"):
+                r.pop(key, None)
+        for key in ("_vieta", "_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve", "_angos_sienose",
+                    "_sienos", "_perimetras_suma"):
+            r.pop(key, None)
+    for key in ("geometrija", "wall_outline_lane", "plan_dimension_lane"):
+        meta.pop(key, None)
+    for lane in ("geometry lane", "raster outlines", "rectangle pairs"):
+        took(lane, taken.get(lane, 0))
+    # Step 2.44 — the plan's stated height (back to the section average production
+    # gives a room nothing else set) and the area labels (scripts/backfill_plan_areas
+    # _undo_lane: the model's figure where the lane kept one).
+    section_average = float(parsed.get("lubu_aukstis_m") or 2.82)
+    n = 0
+    for r in rooms:
+        if r.get("lubu_aukstis_saltinis") == HEIGHT_SOURCE and r.get("_lubu_aukstis_uzrasas"):
+            r["lubu_aukstis_m"] = section_average
+            r["lubu_aukstis_saltinis"] = "section_average"
+            r.pop("_lubu_aukstis_uzrasas", None)
+            n += 1
+    meta.pop("plan_height_statement", None)
+    took("plan height", n)
+    n = 0
+    for r in rooms:
+        if r.get("plotas_saltinis") == SOURCE_LABEL:
+            prior = r.pop("_plotas_pries_uzrasa_m2", None)
+            if prior is not None:
+                r["plotas_m2"] = prior
+            r["plotas_saltinis"] = "wall_dim_calc" if prior is not None else "inline_label"
+            n += 1
+        for key in ("_plotas_uzrasas", "_plotas_uzrasas_kitas", "_area_unconfirmed", "_area_unconfirmed_reason"):
+            r.pop(key, None)
+    if str((parsed.get("_ceiling_anchor") or {}).get("label") or "").startswith("plano užrašų"):
+        parsed.pop("_ceiling_anchor", None)
+    parsed["warnings"] = [w for w in parsed.get("warnings") or []
+                          if not (isinstance(w, dict) and w.get("code") in _LANE_WARNING_CODES)]
+    meta.pop("plan_area_lane", None)
+    took("area labels", n)
+    # What production derives from the lanes before the calc: the prepass draws a
+    # polygon from the box for every room left without one, and niche inference
+    # sizes a missing LED niche from the perimeter.
+    n = 0
+    for r in rooms:
+        if r.get("polygon_source") == "synthesized_from_bbox":
+            r.pop("polygon_pct", None)
+            r.pop("polygon_source", None)
+            n += 1
+        r.pop("shared_with_neighbors_m", None)
+        r.pop("shared_edges_provenance", None)
+    took("box polygons", n)
+    n = 0
+    for r in rooms:
+        kept = [e for e in r.get("elementai") or [] if not (isinstance(e, dict) and e.get("_source") == INFERRED_SOURCE)]
+        n += len(r.get("elementai") or []) - len(kept)
+        if "elementai" in r:
+            r["elementai"] = kept
+    took("inferred LED niches", n)
+    # The zoom re-read runs AFTER the lanes in production and never overrules a
+    # value one of them read (vision_call.READ_SOURCES). A frozen extract older
+    # than a lane had its zoom applied first; each applied change is logged as
+    # „field: before → after", so the room goes back to „before" and the stored
+    # answer is applied again after the lanes (`_reapply_stored_zoom`).
+    n = 0
+    for r in rooms:
+        for change in r.get("_zoom_changes") or []:
+            m = re.match(r"^(perimetras|plotas|lubu_aukstis|nisu_metrai): (\S+) → ", str(change))
+            if not m or m.group(2) == "None":
+                continue
+            field, before = m.group(1), float(m.group(2))
+            if field == "perimetras":
+                r["perimetras_m"] = before
+                if r.get("perimetras_saltinis") == "zoom":
+                    r.pop("perimetras_saltinis", None)
+            elif field == "plotas":
+                r["plotas_m2"] = before
+                if r.get("plotas_saltinis") == "wall_dim_calc":     # the zoom's own label
+                    r["plotas_saltinis"] = "inline_label"
+            elif field == "lubu_aukstis":
+                r["lubu_aukstis_m"] = before
+                if r.get("lubu_aukstis_saltinis") == "zoom":
+                    r["lubu_aukstis_saltinis"] = "section_average"
+            else:
+                r[field] = before
+            n += 1
+        for key in ("_zoom_changes", "_perimetras_zoom_m", "_plotas_zoom_m2", "_lubu_aukstis_zoom_m"):
+            r.pop(key, None)
+    took("zoom changes", n)
+    return notes
+
+
+def _reapply_stored_zoom(parsed: dict) -> int:
+    """Step 2.5 on the stored answers: each room's kept zoom answer (`_zoom`)
+    applied again after the lanes, then — as production does when any applied —
+    the area-label lane's second look and the project's own area total.
+    Returns how many rooms changed."""
+    vc = importlib.import_module("extractor.vision_call")
+    rooms = [r for r in parsed.get("patalpos") or [] if isinstance(r, dict)]
+    applied = sum(1 for r in rooms if isinstance(r.get("_zoom"), dict)
+                  and vc._apply_zoom_refinements(r, r["_zoom"]))
+    if applied:
+        lane = (parsed.get("_meta") or {}).get("plan_area_lane") or {}
+        if lane.get("status") == "applied":
+            from extractor.plan_area_annotations import lane_warnings, reclaim_after_refinement
+            reclaim_after_refinement(rooms, lane)
+            parsed["warnings"] = [w for w in parsed.get("warnings") or []
+                                  if not (isinstance(w, dict) and w.get("code") in _LANE_WARNING_CODES)
+                                  ] + lane_warnings(lane, rooms)
+        areas = [float(r.get("plotas_m2") or 0) for r in rooms if isinstance(r.get("plotas_m2"), (int, float))]
+        if areas:
+            parsed["bendras_plotas_m2"] = round(sum(areas), 2)
+    return applied
+
+
+def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
+    """--replay-geometry: run the paid pipeline's €0 drawing lanes again on a
+    frozen extract, in production's order (vision_call.extract_interior):
+
+      2.44   one text-layer scan → the designer's own figures and the walls /
+             floors anchors billed from them, the plan's stated height, and —
+             only when no room table merged — the area-label lane and its
+             ceiling anchor;
+      2.44b  rectangle pairs from the dimension strings (plan_dimensions);
+      2.44c  raster outlines from the walls (wall_outline);
+      2.44d  the geometry lane (outlines, perimeters added from the strings,
+             wall openings, floor coverings);
+      then   what reads the lanes' output before the calc: the polygon
+             prepass (Step 2.45), each room's stored zoom answer applied again
+             (2.5 — it may not overrule a value a lane read) and niche
+             inference (2.88); the door schedule and vector symbols (2.43 /
+             2.44) are scanned again by the tail below even when the extract
+             carries them. These run before the tail's marker lane and height
+             gate, not after them as in production — no stored zoom answer in
+             the corpus changes a height.
+
+    Before that `_undo_lane_state` takes back what older lane versions froze
+    into the extract. What it cannot give back: the replay starts from the
+    STORED rooms, so a value a later step stored (zoom, the height precedence)
+    is its starting point where the run kept no earlier figure — objektas_g:
+    areas a zoom moved before the area-label backfill; a room the name map gave
+    a height keeps it, as the model's own label at Step 2.44 is not stored.
+    tests/test_golden_replay_extract_interior.py holds this sequence to what
+    production computes on objektas_h. The plain --recompute is unchanged;
+    this only runs with the flag. A project whose PDF is not on disk is scored
+    without the replay, and says so."""
+    pdf_rel = (REGISTRY.get(slug) or {}).get("pdf_path") if slug else None
+    pdf_path = REPO_ROOT / pdf_rel if pdf_rel else None
+    report: dict[str, Any] = {"changed_rooms": {}, "lanes": {}, "undone": [], "skipped": None}
+    REPLAY_REPORT[slug or "?"] = report
+    if pdf_path is None or not pdf_path.exists():
+        report["skipped"] = f"{pdf_rel or 'no project PDF in the registry'} not on disk"
+        print(f"  · geometry replay skipped: {report['skipped']} — scored without it")
+        return parsed
+    pdf = pdf_path.read_bytes()
+    vc = importlib.import_module("extractor.vision_call")
+    from extractor.geometry_lane import apply_geometry
+    from extractor.niche_inference import infer_missing_niches
+    from extractor.plan_area_annotations import (
+        apply_height_statements, lane_warnings, most_common_page, plan_pages_from_classification,
+        reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
+    from extractor.plan_dimensions import apply_dimension_strings
+    from extractor.wall_outline import apply_wall_outlines
+
+    def snapshot() -> dict[str, dict]:
+        return {str(r.get("nr")): {k: r.get(k) for k in _REPLAY_ROOM_FIELDS}
+                for r in parsed.get("patalpos") or [] if isinstance(r, dict)}
+
+    before = snapshot()
+    anchors_before = {"walls": (parsed.get("_walls_anchor") or {}).get("total_area_m2"),
+                      "floors": sorted(parsed.get("_floor_anchors") or {}),
+                      "ceiling": (parsed.get("_ceiling_anchor") or {}).get("total_area_m2")}
+    report["undone"] = _undo_lane_state(parsed)
+    lanes = report["lanes"]
+    rooms = parsed.get("patalpos") or []
+    meta = parsed.setdefault("_meta", {})
+
+    # Step 2.44 — exactly as vision_call runs it (one scan, then each consumer).
+    try:
+        scan = scan_text_layer(pdf, pages=text_pages_from_classification(parsed.get("puslapiai") or []) or None)
+        parsed["_autoriaus_kiekiai"] = scan["figures"]
+        parsed.pop("_walls_anchor", None)
+        wa = vc._walls_anchor_from_figures(scan["figures"])
+        if wa:
+            parsed["_walls_anchor"] = wa
+        parsed.pop("_floor_anchors", None)
+        fa = vc._floor_anchors_from_figures(scan["figures"])
+        if fa:
+            parsed["_floor_anchors"] = fa
+        # The stated height reaches the rooms whose STORED label is a default. At
+        # Step 2.44 a room still carries the model's own label, and whether that
+        # was a default for a room the name map later gave a height (`per_room`)
+        # is not stored — so such a room keeps its height here.
+        hs = apply_height_statements(rooms, scan.get("heights") or [])
+        meta["plan_height_statement"] = {k: v for k, v in hs.items() if k != "rooms"} | {"rooms": len(hs.get("rooms") or [])}
+        lanes["plan height"] = hs.get("status")
+        plan_pages = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
+        annotations = [a for a in scan["annotations"] if not plan_pages or a["page"] in plan_pages]
+        if int(meta.get("eksplikacija_merged_rooms") or 0) == 0 and rooms:
+            lane = reconcile_rooms_with_annotations(rooms, annotations)
+            meta["plan_area_lane"] = lane
+            if lane.get("status") == "applied":
+                parsed.setdefault("warnings", []).extend(lane_warnings(lane, rooms))
+                if not parsed.get("_ceiling_anchor") and float(lane.get("sum_m2") or 0) > 0:
+                    parsed["_ceiling_anchor"] = {"total_area_m2": float(lane["sum_m2"]),
+                                                 "label": "plano užrašų suma",
+                                                 "page": most_common_page(annotations)}
+            lanes["area labels"] = lane.get("status")
+        else:
+            lanes["area labels"] = "not run (room table merged)"
+        dl = apply_dimension_strings(rooms, list(scan.get("dimensions") or []), annotations)
+        meta["plan_dimension_lane"] = dl
+        lanes["rectangle pairs"] = dl.get("status")
+        wl = apply_wall_outlines(rooms, pdf, list(scan.get("dimensions") or []), annotations)
+        meta["wall_outline_lane"] = wl
+        lanes["raster outlines"] = wl.get("status")
+    except Exception as exc:  # noqa: BLE001 — loud, but the project is still scored
+        lanes["text scan"] = f"FAILED: {exc!r}"
+        print(f"  ⚠ geometry replay: the text-layer lanes failed: {exc!r}")
+    g = apply_geometry(parsed, pdf)                     # never raises; a failure is its status
+    lanes["geometry"] = (f"{g.get('status')} — {len(g.get('konturai') or [])} outlines, "
+                         f"{len(g.get('perimetrai_sudeti') or [])} summed, "
+                         f"{len(g.get('perimetrai_tusti') or [])} estimates, "
+                         f"{len((g.get('grindu_dangos') or {}).get('perskaityta') or {})} floors")
+    parsed = vc._apply_polygon_prepass(parsed)          # returns new room dicts
+    lanes["zoom applied"] = _reapply_stored_zoom(parsed)
+    lanes["inferred LED niches"] = infer_missing_niches(parsed.get("patalpos") or [])
+    for key in ("_duru_ziniarastis", "_vector_symbols"):
+        parsed.pop(key, None)                           # the tail below scans them again
+
+    after = snapshot()
+    for nr, now in after.items():
+        was = before.get(nr) or {}
+        diff = {k: (was.get(k), now.get(k)) for k in _REPLAY_ROOM_FIELDS if was.get(k) != now.get(k)}
+        if diff:
+            report["changed_rooms"][nr] = diff
+    anchors_after = {"walls": (parsed.get("_walls_anchor") or {}).get("total_area_m2"),
+                     "floors": sorted(parsed.get("_floor_anchors") or {}),
+                     "ceiling": (parsed.get("_ceiling_anchor") or {}).get("total_area_m2")}
+    report["anchors"] = {k: (anchors_before[k], anchors_after[k]) for k in anchors_after
+                         if anchors_before[k] != anchors_after[k]}
+    _print_replay_report(slug, report)
+    return parsed
+
+
+def _print_replay_report(slug: str | None, report: dict) -> None:
+    def fmt(v: Any) -> str:
+        return "—" if v in (None, "", []) else (f"{v:g}" if isinstance(v, float) else str(v))
+
+    print(f"  ⟲ geometry replay ({slug}): took back {', '.join(report['undone']) or 'nothing'}; "
+          + "; ".join(f"{k} {v}" for k, v in report["lanes"].items()))
+    for name, (was, now) in (report.get("anchors") or {}).items():
+        print(f"      anchor {name}: {fmt(was)} → {fmt(now)}")
+    for nr, diff in report["changed_rooms"].items():
+        print(f"      {nr}: " + ", ".join(f"{k} {fmt(a)} → {fmt(b)}" for k, (a, b) in diff.items()))
+    if not report["changed_rooms"]:
+        print("      no room's area, perimeter, height, outline or floor changed")
+
+
 def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     """Re-run the deterministic (zero-API) tail of the pipeline on a saved
     extract's primitives:
@@ -1734,6 +2144,8 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     formula code — the honest way to measure formula fixes against
     already-paid-for Vision reads without any API spend."""
     vc = importlib.import_module("extractor.vision_call")
+    if REPLAY_GEOMETRY:      # --replay-geometry: the paid pipeline's €0 drawing lanes first
+        parsed = _replay_geometry_lanes(parsed, slug)
     rooms = parsed.get("patalpos") or []
 
     # Step 1 reads the text layer of the ceiling plan, so unlike the rest of
@@ -1905,14 +2317,23 @@ def _rows_row(slug: str, sc, note: str = "") -> str:
 
 def _print_rows_block(scored: list[tuple[str, Any]],
                       extra: list[tuple[str, Any, str]],
-                      *, recomputed: bool) -> None:
+                      *, recomputed: bool,
+                      formerly_blind: frozenset[str] = frozenset()) -> None:
     """Compact per-project row scorecard + the corpus mean of the ±10 % share.
 
     `scored` — (slug, Scorecard) pairs that COUNT toward the mean.
     `extra`  — (slug, Scorecard|None, note) reported but never averaged.
+    `formerly_blind` — scored slugs the mean left out before 2026-10-05; the
+    mean without them is printed too, so the old figure still compares.
+
+    The holdout (testing-eval-12) is only a holdout when it scored. Its
+    project has no extract today, so the block says loudly that nothing is
+    held out instead of naming a holdout that protects nothing.
     """
     if not scored and not extra:
         return
+    holdout_scored = any(slug == ROW_SCORECARD_HOLDOUT and sc is not None
+                         for slug, sc, _ in extra)
     print(f"\n  Rangovo eilutės — kiek JO eilučių atkartojame "
           f"({'live' if recomputed else 'FROZEN'} engine)")
     print(f"  {'Project':<14} {'rows':>5} {'within10':>9} {'€±10':>8} {'within25':>8} "
@@ -1931,9 +2352,27 @@ def _print_rows_block(scored: list[tuple[str, Any]],
         mean = sum(sc.within_10_share for _, sc in scored) / len(scored)
         eurs = [sc.eur_within_10_share for _, sc in scored if sc.eur_within_10_share is not None]
         eur_mean = f"{sum(eurs) / len(eurs):>7.1f}%" if len(eurs) == len(scored) else f"{'—':>8}"
+        held = (f"{ROW_SCORECARD_HOLDOUT} held out" if holdout_scored
+                else "nothing held out")
         print(f"  {'Corpus mean':<14} {'':>5} {mean:>8.1f}% {eur_mean}   "
-              f"(n={len(scored)} projects; {ROW_SCORECARD_HOLDOUT} held out; "
+              f"(n={len(scored)} projects; {held}; "
               f"€ column needs the priced parse — gitignored, present on {len(eurs)}/{len(scored)})")
+        before = [sc.within_10_share for slug, sc in scored if slug not in formerly_blind]
+        if before and len(before) < len(scored):
+            print(f"  {'':<14} {'':>5} {sum(before) / len(before):>8.1f}%   "
+                  f"(the pre-2026-10-05 mean, without {', '.join(sorted(formerly_blind))}, "
+                  f"which it left out as out-of-sample)")
+    if not holdout_scored:
+        why = next((note for slug, _, note in extra if slug == ROW_SCORECARD_HOLDOUT),
+                   "not in this run")
+        print("\n  " + "!" * 92)
+        print(f"  !! THE ROW-SCORECARD HOLDOUT IS EMPTY: {ROW_SCORECARD_HOLDOUT} scored "
+              f"nothing ({why}).")
+        print("  !! Nothing is held out — every rows number above was measured on "
+              "projects the work was developed")
+        print("  !! against. The blind batch replaces it: "
+              "docs/superpowers/plans/2026-10-05-blind-batch-protocol.md")
+        print("  " + "!" * 92)
     gran = sum(sc.granularity_rows for _, sc in scored)
     if gran:
         print(f"\n  · {gran} row(s) are `missing` only because he bills the "
@@ -1956,8 +2395,17 @@ def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
     scored: list[tuple[str, Any]] = []
     extra: list[tuple[str, Any, str]] = []
     details: list[tuple[str, Any]] = []
+    blind_slugs: list[str] = []
+    formerly_blind: set[str] = set()
     for entry in reg.get("projects") or []:
         slug = entry["slug"]
+        if entry.get("blind"):
+            # Nothing of it is read here; `--blind-once` scores it.
+            blind_slugs.append(slug)
+            extra.append((slug, None, "blind — scored only by --blind-once"))
+            continue
+        if entry.get("out_of_sample"):
+            _warn_retired_out_of_sample(slug)
         if _contractor_samata(slug) is None:
             continue
         if recompute and (GROUND_TRUTH_ROOT / slug / "ai_extract.json").exists():
@@ -1970,16 +2418,18 @@ def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
         note = ""
         if slug == ROW_SCORECARD_HOLDOUT:
             note = "HOLDOUT — never in the mean"
-        elif entry.get("out_of_sample"):
-            note = "OUT-OF-SAMPLE — not in the mean"
         elif entry.get("scope_mismatch"):
             note = "registry: scope mismatch — not in the mean"
         elif entry.get("blocked_for_vision_extraction") or entry.get(
                 "blocked_partial_input") or entry.get("ablation_of"):
             note = "registry-excluded — not in the mean"
+        if not note and entry.get("blind_until"):
+            formerly_blind.add(slug)
         (extra.append((slug, sc, note)) if note else scored.append((slug, sc)))
 
-    _print_rows_block(scored, extra, recomputed=recompute)
+    _print_blindness_banner(blind_slugs)
+    _print_rows_block(scored, extra, recomputed=recompute,
+                      formerly_blind=frozenset(formerly_blind))
 
     # The coverage gap: his families no concept covers. This list — not a
     # better reader — is the input for the family-template work.
@@ -2075,6 +2525,7 @@ def run_rescore(path_arg: str, project_id: str | None, *,
         raise SystemExit(
             f"--rescore: cannot infer project slug from {run_dir.name!r}; "
             f"pass --project explicitly")
+    _refuse_blind(slug)
 
     _print_registry_exclusion_banner(slug)
 
@@ -2140,6 +2591,522 @@ def human_corpus_summary() -> dict:
     }
 
 
+# ── The headline: his billed lines (audit 2026-09-29, testing-eval-2) ─────────
+# Until 2026-10-05 the headline averaged walls / ceilings / LED / floor. Six of
+# its eighteen points read ~0 % by construction — the engine bills the room
+# table's printed total as the ceilings and copies the table's areas into the
+# floor, and the truth of those metrics IS that printed total — and the walls
+# of objektas_g/h scored the designer's legend, not the engine. The contractor
+# reads none of those numbers. He bills paint, corners, reveals, GKP ceilings,
+# levelling and tiles, so the headline is now those six families of HIS rows:
+# Σ of his rows against Σ of ours through the frozen concept table the row
+# scorecard uses (`scripts/reconcile_samata_lines.CONCEPTS`), one observation
+# per family per project however he split the family into rows. Whether we
+# split it as he does (iki/virš 3 m, tile formats) is the rows ±10 % share's
+# question, not this one. Nothing here feeds back into the engine.
+BILLED_FAMILIES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    # (label, column label, concept keys of the frozen table)
+    ("Dažymas (sienos+lubos)", "Dažymas",
+     ("dazymas_sienos_virs", "dazymas_sienos_iki", "dazymas_lubos_virs",
+      "dazymas_lubos_iki", "dazymas_sienos", "dazymas_lubos", "dazymas_virs",
+      "dazymas_iki", "dazymas")),
+    ("Dažymo kampai", "Kampai", ("dazymo_kampai",)),
+    # Not `angokrasciu_sandarinimas`: sealing the window frame is a different
+    # job the table keeps apart, and one we emit no row for — the rows ±10 %
+    # share counts it as missing.
+    ("Angokraščiai", "Angokr.", ("angokrasciai", "angokrasciai_dazymas")),
+    ("GKP lubos", "GKP lubos", ("gkp_lubos",)),
+    ("Rotband", "Rotband", ("rotband",)),
+    # He splits tiles by format, large formats on rows of their own; ours are
+    # split by place and hold every format, so the family is both concepts.
+    ("Plytelės", "Plytelės", ("plyteles", "didziaformates")),
+)
+_PAINT_FAMILY = BILLED_FAMILIES[0][0]
+# Paint concepts whose app side pools our Lubų rows (the table's parents).
+_PAINT_CONCEPTS_WITH_CEILINGS = frozenset({
+    "dazymas_lubos_virs", "dazymas_lubos_iki", "dazymas_lubos",
+    "dazymas_virs", "dazymas_iki", "dazymas"})
+# Our paint rows — the same substrings the walls / ceilings metrics read.
+_WALLS_PAINT_ROW = "sienų glaistymas/dažymas"
+_CEILING_PAINT_ROW = "lubų glaistymas/dažymas"
+# The statuses an average counts: a family he bills that we do not produce
+# is a real −100 %, never a gap to step around.
+BILLED_POOLED_STATUSES = ("measured", "not_produced")
+
+
+def billed_line_families(sc) -> list[dict]:
+    """One observation per BILLED_FAMILIES family he bills with a quantity,
+    from a `row_scorecard.Scorecard`'s Σ-vs-Σ concept verdicts.
+
+    status
+      measured       Σ ours against Σ his over the family's concepts he bills
+      not_produced   he bills it and no row of ours carries a comparable
+                     quantity — −100 %, in every average, never dropped
+      unit_mismatch  his rows in the family share no unit, so they cannot be
+                     summed — printed, in no average
+    (`score_billed_lines` may turn `measured` into `copied`.) A family he does
+    not bill, or bills without a quantity, is not returned."""
+    from extractor.row_scorecard import normalize_unit
+    by_key = {c.key: c for c in sc.concepts}
+    out: list[dict] = []
+    for label, short, keys in BILLED_FAMILIES:
+        his_side = [by_key[k] for k in keys
+                    if k in by_key and by_key[k].contractor_quantity]
+        if not his_side:
+            continue
+        his = round(sum(c.contractor_quantity for c in his_side), 3)
+        ours_parts = [c.app_quantity for c in his_side if c.app_quantity is not None]
+        units = [normalize_unit(r.unit) for r in sc.rows
+                 if r.concept in keys and r.quantity is not None]
+        rec = {"family": label, "short": short, "his": his,
+               "ours": round(sum(ours_parts), 3) if ours_parts else None,
+               "concepts": [c.key for c in his_side], "pct_error": None}
+        if not units or not frozenset.intersection(*units):
+            rec["status"] = "unit_mismatch"
+        elif not ours_parts:
+            rec["status"], rec["pct_error"] = "not_produced", -100.0
+        else:
+            rec["status"] = "measured"
+            rec["pct_error"] = round((rec["ours"] - his) / his * 100, 3)
+        out.append(rec)
+    return out
+
+
+def _num(value) -> float | None:
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
+def copied_sources(parsed: dict) -> list[tuple[str, str, float]]:
+    """(kind, label, value) for every number the engine takes off the drawing
+    exactly as printed: the room table's total (`_ceiling_anchor`, and the
+    read `bendras_plotas_m2`), the designer's painted-wall legend
+    (`_walls_anchor`) and the floor plan's legend totals (`_floor_anchors`)."""
+    out: list[tuple[str, str, float]] = []
+    anchor = parsed.get("_ceiling_anchor") or {}
+    if _num(anchor.get("total_area_m2")):
+        out.append(("table", f"drawing: {anchor.get('label') or 'Iš viso'}",
+                    _num(anchor["total_area_m2"])))
+    if _num(parsed.get("bendras_plotas_m2")):
+        out.append(("table", "drawing: bendras plotas (read)",
+                    _num(parsed["bendras_plotas_m2"])))
+    walls = parsed.get("_walls_anchor") or {}
+    if _num(walls.get("total_area_m2")):
+        out.append(("walls_legend", f"drawing: {walls.get('label') or 'sienų legenda'}",
+                    _num(walls["total_area_m2"])))
+    for kind, fa in sorted((parsed.get("_floor_anchors") or {}).items()):
+        if isinstance(fa, dict) and _num(fa.get("total")):
+            out.append(("floor_legend",
+                        f"drawing: {fa.get('label') or 'grindų legenda'} ({kind})",
+                        _num(fa["total"])))
+    return out
+
+
+def _copied_tolerance(value: float) -> float:
+    # The designer's own rounding: a table's rows and its printed total differ
+    # by a few hundredths (objektas_a: 165,64 against 165,61).
+    return max(0.05, 0.001 * abs(value))
+
+
+def copied_source(truth: float | None, ours: float | None,
+                  sources: list[tuple[str, str, float]]) -> tuple[str, float] | None:
+    """(label, value) of the printed number BOTH sides equal, else None.
+
+    When the truth and our value are one figure printed on the drawing, the
+    metric cannot tell the engine from a copy of that figure — it measures
+    nothing, so it is listed as copied and kept out of every new average
+    (testing-eval-2). Both sides must match: a truth that equals the table
+    while ours does not is a measurement (objektas_a GKP lubos)."""
+    if truth is None or ours is None:
+        return None
+    for _kind, label, value in sources:
+        tol = _copied_tolerance(value)
+        if abs(truth - value) <= tol and abs(ours - value) <= tol:
+            return label, value
+    return None
+
+
+def _is_walls_paint_row(row: dict) -> bool:
+    # The rows `_pozicijos_sum(p, _WALLS_PAINT_ROW)` reads: work rows only.
+    if (row.get("skyrius") or "") == _MEDZIAGOS_SKYRIUS or row.get("_medziaga"):
+        return False
+    return _WALLS_PAINT_ROW in (row.get("aprasymas") or row.get("pavadinimas") or "").lower()
+
+
+def anchored_walls_note(parsed: dict, items: list[dict] | None) -> dict | None:
+    """When our Sienų rows bill the painted-wall area the drawing's own legend
+    states (`_walls_anchor`), the paint family scores the designer's figure,
+    not the engine (testing-eval-2: objektas_g/h). Return the engine's own
+    Σ-room walls beside it, and the paint family re-scored with those walls in
+    place of the legend — same rows and frozen mapping, the Sienų rows scaled
+    to the Σ-room total. Read-only: the rows are copied, never edited."""
+    anchor = parsed.get("_walls_anchor") or {}
+    legend = _num(anchor.get("total_area_m2"))
+    billed = _pozicijos_sum(parsed, _WALLS_PAINT_ROW)
+    if not items or not legend or not billed or abs(billed - legend) > _copied_tolerance(legend):
+        return None
+    engine = round(_sum_room_field(parsed, "walls_paintable_m2"), 2)
+    factor = engine / billed
+    rows = [({**r, "kiekis": round(float(r["kiekis"]) * factor, 4)}
+             if _is_walls_paint_row(r) and isinstance(r.get("kiekis"), (int, float)) else r)
+            for r in (parsed.get("pozicijos") or parsed.get("darbu_sarasas") or [])]
+    from extractor.row_scorecard import score_rows
+    paint = next((f for f in billed_line_families(score_rows(items, rows))
+                  if f["family"] == _PAINT_FAMILY and f["status"] == "measured"), None)
+    return {"legend": legend, "billed": billed, "engine": engine,
+            "paint_pct_with_engine_walls": paint["pct_error"] if paint else None}
+
+
+def score_billed_lines(parsed: dict, sc, items: list[dict] | None) -> dict:
+    """The headline for one project: its families (copied ones marked), the
+    mean |error| over the families an average counts, the walls-legend note,
+    and whether the paint family carries ceilings copied from the table.
+    Read-only over `parsed` and `sc`."""
+    fams = billed_line_families(sc) if sc is not None else []
+    sources = copied_sources(parsed)
+    for f in fams:
+        if f["status"] != "measured":
+            continue
+        src = copied_source(f["his"], f["ours"], sources)
+        if src:
+            f["status"] = "copied"
+            f["copied_from"] = {"source": src[0], "value": src[1]}
+    pooled = [abs(f["pct_error"]) for f in fams if f["status"] in BILLED_POOLED_STATUSES]
+    paint = next((f for f in fams if f["family"] == _PAINT_FAMILY), None)
+    ceilings = _pozicijos_sum(parsed, _CEILING_PAINT_ROW)
+    return {
+        "billed_families": fams,
+        "billed_mae_pct": round(sum(pooled) / len(pooled), 3) if pooled else None,
+        "billed_scored": len(pooled),
+        "walls_anchor_note": anchored_walls_note(parsed, items),
+        "ceilings_copied": bool(
+            paint and paint["status"] in BILLED_POOLED_STATUSES
+            and set(paint["concepts"]) & _PAINT_CONCEPTS_WITH_CEILINGS and ceilings
+            and any(kind == "table" and abs(ceilings - v) <= _copied_tolerance(v)
+                    for kind, _label, v in sources)),
+    }
+
+
+def copied_legacy_metrics(results: list[MetricResult], parsed: dict) -> list[dict]:
+    """Legacy metrics (any tier) whose truth and our value are the same printed
+    figure (`copied_source`). They stay inside the legacy MAE — unchanged so
+    history compares — and are listed so nobody reads them as measured."""
+    sources = copied_sources(parsed)
+    out: list[dict] = []
+    for r in results:
+        if r.status == "no_truth" or r.pct_error is None:
+            continue
+        src = copied_source(r.truth_value, r.actual_value, sources)
+        if src:
+            out.append({"truth_key": r.truth_key, "label": r.label, "tier": r.tier,
+                        "truth": r.truth_value, "actual": r.actual_value,
+                        "pct_error": r.pct_error, "source": src[0], "value": src[1]})
+    return out
+
+
+def _print_blindness_banner(blind_slugs: list[str]) -> None:
+    """Say plainly what kind of number follows (audit testing-eval-1)."""
+    print("\n  " + "═" * 92)
+    if blind_slugs:
+        print(f"  {len(blind_slugs)} BLIND project(s) in the registry are NOT in this "
+              f"run — only --blind-once scores them.")
+        print("  Every number below was measured on drawings the engine was developed against.")
+    else:
+        print("  NO BLIND PROJECT: every number below was measured on drawings the engine "
+              "was developed against.")
+    print("  Each project's Vision read was saved once; its run-to-run variance is not "
+          "in these numbers.")
+    print("  " + "═" * 92)
+
+
+def _print_billed_headline(per_project_summary: list[dict], billed_mae, n_obs: int, *,
+                           recomputed: bool, detailed: bool = False) -> None:
+    ok = [s for s in per_project_summary if s.get("status") == "ok"]
+    engine = "live engine" if recomputed else "FROZEN — the numbers saved in ai_extract.json"
+    print(f"\n  HEADLINE — his billed lines ({engine})")
+    print("  Σ of his rows against Σ of ours per family, through the --rows concept "
+          "table; a copied family is in no average")
+    width = 14 + 11 * len(BILLED_FAMILIES) + 9
+    print(f"  {'Project':<14}" + "".join(f"{short:>11}" for _, short, _ in BILLED_FAMILIES)
+          + f" {'MAE':>8}")
+    print("  " + "─" * width)
+    n_projects = 0
+    for s in ok:
+        by = {f["family"]: f for f in s.get("billed_families") or []}
+        cells = []
+        for label, _short, _keys in BILLED_FAMILIES:
+            f = by.get(label)
+            cell = ("—" if f is None else
+                    "copied" if f["status"] == "copied" else
+                    "units?" if f["status"] == "unit_mismatch" else
+                    f"{f['pct_error']:+.2f}%")
+            cells.append(f"{cell:>11}")
+        mae = s.get("billed_mae_pct")
+        n_projects += mae is not None
+        print(f"  {s['slug']:<14}{''.join(cells)} "
+              f"{('—' if mae is None else f'{mae:.2f}%'):>8}")
+    print("  " + "─" * width)
+    line = "—" if billed_mae is None else f"{billed_mae:.2f}%"
+    print(f"  {'Billed lines':<14}{'':>{11 * len(BILLED_FAMILIES)}} {line:>8}  "
+          f"(n={n_obs} family observations on {n_projects} project(s))")
+    for s in ok:
+        for f in s.get("billed_families") or []:
+            if f["status"] == "not_produced":
+                print(f"  · {s['slug']} {f['family']}: he bills {f['his']:.2f}, no row of "
+                      f"ours is comparable — counted as −100 %")
+            elif f["status"] == "unit_mismatch":
+                print(f"  · {s['slug']} {f['family']}: his rows share no unit — not "
+                      f"summed, in no average")
+        note = s.get("walls_anchor_note")
+        if note:
+            alt = note.get("paint_pct_with_engine_walls")
+            print(f"  · {s['slug']} Dažymas: the walls are the drawing's own legend "
+                  f"({note['legend']:.2f} m²); the engine's Σ-room walls are "
+                  f"{note['engine']:.2f} m²"
+                  + (f" and would read {alt:+.2f}%" if alt is not None else ""))
+    ceilings = [s["slug"] for s in ok if s.get("ceilings_copied")]
+    if ceilings:
+        print(f"  · Dažymas carries ceilings billed at the drawing's room-table total (a "
+              f"copy) on: {', '.join(ceilings)}")
+    if detailed:
+        print("\n  Billed lines — detail (Σ his · Σ ours · his concepts)")
+        for s in ok:
+            for f in s.get("billed_families") or []:
+                ours = "—" if f["ours"] is None else f"{f['ours']:.2f}"
+                pct = "—" if f["pct_error"] is None else f"{f['pct_error']:+.2f}%"
+                print(f"  {s['slug']:<14} {f['family']:<24} {f['his']:>9.2f} {ours:>9} "
+                      f"{pct:>9}  {f['status']:<13} {', '.join(f['concepts'])}")
+
+
+def _print_copied_block(per_project_summary: list[dict]) -> None:
+    rows: list[tuple] = []
+    for s in per_project_summary:
+        if s.get("status") != "ok":
+            continue
+        for c in s.get("copied") or []:
+            rows.append((s["slug"], c["label"], c["truth"], c["actual"], c["pct_error"],
+                         c["source"], c["value"]))
+        for f in s.get("billed_families") or []:
+            if f["status"] == "copied":
+                rows.append((s["slug"], f"billed · {f['family']}", f["his"], f["ours"],
+                             f["pct_error"], f["copied_from"]["source"],
+                             f["copied_from"]["value"]))
+    if not rows:
+        return
+    print("\n  COPIED, NOT MEASURED — the truth and our number are one figure printed on "
+          "the drawing, so these cannot")
+    print("  tell the engine from a copy. In no average but the legacy one (kept unchanged "
+          "for history); still gated —")
+    print("  a copy that stops matching is a regression.")
+    for slug, label, truth, ours, pct, src, value in rows:
+        print(f"      {slug:<14} {label[:36]:<36} truth {truth:>8.2f}  ours {ours:>8.2f} "
+              f"{pct:+7.2f}%  = {src} {value:.2f}")
+
+
+def _warn_retired_out_of_sample(slug: str) -> None:
+    print(f"  ⚠ registry: `out_of_sample` is retired (2026-10-05, audit testing-eval-1) — "
+          f"{slug} is scored in-sample. A project nobody has looked at is `blind: true`; "
+          f"one that was blind once is `blind_until: <date>`.")
+
+
+def _refuse_blind(slug: str | None) -> None:
+    """Every single-project mode prints per-metric detail — exactly what a blind
+    project may not show before its one scoring."""
+    if slug and slug in BLIND_SLUGS:
+        raise SystemExit(f"{slug} is a BLIND project: only --blind-once scores it "
+                         f"(docs/superpowers/plans/2026-10-05-blind-batch-protocol.md)")
+
+
+# ── The blind batch, scored once per release candidate (testing-eval-1/-12) ────
+# No project in the eval has been unseen since 2026-09-05. A blind project's
+# files live OUTSIDE the repository — every agent working on the engine reads
+# the working tree — in $SAMATU_BLIND_DIR/<slug>/ (default ~/pathon-blind). Its
+# registry entry holds a codename and `blind: true`; nothing but `--blind-once`
+# reads it, and that prints two numbers and logs one line.
+BLIND_DIR_ENV = "SAMATU_BLIND_DIR"
+BLIND_LOG_PATH = GROUND_TRUTH_ROOT / "blind_log.jsonl"
+# The sealed Vision read and his parsed sąmata. `project.pdf` is optional: the
+# tail's text-layer lanes run when it is there, and the log says whether.
+_BLIND_REQUIRED = ("ai_extract.json", "contractor_samata_parsed.json")
+_BLIND_PROTOCOL = "docs/superpowers/plans/2026-10-05-blind-batch-protocol.md"
+
+
+def _blind_dir() -> Path:
+    return Path(os.environ.get(BLIND_DIR_ENV) or (Path.home() / "pathon-blind"))
+
+
+def _git_state() -> tuple[str | None, bool, str | None]:
+    """(HEAD commit, are tracked files modified?, code fingerprint) —
+    (None, True, None) without git.
+
+    The fingerprint hashes HEAD's tree listing minus the blind log itself.
+    Committing a score's log line makes a new commit with the same code, and
+    "once per release candidate" means once per CODE, so it is the
+    fingerprint, not the commit, that may be scored only once."""
+    import hashlib
+    import subprocess
+
+    def _git(*cmd: str) -> str:
+        return subprocess.check_output(["git", *cmd], cwd=REPO_ROOT, text=True,
+                                       stderr=subprocess.DEVNULL)
+    try:
+        sha = _git("rev-parse", "HEAD").strip()
+        dirty = _git("status", "--porcelain", "--untracked-files=no").strip()
+        log_rel = BLIND_LOG_PATH.relative_to(REPO_ROOT).as_posix()
+        listing = [line for line in _git("ls-tree", "-r", "HEAD").splitlines()
+                   if not line.endswith("\t" + log_rel)]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None, True, None
+    code = hashlib.sha256("\n".join(listing).encode("utf-8")).hexdigest()[:16]
+    return (sha or None), bool(dirty), code
+
+
+def _blind_log_entries(path: Path) -> list[dict]:
+    """Every logged run. An unreadable line raises: the log is what proves a
+    commit was already scored, so it is never skipped over."""
+    if not path.exists():
+        return []
+    out: list[dict] = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            raise ValueError(f"{path.name} line {n} is not JSON — fix it by hand first")
+    return out
+
+
+def _score_blind_project(folder: Path, slug: str) -> dict:
+    """The live engine on one sealed read, scored on the headline and the rows
+    share. Prints nothing: the tail narrates what it reads off the drawing."""
+    import contextlib
+    import hashlib
+    import io
+    raw = (folder / "ai_extract.json").read_bytes()
+    parsed = json.loads(raw.decode("utf-8"))
+    items = (json.loads((folder / "contractor_samata_parsed.json").read_text(encoding="utf-8"))
+             .get("line_items") or [])
+    pdf = folder / "project.pdf"
+    added = slug not in REGISTRY
+    if added:  # the tail finds the drawing through REGISTRY; an absolute path wins the join
+        REGISTRY[slug] = {"name": slug, "truth_path": "",
+                          **({"pdf_path": str(pdf)} if pdf.is_file() else {})}
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            parsed = _rerun_deterministic_tail(parsed, slug)
+    finally:
+        if added:
+            REGISTRY.pop(slug, None)
+    from extractor.row_scorecard import score_rows
+    app_rows = parsed.get("pozicijos") or parsed.get("darbu_sarasas") or []
+    sc = score_rows(items, app_rows) if items and app_rows else None
+    billed = score_billed_lines(parsed, sc, items)
+    errors = [abs(f["pct_error"]) for f in billed["billed_families"]
+              if f["status"] in BILLED_POOLED_STATUSES]
+    share = sc.within_10_share if sc is not None else None
+    return {
+        "_family_abs_errors": errors,
+        "billed_mae_pct": billed["billed_mae_pct"],
+        "n_billed_observations": len(errors),
+        "rows_within_10_share": round(share, 3) if share is not None else None,
+        "rows_scored": sc.n_scored if sc is not None else 0,
+        "pdf_lanes": pdf.is_file(),
+        # Which sealed read was scored: a re-sealed (re-extracted) project
+        # shows up as a new hash, so a move in the number can be traced to it.
+        "read_sha256": hashlib.sha256(raw).hexdigest()[:12],
+    }
+
+
+def run_blind_once(registry_path: Path, *, blind_dir: Path | None = None,
+                   log_path: Path = BLIND_LOG_PATH,
+                   git_state: tuple[str | None, bool, str | None] | None = None) -> int:
+    """`--blind-once`: score the blind batch ONCE for this release candidate.
+
+    Refuses, scoring and logging nothing, when the registry has no blind
+    project, when a blind slug is not a codename (the log is tracked), when
+    tracked files are modified (a score belongs to one commit), when this code
+    is already in the log (`_git_state`'s fingerprint: a commit that only adds
+    the log line is the same code), or when any project's files are missing
+    (the batch is scored whole or not at all). Otherwise it runs the live engine on
+    each sealed read, prints ONE line — the batch's billed-lines MAE and the
+    share of his rows within ±10 % — and appends ONE line to `log_path`. No
+    per-project, per-family or per-row figure is printed; the per-project
+    aggregates go to the log only. Protocol: `_BLIND_PROTOCOL`."""
+    import yaml
+    reg = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
+    blind = [e for e in (reg.get("projects") or []) if e.get("blind")]
+    if not blind:
+        print(f"  No blind project in {registry_path.name} — nothing scored, nothing "
+              f"logged. How to add one: {_BLIND_PROTOCOL}")
+        return 2
+    if any(not str(e.get("slug") or "").startswith(_CODENAME_PREFIX) for e in blind):
+        print(f"  REFUSED: every blind slug must be a codename ({_CODENAME_PREFIX}…) — "
+              f"the log is tracked. Nothing scored.")
+        return 2
+    sha, dirty, code = git_state if git_state is not None else _git_state()
+    if not sha or not code or dirty:
+        print("  REFUSED: a blind score belongs to one release candidate — commit first "
+              "(tracked files are modified, or git is unavailable). Nothing scored.")
+        return 2
+    try:
+        prior = _blind_log_entries(log_path)
+    except ValueError as exc:
+        print(f"  REFUSED: {exc}. Nothing scored.")
+        return 2
+    done = next((e for e in prior if e.get("code") == code or e.get("commit") == sha), None)
+    if done:
+        print(f"  REFUSED: this code was already scored blind at "
+              f"{str(done.get('commit'))[:12]} ({done.get('ts')}) — once per release "
+              f"candidate. Nothing scored.")
+        return 2
+    root = blind_dir or _blind_dir()
+    missing = [f"{e['slug']}/{name}" for e in blind for name in _BLIND_REQUIRED
+               if not (root / e["slug"] / name).is_file()]
+    if missing:
+        print(f"  REFUSED: missing under {root}: {', '.join(missing)} — the batch is "
+              f"scored whole or not at all. Nothing logged.")
+        return 2
+
+    projects: dict[str, dict] = {}
+    family_errors: list[float] = []
+    for e in blind:
+        try:
+            res = _score_blind_project(root / e["slug"], e["slug"])
+        except Exception as exc:  # its message could quote the drawing: the type only
+            print(f"  REFUSED: scoring {e['slug']} failed ({type(exc).__name__}) — "
+                  f"nothing logged.")
+            return 1
+        family_errors.extend(res.pop("_family_abs_errors"))
+        projects[e["slug"]] = res
+    shares = [p["rows_within_10_share"] for p in projects.values()
+              if p["rows_within_10_share"] is not None]
+    billed = round(sum(family_errors) / len(family_errors), 3) if family_errors else None
+    rows = round(sum(shares) / len(shares), 2) if shares else None
+    line = {
+        "ts": _dt.datetime.now().isoformat(timespec="seconds"),
+        "commit": sha,
+        "code": code,
+        "harness": "eval_harness.py --blind-once",
+        "n_projects": len(projects),
+        "billed_lines_mae_pct": billed,
+        "n_billed_observations": len(family_errors),
+        "rows_within_10_share_mean": rows,
+        "projects": projects,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line, ensure_ascii=False, sort_keys=True) + "\n")
+    print(f"  BLIND batch @ {sha[:12]}: billed lines "
+          f"{'—' if billed is None else f'{billed:.2f} %'} (n={len(family_errors)}), his "
+          f"rows within ±10 % {'—' if rows is None else f'{rows:.1f} %'} — "
+          f"{len(projects)} project(s), scored once. Logged → {log_path}")
+    return 0
+
+
 # ── Regression gate (audit 2026-09-29, testing-eval-4) ─────────────────────────
 # The plain exit code above (1 when any project's worst metric is over 2 %) is
 # 1 on every run, so it gates nothing. `--gate` compares against the accepted
@@ -2153,13 +3120,26 @@ _CODENAME_PREFIX = "objektas_"
 
 
 def gate_numbers_totals(per_project_summary: list[dict]) -> dict:
-    """{slug: {"MAE": %, <metric label>: |% error|}} for every scored project.
-    Lower is better."""
+    """{slug: {"billed MAE": %, "billed · <family>": |% error|,
+    "legacy MAE": %, <legacy metric label>: |% error|}} for every scored
+    project. Lower is better.
+
+    2026-10-05: the headline is his billed lines, so they are gated first. A
+    copied family or metric is still gated — it is in no average, but a copy
+    that stops matching is a regression. The legacy keys are the pre-2026-10-05
+    ones unchanged, except that its per-project "MAE" is now "legacy MAE"."""
     out: dict[str, dict[str, float]] = {}
     for s in per_project_summary:
         if s.get("status") != "ok" or not s["slug"].startswith(_CODENAME_PREFIX):
             continue
-        nums = {"MAE": s["mae_pct"]} if s.get("mae_pct") is not None else {}
+        nums: dict[str, float] = {}
+        if s.get("billed_mae_pct") is not None:
+            nums["billed MAE"] = s["billed_mae_pct"]
+        for f in s.get("billed_families") or []:
+            if f.get("pct_error") is not None:
+                nums[f"billed · {f['family']}"] = round(abs(f["pct_error"]), 3)
+        if s.get("mae_pct") is not None:
+            nums["legacy MAE"] = s["mae_pct"]
         for m in s.get("metrics") or []:
             if m.get("pct_error") is not None:
                 nums[m["label"]] = round(abs(m["pct_error"]), 3)
@@ -2292,6 +3272,14 @@ def main() -> int:
                           "results_rescored.json alongside (never overwrites "
                           "results.json). Project slug is inferred from the "
                           "run-dir name or taken from --project.")
+    grp.add_argument("--blind-once", action="store_true",
+                     help="score every `blind: true` registry project ONCE for "
+                          "this commit (a release candidate): live engine, zero "
+                          "API, only the batch's two headline numbers printed, "
+                          "one line appended to ground_truth/blind_log.jsonl. "
+                          "Refuses on modified tracked files or a commit already "
+                          "scored. Protocol: docs/superpowers/plans/"
+                          "2026-10-05-blind-batch-protocol.md")
     ap.add_argument("--all", action="store_true",
                     help="alias for --totals-only (spec compatibility)")
     ap.add_argument("--recompute", action="store_true",
@@ -2308,6 +3296,17 @@ def main() -> int:
                          "from the vector walls, perimeters added from the plan's "
                          "dimension strings) on the fixture PDF before the "
                          "recompute — zero API. Compare a run with and without it.")
+    ap.add_argument("--replay-geometry", action="store_true",
+                    help="with --recompute: run the paid pipeline's zero-cost drawing "
+                         "lanes again on each frozen extract before the recompute, in "
+                         "production's order — the plan text scan (designer's figures, "
+                         "walls/floors anchors, stated height, area labels when no table "
+                         "merged), rectangle pairs, raster outlines, the geometry lane, "
+                         "then the polygon prepass, niche inference, door schedule and "
+                         "vector symbols — after taking back what older lane versions "
+                         "froze into the extract. Prints per project what changed. A "
+                         "project without its PDF is scored without it. Not the default; "
+                         "never accepted as the baseline.")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -2366,6 +3365,16 @@ def main() -> int:
     gate_mode = _gate_mode(args)
     global GEOMETRY_LANE
     GEOMETRY_LANE = bool(args.geometry)
+    global REPLAY_GEOMETRY
+    REPLAY_GEOMETRY = bool(args.replay_geometry)
+    if REPLAY_GEOMETRY:
+        if not args.recompute:
+            raise SystemExit("--replay-geometry needs --recompute (it runs before the live tail)")
+        if args.geometry:
+            raise SystemExit("--replay-geometry already runs the geometry lane — drop --geometry")
+        if args.accept_baseline:
+            raise SystemExit("--replay-geometry is not the default eval: its numbers are never "
+                             "accepted as the baseline (compare them with --gate instead)")
 
     if args.model:
         # FAIL LOUDLY on any cache-reading mode: --replay reuses a saved
@@ -2409,6 +3418,18 @@ def main() -> int:
         import json as _json
         print(_json.dumps(human_corpus_summary(), ensure_ascii=False, indent=2))
         return 0
+
+    if args.blind_once:
+        # Its one scoring per release candidate is of the default pipeline.
+        if args.geometry or getattr(args, "replay_geometry", False):
+            raise SystemExit("--blind-once scores the default pipeline only — "
+                             "drop --geometry / --replay-geometry")
+        return run_blind_once(GROUND_TRUTH_ROOT / "registry.yaml")
+
+    # Every single-project mode prints per-metric detail — exactly what a
+    # blind project may not show before its one scoring.
+    for _slug in (args.project, args.debug_project):
+        _refuse_blind(_slug)
 
     if args.debug_project:
         return run_debug_project(args.debug_project)
