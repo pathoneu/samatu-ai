@@ -63,7 +63,11 @@ export const DEFAULT_PREFS = {
   // computed every new project the way the UI did NOT show („Ką skaičiuoti"
   // pre-selects „Su patalpų vidiniais kampais"). The choice stays per project.
   count_inner_corners: true,
-  count_outer_corners: true,
+  // `count_outer_corners` was here with a „Skaičiuoti išorės kampus" checkbox
+  // the backend never read (2026-10-03 review): the openings' edges and the
+  // partition junctions are always counted; the one real choice is the rooms'
+  // own corners — this flag, and per project Patikra → „Bendri dalykai" →
+  // „Ką skaičiuoti" → „Dažymo kampai (kampuotės)" (GeneralFactsPanel).
 
   // Glaistas
   glaistas_q_lygis: 'Q2',              // Q1/Q2/Q3/Q4
@@ -311,23 +315,6 @@ export default function SetupWizard({ onComplete, onClose }) {
               <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
                 <input
                   type="checkbox"
-                  checked={prefs.count_outer_corners}
-                  onChange={e => update({ count_outer_corners: e.target.checked })}
-                  className="mt-1 w-4 h-4 accent-foreground"
-                />
-                <div>
-                  <div className="text-sm font-medium text-foreground">
-                    Skaičiuoti išorės kampus
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Standartas: TAIP — kampų profiliai (corner bead)
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 p-3 border-2 border-border rounded-lg cursor-pointer hover:border-primary/40 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/15">
-                <input
-                  type="checkbox"
                   checked={prefs.count_inner_corners}
                   onChange={e => update({ count_inner_corners: e.target.checked })}
                   className="mt-1 w-4 h-4 accent-foreground"
@@ -337,7 +324,7 @@ export default function SetupWizard({ onComplete, onClose }) {
                     Skaičiuoti vidaus kampus
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Standartas: NE (paprastai kampuotis nereikalingas)
+                    Kampuotė dedama ir ant patalpų vidinių kampų. Kiekvienam projektui galima pakeisti: Patikra → „Bendri dalykai“ → „Ką skaičiuoti“ → „Dažymo kampai (kampuotės)“.
                   </div>
                 </div>
               </label>

@@ -11,7 +11,9 @@ run, and nothing here can bring the project back.
 
 Purged: the stored PDF, the in-memory PDF byte caches (CV tools and evidence
 crops), the CV page renders of that PDF, annotations, calibrations, the symbol
-legend, the evidence crops on disk and the F2/F3 line override. Not purged (see the audit report): symbol-training
+legend, the evidence crops on disk, the F2/F3 line override and any re-read
+the server holds for the project on its extraction job row (2026-10-03: it
+otherwise stayed for the 3-day hold). Not purged (see the audit report): symbol-training
 crops (append-only corpus keyed by class, the id is only in its log) and the
 per-architect legend aggregate (keyed by architect, not by project).
 """
@@ -60,7 +62,8 @@ def _purge_cv_renders(project_id: str, pdf_bytes: bytes | None, backend) -> None
 
 
 def purge_project_files(project_id: str) -> list[str]:
-    """Delete everything stored under `project_id` outside the database.
+    """Delete everything stored under `project_id` besides its projects row
+    (which the caller already deleted).
 
     Returns the names of the steps that failed (empty list = all clean).
     """
@@ -83,6 +86,9 @@ def purge_project_files(project_id: str) -> list[str]:
     step("pdf", lambda: backend.delete(pdf_key(project_id)))
     from api import evidence
     step("evidence_memory", lambda: evidence.forget_project(project_id))
+    # A parameterised UPDATE, so any id is safe here (no path is built).
+    import db
+    step("held_rereads", lambda: db.drop_held_extraction_results(project_id))
 
     if not _plain_id(project_id):
         return failed

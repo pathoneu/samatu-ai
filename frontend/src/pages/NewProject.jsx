@@ -122,7 +122,6 @@ function appendRulesOverride(fd, scope) {
         default_door_area_m2: prefs.default_door_area_m2,
         default_window_area_m2: prefs.default_window_area_m2,
         count_inner_corners: prefs.count_inner_corners,
-        count_outer_corners: prefs.count_outer_corners,
         glaistas_q_lygis: prefs.glaistas_q_lygis,
         glaistas_storis_mm: prefs.glaistas_storis_mm,
         tile_method: prefs.tile_method,
@@ -294,6 +293,11 @@ export default function NewProject() {
   // ceiling) or 'user' (the cancel button). The interior stream keeps its own
   // reasons — stall, ceiling, edge hand-off — in lib/extractionRun.js.
   const abortReasonRef = useRef(null);
+  // The interior run's id once the server announced it — i.e. the reading has
+  // STARTED there. A cancel after that does not stop it: the server finishes
+  // the reading and saves the project, which then appears in „Projektai"
+  // (backend _drain_gen). The cancel's text has to say so.
+  const runIdRef = useRef(null);
 
   /**
    * Look at the PDF the moment it is chosen. Free (no Vision), ~1-3 s, and it
@@ -365,6 +369,7 @@ export default function NewProject() {
     const controller = new AbortController();
     setAbortController(controller);
     abortReasonRef.current = null; // 'timeout' | 'user' | null
+    runIdRef.current = null;
 
     // Generic per-second elapsed counter (also used by streaming UI).
     const elapsedStart = Date.now();
@@ -458,7 +463,10 @@ export default function NewProject() {
             interiorStreamForm(file, { interiorSubtype, scope: scopeChoice() }),
             {
               controller,
-              onEvent: onStreamEvent,
+              onEvent: (ev) => {
+                if (ev?.event === 'recovery_id' && ev.project_id) runIdRef.current = ev.project_id;
+                onStreamEvent(ev);
+              },
               // The socket is gone — or we let go before the proxy's 900 s
               // cut — and the server keeps reading. The extraction is HEALTHY,
               // so the screen stays alive: the step animation, the room list
@@ -708,8 +716,9 @@ export default function NewProject() {
         // started again, instead of „nekartokite įkėlimo" about a project that
         // will never appear. A drop before the run's id arrived means nothing
         // started on the server: that is a connection problem, said as one.
-        const { key, defaultValue } = runEndText('new', ended);
-        userMessage = defaultValue ? t(key, { defaultValue }) : t(key);
+        // His cancel after the start: the server still finishes and saves
+        // the project, so the text says it will appear — not „try again".
+        userMessage = t(runEndText('new', ended, { started: !!e?.recoveryId }));
       } else if (e.name === 'AbortError') {
         // The non-streaming paths: their ceiling, or the cancel button.
         userMessage = abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
@@ -753,11 +762,15 @@ export default function NewProject() {
             <Button
               variant="outline"
               size="sm"
-              title={t('newProject.cancelTitle')}
+              // The interior stream: a started reading is finished and saved by
+              // the server anyway. The other paths: nothing is saved anywhere.
+              title={t(isStreaming ? 'newProject.cancelTitle' : 'newProject.cancelTitleNoStream')}
               onClick={() => {
                 abortReasonRef.current = 'user';
                 abortController.abort();
-                setError(t('newProject.abortedByUser'));
+                setError(t(isStreaming
+                  ? runEndText('new', 'user', { started: !!runIdRef.current })
+                  : 'newProject.abortedByUser'));
                 setIsProcessing(false);
                 setAbortController(null);
               }}

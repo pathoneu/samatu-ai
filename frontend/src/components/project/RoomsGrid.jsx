@@ -16,6 +16,9 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import RoomCard from './RoomCard';
+import {
+  backendKampaiM, kampaiInputsChanged, withoutBackendKampai, kampaiTotalM,
+} from '@/lib/roomKampai';
 
 // Universal industries skaičiavimas frontend'e (tas pats, kas backend V8)
 const ROOM_RULES = {
@@ -59,7 +62,11 @@ function calcRoomQuantities(room) {
   const ceilingPaintable = rules.ceiling === 'gkp' ? plotas : 0;
   const isHigh = H > 3.0;
   const dazymo = wallsPaintable + ceilingPaintable;
-  const kampai = rules.walls_paint > 0 ? perim + 4 * H : 0;
+  // Corners (kampai) are NOT computed here (2026-10-03 review): this used to
+  // be „perimetras + 4 × aukštis", a second formula beside the backend's
+  // calc_room_quantities (openings' edges, partition junctions, his „Dažymo
+  // kampai" choice), so one room showed two corner figures. Only the
+  // backend's own value is shown; without one, nothing (lib/roomKampai.js).
   const plytSienos = tileWallsArea;
   const plytGrindys = rules.tile_floor ? plotas : 0;
   // NRM2 §27: baseboard = (perimetras − Σ door widths) × 1.10 (10% waste)
@@ -75,7 +82,7 @@ function calcRoomQuantities(room) {
     dazymo_plotas_m2: dazymo,
     gkp_lubu_standart_m2: !isHigh ? ceilingPaintable : 0,
     gkp_lubu_virs_3m_m2: isHigh ? ceilingPaintable : 0,
-    kampai_m: kampai,
+    kampai_m: backendKampaiM(room),
     plyteles_sienos_m2: plytSienos,
     plyteles_grindys_m2: plytGrindys,
     grindjuostes_m: grindjuostes,
@@ -91,7 +98,8 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
     const t = {
       bendras_plotas_m2: 0, dazymo_plotas_m2: 0,
       gkp_lubu_standart_m2: 0, gkp_lubu_virs_3m_m2: 0,
-      kampai_m: 0, plyteles_sienos_m2: 0,
+      // null unless every room carries the backend's corner length
+      kampai_m: kampaiTotalM(rooms), plyteles_sienos_m2: 0,
       plyteles_grindys_m2: 0, grindjuostes_m: 0,
       hidroizoliacijos_vnt: 0,
     };
@@ -100,7 +108,6 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
       t.dazymo_plotas_m2 += r.dazymo_plotas_m2 || 0;
       t.gkp_lubu_standart_m2 += r.gkp_lubu_standart_m2 || 0;
       t.gkp_lubu_virs_3m_m2 += r.gkp_lubu_virs_3m_m2 || 0;
-      t.kampai_m += r.kampai_m || 0;
       t.plyteles_sienos_m2 += r.plyteles_sienos_m2 || 0;
       t.plyteles_grindys_m2 += r.plyteles_grindys_m2 || 0;
       t.grindjuostes_m += r.grindjuostes_m || 0;
@@ -113,7 +120,11 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
 
   const handleRoomChange = (idx, newRoom) => {
     const updated = [...rooms];
-    updated[idx] = calcRoomQuantities(newRoom);
+    // An edit to what the corners were computed from makes the backend's
+    // value stale: show nothing for that room. (The grid keeps its own copy
+    // of the rooms, so the recomputed value shows when it is opened again.)
+    updated[idx] = calcRoomQuantities(kampaiInputsChanged(rooms[idx], newRoom)
+      ? withoutBackendKampai(newRoom) : newRoom);
     setRooms(updated);
     onChange?.(updated, totals);
   };
@@ -161,7 +172,7 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
           <div>
             <div className="text-muted-foreground text-xs">Dažymo kampai</div>
             <div className="font-bold text-lg text-orange-400">
-              {totals.kampai_m.toFixed(2)} m
+              {totals.kampai_m != null ? `${totals.kampai_m.toFixed(2)} m` : '—'}
             </div>
           </div>
         </div>

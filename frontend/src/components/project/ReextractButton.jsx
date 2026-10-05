@@ -23,65 +23,46 @@
  * a second project); the wait takes it from there and merges it here exactly
  * as a read that arrived over the stream. A read the server reports stopped
  * (restart, failure) leaves the project untouched and says so.
+ *
+ * A RELOAD DURING THE WAIT (2026-10-03 review). The run id is remembered per
+ * project the moment the server announces it (lib/heldReread.js); the project
+ * page (hooks/useHeldReread.js) merges a read the server held for a page that
+ * is gone, through the same lib/rereadApply.js path this card uses. The card
+ * forgets the run once it handled the ending itself — except when the server
+ * still reported it running as the wait gave up: the next open takes it.
+ *
+ * The confirm card states the free preflight's time estimate for THIS PDF
+ * (fetched when the card opens), never a price: nothing in the code charges a
+ * fixed amount per re-read.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';
-import { getProject, updateProject } from '@/lib/projectStore';
-import { mergeReextract } from '@/lib/mergeReextract';
-import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
-import { saveRoomEdit } from '@/lib/roomSheetApi';
-import { recordPilot } from '@/lib/telemetry';
+import { getProject } from '@/lib/projectStore';
 import { fetchPreflight, pollLimitMs } from '@/lib/preflight';
 import {
   runExtraction, runEndText, ExtractionStopped, reduceStreamProgress, progressLine,
 } from '@/lib/extractionRun';
+import {
+  rememberRereadRun, forgetRereadRun, keepRunAfterCardEnding, rereadInFlight, trackReread,
+} from '@/lib/heldReread';
+import { applyRereadResult } from '@/lib/rereadApply';
 
 // The preflight is a convenience (an estimate on screen, a wait sized to the
 // file): it never holds the paid read back for more than this.
 const PREFLIGHT_WAIT_MS = 20_000;
 
-// Re-reads in flight on this page load, per project id → Promise<{error}>.
-// The button lives inside the Prielaidos panel; closing and reopening the
-// panel mid-read mounts a fresh button, which must show the read that is
-// running instead of offering a second paid one.
-const inflight = new Map();
-
-/**
- * The stored project after a fresh read: merged, then its rows rebuilt on the
- * merged rooms (the fresh read built them on its own rooms — without the facts
- * he set, without the project's scope). If the rebuild fails, the merged
- * project is still a complete, honest state: fresh rows with his prices.
- */
-export async function projectAfterReread(base, result) {
-  const { project: merged } = mergeReextract(base, result);
-  try {
-    const re = await saveRoomEdit(merged, merged.patalpos);
-    const notes = [];
-    return {
-      ...merged,
-      ...re,
-      name: base.name,
-      company_name: base.company_name,
-      vat_rate: base.vat_rate,
-      _overrides: merged._overrides,
-      _apimtis: merged._apimtis,
-      _per_room_overrides: merged._per_room_overrides,
-      _reextracted_at: merged._reextracted_at,
-      _reread_diff: merged._reread_diff,
-      darbu_sarasas: mergeDarbuSarasasEdits(re.darbu_sarasas, base.darbu_sarasas, notes),
-    };
-  } catch (e) {
-    console.warn('[reextract] rebuilding rows on the merged rooms failed — keeping the merged read:', e);
-    return merged;
-  }
-}
+// Re-reads in flight on this page load live in lib/heldReread.js (one per
+// project): the button lives inside the Prielaidos panel, and closing and
+// reopening the panel mid-read — or the project page resuming a held read —
+// must show the read that is running instead of offering a second paid one.
 
 /** The preflight of the stored PDF, or null after PREFLIGHT_WAIT_MS. */
 async function quickPreflight(blob, name) {
+  if (!blob) return null;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), PREFLIGHT_WAIT_MS);
   try {
@@ -104,14 +85,35 @@ export default function ReextractButton({ project, onComplete }) {
   const [elapsed, setElapsed] = useState(null);
   const [estimate, setEstimate] = useState('');
   const [error, setError] = useState(null);
+  // The free preflight of the stored PDF, fetched once when the confirm card
+  // opens: its estimate replaces the old fixed „15–35 min, ~1–2 $" line, and
+  // the read reuses it instead of asking again. undefined = not asked yet,
+  // null = no estimate (no PDF, probe failed or timed out).
+  const preflightRef = useRef(null);      // { id, promise } — per project
+  const [pre, setPre] = useState(undefined);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => {
+    if (!confirming || preflightRef.current?.id === project.id) return;
+    const id = project.id;
+    setPre(undefined);
+    const promise = getPdfBlob(id)
+      .then((blob) => quickPreflight(blob, project.name))
+      .catch(() => null);
+    preflightRef.current = { id, promise };
+    promise.then((res) => {
+      if (mountedRef.current && preflightRef.current?.id === id) setPre(res || null);
+    });
+  }, [confirming, project.id, project.name]);
 
   // A read already running for this project (started before this button was
   // mounted): show it, and its ending, instead of the start button.
   useEffect(() => {
-    const running = inflight.get(project.id);
+    const running = rereadInFlight(project.id);
     if (!running) return undefined;
     let live = true;
     setExtracting(true);
+    setProgress(t(...progressLine({ step: 'finishing' })));
     running.then(({ error: err }) => {
       if (!live) return;
       setExtracting(false);
@@ -120,14 +122,15 @@ export default function ReextractButton({ project, onComplete }) {
     return () => { live = false; };
   }, [project.id]);
 
-  const endMessage = (why) => {
-    const { key, defaultValue } = runEndText('reread', why);
-    return defaultValue ? t(key, { defaultValue }) : t(key);
-  };
+  const endMessage = (why) => t(runEndText('reread', why));
 
   const readAgain = async () => {
     const t0 = Date.now();
     const clock = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    // The run's id, remembered for this project as soon as the server announces
+    // it, so a reload mid-read can still merge the read the server holds.
+    let runId = null;
+    let keepRun = false;
     try {
       setProgress(t('project.reextract.loadingPdf'));
       const blob = await getPdfBlob(project.id);
@@ -135,11 +138,14 @@ export default function ReextractButton({ project, onComplete }) {
         throw new Error(t('project.reextract.pdfNotFound'));
       }
 
-      // The free five-second look at the same PDF: its estimate replaces a
-      // hard-coded range, and its page tier sizes the wait after a hand-off.
+      // The free five-second look at the same PDF (asked when the confirm
+      // card opened): its estimate replaces a hard-coded range, and its page
+      // tier sizes the wait after a hand-off.
       setProgress(t('newProject.preflight.checking'));
-      const pre = await quickPreflight(blob, project.name);
-      if (pre?.est_minutes) setEstimate(pre.est_minutes);
+      const probe = await (preflightRef.current?.id === project.id
+        ? preflightRef.current.promise
+        : quickPreflight(blob, project.name));
+      if (probe?.est_minutes) setEstimate(probe.est_minutes);
 
       const fd = new FormData();
       fd.append('files', blob, project.name + '.pdf');
@@ -160,17 +166,26 @@ export default function ReextractButton({ project, onComplete }) {
       const run = await runExtraction(fd, {
         kind: 'reread',
         onEvent: (ev) => {
+          if (ev?.event === 'recovery_id' && ev.project_id) {
+            runId = ev.project_id;
+            rememberRereadRun(project.id, runId);
+          }
           step = reduceStreamProgress(step, ev);
           setProgress(t(...progressLine(step)));
         },
         onHandoff: () => setProgress(t(...progressLine({ step: 'finishing' }))),
-        waitLimitMs: pollLimitMs(pre),
+        waitLimitMs: pollLimitMs(probe),
       });
 
       // The stream's own result, or the read the server held after the
       // connection went — merged the same way either way.
       const result = (run.status === 'done' || run.status === 'recovered') ? run.result : null;
-      if (!result) return { error: endMessage(run.status) };
+      if (!result) {
+        // Still running on the server when the wait gave up: keep the run —
+        // the project page merges it when it is next opened.
+        keepRun = keepRunAfterCardEnding(run.status);
+        return { error: endMessage(run.status) };
+      }
       if (result.status === 'error') {
         throw new Error(result._error || t('project.reextract.pipelineErr'));
       }
@@ -185,12 +200,11 @@ export default function ReextractButton({ project, onComplete }) {
       // silently rolled back to that snapshot. Re-read the CURRENT stored
       // project first; same idiom as InteriorWorkspace.jsx.
       //
-      // 2026-09-13: no longer a wholesale replace — see projectAfterReread.
+      // 2026-09-13: no longer a wholesale replace — see lib/rereadApply.js.
       setProgress(t('project.reextract.rebuilding'));
-      const base = getProject(project.id) || project;
-      const merged = await projectAfterReread(base, result);
-      recordPilot(project.id, 'reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
-      updateProject(project.id, merged);
+      const merged = await applyRereadResult(project.id, result,
+        { runId: run.recoveryId || runId, fallback: project })
+        || getProject(project.id) || project;
       setProgress(t('project.reextract.updated'));
       setTimeout(() => {
         onComplete?.(merged);
@@ -200,31 +214,37 @@ export default function ReextractButton({ project, onComplete }) {
       return { error: null };
     } catch (e) {
       console.error('Re-extract failed:', e);
+      // A cancel included: his cancel promises the reading will not be
+      // written into the project, so the run is forgotten below and nothing
+      // merges what the server may still finish.
       if (e instanceof ExtractionStopped) return { error: endMessage(e.reason) };
       return { error: e.message || t('project.reextract.error') };
     } finally {
       clearInterval(clock);
+      if (runId && !keepRun) forgetRereadRun(project.id, runId);
     }
   };
 
   const handleReextract = async () => {
-    if (inflight.has(project.id)) return;
+    if (rereadInFlight(project.id)) return;
     setError(null);
     setEstimate('');
     setElapsed(null);
     setExtracting(true);
-    const running = readAgain();
-    inflight.set(project.id, running);
-    try {
-      const { error: err } = await running;
-      if (err) {
-        setError(err);
-        setExtracting(false);
-      }
-    } finally {
-      inflight.delete(project.id);
+    const { error: err } = await trackReread(project.id, readAgain());
+    if (err) {
+      setError(err);
+      setExtracting(false);
     }
   };
+
+  // The duration line of the confirm card: the preflight's estimate for this
+  // PDF, a plain sentence without one, „Tikriname failą…" while it is asked.
+  const durationLine = pre === undefined
+    ? t('newProject.preflight.checking')
+    : pre?.est_minutes
+      ? t('project.reextract.durationEstimate', { value: pre.est_minutes })
+      : t('project.reextract.durationPlain');
 
   if (extracting) {
     return (
@@ -269,7 +289,7 @@ export default function ReextractButton({ project, onComplete }) {
             {t('project.reextract.confirmTitle')}
           </p>
           <ul className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 mb-3 space-y-0.5 list-disc pl-4">
-            <li>{t('project.reextract.bullet1')}</li>
+            <li>{durationLine}</li>
             <li>{t('project.reextract.bullet2')}</li>
             <li>{t('project.reextract.bullet3')}</li>
             <li>{t('project.reextract.bullet5')}</li>

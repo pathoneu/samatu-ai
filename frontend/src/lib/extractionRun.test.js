@@ -10,10 +10,20 @@
 
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
-  runExtraction, waitForExtraction, fetchExtractionJob, runEndText,
+  runExtraction, waitForExtraction, fetchExtractionJob, runEndText, RUN_END_KEYS,
   ExtractionStopped, isUsableProject, reduceStreamProgress, progressLine,
 } from './extractionRun.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const LT = JSON.parse(readFileSync(join(HERE, '../i18n/lt.json'), 'utf8'));
+const EN = JSON.parse(readFileSync(join(HERE, '../i18n/en.json'), 'utf8'));
+/** The value at a dotted key, or undefined. */
+const at = (dict, key) => key.split('.').reduce((n, k) => (n == null ? n : n[k]), dict);
+const lt = (key) => at(LT, key);
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -267,7 +277,17 @@ test('the cancel button aborts the caller\'s controller → "user"', async () =>
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 20);
   await assert.rejects(runExtraction(new FormData(), { controller }),
-    (e) => e instanceof ExtractionStopped && e.reason === 'user');
+    (e) => e instanceof ExtractionStopped && e.reason === 'user'
+      // The server had announced the run: it keeps reading after this cancel.
+      && e.recoveryId === RID);
+});
+
+test('a cancel before the id arrived carries no run id: nothing started', async () => {
+  serve({ stream: [{ hang: true }] });
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 20);
+  await assert.rejects(runExtraction(new FormData(), { controller }),
+    (e) => e instanceof ExtractionStopped && e.reason === 'user' && e.recoveryId === null);
 });
 
 test('an HTTP refusal is rethrown with its status and body (paywall detection)', async () => {
@@ -284,30 +304,103 @@ test('an HTTP refusal is rethrown with its status and body (paywall detection)',
 
 const BANNED = /(?<![A-Za-zĄČĘĖĮŠŲŪŽąčęėįšųūž])AI(?![A-Za-zĄČĘĖĮŠŲŪŽąčęėįšųūž])|analiz|ekstrakc|vision|\bmodel/i;
 
+test('every ending\'s key exists in lt.json and en.json (lt.json is the one source)', () => {
+  assert.ok(RUN_END_KEYS.length >= 13);
+  for (const key of RUN_END_KEYS) {
+    assert.equal(typeof lt(key), 'string', `lt.json lacks ${key}`);
+    assert.ok(lt(key).trim(), `lt.json ${key} is empty`);
+    assert.equal(typeof at(EN, key), 'string', `en.json lacks ${key}`);
+    // Inside the namespaces the vocabulary guard (ltVocabulary.test.js) walks.
+    assert.ok(['newProject', 'project'].includes(key.split('.')[0]), key);
+  }
+  // The keys the components used to reach only through a defaultValue.
+  for (const key of ['newProject.errRunInterrupted', 'newProject.errRunFailed',
+    'newProject.errRunLost', 'project.reextract.errInterrupted', 'project.reextract.errFailed',
+    'project.reextract.errLost', 'project.reextract.errStillRunning']) {
+    assert.ok(RUN_END_KEYS.includes(key), key);
+  }
+});
+
 test('an ending the server reported never says the work continues, nor promises money', () => {
   for (const kind of ['new', 'reread']) {
     for (const why of ['interrupted', 'failed', 'lost']) {
-      const { key, defaultValue } = runEndText(kind, why);
-      assert.ok(key && defaultValue, `${kind}/${why} needs text`);
-      assert.doesNotMatch(defaultValue, /tęsiasi|tęsis|nekartokite|atsiras/i, `${kind}/${why}`);
-      assert.match(defaultValue, /dar kartą/i, `${kind}/${why} must say it can be started again`);
-      assert.doesNotMatch(defaultValue, /€|\$|kain|mokė|mokės|nuskait|sąskait/i, `${kind}/${why}`);
-      assert.doesNotMatch(defaultValue, BANNED, `${kind}/${why}`);
+      const key = runEndText(kind, why);
+      const text = lt(key);
+      assert.ok(text, `${kind}/${why} needs text`);
+      assert.doesNotMatch(text, /tęsiasi|tęsis|nekartokite|atsiras|vyksta/i, `${kind}/${why}`);
+      assert.match(text, /dar kartą/i, `${kind}/${why} must say it can be started again`);
+      assert.doesNotMatch(text, /€|\$|kain|mokė|mokės|nuskait|sąskait/i, `${kind}/${why}`);
+      assert.doesNotMatch(text, BANNED, `${kind}/${why}`);
     }
   }
   // A re-read that stopped leaves his project as it was — and says so.
-  for (const why of ['interrupted', 'failed', 'lost', 'waiting']) {
-    assert.match(runEndText('reread', why).defaultValue, /Projektas nepakeistas/);
+  for (const why of ['interrupted', 'failed', 'lost', 'waiting', 'user', 'cancelled']) {
+    assert.match(lt(runEndText('reread', why)), /Projektas (kol kas )?nepakeistas/, why);
+  }
+});
+
+test('a re-read still running when the wait gave up does not send him to start another', () => {
+  const text = lt(runEndText('reread', 'waiting'));
+  assert.match(text, /vyksta/);
+  assert.match(text, /Naujo skaitymo pradėti nereikia/);
+  assert.doesNotMatch(text, /pabandykite dar kartą/i);
+});
+
+test('a cancel is not a stop on the server — the texts say what really happens', () => {
+  // A re-read: its own text, not „Skaitymas nepavyko", and no claim that the
+  // server stopped — only that the result will not be written into the project.
+  assert.equal(runEndText('reread', 'user'), 'project.reextract.cancelled');
+  assert.equal(runEndText('reread', 'cancelled'), 'project.reextract.cancelled');
+  const reread = lt('project.reextract.cancelled');
+  assert.doesNotMatch(reread, /nepavyko/i);
+  assert.match(reread, /atšaukėte/i);
+  assert.match(reread, /nebus įrašytas/);
+  assert.doesNotMatch(reread, /sustabdytas|sustojo|nutrauktas serveryje/i);
+
+  // A new project cancelled AFTER the server started: it will still appear.
+  assert.equal(runEndText('new', 'user', { started: true }), 'newProject.cancelledRunContinues');
+  assert.equal(runEndText('new', 'cancelled'), 'newProject.cancelledRunContinues');
+  const continues = lt('newProject.cancelledRunContinues');
+  assert.match(continues, /atsiras sąraše „Projektai“/);
+  assert.match(continues, /įkelti iš naujo nereikia/);
+  // …and BEFORE: nothing was created, he may upload again.
+  assert.equal(runEndText('new', 'user'), 'newProject.abortedByUser');
+  assert.match(lt('newProject.abortedByUser'), /Projektas nesukurtas/);
+  assert.doesNotMatch(lt('newProject.abortedByUser'), /vartotojo/);
+
+  // The button's tooltip no longer promises he has to upload again.
+  assert.doesNotMatch(lt('newProject.cancelTitle'), /teks įkelti iš naujo/);
+  assert.match(lt('newProject.cancelTitle'), /atsiras sąraše „Projektai“/);
+  for (const key of ['project.reextract.cancelled', 'newProject.cancelledRunContinues',
+    'newProject.abortedByUser', 'newProject.cancelTitle', 'newProject.cancelTitleNoStream']) {
+    assert.doesNotMatch(lt(key), /€|\$|kainuos|mokės/i, key);
+    assert.equal(typeof at(EN, key), 'string', `en.json lacks ${key}`);
   }
 });
 
 test('the new-project endings reuse the existing keys where lt.json has them', () => {
-  assert.equal(runEndText('new', 'waiting').key, 'newProject.errStreamLostButRunning');
-  assert.equal(runEndText('new', 'waiting').defaultValue, null);
-  assert.equal(runEndText('new', 'stalled').key, 'newProject.errStalled');
-  assert.equal(runEndText('new', 'network').key, 'newProject.errNetwork');
-  assert.equal(runEndText('new', 'user').key, 'newProject.abortedByUser');
-  assert.equal(runEndText('new', 'something-new').key, 'newProject.errRunFailed');
+  assert.equal(runEndText('new', 'waiting'), 'newProject.errStreamLostButRunning');
+  assert.equal(runEndText('new', 'stalled'), 'newProject.errStalled');
+  assert.equal(runEndText('new', 'network'), 'newProject.errNetwork');
+  assert.equal(runEndText('new', 'something-new'), 'newProject.errRunFailed');
+  assert.equal(runEndText('reread', 'something-new'), 'project.reextract.errFailed');
+});
+
+test('the re-read card states no price and the fixed-range line is gone', () => {
+  const r = LT.project.reextract;
+  assert.equal(r.bullet1, undefined, 'the „~1–2 $" line is gone');
+  for (const gone of ['analyzing', 'pass1', 'pass2', 'complex']) {
+    assert.equal(r[gone], undefined, `unused key ${gone} is gone from lt.json`);
+    assert.equal(EN.project.reextract[gone], undefined, `unused key ${gone} is gone from en.json`);
+  }
+  for (const [key, text] of Object.entries(r)) {
+    assert.doesNotMatch(text, /\$|€|kainuos|kainuoja/i, `project.reextract.${key}`);
+  }
+  assert.match(r.durationEstimate, /\{\{value\}\}/);
+  // Without an estimate: no upper bound the preflight itself would break
+  // (backend/extractor/preflight.estimate_minutes has a „virš valandos" tier).
+  assert.match(r.durationPlain, /iki valandos ar ilgiau/);
+  assert.match(EN.project.reextract.durationPlain, /an hour or more/);
 });
 
 test('isUsableProject accepts rooms, rows or a saved empty read', () => {

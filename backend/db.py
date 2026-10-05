@@ -1513,6 +1513,19 @@ def prune_held_extraction_results(days: int = HELD_RESULT_DAYS) -> int:
         return cur.rowcount
 
 
+def drop_held_extraction_results(project_id: str) -> int:
+    """Drop every read held for `project_id` — the project was deleted, so
+    there is nothing left to merge it into, and the drawing's measurements
+    must not outlive the project for the 3-day hold (2026-10-03). The job rows
+    themselves stay, like after a prune. Returns how many were dropped."""
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE extraction_jobs SET result = NULL "
+            "WHERE project_id = ? AND result IS NOT NULL",
+            (project_id,))
+        return cur.rowcount
+
+
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────
 
 def seen_webhook(event_id: str) -> bool:

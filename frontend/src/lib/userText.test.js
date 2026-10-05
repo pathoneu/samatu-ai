@@ -5,7 +5,12 @@ import { cleanUserText, isBannedText, _resetConfidentialCache, FALLBACK_TEXT } f
 const OLD = 'Formulė kalibruota pagal 1 rangovo samatą (Kliento) — apima ginčytiną pusinių kampų dedamąją; tikslumas nepatvirtintas (reikia daugiau etalonų); Gretimybės analizė nerado pertvarų (žinomai per maža)';
 
 test('current guidance passes through untouched', () => {
-  const ok = 'Kampų ilgis apskaičiuotas iš patalpų geometrijos (išoriniai kampai × aukštis) — suskaičiuokite dažomus kampus plane ir palyginkite.';
+  // The engine's own corner reason (backend/extractor/confidence.py KAMPAI_REASON,
+  // 2026-10-03) — the old „išoriniai kampai × aukštis" sentence was not the math.
+  const ok = 'Kampų ilgis sudėtas iš patalpos perimetro (sienų ir lubų sandūra), vidinių '
+    + 'kampų (kampų skaičius × aukštis), angų kraštų (standartinio dydžio durys ir '
+    + 'langai, ne brėžinio matmenys) ir pertvarų sandūrų (× aukštis). Suskaičiuokite '
+    + 'dažomus kampus plane ir palyginkite.';
   assert.equal(cleanUserText(ok), ok);
   assert.equal(isBannedText(ok), false);
 });

@@ -30,8 +30,8 @@
  *   • 840 s edge deadline → hand off to the wait (armed only once the id is
  *     known; without an id there is nothing to wait for).
  *
- * No i18n here: `runEndText` maps an ending to an i18n key plus the Lithuanian
- * fallback for keys not yet in lt.json, and the components call `t()`.
+ * No i18n here: `runEndText` maps an ending to an i18n key (lt.json is the one
+ * source of the text) and the components call `t()`.
  * Relative imports with .js: this module runs under `node --test`, which
  * resolves no Vite aliases.
  */
@@ -63,15 +63,20 @@ const realSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /**
  * The run stopped on THIS side before the server could finish it — or before
  * it ever started. `reason`: 'stalled' | 'timeout' | 'user' | 'network'.
+ * `recoveryId` is the run's id when the server had announced it, i.e. when the
+ * reading had STARTED there: the server then keeps reading after this side
+ * lets go (a new project is saved, a re-read is held on its job row), which is
+ * what a cancel message has to say. null = the server never started.
  * (An HTTP refusal is rethrown as postSse built it, status + body intact, so
  * the paywall detection keeps working.)
  */
 export class ExtractionStopped extends Error {
-  constructor(reason, cause) {
+  constructor(reason, cause, recoveryId = null) {
     super(cause?.message || reason);
     this.name = 'ExtractionStopped';
     this.reason = reason;
     this.cause = cause;
+    this.recoveryId = recoveryId || null;
   }
 }
 
@@ -235,7 +240,7 @@ export async function runExtraction(body, {
       // the user to start over here used to buy a second paid run of work
       // the server then finished anyway.
       if ((reason === 'edge_deadline' || reason === 'stalled') && recoveryId) handoff = reason;
-      else throw new ExtractionStopped(reason || 'user', e);
+      else throw new ExtractionStopped(reason || 'user', e, recoveryId);
     } else if (e?.status) {
       throw e;                       // HTTP refusal: nothing started
     } else if (isConnectionLoss(e)) {
@@ -264,8 +269,9 @@ export async function runExtraction(body, {
  * What to tell the user when a run ends WITHOUT a result to show.
  * `why` is an outcome status ('interrupted' | 'failed' | 'lost' | 'waiting' |
  * 'cancelled') or an ExtractionStopped reason ('stalled' | 'timeout' | 'user' |
- * 'network'). Returns `{ key, defaultValue }` for `t(key, { defaultValue })`;
- * `defaultValue` is null for keys lt.json already has.
+ * 'network'). `started` — the server had announced the run (the
+ * ExtractionStopped's `recoveryId`), so it keeps reading after a cancel.
+ * Returns the i18n key; the text lives in lt.json only.
  *
  * The honest split this module exists for: only 'waiting' — the server still
  * reports the run as running — may say the work continues. Every ending the
@@ -273,62 +279,50 @@ export async function runExtraction(body, {
  * of them promises anything about money: a run cut off by a restart is not
  * metered at all, and a failed one is metered as failed, so there is nothing
  * true and simple to promise.
+ *
+ * A CANCEL IS NOT A STOP ON THE SERVER (2026-10-03 review). Closing the stream
+ * does not end a reading that has started — the server finishes it in the
+ * background: a new project is saved and appears in „Projektai", a re-read is
+ * held on its job row. So a new project's cancel after the start says the
+ * project will still appear (and not to upload again), and a re-read's cancel
+ * says the project is unchanged and the reading will not be written into it
+ * (the caller forgets the run, so nothing later merges it).
  */
-export function runEndText(kind, why) {
-  const table = kind === 'reread' ? REREAD_TEXT : NEW_TEXT;
-  return table[why] || table.failed;
+export function runEndText(kind, why, { started = false } = {}) {
+  if (kind === 'reread') return REREAD_TEXT[why] || REREAD_TEXT.failed;
+  if (why === 'user') return started ? NEW_TEXT.cancelled : NEW_TEXT.user;
+  return NEW_TEXT[why] || NEW_TEXT.failed;
 }
 
 const NEW_TEXT = {
-  interrupted: {
-    key: 'newProject.errRunInterrupted',
-    defaultValue: 'Skaitymas nutrūko mūsų serveryje ir nebuvo baigtas, todėl projektas nesukurtas. Pradėkite skaitymą dar kartą.',
-  },
-  failed: {
-    key: 'newProject.errRunFailed',
-    defaultValue: 'Skaitymas nepavyko, todėl projektas nesukurtas. Pradėkite skaitymą dar kartą — jei kartojasi, parašykite mums.',
-  },
-  lost: {
-    key: 'newProject.errRunLost',
-    defaultValue: 'Skaitymas baigėsi, bet rezultatas į šį langą neatėjo, todėl projektas nesukurtas. Pradėkite skaitymą dar kartą.',
-  },
-  waiting: { key: 'newProject.errStreamLostButRunning', defaultValue: null },
-  cancelled: { key: 'newProject.abortedByUser', defaultValue: null },
-  user: { key: 'newProject.abortedByUser', defaultValue: null },
-  stalled: { key: 'newProject.errStalled', defaultValue: null },
-  timeout: { key: 'newProject.errTimeout', defaultValue: null },
-  network: { key: 'newProject.errNetwork', defaultValue: null },
+  interrupted: 'newProject.errRunInterrupted',
+  failed: 'newProject.errRunFailed',
+  lost: 'newProject.errRunLost',
+  waiting: 'newProject.errStreamLostButRunning',
+  // 'cancelled' only happens once the run was handed off — i.e. it had started.
+  cancelled: 'newProject.cancelledRunContinues',
+  user: 'newProject.abortedByUser',
+  stalled: 'newProject.errStalled',
+  timeout: 'newProject.errTimeout',
+  network: 'newProject.errNetwork',
 };
 
 const REREAD_TEXT = {
-  interrupted: {
-    key: 'project.reextract.errInterrupted',
-    defaultValue: 'Skaitymas nutrūko mūsų serveryje ir nebuvo baigtas. Projektas nepakeistas — galite skaityti brėžinį iš naujo dar kartą.',
-  },
-  failed: {
-    key: 'project.reextract.errFailed',
-    defaultValue: 'Skaitymas nepavyko. Projektas nepakeistas — pabandykite dar kartą.',
-  },
-  lost: {
-    key: 'project.reextract.errLost',
-    defaultValue: 'Skaitymas baigėsi, bet rezultatas į šį langą neatėjo. Projektas nepakeistas — pabandykite dar kartą.',
-  },
-  waiting: {
-    key: 'project.reextract.errStillRunning',
-    defaultValue: 'Skaitymas užtruko per ilgai ir šiame lange nebuvo baigtas. Projektas nepakeistas — pabandykite dar kartą vėliau.',
-  },
-  cancelled: {
-    key: 'project.reextract.errFailed',
-    defaultValue: 'Skaitymas nepavyko. Projektas nepakeistas — pabandykite dar kartą.',
-  },
-  user: {
-    key: 'project.reextract.errFailed',
-    defaultValue: 'Skaitymas nepavyko. Projektas nepakeistas — pabandykite dar kartą.',
-  },
-  stalled: { key: 'newProject.errStalled', defaultValue: null },
-  timeout: { key: 'newProject.errTimeout', defaultValue: null },
-  network: { key: 'newProject.errNetwork', defaultValue: null },
+  interrupted: 'project.reextract.errInterrupted',
+  failed: 'project.reextract.errFailed',
+  lost: 'project.reextract.errLost',
+  // The server still reads; the run id stays remembered and the project page
+  // merges the held read when it is next opened (hooks/useHeldReread.js).
+  waiting: 'project.reextract.errStillRunning',
+  cancelled: 'project.reextract.cancelled',
+  user: 'project.reextract.cancelled',
+  stalled: 'newProject.errStalled',
+  timeout: 'newProject.errTimeout',
+  network: 'newProject.errNetwork',
 };
+
+/** Every key `runEndText` can return — for the lt.json/en.json presence test. */
+export const RUN_END_KEYS = [...new Set([...Object.values(NEW_TEXT), ...Object.values(REREAD_TEXT)])];
 
 /**
  * The one-line progress of a stream, for the compact re-read card. A reducer

@@ -21,6 +21,7 @@ import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ReextractButton from '@/components/project/ReextractButton';
+import useHeldReread from '@/hooks/useHeldReread';
 import { pilotSession, releasePilotSession } from '@/lib/telemetry';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
 // Sprint §17 (2026-04-29): ProjectCanvas removed — experimental ?canvas=1
@@ -739,8 +740,8 @@ function DarbuSarasas({ items }) {
 
 export default function InteriorProject({ project: projectProp, onDelete }) {
   const { t } = useTranslation();
-  // Local mirror of project prop — needed because RulesOverridePanel rewrites
-  // big swaths of state via /recompute-interior. Keep prop sync via useEffect
+  // Local mirror of project prop — needed because the recomputes (Prielaidos,
+  // room edits) and a merged re-read rewrite big swaths of state. Keep prop sync via useEffect
   // so navigation between projects still works.
   const [projectState, setProjectState] = useState(projectProp);
   useEffect(() => { setProjectState(projectProp); }, [projectProp]);
@@ -776,6 +777,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  // A paid re-read whose page was reloaded or closed mid-wait: the server held
+  // the read on its job row — merge it now, through the re-read card's own
+  // path (hooks/useHeldReread.js, 2026-10-03).
+  useHeldReread(project?.id, setProject);
   // Pilot telemetry: the clock starts when the project opens, not on step 3.
   useEffect(() => {
     if (!project?.id) return undefined;
@@ -1540,6 +1545,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                       plotas_m2: p.plotas_m2 || 0,
                       perimetras_m: p.perimetras_m || 0,
                       lubu_aukstis_m: p.lubu_aukstis_m || 2.82,
+                      // The backend's corner length, when the room carries one
+                      // — RoomsGrid shows only that, never a figure of its own.
+                      ...(p.kampai_m != null ? { kampai_m: p.kampai_m } : {}),
+                      ...(p.kampu_metrai != null ? { kampu_metrai: p.kampu_metrai } : {}),
                     }))
               }
               onShowOnPdf={(pageNr) => {
