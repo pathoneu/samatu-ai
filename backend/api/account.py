@@ -5,12 +5,13 @@ settings; nothing in the app could do it. This router does it, for the
 signed-in account only — no user id is ever read from the request.
 
 What goes, in this order:
-  1. every project the user owns, one by one, exactly as his own
-     DELETE /api/projects/{id} removes it (main.api_delete_project): the
-     owner-scoped row delete — which takes the project's extraction archive and
-     correction log with it (ON DELETE CASCADE) — then the best-effort purge of
-     its drawing and every id-keyed store, held re-reads included
-     (project_purge). There is deliberately no second deletion policy here;
+  1. every project the user owns, one by one, through the same function his
+     own DELETE /api/projects/{id} calls
+     (project_purge.delete_project_and_files): the owner-scoped row delete —
+     which takes the project's extraction archive and correction log with it
+     (ON DELETE CASCADE) — then the best-effort purge of its drawing and every
+     id-keyed store, held re-reads included. There is deliberately no second
+     deletion policy here;
   2. the account itself, in one transaction (db.delete_account): the users row
      becomes a tombstone, and his company details, extraction-job records,
      price lists and sąmata templates are deleted. Every session is void;
@@ -98,26 +99,12 @@ def _billing_blocker(user: dict) -> str | None:
     return None
 
 
-def _delete_project_as_owner(project_id: str, user_id: str) -> bool:
-    """One project, removed exactly as DELETE /api/projects/{id} removes it for
-    its owner (main.api_delete_project): the owner-scoped row delete, then —
-    only when that removed a row — the best-effort purge of the drawing and
-    every id-keyed store. A purge failure is logged and never brings the project
-    back. Keep this in step with that handler; it is not a second policy."""
-    if not db.delete_project(project_id, user_id=user_id):
-        return False
-    try:
-        project_purge.purge_project_files(project_id)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("project purge failed for %s: %r", project_id, exc)
-    return True
-
-
 def _delete_projects_of(user_id: str) -> int:
     """Every project the user owns (in the bin too — that is a flag on the
-    project, not a separate place). Returns how many were deleted."""
+    project, not a separate place), each through the one project delete —
+    always scoped to him. Returns how many were deleted."""
     return sum(1 for p in db.list_projects(user_id=user_id)
-               if _delete_project_as_owner(p["id"], user_id))
+               if project_purge.delete_project_and_files(p["id"], user_id=user_id))
 
 
 @router.post("/delete")

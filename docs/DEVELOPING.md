@@ -44,12 +44,70 @@ real R2 path deliberately: `STORAGE_BACKEND=r2 ../venv/bin/uvicorn main:app`
 > Related, **not** fixed: `backup_scheduler.is_enabled()` still defaults on
 > whenever `R2_BUCKET` is set, so a dev box runs the nightly DB backup. It is now
 > harmless — `backup.py` goes through `get_storage()`, so the snapshot lands on
-> local disk — just pointless. Set `SAMATU_NIGHTLY_BACKUP=0` to silence it.
+> local disk — just pointless. Set `SAMATU_NIGHTLY_BACKUP=0` to silence it. (It
+> also records its outcome in the dev DB's `app_state`; pruning stays off unless
+> `SAMATU_BACKUP_KEEP_DAYS` is set — RUNBOOK §2a.)
 
 ### ⚠️ The gotcha that WILL waste an hour: the dev backend has no `--reload`.
 After you edit backend code, the running uvicorn keeps serving the **old** code.
 Symptom: the frontend gets `400 Unknown field '…'`, or "my change didn't take."
 Fix: `pkill -f "uvicorn main:app"` and relaunch — or run with `--reload` while developing.
+
+## Python dependencies — the lock is what runs (2026-10-05)
+
+Two files you edit, two you generate, all in `backend/`:
+
+| File | Holds | Installed by |
+|---|---|---|
+| `requirements.txt` | production dependencies (human-edited, some loose bounds) | nothing directly |
+| `requirements-dev.txt` | `-r requirements.txt` + test-only packages (pytest, pytest-asyncio, pikepdf) | nothing directly |
+| `requirements.lock` | exact pins of the full production closure (58 packages) | `backend/Dockerfile`, `nixpacks.toml` |
+| `requirements-dev.lock` | `-r requirements.lock` + the test-only closure (8 packages) | CI, your venv |
+
+Every install is `pip install --no-deps -r <lock>` followed by `pip check`: a
+dependency missing from a lock fails the build instead of being resolved to
+whatever is newest on deploy day. Production runs CPython **3.12** (nixpacks),
+the Dockerfile and the dev venv **3.14**; both locks resolve to wheels on both
+(Linux x86_64). `backend/tests/test_dependency_locks.py` holds the contract:
+exact pins, no package in both locks, the production closure complete and free
+of test packages, the builds installing the lock, installed = locked, and no
+production module importing a test-only package.
+
+- **Your venv:** `venv/bin/python -m pip install --no-deps -r backend/requirements-dev.lock && venv/bin/python -m pip check`.
+  The current venv also carries ~34 packages that are in neither lock (pip-audit, scipy,
+  scikit-*, pymupdf, defusedxml…). The code imports none of them, but **defusedxml
+  switches openpyxl's XML parsing locally** — for an exact production twin, build a fresh
+  venv from the dev lock.
+- **lxml is a production dependency on purpose.** openpyxl picks its XML engine by whether
+  lxml imports; production always had it (pulled in by pikepdf, now test-only).
+
+**To change a version or add a package:**
+
+1. Edit `requirements.txt` (production) or `requirements-dev.txt` (tests only).
+2. Resolve it in a throwaway venv on the dev Python:
+   ```bash
+   python3.14 -m venv /tmp/lockvenv
+   /tmp/lockvenv/bin/pip install -r backend/requirements.txt
+   /tmp/lockvenv/bin/pip freeze --exclude pip | sort > /tmp/runtime.txt   # body of requirements.lock
+   /tmp/lockvenv/bin/pip install -r backend/requirements-dev.txt
+   /tmp/lockvenv/bin/pip freeze --exclude pip | sort > /tmp/all.txt
+   comm -13 /tmp/runtime.txt /tmp/all.txt     # body of requirements-dev.lock, after its `-r requirements.lock` line
+   ```
+   Keep both file headers. If the second install moved a version the first one chose, that
+   package lands in both locks and the test fails — pin it in `requirements.txt` and redo.
+3. Prove both locks install on production's interpreter and the Dockerfile's, wheels only,
+   as Linux sees them — for each lock file and for `3.12`/`cp312` and `3.14`/`cp314`:
+   ```bash
+   venv/bin/python -m pip install --dry-run --ignore-installed --only-binary=:all: \
+     --python-version 3.12 --implementation cp --abi cp312 \
+     --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 \
+     --target /tmp/lockcheck -r backend/requirements.lock --report /tmp/lock-312.json
+   ```
+   Exit 0, and the report's `install` list holds exactly the locked packages (58 / 66) — an
+   extra one is a missing pin. A pin with no wheel for 3.12 must not ship: production would
+   try to compile it.
+4. Reinstall your venv from the dev lock, run the full backend suite, and commit the four
+   files together. Never hand-edit a single pin in a lock.
 
 ## Auth config
 
@@ -108,6 +166,7 @@ Then: Sąmata → switch → type into a blank cell (becomes an `rnk-` row in `d
 
 - `BILLING_ENABLED` defaults `'0'` (dormant). Don't flip without the pre-flight: Stripe secret + webhook secret + price IDs present, webhook signature verified live, and `usage_events` logging confirmed (a silent-fail there could let a user drain the API budget uncharged).
 - Prod needs `R2_*` env vars (PDF + DB-backup storage); `.env` is gitignored → set on the host.
+- Nightly DB backups are checked (`PRAGMA integrity_check`) before upload, their outcome shows in the admin cockpit's health panel, and old ones are **never deleted** until `SAMATU_BACKUP_KEEP_DAYS` is set — a founder decision; `scripts/report_backup_retention.py --days N` shows what a value would delete. Details: `RUNBOOK.md` §2a.
 - All work is on `viewer-rebuild`; nothing auto-deploys.
 
 ## Housekeeping gotchas

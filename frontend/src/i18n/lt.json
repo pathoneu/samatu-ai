@@ -1942,7 +1942,8 @@
     },
     "status": {
       "active": "Aktyvus",
-      "disabled": "Išjungtas"
+      "disabled": "Išjungtas",
+      "deleted": "Ištrinta"
     },
     "cost": {
       "eyebrow": "Sąnaudų monitorius",
@@ -2017,7 +2018,32 @@
       "noEvents": "Įvykių nėra.",
       "recentActivity": "Paskutinis aktyvumas",
       "errorLog": "Klaidų žurnalas",
-      "noErrorLog": "Nėra išsaugoto klaidų žurnalo."
+      "noErrorLog": "Nėra išsaugoto klaidų žurnalo.",
+      "backup": {
+        "title": "Atsarginė DB kopija",
+        "statusOk": "Tvarkoje",
+        "statusBad": "Reikia dėmesio",
+        "reason": {
+          "ok": "Kopija daroma kas naktį ir paskutinė pavyko.",
+          "off": "Naktinė kopija išjungta — kopijos nedaromos.",
+          "missing": "Sėkmingos kopijos dar nėra.",
+          "stale": "Paskutinė sėkminga kopija senesnė nei {{hours}} val.",
+          "failed": "Paskutinis bandymas nepavyko."
+        },
+        "lastGood": "Paskutinė sėkminga",
+        "none": "nėra",
+        "size": "Dydis",
+        "file": "Failas",
+        "error": "Klaida",
+        "storage": "Failų saugykla",
+        "storageR2": "R2 (debesis)",
+        "storageLocal": "šio serverio diskas",
+        "retention": "Senų kopijų trynimas",
+        "retentionOff": "išjungtas — kopijos neištrinamos",
+        "retentionOn": "laikoma {{days}} d., bent {{newest}} naujausios",
+        "lastPrune": "paskutinį kartą ištrinta: {{n}}",
+        "pruneFailed": "Trynimas nepavyko: {{error}}"
+      }
     },
     "users": {
       "eyebrow": "Vartotojų valdymas",
@@ -2042,7 +2068,10 @@
       "confirmTitle": "Išjungti vartotoją?",
       "confirmDescA": "Vartotojas ",
       "confirmDescB": " nebegalės prisijungti, kol vėl jį aktyvuosite. Jo projektai ir duomenys išliks.",
-      "cancel": "Atšaukti"
+      "cancel": "Atšaukti",
+      "deletedAccount": "Ištrinta paskyra",
+      "deletedOn": "ištrinta {{date}}",
+      "deletedHint": "Paskyrą ištrynė jos savininkas. Eilutė liko tik dėl išrašytų sąskaitų, jos įjungti negalima."
     }
   },
   "newProject": {

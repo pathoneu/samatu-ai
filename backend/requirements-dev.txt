@@ -1,0 +1,8 @@
+# Test-only dependencies, human-edited: the backend suite needs them, production
+# never imports them, so the production builds (backend/Dockerfile, nixpacks.toml)
+# do not install them. CI and the dev venv install the pinned closure in
+# requirements-dev.lock — see docs/DEVELOPING.md › Dependencies.
+-r requirements.txt
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pikepdf==10.5.1       # tests/test_pdf_vectors.py rotates synthetic pages with it (4 tests skip without it)

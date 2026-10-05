@@ -1,3 +1,7 @@
+# Production (runtime) dependencies, human-edited. Test-only packages live in
+# requirements-dev.txt. Builds never install this file: they install the pinned
+# closure in requirements.lock — see docs/DEVELOPING.md › Dependencies.
+#
 # fastapi 0.115.6 capped starlette<0.42, pinning it to 0.41.3 (8+ CVEs) and
 # python-multipart<0.0.31 (6 CVEs). Bumped 2026-07-04 (F8) to open the cap.
 # Explicit starlette/python-multipart pins guarantee the CVE-clean transitive
@@ -22,9 +26,11 @@ pydantic>=2.10.0
 python-dotenv==1.2.2
 openpyxl==3.1.5
 reportlab==4.2.5
-pytest==8.3.4
-pytest-asyncio==0.25.0
-pikepdf==10.5.1       # test-only: tests/test_pdf_vectors.py rotates synthetic pages with it (4 tests skip without it)
+# openpyxl switches its XML engine on whether lxml is importable (openpyxl/xml/__init__.py:
+# Element, xmlfile, fromstring). Production always had it, pulled in by pikepdf; pikepdf is
+# test-only (requirements-dev.txt) since 2026-10-05, so lxml is declared here — dropping it
+# would silently move the Excel export and the price-list import onto another XML parser.
+lxml==6.1.0
 bcrypt>=5.0
 itsdangerous>=2.2
 

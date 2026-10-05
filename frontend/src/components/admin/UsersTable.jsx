@@ -8,11 +8,15 @@
  *
  * Row shape (admin_list_users_paginated): id, email, name, company_name,
  * company_code, plan, plan_status, is_admin, is_active, created_at,
- * last_login_at, project_count, total_spend_eur.
+ * last_login_at, project_count, total_spend_eur, deleted_at.
+ *
+ * A deleted account (deleted_at set) is a tombstone kept for its invoices: it
+ * reads „Ištrinta paskyra" with the deletion date instead of its placeholder
+ * email, and has no action — the backend refuses to switch it either way.
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, ShieldAlert, UserX, UserCheck, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ShieldAlert, UserX, UserCheck, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { SectionHead, Panel, PlanPill, StatusPill, EmptyLine, ErrorLine } from './adminPrimitives';
 import { fetchAdmin, postAdmin, fmtEur, fmtInt, fmtDate } from './adminUtils';
+import { isDeletedAccount } from '@/lib/adminStatus';
 
 const LIMIT = 25;
 
@@ -166,18 +171,32 @@ export default function UsersTable() {
                     }`}
                   >
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-foreground truncate max-w-[220px]" title={u.email}>
-                          {u.email}
-                        </span>
-                        {u.is_admin ? (
-                          <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/12 px-1.5 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wide">
-                            <ShieldAlert className="w-3 h-3" /> admin
-                          </span>
-                        ) : null}
-                      </div>
-                      {u.name && (
-                        <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">{u.name}</div>
+                      {isDeletedAccount(u) ? (
+                        <div title={`${t('admin.users.deletedHint')} (${u.email})`}>
+                          <div className="flex items-center gap-1.5 text-foreground">
+                            <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                            {t('admin.users.deletedAccount')}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground tabular-nums">
+                            {t('admin.users.deletedOn', { date: fmtDate(u.deleted_at) })}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground truncate max-w-[220px]" title={u.email}>
+                              {u.email}
+                            </span>
+                            {u.is_admin ? (
+                              <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/12 px-1.5 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wide">
+                                <ShieldAlert className="w-3 h-3" /> admin
+                              </span>
+                            ) : null}
+                          </div>
+                          {u.name && (
+                            <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">{u.name}</div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[160px]" title={u.company_name || ''}>
@@ -187,7 +206,14 @@ export default function UsersTable() {
                       <PlanPill plan={u.plan} />
                     </td>
                     <td className="px-4 py-2.5">
-                      <StatusPill active={!!u.is_active} />
+                      {isDeletedAccount(u) ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+                          {t('admin.status.deleted')}
+                        </span>
+                      ) : (
+                        <StatusPill active={!!u.is_active} />
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-mono text-foreground">
                       {fmtInt(u.project_count)}
@@ -202,7 +228,7 @@ export default function UsersTable() {
                       {u.last_login_at ? fmtDate(u.last_login_at) : t('admin.users.never')}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      {u.is_admin ? (
+                      {u.is_admin || isDeletedAccount(u) ? (
                         <span className="text-[11px] text-muted-foreground/60">—</span>
                       ) : u.is_active ? (
                         <Button

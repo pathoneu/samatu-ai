@@ -1,16 +1,20 @@
 /**
  * HealthPanel — system-health snapshot from /api/admin/v2/system-health:
- *   { totals, events_by_kind[], db_size_bytes, recent_activity, error_log_tail[], note }
+ *   { totals, events_by_kind[], db_size_bytes, recent_activity, storage_backend,
+ *     backup, error_log_tail[], note }
  *
- * Renders table totals, event-kind volume (30d), DB size, recent-activity
- * timestamps, and the error-log `note` gracefully (there is no persisted log —
- * error_log_tail is always []; we show the note instead of a broken tail).
+ * Renders the nightly DB backup (red when the last good snapshot is missing or
+ * older than 26 h, when the latest attempt failed, or when the backup is off —
+ * lib/adminStatus.js), table totals, event-kind volume (30d), DB size,
+ * recent-activity timestamps, and the error-log `note` gracefully (there is no
+ * persisted log — error_log_tail is always []; we show the note instead).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Database, Info, Activity } from 'lucide-react';
+import { Database, DatabaseBackup, Info, Activity } from 'lucide-react';
 import { SectionHead, Panel, EmptyLine, ErrorLine, BlockSkeleton } from './adminPrimitives';
 import { fmtInt, fmtBytes, fmtRelative, fmtDateTime } from './adminUtils';
+import { backupStatus } from '@/lib/adminStatus';
 
 // Keys of the recent-activity block, in display order. Labels resolve via i18n.
 const ACTIVITY_KEYS = ['last_signup', 'last_project', 'last_usage_event', 'last_invoice'];
@@ -27,6 +31,8 @@ export default function HealthPanel({ health, loading, error }) {
 
       {error && <ErrorLine message={error} />}
       {loading && !health && !error && <BlockSkeleton height={220} />}
+
+      {health && <BackupPanel backup={health.backup} storageBackend={health.storage_backend} />}
 
       {health && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -102,6 +108,95 @@ export default function HealthPanel({ health, loading, error }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The nightly DB backup at a glance: a red border and „Reikia dėmesio" whenever
+ * backupStatus() says so, the reason in one plain sentence, then the last good
+ * snapshot, the latest error, where files are stored and the retention setting.
+ */
+function BackupPanel({ backup, storageBackend }) {
+  const { t } = useTranslation();
+  const b = backup || {};
+  const status = backupStatus(b);
+  const bad = status.tone === 'bad';
+  const prune = b.last_prune && typeof b.last_prune === 'object' ? b.last_prune : null;
+
+  const storageLabel = storageBackend === 'r2'
+    ? t('admin.health.backup.storageR2')
+    : storageBackend === 'local'
+      ? t('admin.health.backup.storageLocal')
+      : storageBackend || '—';
+
+  let retention = t('admin.health.backup.retentionOff');
+  if (b.keep_days) {
+    retention = t('admin.health.backup.retentionOn', { days: b.keep_days, newest: b.keep_newest ?? 7 });
+    if (prune && !prune.error) retention += ` · ${t('admin.health.backup.lastPrune', { n: prune.deleted ?? 0 })}`;
+  }
+
+  return (
+    <Panel className={`p-4 mb-4 ${bad ? 'border-destructive/50' : ''}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 skyrius-header">
+          <DatabaseBackup className="w-3.5 h-3.5" /> {t('admin.health.backup.title')}
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+            bad
+              ? 'border-destructive/30 bg-destructive/10 text-destructive'
+              : 'border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.08)] text-[hsl(var(--accent-2))]'
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${bad ? 'bg-destructive' : 'bg-[hsl(var(--accent-2))]'}`} />
+          {bad ? t('admin.health.backup.statusBad') : t('admin.health.backup.statusOk')}
+        </span>
+      </div>
+
+      <p className={`text-sm ${bad ? 'text-destructive font-medium' : 'text-foreground'}`}>
+        {t(`admin.health.backup.reason.${status.reason}`, { hours: status.staleAfterHours })}
+      </p>
+
+      <dl className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
+        <BackupRow label={t('admin.health.backup.lastGood')}>
+          {b.last_ok_at ? `${fmtRelative(b.last_ok_at)} · ${fmtDateTime(b.last_ok_at)}` : t('admin.health.backup.none')}
+        </BackupRow>
+        <BackupRow label={t('admin.health.backup.size')}>
+          {b.last_size != null ? fmtBytes(b.last_size) : '—'}
+        </BackupRow>
+        <BackupRow label={t('admin.health.backup.file')} mono>
+          {b.last_key || '—'}
+        </BackupRow>
+        <BackupRow label={t('admin.health.backup.storage')}>{storageLabel}</BackupRow>
+        <BackupRow label={t('admin.health.backup.retention')}>{retention}</BackupRow>
+      </dl>
+
+      {status.error && (
+        <div className="mt-3 text-xs text-destructive break-words">
+          <span className="font-semibold">{t('admin.health.backup.error')}</span>
+          {b.last_attempt?.at ? ` (${fmtDateTime(b.last_attempt.at)})` : ''}: {status.error}
+        </div>
+      )}
+      {prune?.error && (
+        <div className="mt-2 text-xs text-destructive break-words">
+          {t('admin.health.backup.pruneFailed', { error: prune.error })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function BackupRow({ label, mono, children }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 min-w-0">
+      <dt className="text-muted-foreground shrink-0">{label}</dt>
+      <dd
+        className={`text-right text-foreground min-w-0 ${mono ? 'font-mono text-xs truncate' : 'tabular-nums break-words'}`}
+        title={typeof children === 'string' ? children : undefined}
+      >
+        {children}
+      </dd>
+    </div>
   );
 }
 

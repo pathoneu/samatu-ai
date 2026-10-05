@@ -18,9 +18,13 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Layer-cache the dependency install.
-COPY backend/requirements.txt backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# Layer-cache the dependency install. The LOCK, not requirements.txt (2026-10-05):
+# exactly the versions the suite passed on, runtime only (test packages are in
+# requirements-dev.lock). --no-deps + `pip check`: a dependency missing from the
+# lock fails this build instead of being resolved to whatever is newest today.
+COPY backend/requirements.lock backend/requirements.lock
+RUN pip install --no-cache-dir --no-deps -r backend/requirements.lock \
+    && pip check
 
 COPY backend/ backend/
 # prompts/ lives at repo root and is read via relative paths from backend/.
@@ -35,6 +39,9 @@ COPY scripts/reconcile_samata_lines.py scripts/reconcile_samata_lines.py
 # Read-only report of files left by deleted projects. It has to run where the
 # production database and side stores live, i.e. inside this container.
 COPY scripts/report_orphaned_files.py scripts/report_orphaned_files.py
+# Read-only report of which nightly DB backups a given retention would delete —
+# here so it also works on a deployment whose backups are on its local disk.
+COPY scripts/report_backup_retention.py scripts/report_backup_retention.py
 
 WORKDIR /app/backend
 

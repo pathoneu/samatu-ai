@@ -52,7 +52,9 @@ months-old code and report a green deploy.
 4. **Runtime: Docker.** The repo ships `backend/Dockerfile` (build context =
    repo root; the blueprint wires `dockerfilePath` + `dockerContext`). Do NOT
    pick the native Python runtime — it cannot install the native libs
-   extraction hard-depends on (see the ⚠️ below).
+   extraction hard-depends on (see the ⚠️ below). The image installs the
+   pinned `backend/requirements.lock` (no test packages), not
+   `requirements.txt`.
 5. **Build/start commands: none to enter** — the Dockerfile bakes both. The
    baked start command is:
    ```
@@ -109,6 +111,28 @@ For the **frontend**:
   `SAMATU_NIGHTLY_BACKUP=1`. It uploads to the R2 bucket as
   **`backups/samatu-<utc-stamp>.db`**. It runs in-process on purpose: on
   Render a separate cron service cannot see this service's disk.
+- **Every snapshot is checked before upload** (2026-10-05): `PRAGMA
+  integrity_check` on the copy; one that fails is **not uploaded** and the
+  night is recorded as failed. The outcome of the last attempt (time, ok /
+  failed, key, size, error) and of the last good one is kept in the database
+  (`app_state`, key `backup_last_outcome`), so a deploy no longer blanks it.
+- **Watch it in the admin cockpit** (`/admin` → Sistema → „Atsarginė DB
+  kopija"). It turns red when there is no good snapshot, the last good one is
+  older than 26 h, the latest attempt failed, or the nightly backup is off. It
+  also says where files are stored (R2 or this server's disk).
+- **Retention is OFF until someone chooses it.** With
+  `SAMATU_BACKUP_KEEP_DAYS` unset or empty — the default — no snapshot is ever
+  deleted, which also means a deleted account's data lives on in old
+  snapshots. Set it to N (whole days ≥ 1) and, after each night whose own
+  snapshot was stored, snapshots taken more than N days ago are deleted —
+  except the **newest 7, which are always kept** whatever their age. Only keys
+  named exactly `backups/samatu-<YYYYMMDDTHHMMSSZ>.db` are ever touched; any
+  other file under `backups/` is left alone. Before setting N, see what it
+  would delete (read-only, never deletes):
+  `python scripts/report_backup_retention.py --days N` — with the production
+  storage selected (`STORAGE_BACKEND=r2` plus the four `R2_*` vars, or inside
+  the container). An invalid value (`0`, `abc`) also means no pruning, logged
+  as a warning.
 - **There is NO automated restore.** Restoring is manual: download the chosen
   `backups/samatu-<stamp>.db` object from the R2 bucket, stop the service,
   replace the file at `SAMATU_DB_PATH`, restart. Nothing in the codebase does
@@ -119,7 +143,9 @@ For the **frontend**:
 ## 2b. Hosting setup — Railway path (the alternative that's already wired)
 
 `railway.toml` + `nixpacks.toml` at repo root are complete and current. The
-build creates a venv at `/opt/venv`, installs `backend/requirements.txt`, and —
+build creates a venv at `/opt/venv`, installs the pinned
+`backend/requirements.lock` (`--no-deps`, then `pip check` — the Dockerfile
+does the same; see `DEVELOPING.md` › Python dependencies), and —
 the reason to prefer it — **declares the native deps Render doesn't**:
 `poppler_utils` (nixPkgs) plus `libgl1` + `libglib2.0-0` (aptPkgs). The start
 command carries the same `--proxy-headers --forwarded-allow-ips='*'` flags;
@@ -176,6 +202,10 @@ R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=samatu-pdfs
+
+# Backup retention in days — UNSET on purpose until the founder chooses (§2a).
+# Unset/empty = no backup is ever deleted. When set, the newest 7 always stay.
+# SAMATU_BACKUP_KEEP_DAYS=
 
 # Optional — Google OAuth. Redirect URI must match the real API origin.
 GOOGLE_CLIENT_ID=
@@ -235,9 +265,10 @@ From your laptop, with browser DevTools open:
 - **Backups:** there is no managed-DB snapshot service — the only backup is
   the app's own nightly R2 upload (§2a). Verify it: after the first night,
   list the bucket and confirm a `backups/samatu-<stamp>.db` object exists,
-  then check the log line `nightly backup ok: ...`. **Also rehearse the
-  manual restore once** — it is not automated, and discovering that during
-  an outage is the wrong time.
+  then check the log line `nightly backup ok: ...` and the admin cockpit's
+  „Atsarginė DB kopija" block (green, with that key and its size). **Also
+  rehearse the manual restore once** — it is not automated, and discovering
+  that during an outage is the wrong time.
 - **Uptime monitoring:** UptimeRobot free tier — ping every 5 min
   (`/health` is the backend health check path).
 - **Error tracking:** Sentry free tier (5k events/mo) — wire later if needed.

@@ -89,10 +89,20 @@ def test_selected_backend_name_matches_selection(monkeypatch):
 
 # ── (b) the scheduler remembers its last outcome ────────────────────────────
 
-def test_backup_failure_is_recorded_and_logged(monkeypatch, caplog):
+def _temp_db(tmp_path, monkeypatch):
+    """The outcome is persisted in app_state (2026-10-05) — never in the
+    developer's own backend/data/samatu.db."""
+    import db
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "outcome.db")
+    db.init_schema()
+    db._migrate_schema()
+
+
+def test_backup_failure_is_recorded_and_logged(tmp_path, monkeypatch, caplog):
     import backup_scheduler as bs
     import backup
 
+    _temp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(bs, "_last", {"last_ok_at": None, "last_error": None,
                                       "last_error_at": None, "last_key": None})
     monkeypatch.setattr(bs, "_seconds_until", lambda h, m: 0.0)
@@ -103,8 +113,8 @@ def test_backup_failure_is_recorded_and_logged(monkeypatch, caplog):
 
     async def go():
         task = asyncio.create_task(bs._run_forever())
-        for _ in range(50):                       # let one cycle run, then stop
-            await asyncio.sleep(0)
+        for _ in range(500):                      # let one cycle run, then stop
+            await asyncio.sleep(0.01)             # (the record goes through a thread)
             if bs._last["last_error"]:
                 break
         task.cancel()
@@ -122,8 +132,9 @@ def test_backup_failure_is_recorded_and_logged(monkeypatch, caplog):
                if r.name == "samatu.backup")
 
 
-def test_backup_success_is_recorded(monkeypatch):
+def test_backup_success_is_recorded(tmp_path, monkeypatch):
     import backup_scheduler as bs
+    _temp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(bs, "_last", {"last_ok_at": None, "last_error": None,
                                       "last_error_at": None, "last_key": None})
     bs._record_error(RuntimeError("older failure"))

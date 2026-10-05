@@ -1893,7 +1893,8 @@
     },
     "status": {
       "active": "Active",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "deleted": "Deleted"
     },
     "cost": {
       "eyebrow": "Cost monitor",
@@ -1968,7 +1969,32 @@
       "noEvents": "No events.",
       "recentActivity": "Last activity",
       "errorLog": "Error log",
-      "noErrorLog": "No stored error log."
+      "noErrorLog": "No stored error log.",
+      "backup": {
+        "title": "Database backup",
+        "statusOk": "OK",
+        "statusBad": "Needs attention",
+        "reason": {
+          "ok": "Backed up nightly; the last attempt succeeded.",
+          "off": "The nightly backup is off — no backups are made.",
+          "missing": "No successful backup yet.",
+          "stale": "The last successful backup is older than {{hours}} h.",
+          "failed": "The last attempt failed."
+        },
+        "lastGood": "Last successful",
+        "none": "none",
+        "size": "Size",
+        "file": "File",
+        "error": "Error",
+        "storage": "File storage",
+        "storageR2": "R2 (cloud)",
+        "storageLocal": "this server's disk",
+        "retention": "Old backup pruning",
+        "retentionOff": "off — no backup is deleted",
+        "retentionOn": "keeps {{days}} days, at least the newest {{newest}}",
+        "lastPrune": "last run deleted: {{n}}",
+        "pruneFailed": "Pruning failed: {{error}}"
+      }
     },
     "users": {
       "eyebrow": "User management",
@@ -1993,7 +2019,10 @@
       "confirmTitle": "Disable user?",
       "confirmDescA": "User ",
       "confirmDescB": " will no longer be able to log in until you enable them again. Their projects and data are retained.",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "deletedAccount": "Deleted account",
+      "deletedOn": "deleted {{date}}",
+      "deletedHint": "The owner deleted this account. The row stays only for issued invoices; it cannot be enabled."
     }
   },
   "newProject": {

@@ -1394,16 +1394,13 @@ def api_upsert_project(request: Request, project_id: str, payload: dict = Body(.
 async def api_delete_project(request: Request, project_id: str):
     user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
-    if not db.delete_project(project_id, user_id=user_filter):
+    # The row, then the drawing and every id-keyed side store (audit
+    # 2026-09-29) — the one delete the account deletion uses too. The purge is
+    # best-effort: a storage failure is logged and never brings the project back.
+    import project_purge
+    if not await asyncio.to_thread(project_purge.delete_project_and_files,
+                                   project_id, user_filter):
         raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-    # The row is gone; now the drawing and every id-keyed side store (audit
-    # 2026-09-29). Best-effort: a storage failure is logged and never brings
-    # the project back.
-    try:
-        import project_purge
-        await asyncio.to_thread(project_purge.purge_project_files, project_id)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("project purge failed for %s: %r", project_id, exc)
     return {"deleted": project_id}
 
 

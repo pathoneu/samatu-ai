@@ -9,6 +9,11 @@ Runs only AFTER the owner-scoped database delete succeeded. Every step is
 best-effort and safe to repeat: a failure is logged, the remaining steps still
 run, and nothing here can bring the project back.
 
+`delete_project_and_files` is THE project delete — the row, then this purge.
+DELETE /api/projects/{id} and the account deletion both call it (2026-10-05:
+they used to repeat the same two calls, each promising to stay in step with
+the other).
+
 Purged: the stored PDF, the in-memory PDF byte caches (CV tools and evidence
 crops), the CV page renders of that PDF, annotations, calibrations, the symbol
 legend, the evidence crops on disk, the F2/F3 line override and any re-read
@@ -104,3 +109,24 @@ def purge_project_files(project_id: str) -> list[str]:
     step("exports", lambda: _rmtree_inside(
         exports_v2.PROJECTS_DIR, exports_v2.PROJECTS_DIR / project_id))
     return failed
+
+
+def delete_project_and_files(project_id: str, user_id: str | None = None) -> bool:
+    """Delete one project: its row, then — only when that removed a row — the
+    best-effort purge of its drawing and every id-keyed store.
+
+    `user_id` scopes the row delete to that owner; None deletes whoever owns
+    it (an admin's DELETE /api/projects/{id}). An empty id is refused rather
+    than read as None, which would widen an owner's delete to every project.
+    Returns whether a row was deleted. A purge failure is logged and never
+    brings the project back."""
+    import db
+    if user_id is not None and (not isinstance(user_id, str) or not user_id):
+        raise ValueError("an owner-scoped project delete needs a non-empty user_id")
+    if not db.delete_project(project_id, user_id=user_id):
+        return False
+    try:
+        purge_project_files(project_id)
+    except Exception as exc:  # noqa: BLE001 — the row is gone; files are best-effort
+        log.warning("project purge failed for %s: %r", project_id, exc)
+    return True

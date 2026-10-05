@@ -91,26 +91,57 @@ def cost_monitor(request: Request, days: int = 30) -> dict:
 
 # ── 3. User management ───────────────────────────────────────────────────────
 
+def _with_deletion_dates(rows: list[dict]) -> list[dict]:
+    """Add `deleted_at` to directory rows (None for a live account).
+
+    A deleted account stays as a tombstone row — placeholder email, no name,
+    is_active 0 — for the invoices that still point at it (db.delete_account),
+    and without this it looked like any switched-off customer. The directory
+    query does not carry the column; a tombstone is always inactive (the
+    deletion switches it off and _toggle_active refuses to switch it back on),
+    so only inactive rows are looked up."""
+    for row in rows:
+        row["deleted_at"] = None
+        if not row.get("is_active"):
+            row["deleted_at"] = (db.get_user_by_id(row["id"]) or {}).get("deleted_at")
+    return rows
+
+
 @router.get("/users")
 def list_users(request: Request, search: str = "", page: int = 1,
                limit: int = 25) -> dict:
-    """Paginated + searchable user directory. Each row carries project_count and
-    total_spend_eur (SUM usage_events). {rows, total, page, limit}."""
+    """Paginated + searchable user directory. Each row carries project_count,
+    total_spend_eur (SUM usage_events) and deleted_at (set = a deleted
+    account's tombstone). {rows, total, page, limit}."""
     _auth.require_admin(request)
-    return db.admin_list_users_paginated(
+    data = db.admin_list_users_paginated(
         search=search.strip() or None, page=page, limit=limit)
+    _with_deletion_dates(data["rows"])
+    return data
+
+
+_DELETED_ENABLE_LT = "Ši paskyra ištrinta. Ištrintos paskyros vėl įjungti negalima."
+_DELETED_DISABLE_LT = "Ši paskyra jau ištrinta — ji ir taip išjungta."
 
 
 def _toggle_active(request: Request, user_id: str, active: bool) -> dict:
-    """Shared disable/enable body with the guardrails. On DISABLE only:
+    """Shared disable/enable body with the guardrails:
+      - a deleted account (tombstone) is never switched either way → 409; its
+        row is kept only for the invoices pointing at it, and enabling it would
+        bring a placeholder address back to life
+    On DISABLE only:
       - an admin may not disable THEMSELVES (would lock themselves out) → 400
       - an admin may not disable ANOTHER admin → 400
-    Enabling is always allowed (re-activating an admin is safe)."""
+    Enabling a live account is always allowed (re-activating an admin is safe)."""
     from fastapi import HTTPException
     caller = _auth.require_admin(request)
     target = db.get_user_by_id(user_id)
     if not target:
         raise HTTPException(status_code=404, detail="Vartotojas nerastas")
+    if target.get("deleted_at"):
+        raise HTTPException(
+            status_code=409,
+            detail=_DELETED_ENABLE_LT if active else _DELETED_DISABLE_LT)
     if not active:
         if target["id"] == caller["id"]:
             raise HTTPException(
@@ -187,6 +218,9 @@ def system_health(request: Request) -> dict:
         storage_backend = _storage.selected_backend_name()
     except Exception:
         storage_backend = "unknown"
+    # 2026-10-05 (data-ops-infra-9): the outcome is read back from app_state, so
+    # a deploy no longer blanks it; the HealthPanel turns red when last_ok_at is
+    # missing or older than stale_after_hours.
     try:
         import backup_scheduler as _bs
         outcome = _bs.last_outcome()
@@ -196,6 +230,14 @@ def system_health(request: Request) -> dict:
             "last_error": outcome.get("last_error"),
             "last_error_at": outcome.get("last_error_at"),
             "last_key": outcome.get("last_key"),
+            "last_size": outcome.get("last_size"),
+            # {at, ok, key, size, error} of the latest attempt, good or not.
+            "last_attempt": outcome.get("last_attempt"),
+            # {at, keep_days, deleted, kept, error} — only once retention is on.
+            "last_prune": outcome.get("last_prune"),
+            "keep_days": outcome.get("keep_days"),           # None = never pruned
+            "keep_newest": outcome.get("keep_newest"),
+            "stale_after_hours": outcome.get("stale_after_hours"),
         }
     except Exception:
         backup_status = {"enabled": False, "last_ok_at": None,
@@ -235,7 +277,7 @@ def _csv_response(header: list[str], rows: list[list], filename: str) -> Respons
 _USERS_CSV_COLUMNS = [
     "id", "email", "name", "company_name", "company_code", "plan",
     "plan_status", "is_admin", "is_active", "created_at", "last_login_at",
-    "project_count", "total_spend_eur",
+    "project_count", "total_spend_eur", "deleted_at",
 ]
 
 
@@ -247,6 +289,7 @@ def export_users_csv(request: Request, search: str = "") -> Response:
     # concern; the export is the full set).
     data = db.admin_list_users_paginated(
         search=search.strip() or None, page=1, limit=100000)
+    _with_deletion_dates(data["rows"])
     rows = [[u.get(col) for col in _USERS_CSV_COLUMNS] for u in data["rows"]]
     return _csv_response(_USERS_CSV_COLUMNS, rows, "pathon-users.csv")
 
