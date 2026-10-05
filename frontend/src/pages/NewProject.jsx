@@ -21,7 +21,8 @@ import {
 import { autoFillFromDefaultPriceList, describeAmbiguous } from '@/lib/applyPriceList';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
-import { runExtraction, runEndText, ExtractionStopped, HARD_ABORT_MS } from '@/lib/extractionRun';
+import { runExtraction, ExtractionStopped, HARD_ABORT_MS } from '@/lib/extractionRun';
+import { newRunEnding } from '@/lib/runEndNotice';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 import { API_BASE as API } from '@/lib/apiBase';
@@ -259,6 +260,10 @@ export default function NewProject() {
   const [abortController, setAbortController] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError]               = useState(null);
+  // A reading the SERVER goes on with (the connection dropped, or his cancel
+  // after it started): news, not an error — shown in a neutral box with the way
+  // to the projects list, where the project will appear (lib/runEndNotice.js).
+  const [notice, setNotice]             = useState(null);
   const [status, setStatus]             = useState('');
   // SM01 streaming progress state
   // null | 'rendering' | 'pass1' | 'zoom' | 'post' | 'finishing'
@@ -355,6 +360,7 @@ export default function NewProject() {
       }
     } catch { /* no Notification API — fine */ }
     setError(null);
+    setNotice(null);
     setStatus(t('newProject.statusUploading'));
     setIsProcessing(true);
     setStreamPhase(null);
@@ -706,6 +712,7 @@ export default function NewProject() {
       // User-friendly error mapping. Stack only kept in console for debugging.
       console.error('Upload pipeline failed:', e);
       let userMessage;
+      let noticeMessage = null;
       const ended = e?.runEnd || (e instanceof ExtractionStopped ? e.reason : null);
       if (ended) {
         // The interior run ended with nothing to show. Honest per ending
@@ -718,7 +725,10 @@ export default function NewProject() {
         // started on the server: that is a connection problem, said as one.
         // His cancel after the start: the server still finishes and saves
         // the project, so the text says it will appear — not „try again".
-        userMessage = t(runEndText('new', ended, { started: !!e?.recoveryId }));
+        // The two endings the server goes on with are a notice, not an error.
+        const end = newRunEnding(ended, { started: !!e?.recoveryId });
+        if (end.tone === 'notice') noticeMessage = t(end.key);
+        else userMessage = t(end.key);
       } else if (e.name === 'AbortError') {
         // The non-streaming paths: their ceiling, or the cancel button.
         userMessage = abortReasonRef.current === 'timeout' ? t('newProject.errTimeout')
@@ -731,7 +741,8 @@ export default function NewProject() {
       }
       stopElapsed();   // idempotent — covers every branch
       setRecovering(false);
-      setError(userMessage);
+      setError(noticeMessage ? null : userMessage);
+      setNotice(noticeMessage);
       setIsProcessing(false);
       setStatus('');
     }
@@ -768,9 +779,11 @@ export default function NewProject() {
               onClick={() => {
                 abortReasonRef.current = 'user';
                 abortController.abort();
-                setError(t(isStreaming
-                  ? runEndText('new', 'user', { started: !!runIdRef.current })
-                  : 'newProject.abortedByUser'));
+                const end = isStreaming
+                  ? newRunEnding('user', { started: !!runIdRef.current })
+                  : { key: 'newProject.abortedByUser', tone: 'error' };
+                if (end.tone === 'notice') setNotice(t(end.key));
+                else setError(t(end.key));
                 setIsProcessing(false);
                 setAbortController(null);
               }}
@@ -819,6 +832,19 @@ export default function NewProject() {
       {error && (
         <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          className="mb-4 p-3 bg-card border border-border rounded-lg text-sm text-foreground"
+          role="status"
+          data-testid="run-continues-notice"
+        >
+          <p>{notice}</p>
+          <Button asChild variant="outline" size="sm" className="mt-3">
+            <Link to="/dashboard">{t('newProject.backToProjects')}</Link>
+          </Button>
         </div>
       )}
 

@@ -872,6 +872,17 @@
         "grindu_danga": "floor covering",
         "polygon": "outline"
       },
+      "outline": {
+        "corrected": "corrected by you",
+        "manual": "drawn by you",
+        "sienu_konturas": "found from the walls",
+        "vektoriniai_konturai": "found from the drawing's lines",
+        "auto_floodfill": "found automatically",
+        "synthesized_from_bbox": "an approximate rectangle",
+        "bbox_fallback": "an approximate rectangle",
+        "manual_needed": "not found",
+        "other": "another outline"
+      },
       "dismiss": "Got it",
       "roomNote": "After the drawing was read again:",
       "roomKept": "Kept"

@@ -11,10 +11,21 @@ No network calls — client.messages.create is stubbed and its kwargs captured.
 """
 import types
 
+import pytest
 from fastapi.testclient import TestClient
 
 import main  # noqa: E402  (main before auth — house idiom)
 from main import app  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _own_database(tmp_path, monkeypatch):
+    """`with TestClient(app)` runs the app's startup: it marks other boots' running extractions interrupted
+    and prunes held re-reads. Until 2026-10-05 that ran against backend/data/samatu.db — a dev server's live
+    read could be marked interrupted by a test run."""
+    monkeypatch.setattr(main.db, "_DB_PATH", tmp_path / "chat.db")
+    main.db.init_schema()
+    main.db._migrate_schema()
 
 
 class _StubUsage:

@@ -3797,7 +3797,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         _dt_read = int(_dt.get("reader_beapvadines") or 0) > 0
     except (TypeError, ValueError):
         _dt_read = False
-    if (not _frameless_assumed and _dt_read and _prep_src not in ("jusu", "ziniarastis", "ziniarastis_misrus")
+    if (not _frameless_assumed and _dt_read
+            and _prep_src not in ("jusu", "ziniarastis", "ziniarastis_misrus", "ziniarastis_neaiskus")
             and _dt.get("count") and int(_dt["count"]) > n_pasleptu_tagged):
         avg_reveal = (reveal_sum / n_pasleptu_tagged) if n_pasleptu_tagged > 0 else 5.1
         pasleptu_duru_staktu_m = round(int(_dt["count"]) * avg_reveal, 2)
@@ -3843,7 +3844,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             _door_line["_assumption"] = ("Vidaus durys laikomos beapvadinėmis — projekte yra paslėptų (beapvadinių) "
                                          "durų, todėl ir nepažymėtos vidaus durys skaičiuojamos taip pat. Jei dalis durų "
                                          "su apvadais, pakeiskite Prielaidose (vidaus durys beapvadinės: ne).")
-        if _prep_source in ("brezinys", "nera_pozymiu", "anotacija", "gaminiai"):
+        if _prep_source in ("brezinys", "nera_pozymiu", "anotacija", "gaminiai", "ziniarastis_neaiskus"):
             _door_line["confidence"] = "geltona"
             _door_line["_confidence_reason"] = str(_prep.get("sakinys") or "")
         elif _prep_source in ("jusu", "ziniarastis"):

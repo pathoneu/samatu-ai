@@ -1133,7 +1133,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           from a „Pataisyti", and you come straight back to where you were.
           2026-05-06: per user request, removed the heavier RulesOverridePanel
           (templates, LT library viewer, formula card, multi-floor multipliers,
-          duplicate header). AssumptionsPanel alone. */}
+          duplicate header; its file was deleted 2026-10-05). AssumptionsPanel alone. */}
       {assumptionsOpen && (
         <div className="fixed inset-0 z-40 flex justify-end">
           <div

@@ -34,6 +34,10 @@ def client(tmp_path_factory):
     import db as _db
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_auth, "AUTH_DISABLED", True)
+        # its own database (2026-10-05: these project rows were written into backend/data/samatu.db)
+        mp.setattr(_db, "_DB_PATH", tmp_path_factory.mktemp("calibrate_db") / "calibrate.db")
+        _db.init_schema()
+        _db._migrate_schema()
         dev = _auth._ensure_dev_user()
         # N1 (pass 2): calibrate WRITE now requires the URL project_id to be an
         # owned project even when ?fixture= seeds the baseline. Upsert every

@@ -33,7 +33,7 @@ This document is the result of an Explore-subagent UI audit + manual stress test
 
 ### ✅ Limitation 1: AssumptionsPanel — FIXED in Phase 10
 Backend `/recompute-interior` endpoint + frontend `RulesOverridePanel.jsx`. 6 per-paskirtis toggles + 3 numeric inputs + per-room override table. Sub-second roundtrip (~8ms measured). "Prielaidos" tab restored to TabBar.
-**Update 2026-07-25:** `RulesOverridePanel` was **removed from the UI 2026-05-06** (founder request: too heavy) and is now an orphan file. The live surface is `AssumptionsPanel`, opened from the **Prielaidos** button in `ProjectTopBar`, and it recomputes via `POST /api/recompute-quantities`, not `/recompute-interior`. `/recompute-interior` is still live — it now serves the room/polygon-edit path (`handleRoomsChange`).
+**Update 2026-07-25:** `RulesOverridePanel` was **removed from the UI 2026-05-06** (founder request: too heavy); the orphan file was **deleted 2026-10-05**. The live surface is `AssumptionsPanel`, opened from the **Prielaidos** button in `ProjectTopBar`, and it recomputes via `POST /api/recompute-quantities`, not `/recompute-interior`. `/recompute-interior` is still live — it now serves the room/polygon-edit path (`handleRoomsChange`).
 
 ### Limitation 2: Hidden tabs (`puslapiai`, `kiekiai`, `workspace`, `prielaidos`)
 **Severity:** LOW. Tab content code exists but unreachable. **Status 2026-07-25: still true, and the TabBar shrank.** It now renders only `brezinys` / `main` / `aichat`; `rules` and `eksport` are reachable only via `ProjectTopBar` buttons, and the `prielaidos` block in `InteriorProject.jsx` is explicitly dead-gated `{false && tab === 'prielaidos'}`.

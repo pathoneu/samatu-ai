@@ -227,7 +227,11 @@ def _frameless_units(op, frameless_default: bool, chosen_framed: bool = False) -
     if _get(op, "_exterior") or _get(op, "_be_ziniarascio") or _get(op, "_praejimas") or _get(op, "_be_angos"):
         return 0
     scheduled = _get(op, "_duru_tipas")                        # the drawing's door schedule names the frame
-    if scheduled:
+    if scheduled == "neaisku":
+        # …both ways (door_schedule.AMBIGUOUS): the project's answer decides, as for an untagged door, and the
+        # schedule says it is a door — no width test (universal_rules.calc_room_quantities, the same rule)
+        frameless = (t == "hidden_door" and not chosen_framed) or (frameless_default and t == "door")
+    elif scheduled:
         frameless = scheduled == "beapvadines"
     else:
         w_m, _h, _n = _opening_dims(op)

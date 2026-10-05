@@ -739,3 +739,18 @@ def test_a_share_of_another_storeys_space_written_on_an_earlier_run_is_taken_bac
                      "_perimetras_priezastis", "_perimetras_pries_geometrija"):
             assert gone not in r, (r["nr"], gone)
         assert r["perimetras_m"] == 13.0 and "kitas aukštas" in r["_konturo_priezastis"]
+
+
+def test_a_sheet_read_at_another_scale_than_it_writes_is_noted_in_the_lane_meta():
+    """2026-10-05: a reduced print is read at the scale its strings measure (plan_dimensions._scale_verdict); the
+    scale the sheet writes is kept beside it, in the lane's meta, like a refused sheet's record."""
+    pdf = _two_sheets()
+    dims = gl.geometry_dimension_strings(pdf)
+    for d in dims:
+        if int(d["page"]) == 2:
+            d["mastelis_kitas"] = {"ismatuota": 100, "uzrasyta": [50]}
+    parsed = _parsed()
+    gl.apply_geometry(parsed, pdf, dims=dims)
+    g = parsed["_meta"]["geometrija"]
+    assert g["masteliai_kiti"] == {"2": {"ismatuota": 100, "uzrasyta": [50]}}
+    assert g["masteliai_atmesti"] == {}

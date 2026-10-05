@@ -714,6 +714,31 @@ def test_a_room_no_plan_label_supports_is_assumed_and_says_so():
     assert "nesidubliuoja" in f["sentence"]
 
 
+def test_a_label_in_the_rooms_place_too_far_from_its_area_is_named_not_called_missing():
+    """2026-10-05: the area lane now keeps a label that stands in the room's place but is too far from its
+    area (`label_differs`, `_plotas_uzrasas_kitas`). The sheet used to say „užrašo neradau" — the label is
+    there; it says where, what it says, what the calculation uses, and crops the label."""
+    project = {"patalpos": [{
+        "nr": "07", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2,
+        "plotas_m2": 5.64, "plotas_saltinis": "wall_dim_calc", "_area_unconfirmed": True,
+        "_area_unconfirmed_reason": "label_differs",
+        "_plotas_uzrasas_kitas": {"page": 4, "value_m2": 9.12, "bbox": [500.0, 300.0, 540.0, 312.0],
+                                  "page_width": 1000.0, "page_height": 1000.0}}]}
+    f = _fact(build_room_facts(project, "07"), "plotas")
+    assert f["status"] == "assumed" and f["value"] == 5.64
+    s = f["sentence"]
+    assert "neradau" not in s
+    assert "(4 psl.)" in s and "9,12 m²" in s and "5,64 m²" in s
+    assert "kurios patalpos tai užrašas" in s and "įrašykite tikrą plotą" in s
+    # the evidence is the label, on its own sheet
+    assert f["source"]["page"] == 4
+    x0, y0, x1, y1 = f["source"]["rect_pct"]
+    assert x0 < 0.50 < 0.54 < x1 and y0 < 0.30 < 0.312 < y1
+    # without the label's record the old sentence stands (nothing to point at)
+    del project["patalpos"][0]["_plotas_uzrasas_kitas"]
+    assert "užrašo neradau" in _fact(build_room_facts(project, "07"), "plotas")["sentence"]
+
+
 def test_a_room_drawn_over_another_rooms_label_is_called_a_likely_duplicate():
     project = {"patalpos": [
         {"nr": "06", "pavadinimas": "Vonios kambarys", "puslapio_nr": 2, "plotas_m2": 7.25,

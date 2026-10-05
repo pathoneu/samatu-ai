@@ -16,10 +16,13 @@ only PROPOSED until a traced outline is as long as 2 × (plotis + ilgis)
 (2026-10-03, audit geometry-lanes-6). No pair passes ⇒ the room keeps
 whatever it had (Vision's read), and says so.
 
-The page's scale must be a plan's (1:20..1:500) and the one the sheet writes
-in its title when it writes one (audit geometry-lanes-4: centimetre strings
-read as millimetres agree with their lines at 1:5, and every length came out
-10× short). A page that fails backs no string — nothing on it is used.
+The page's scale must be a plan's (1:20..1:500) and must not be the scale the
+sheet writes in its title off by a unit (audit geometry-lanes-4: centimetre
+strings read as millimetres agree with their lines at 1:5 — or at 1:20 on a
+1:200 sheet — and every length came out 10× short). A page that fails backs no
+string — nothing on it is used. A page printed at another size than it was
+drawn (an A1 sheet on A3, a „fit to page" print) is read at the scale its
+strings measure, and the written one is noted beside it (`_scale_verdict`).
 
 Why the lines matter (2026-09-10, fresh objektas_g runs): the same storey's
 sheets pool ~300 strings, and a product alone cannot tell a room's own walls
@@ -33,11 +36,13 @@ Shapes: `read_dimension_strings` → dicts {page, text, value_m, bbox (display
 frame, PDF points from the top-left), page_width, page_height, orientation
 "h" | "v"} plus, when the vector layer backs the string, {span: [a0, a1]
 along the string's axis, line_pos: the line's other coordinate, span_source:
-"line", scale_m_per_pt, mastelis}; on a page whose scale is refused, every
-string carries `mastelis_atmestas` {ismatuota, uzrasyta, priezastis} instead.
-`apply_dimension_strings` mutates rooms in place and returns a summary
-{status, dimensions, lines, confirmed, corrected, unmatched, skipped,
-proposed, pages, mastelis, mastelis_atmestas}.
+"line", scale_m_per_pt, mastelis} — and `mastelis_kitas` {ismatuota, uzrasyta}
+when the sheet writes a scale its strings do not measure; on a page whose
+scale is refused, every string carries `mastelis_atmestas` {ismatuota,
+uzrasyta, priezastis} instead. `apply_dimension_strings` mutates rooms in
+place and returns a summary {status, dimensions, lines, confirmed, corrected,
+unmatched, skipped, proposed, pages, mastelis, mastelis_kitas,
+mastelis_atmestas}.
 """
 
 from __future__ import annotations
@@ -81,18 +86,29 @@ _STANDARD_SCALES = (1, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250
 
 # Is the page's scale a plan's at all? (audit 2026-09-29, geometry-lanes-4.) Strings in CENTIMETRES read as
 # millimetres agree with their hairlines just as well — at 1:5 instead of 1:50 — and every length the sheet
-# gives is then 10× too short. A derived scale outside 1:20..1:500 is no plan's; a sheet that STATES its scale
-# („M 1:50" in the title, „1:25" under a detail) is held to it: what the strings measure must lie within
-# STATED_TOL of one stated scale, and the stated one is then the sheet's scale (exact — PDFium's bounds carry the
-# stroke and the caps, a median of them does not). „What the strings measure" is the UPPER end of their scales
-# (the 90th percentile): a dimension line drawn past its extension lines only ever makes a string measure a
-# smaller 1:N than the sheet's — objektas_b's 1:100 sheets measure a median of 1:94,5–98,5 but an upper end of
-# 1:96,8–99,3 (2026-10-05), and the median refused its dimensioned plan. A page that fails keeps its strings
-# unbacked: nothing on it pairs, adds up or measures, and the rooms keep what they had — never a guessed correction.
+# gives is then 10× too short. A derived scale outside 1:20..1:500 is no plan's. A sheet that STATES its scale
+# („M 1:50" in the title, „1:25" under a detail) is compared with what its strings measure, N — the UPPER end of
+# their scales (the 90th percentile): a dimension line drawn past its extension lines only ever LOWERS the 1:N a
+# string measures — objektas_b's 1:100 sheets measure a median of 1:94,5–98,5 but an upper end of 1:96,8–99,3
+# (2026-10-05). Against the nearest stated scale S:
+#   · N at most STATED_TOL below S, or at most REDUCED_TOL above it (PDFium's bounds) → the sheet is drawn at S,
+#     and S is its scale, exact (the bounds carry the stroke and the caps, a median of them does not);
+#   · N / S near 10, 100, 0,1 or 0,01 (UNIT_RATIO_TOL) → the strings are in other units than the sheet is drawn
+#     in (centimetres on a 1:200 sheet measure 1:20): REFUSED — the page keeps its strings unbacked, nothing on
+#     it pairs, adds up or measures, and the rooms keep what they had, never a guessed correction;
+#   · any other N → the PDF is printed at another size than drawn (an A1 sheet on A3 states 1:50 and measures
+#     1:100; „fit to page" at 97 % measures 1:103 against 1:100), or the sheet mixes a detail's scale with the
+#     plan's: the strings and their lines agree with each other in THIS PDF, so the page is read at the scale
+#     they measure (their median, as before 2026-10-05) and the stated one is noted beside it (`mastelis_kitas`).
+#     plausible_perimeter stays the backstop for a sum that came out too short.
+# Until 2026-10-05 every disagreement past 5 % was refused, and a reduced print lost every correct string it had.
 MIN_SCALE_DENOM = 20
 MAX_SCALE_DENOM = 500
 SCALE_RANGE_TOL = 0.03      # PDFium's bounds: a 1:20 plan may measure 1:19,6
-STATED_TOL = 0.05
+STATED_TOL = 0.05           # N may fall this far below a stated 1:N and still be drawn at it…
+REDUCED_TOL = 0.01          # …and rise only this far above it; further up the sheet was printed reduced
+UNIT_RATIOS = (10.0, 100.0, 0.1, 0.01)
+UNIT_RATIO_TOL = 0.10
 _STATED_RE = re.compile(r"(?<![\d.,:/])1\s*:\s*(\d{2,3})(?![\d.,:])")
 # Any room's perimeter is at least that of the circle of its area, 2·√(π·A) ≈ 3,54·√A (a rectangle's at least
 # 4·√A). A figure below this cannot be the room's — the strings or the scale are not what they seem.
@@ -119,21 +135,27 @@ def stated_scales_on_page(chars: list[dict]) -> set[int]:
     return out
 
 
-def _scale_verdict(scale_m_per_pt: float, stated: set[int] | None,
-                   upper_m_per_pt: float | None = None) -> tuple[float | None, int | None, str | None]:
-    """(scale to use, its 1:N, None) — or (None, None, the reason) when the page's scale is refused.
-    `scale_m_per_pt` is the strings' median, `upper_m_per_pt` the upper end of what they measure — the figure a
-    stated scale is held to (see STATED_TOL)."""
+def _scale_verdict(scale_m_per_pt: float, stated: set[int] | None, upper_m_per_pt: float | None = None,
+                   ) -> tuple[float | None, int | None, str | None, dict | None]:
+    """(scale to use, its 1:N, None, note) — or (None, None, the reason, None) when the page's scale is refused
+    („ne_plano_mastelis": no plan's; „kiti_vienetai": the stated scale off by a unit ratio). `note` is
+    {ismatuota, uzrasyta} when the sheet states a scale its strings do not measure and the page is read at its
+    own (the rule above STATED_TOL). `scale_m_per_pt` is the strings' median, `upper_m_per_pt` the upper end of
+    what they measure — the N a stated scale is compared with."""
     denom = scale_m_per_pt / _PT_M
     if not (MIN_SCALE_DENOM * (1 - SCALE_RANGE_TOL) <= denom <= MAX_SCALE_DENOM * (1 + SCALE_RANGE_TOL)):
-        return None, None, "ne_plano_mastelis"
-    if stated:
-        top = (upper_m_per_pt or scale_m_per_pt) / _PT_M
-        best = min(sorted(stated), key=lambda s: abs(s - top) / s)
-        if abs(best - top) / best > STATED_TOL:
-            return None, None, "nesutampa_su_uzrasytu"
-        return best * _PT_M, int(best), None
-    return scale_m_per_pt, _mastelis(scale_m_per_pt), None
+        return None, None, "ne_plano_mastelis", None
+    if not stated:
+        return scale_m_per_pt, _mastelis(scale_m_per_pt), None, None
+    top = (upper_m_per_pt or scale_m_per_pt) / _PT_M
+    best = min(sorted(stated), key=lambda s: abs(s - top) / s)
+    if -STATED_TOL <= (top - best) / best <= REDUCED_TOL:
+        return best * _PT_M, int(best), None, None
+    if any(abs(top / s - u) / u <= UNIT_RATIO_TOL for s in stated for u in UNIT_RATIOS):
+        return None, None, "kiti_vienetai", None
+    # printed reduced or enlarged, or a sheet mixing scales: read at what the strings measure — not snapped to a
+    # standard scale either, so the check sheet and the viewer measure with the scale the lane measured with
+    return scale_m_per_pt, int(round(denom)), None, {"ismatuota": int(round(denom)), "uzrasyta": sorted(stated)}
 
 
 def _dimension_runs(chars: list[dict]) -> list[dict]:
@@ -283,9 +305,10 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
     the median over the strings with exactly one hairline under them (a
     wall or grid line passing near a string is the ambiguity), refined over
     every accepted string, and then held to what a plan's scale can be and
-    to the scale the page states (`stated`, `_scale_verdict`) — a page that
-    fails is marked `mastelis_atmestas` and backs nothing. Returns the number
-    of line-backed strings."""
+    compared with the scale the page states (`stated`, `_scale_verdict`) — a
+    page that fails is marked `mastelis_atmestas` and backs nothing; a page
+    read at another scale than it states carries `mastelis_kitas`. Returns the
+    number of line-backed strings."""
     cands = [_line_candidates(d, lines) for d in dims]
     votes = [d["value_m"] / c[0][3] for d, c in zip(dims, cands) if len(c) == 1]
     if len(votes) < MIN_SCALED:
@@ -316,7 +339,8 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
         return 0
     ratios = [r for _, _, r in accepted]
     measured = statistics.median(ratios)
-    scale, mastelis, refused = _scale_verdict(measured, stated, statistics.quantiles(ratios, n=10, method="inclusive")[-1])
+    scale, mastelis, refused, other = _scale_verdict(
+        measured, stated, statistics.quantiles(ratios, n=10, method="inclusive")[-1])
     if refused:
         record = {"ismatuota": int(round(measured / _PT_M)), "uzrasyta": sorted(stated or ()), "priezastis": refused}
         for d in dims:
@@ -325,6 +349,8 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
     for d in dims:
         d["scale_m_per_pt"] = round(scale, 6)
         d["mastelis"] = mastelis
+        if other:
+            d["mastelis_kitas"] = other
     for d, (a0, a1, p), _ in accepted:
         d["span"] = [round(a0, 2), round(a1, 2)]
         d["line_pos"] = round(p, 2)
@@ -335,9 +361,9 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
 def attach_dimension_lines(pdf_bytes: bytes, dims: list[dict], stated: dict[int, set[int]] | None = None) -> int:
     """Back the strings with the vector layer's hairlines (module doc).
     `stated`: the scales each page writes (`stated_scales_on_page`), which
-    its derived scale must agree with. Mutates in place; returns the number
-    of line-backed strings. Without pypdfium2, or on a raster sheet, nothing
-    is backed and nothing pairs."""
+    its derived scale is compared with (`_scale_verdict`). Mutates in place;
+    returns the number of line-backed strings. Without pypdfium2, or on a
+    raster sheet, nothing is backed and nothing pairs."""
     by_page: dict[int, list[dict]] = {}
     for d in dims:
         by_page.setdefault(int(d["page"]), []).append(d)
@@ -722,7 +748,10 @@ def apply_dimension_strings(rooms: Sequence[dict], dims: Sequence[dict],
         "pages": sorted({int(d["page"]) for d in dims}),
         "mastelis": {str(p): m for p, m in sorted({int(d["page"]): int(d["mastelis"])
                                                     for d in dims if d.get("mastelis")}.items())},
-        # pages whose strings agree with their hairlines at no plan's scale, or at another than the one written
+        # pages read at the scale their strings measure although the sheet writes another (a reduced print)
+        "mastelis_kitas": {str(p): rec for p, rec in sorted({int(d["page"]): d["mastelis_kitas"]
+                                                              for d in dims if d.get("mastelis_kitas")}.items())},
+        # pages whose strings agree with their hairlines at no plan's scale, or at the written one off by a unit
         "mastelis_atmestas": {str(p): rec for p, rec in sorted({int(d["page"]): d["mastelis_atmestas"]
                                                                  for d in dims if d.get("mastelis_atmestas")}.items())},
     }

@@ -11,6 +11,7 @@ createProject() would have built it.
 """
 import main  # noqa: E402  (main before auth — house idiom)
 import db
+import storage
 
 
 def _result(rooms=2):
@@ -106,13 +107,25 @@ def test_orphan_save_defaults_name_when_filename_empty(monkeypatch):
 # exactly, so this drives the real code path with no network and no sockets.
 import asyncio
 import io
+import json
 import time
 
 from starlette.requests import Request
 from fastapi import UploadFile
 
 
-def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
+def test_client_disconnect_midstream_finishes_and_saves(monkeypatch, tmp_path):
+    # Its own database and PDF store (the house idiom): the run writes its job row and the drain stores the
+    # drawing — until 2026-10-05 both landed in backend/data (a job row in samatu.db, a 409-byte fake PDF in
+    # pdf_store) on every suite run.
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "disconnect.db")
+    db.init_schema()
+    db._migrate_schema()
+    for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "pdfs"))
+    monkeypatch.setattr(storage, "_instance", None)
+
     def fake_stream(pdf_bytes, overrides):
         yield {"event": "started", "pages": 3}
         time.sleep(0.6)                     # a step is IN FLIGHT on disconnect
@@ -147,21 +160,28 @@ def test_client_disconnect_midstream_finishes_and_saves(monkeypatch):
         # first yield deliberately saves nothing: no extraction has happened.
         first = await it.__anext__()
         assert b"recovery_id" in first
+        rid.append(json.loads(first.decode("utf-8")[len("data: "):].strip())["project_id"])
         await it.__anext__()
         try:
             await it.athrow(asyncio.CancelledError())   # …then the socket dies
         except (asyncio.CancelledError, StopAsyncIteration):
             pass
         for _ in range(80):                        # drain is detached
-            if saved:
+            job = db.get_extraction_job(rid[0])
+            if saved and job and job["status"] != "running":
                 break
             await asyncio.sleep(0.25)
 
+    rid: list[str] = []
     asyncio.run(drive())
     assert saved, "client disconnected mid-extraction and NOTHING was saved"
     assert saved["blob"]["_saved_by"] == "stream_disconnect_recovery"
     assert saved["blob"]["name"] == "objektas_a"        # PDF stem, like the frontend
     assert saved["blob"]["total_rows"] == 1
+    # what the run wrote stayed in the test's own database and store
+    job = db.get_extraction_job(rid[0])
+    assert job["status"] == "done" and job["project_id"] == saved["pid"] == rid[0]
+    assert (tmp_path / "pdfs" / "projects" / f"{rid[0]}.pdf").exists()
 
 
 # ── Project naming on the recovery path ─────────────────────────────────────

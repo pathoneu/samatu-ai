@@ -886,6 +886,9 @@ KARNIZAS_KEY = "_karnizas"              # room flag: the drawing mentions a corn
 EXTERIOR_KEY = "_exterior"              # door element: leads outside (Vision recount, the walls, the entrance room)
 EXTERIOR_MARKED_KEY = "_lauko_pagal"    # …set by mark_exterior_doors (its own marks are cleared before a re-run)
 SCHEDULE_TYPE_KEY = "_duru_tipas"       # door element: frame type the drawing's door schedule gives it
+# …except a row that names the doors frameless AND framed (door_schedule.AMBIGUOUS): such a door takes the
+# project's answer like an untagged one — the schedule cannot settle it, he is asked (settle_frameless_default)
+SCHEDULE_TYPE_UNCLEAR = "neaisku"
 SCHEDULE_CODE_KEY = "_ziniarascio_kodas"
 SCHEDULE_UNITS_KEY = "_ziniarascio_n"   # …how many of its units the schedule lists
 BEYOND_SCHEDULE_KEY = "_be_ziniarascio" # door element: an interior door the schedule does not have — no per-opening row
@@ -1645,12 +1648,16 @@ def reconcile_doors_with_schedule(rooms: list[dict], schedule: dict | None) -> d
     return out
 
 
-def _frameless_sentence(source: str, schedule: dict | None) -> str:
+def _frameless_sentence(source: str, schedule: dict | None, value: bool = False) -> str:
     said = str((schedule or {}).get("sakinys") or "").strip()
     if source == "jusu":
         return "Jūsų pasirinkimas Prielaidose."
     if source in ("ziniarastis", "ziniarastis_misrus"):
         return said
+    if source == "ziniarastis_neaiskus":
+        # the schedule's own sentence already says which rows name both types and asks to check them
+        said = said or "Durų žiniaraštyje dalies durų eilutėse užrašyta ir „be apvadų“, ir „su apvadais“."
+        return f"{said} Kol nepasirinksite, jos skaičiuojamos kaip {'beapvadinės' if value else 'durys su apvadais'}."
     if source in ("pastaba", "anotacija"):
         return f"{said} Nepažymėtos vidaus durys laikomos tokiomis pat."
     if source == "gaminiai":
@@ -1678,8 +1685,27 @@ def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, d
     except (TypeError, ValueError):
         read = False
     beap, framed = int(sch.get("beapvadines") or 0), int(sch.get("su_apvadais") or 0)
+    try:
+        unclear = int(sch.get("neaiskios") or 0)
+    except (TypeError, ValueError):
+        unclear = 0
     if chosen is not None:
         value, source = bool(chosen), "jusu"
+    elif unclear:
+        # Rows that name both frame types (door_schedule.AMBIGUOUS) settle nothing — not even beside clear rows,
+        # which would hand those doors the clear rows' answer without a word (2026-10-05). The source is not a
+        # settled one (project_questions._DOORS_SETTLED), so he is asked; until he answers, those doors take
+        # what the rest of the drawing says: the table's clear rows, else a note, the annotations, the products,
+        # the plan's symbols.
+        if beap or framed:
+            value = bool(beap and not framed)
+        elif sch.get("pastaba_visos") or sch.get("anotacijos_beapvadines") or sch.get("pastaba_beapvadines"):
+            value = True
+        elif sch.get("gaminiai"):
+            value = False
+        else:
+            value = bool(tagged or read)
+        source = "ziniarastis_neaiskus"
     elif beap and not framed:
         value, source = True, "ziniarastis"
     elif framed and not beap:
@@ -1700,7 +1726,7 @@ def settle_frameless_default(rooms: list[dict], overrides: dict | None = None, d
             # his „su apvadais" is about EVERY interior door — the plan's hidden-door symbols too (they are
             # the same symbol as a framed door's); only a door the drawing's schedule names frameless stays
             r[FRAMELESS_CHOSEN_KEY] = bool(chosen is not None)
-    return {"value": value, "source": source, "sakinys": _frameless_sentence(source, sch)}
+    return {"value": value, "source": source, "sakinys": _frameless_sentence(source, sch, value)}
 
 
 _REVEALS_KIND_LT = {"langai": "langų", "lauko_durys": "lauko durų", "praejimai": "praėjimų be durų", "vidaus_durys": "vidaus durų"}
@@ -3010,13 +3036,14 @@ def calc_room_quantities(room: dict,
                 if scope["vidaus_durys"]:
                     # his convention: the interior doors' reveals are finished too (off by default)
                     angokrasciu_m += kiekis * (w_m + 2 * h_m)
-                if el.get(SCHEDULE_TYPE_KEY):
+                if el.get(SCHEDULE_TYPE_KEY) and el.get(SCHEDULE_TYPE_KEY) != SCHEDULE_TYPE_UNCLEAR:
                     # the schedule names the frame: a frameless door is prepared, a framed or sliding one is not
                     if el.get(SCHEDULE_TYPE_KEY) == "beapvadines":
                         pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
                         pasleptu_duru_n += kiekis
                 elif frameless_default or (tipas == "pasleptos_duris" and not room.get(FRAMELESS_CHOSEN_KEY)):
-                    # a hidden-door symbol counts unless he said the interior doors are framed
+                    # an untagged door — or one the schedule names both ways — takes the project's answer; a
+                    # hidden-door symbol counts unless he said the interior doors are framed
                     pasleptu_duru_staktu_m += kiekis * (w_m + 2 * h_m)
                     pasleptu_duru_n += kiekis
         elif tipas in ("langas", "stoglangis"):

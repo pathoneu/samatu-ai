@@ -26,11 +26,18 @@ from main import app  # noqa: E402  (import main first so load_dotenv runs)
 
 import auth  # noqa: E402
 import db  # noqa: E402
+import storage  # noqa: E402
 
 
 def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "_DB_PATH", tmp_path / "wh_handlers.db")
     monkeypatch.setattr(auth, "AUTH_DISABLED", False)
+    # …and its own PDF store: an emitted invoice is stored as a PDF (2026-10-05: they landed in
+    # backend/data/pdf_store/invoices on every suite run)
+    for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "pdfs"))
+    monkeypatch.setattr(storage, "_instance", None)
     db.init_schema()
     db._migrate_schema()
 

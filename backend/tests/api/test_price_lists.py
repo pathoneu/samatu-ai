@@ -308,11 +308,13 @@ def as_user(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _clean_price_lists():
+def _own_database(tmp_path, monkeypatch):
+    """Every test on its own throwaway database. Until 2026-10-05 these lists —
+    and the cleanup that deleted them again — ran against backend/data/samatu.db."""
+    monkeypatch.setattr(_db, "_DB_PATH", tmp_path / "price_lists.db")
+    _db.init_schema()
+    _db._migrate_schema()
     yield
-    with _db._conn() as c:
-        c.execute("DELETE FROM price_lists WHERE user_id IN (?, ?)",
-                  (USER_A["id"], USER_B["id"]))
 
 
 def test_upload_requires_auth():

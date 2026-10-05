@@ -6244,6 +6244,17 @@ def _clean_pdf_stem(pdf_name: str) -> str:
     return stem or "Interjero projektas"
 
 
+def _project_gone(project_id: str) -> bool:
+    """True only when the project is KNOWN to be gone (deleted while its re-read
+    ran). A failed check says False: the read is then held as usual — never
+    dropped on a guess. (2026-10-05)"""
+    try:
+        return not db.project_exists(project_id)
+    except Exception:  # noqa: BLE001
+        log.warning("project %s: existence check failed", project_id, exc_info=True)
+        return False
+
+
 def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
                           pdf_bytes: bytes | None = None,
                           project_id: str | None = None) -> str | None:
@@ -6494,9 +6505,25 @@ async def extract_interior_stream_endpoint(
                         _job_finish("failed", "pipeline_error")
                         return
                     if reread_of:
+                        if _project_gone(reread_of):
+                            # Deleted while it ran: there is nothing to merge it
+                            # into, and a re-read is never a project of its own —
+                            # the run ends done, the read is not kept. (2026-10-05)
+                            log.info("stream orphan drain: re-read %s finished after its "
+                                     "project %s was deleted; not kept", recovery_id, reread_of)
+                            _job_finish("done")
+                            return
                         # A re-read belongs to the project it re-reads: hold it
                         # on the job row for the browser to merge there.
                         if _job_finish("done", result=result):
+                            # deleted between the check and the hold — its purge
+                            # may already have run: drop what was just held
+                            if _project_gone(reread_of):
+                                try:
+                                    db.drop_held_extraction_results(reread_of)
+                                except Exception:  # noqa: BLE001
+                                    log.warning("stream orphan drain: dropping the held "
+                                                "re-read %s failed", recovery_id, exc_info=True)
                             return
                         # Could not hold it (the row was never written): keep the
                         # paid read anyway, as a project of its own.

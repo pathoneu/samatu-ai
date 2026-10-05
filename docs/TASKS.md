@@ -10,8 +10,8 @@
 | # | Task | Files |
 |---|------|-------|
 | 1 | **CRITICAL** /recompute-interior fix (10→71 positions, 7.1× recovery) | main.py |
-| 2 | English → LT tooltips (NRM2/VOB/Klasė) | RulesOverridePanel.jsx |
-| 3 | Glaistymo lygis Q1-Q4 UI selektorius | RulesOverridePanel.jsx |
+| 2 | English → LT tooltips (NRM2/VOB/Klasė) | RulesOverridePanel.jsx (ištrintas 2026-10-05) |
+| 3 | Glaistymo lygis Q1-Q4 UI selektorius | RulesOverridePanel.jsx (ištrintas 2026-10-05) |
 | 4 | **H1** Left vertical tool rail (Togal-style icon bar) | PdfViewer.jsx (LeftToolRail) |
 | 5 | **H2** Top toolbar declutter (Pažangu/Eksplikacija icon-only on small screens) | PdfViewer.jsx |
 | 6 | **H3** Bottom status bar (Įrankis · Mastelis · Keyboard hints) | PdfViewer.jsx |
@@ -236,9 +236,9 @@ Research'as parodė, kad **competitive moat** = **eksplikacija-grounded confiden
 #### 2A. Research-driven fix'ai (2026-04-28 research, ranked by impact)
 - 🟢 **NRM2 tiered opening rule (3 m² slenkstis)** — ✅ DONE 2026-04-28: helpers `_opening_should_deduct`, `_opening_adds_reveal`, `_resolve_deduction_standard`; `paint_deduction_standard` user pref propagated via `_paint_deduction_standard` meta key; reveal logic in `vision_call.py::_build_pozicijos_from_rooms` gates by standard; LT default = backward compatible. **18 nauji testai** `test_nrm2_opening_deduction.py`. **TODO:** frontend Setup Wizard / Prielaidos panel toggle (LT/NRM2/VOB radio) (~0.25 d.).
 - 🔴 **Polygon-based tile zones** — replace `tiled_wall_length × tile_height` (CLAUDE.md §1.7) → polygon area iš išklotinės elevation. Add niche internals (1.5–3 m²/niša šiandien PRARASTI) + Schlüter trim line items. Unifikuoti su §2B wall_elevation merge task'u. Files: `extractor/wall_elevation.py`, `extractor/universal_rules.py`. Reference: [research §A2](superpowers/research/2026-04-28-takeoff-standards-and-pdf-ux.md#a2). (1.5–2 d.)
-- 🟢 **Sloped ceiling + stairwell modules** — ✅ DONE 2026-04-28: helpers `slope_factor(angle_deg)`, `stairwell_wall_area_m2(perim, max_h, n_steps, run, rise)`. `ceiling_geometry` parameter (flat/sloped/vaulted/coffered) + `coffered_factor` override. Stairwell: `paskirtis="laiptine"` arba `room_type="stairwell"` triggers stair triangle subtraction. Pridėtas `laiptine` į ROOM_TYPE_RULES + `normalize_paskirtis` recognition. **21 naujas testas** `test_sloped_stairwell.py`. **TODO:** Vision prompt update kad pildytų `ceiling_geometry` + `slope_angle_deg` automatiškai; frontend RulesOverridePanel UI šiems parametrams (~0.5 d.).
+- 🟢 **Sloped ceiling + stairwell modules** — ✅ DONE 2026-04-28: helpers `slope_factor(angle_deg)`, `stairwell_wall_area_m2(perim, max_h, n_steps, run, rise)`. `ceiling_geometry` parameter (flat/sloped/vaulted/coffered) + `coffered_factor` override. Stairwell: `paskirtis="laiptine"` arba `room_type="stairwell"` triggers stair triangle subtraction. Pridėtas `laiptine` į ROOM_TYPE_RULES + `normalize_paskirtis` recognition. **21 naujas testas** `test_sloped_stairwell.py`. **TODO:** Vision prompt update kad pildytų `ceiling_geometry` + `slope_angle_deg` automatiškai; frontend UI šiems parametrams (~0.5 d.) — ne RulesOverridePanel: jis ištrintas 2026-10-05, prielaidos dabar AssumptionsPanel.
 - 🟢 **Q4 thickness fix (3–5 mm) + šlifavimo labor** — ✅ FULL DONE 2026-04-28: Phase 1 (constants + CLAUDE.md §1.11). **Phase 2:** Q4-conditional šlifavimas line item su `darbo_norma_h_m2: 0.30` + `_q_lygis: "Q4"` tag + description suffix „Q4 (80–120 grit, 100% paviršius)". **5 nauji testai** `test_q4_sanding.py`.
-- 🟢 **Paint class (1/2/3) parameter** — ✅ DONE 2026-04-28: `_PAINT_CLASS_PROFILES` table (Class 1/2/3) drives coats × coverage × absorption_factor. Helper `_resolve_paint_class()`, propagated via `_paint_class` meta key. `_calc_dazai_liters` accepts `paint_class` param (priority over legacy coats). Class 2 = backward-compatible default. **20 nauji testai** `test_paint_class.py`. **TODO:** frontend RulesOverridePanel paint class radio (~0.25 d.).
+- 🟢 **Paint class (1/2/3) parameter** — ✅ DONE 2026-04-28: `_PAINT_CLASS_PROFILES` table (Class 1/2/3) drives coats × coverage × absorption_factor. Helper `_resolve_paint_class()`, propagated via `_paint_class` meta key. `_calc_dazai_liters` accepts `paint_class` param (priority over legacy coats). Class 2 = backward-compatible default. **20 nauji testai** `test_paint_class.py`. **TODO:** frontend paint class radio (~0.25 d.) — ne RulesOverridePanel: jis ištrintas 2026-10-05, prielaidos dabar AssumptionsPanel.
 - 🟢 **CLAUDE.md §8 — 4 nauji common mistakes** — Phase 1 ✅ DONE 2026-04-28: items #11–14 pridėti į CLAUDE.md §8 + research source nuoroda. Phase 2 LIKO: surface as UI warnings (frontend banner / tooltip kai aptikti susiję pozicijos). (0.25 d.)
 
 #### 2B. Esami planai (priority adjusted)
@@ -359,7 +359,7 @@ components/
     ├── ProjectMainView.jsx      — Kiekiai tab table view
     ├── InteriorWorkspace.jsx    — PDF + WorkspacePanel split
     ├── AiChat.jsx               — chat tab
-    ├── RulesOverridePanel.jsx   — Prielaidos
+    ├── AssumptionsPanel.jsx     — Prielaidos (RulesOverridePanel.jsx ištrintas 2026-10-05)
     └── (others)
 
 lib/

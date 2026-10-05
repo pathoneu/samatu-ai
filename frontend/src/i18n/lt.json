@@ -880,6 +880,17 @@
         "grindu_danga": "grindų danga",
         "polygon": "kontūras"
       },
+      "outline": {
+        "corrected": "jūsų pataisytas",
+        "manual": "jūsų nubrėžtas",
+        "sienu_konturas": "rastas pagal sienas",
+        "vektoriniai_konturai": "rastas pagal brėžinio linijas",
+        "auto_floodfill": "rastas automatiškai",
+        "synthesized_from_bbox": "apytikslis stačiakampis",
+        "bbox_fallback": "apytikslis stačiakampis",
+        "manual_needed": "nerastas",
+        "other": "kitas kontūras"
+      },
       "dismiss": "Supratau",
       "roomNote": "Perskaičius brėžinį iš naujo:",
       "roomKept": "Palikta"

@@ -34,6 +34,10 @@ def client(tmp_path_factory):
     import db as _db
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_auth, "AUTH_DISABLED", True)
+        # its own database (2026-10-05: these project rows were written into backend/data/samatu.db)
+        mp.setattr(_db, "_DB_PATH", tmp / "annotations.db")
+        _db.init_schema()
+        _db._migrate_schema()
         dev = _auth._ensure_dev_user()
         for pid in ("test-project", "to-delete"):
             _db.upsert_project(pid, {"name": pid, "tipas": "interjeras"}, user_id=dev["id"])

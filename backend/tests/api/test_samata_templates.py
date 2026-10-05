@@ -87,7 +87,12 @@ def as_user(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _clean():
+def _clean(tmp_path, monkeypatch):
+    # Its own throwaway database: until 2026-10-05 these users, projects and
+    # templates — and the cleanup below — ran against backend/data/samatu.db.
+    monkeypatch.setattr(_db, "_DB_PATH", tmp_path / "samata_templates.db")
+    _db.init_schema()
+    _db._migrate_schema()
     # `projects.user_id` carries a FOREIGN KEY, so the two identities have to
     # exist as rows before a project can be owned by one.
     with _db._conn() as c:

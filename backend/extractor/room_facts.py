@@ -368,11 +368,29 @@ def _fact_plotas(project: dict, room: dict, region: list[float] | None) -> dict:
         # its outline lies over another room that DOES own the label, say so:
         # it is most likely the same room returned twice.
         reason = str(room.get("_area_unconfirmed_reason") or "")
+        other = room.get("_plotas_uzrasas_kitas")
         if reason.startswith("duplicate_of:"):
             of = reason.split(":", 1)[1]
             sentence = (f"Ši patalpa plane persidengia su patalpa {of}, o ploto užrašas ten "
                         f"vienas — greičiausiai ta pati patalpa antrą kartą. Kol kas skaičiuoju su "
                         f"{lt_num(value)} m²; jei ji nereikalinga, išjunkite.")
+        elif reason == "label_differs" and isinstance(other, dict) and _f(other.get("value_m2")):
+            # A label DOES stand in this room's place — too far from its area to be its own
+            # (plan_area_annotations, `_plotas_uzrasas_kitas`): say which, crop where it is written,
+            # the same words as the warning (lane_warnings) — not „no label found" (2026-10-05).
+            page = other.get("page") or room.get("puslapio_nr")
+            label_rect = _bbox_pdf_to_pct(other.get("bbox"), other.get("page_width"), other.get("page_height"))
+            if label_rect:
+                m = MARKER_MARGIN_PCT
+                label_rect = [max(0.0, label_rect[0] - m), max(0.0, label_rect[1] - m),
+                              min(1.0, label_rect[2] + m), min(1.0, label_rect[3] + m)]
+            where = f" ({page} psl.)" if other.get("page") else ""
+            sentence = (f"Šios patalpos vietoje plane{where} užrašyta {lt_num(_f(other['value_m2']))} m², "
+                        f"o skaičiuoju su {lt_num(value)} m² — skirtumas per didelis, kad tai būtų tas pats "
+                        "plotas. Patikrinkite, kurios patalpos tai užrašas, ir įrašykite tikrą plotą.")
+            return _fact("plotas", round(value, 2), "m²", "assumed", "prielaida",
+                         page, label_rect or region_on_page(room, page, region), sentence,
+                         {"field": "plotas_m2", "kind": "number"})
         else:
             sentence = (f"Plane prie šios patalpos ploto užrašo neradau, nors kitos "
                         f"patalpos jį turi — skaičiuoju su {lt_num(value)} m². "

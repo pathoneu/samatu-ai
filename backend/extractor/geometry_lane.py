@@ -140,9 +140,12 @@ def _forget_open_space(room: dict) -> None:
 # share by floor area (objektas_h 04/05: estimates 16,08 / 21,69 → read 17,93 / 19,82).
 # RAISE it when the lane starts reading something a stored project would gain from.
 # 9 (2026-09-25): openings carry what the drawing shows in them — glazing → langas, swing arc → durys; doors drawn
-# where the wall is not cut. 10 (2026-10-05, audit round 13): a sheet's scale must be a plan's and the one its title
-# writes; typical floors are no longer laid over each other as one plan (a share of another storey's space written
-# before is taken back); a two-string rectangle gives way to the room's walls added up when they differ, and a
+# where the wall is not cut. 10 (2026-10-05, audit round 13): a sheet's scale must be a plan's, and it is the scale its
+# title writes when the strings measure that (a line drawn past its ends only lowers their 1:N); a sheet printed
+# reduced or enlarged is read at the scale its strings measure, the written one noted (`masteliai_kiti`), and only
+# strings in other units than the sheet (1:20 measured on a „M 1:200" sheet) are refused; typical floors are no
+# longer laid over each other as one plan (a share of another storey's space written before is taken back); a
+# two-string rectangle gives way to the room's walls added up when they differ, and a
 # bounding-box pair the outline is as long as becomes the perimeter; walls adding up to less than any room of that
 # area could have are not taken; the door schedule (it rides along with the free re-read) reads „be apvadų" as
 # frameless and „910x2100" sizes, and a row naming both frame types is left to him.
@@ -379,7 +382,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
                   "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "nupiesta": {"langai": 0, "durys": 0, "be_tarpo": 0}, "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []},
-                  "kiti_aukstai": [], "skirtingu_lapu_erdves": [], "masteliai_atmesti": {}, "poros_patvirtintos": [], "poros_atmestos": [],
+                  "kiti_aukstai": [], "skirtingu_lapu_erdves": [], "masteliai_atmesti": {}, "masteliai_kiti": {}, "poros_patvirtintos": [], "poros_atmestos": [],
                   "perimetrai_atmesti": [], "seconds": 0.0}
     status = "insufficient"
     try:
@@ -389,9 +392,11 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
             plan_pages = sorted({int(r["puslapio_nr"]) for r in rooms if r.get("puslapio_nr")}) or [1]
         if dims is None:
             dims = geometry_dimension_strings(pdf_bytes)
-        for d in dims:                     # sheets whose scale is no plan's, or not the one they write (plan_dimensions)
+        for d in dims:                     # sheets whose scale is no plan's, or the written one off by a unit (plan_dimensions)
             if d.get("mastelis_atmestas"):
                 meta["masteliai_atmesti"].setdefault(str(d["page"]), d["mastelis_atmestas"])
+            if d.get("mastelis_kitas"):    # …and sheets read at another scale than they write (a reduced print)
+                meta["masteliai_kiti"].setdefault(str(d["page"]), d["mastelis_kitas"])
         # Which sheets belong to the plan is decided by ALIGNMENT — the same walls in the same place —
         # not by the page classifier (objektas_g, 2026-09-10: the dimensioned sheet was called something
         # else and every wall was lost; two of its outlines were traced on the plumbing plan). So every

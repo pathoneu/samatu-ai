@@ -22,11 +22,18 @@ from starlette.requests import Request
 
 import main  # noqa: E402  (main before db — house idiom)
 import db
+import storage
 
 
 @pytest.fixture
 def jobs_db(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "_DB_PATH", tmp_path / "jobs.db")
+    # …and its own PDF store: the disconnect path stores the drawing of the project it saves (2026-10-05:
+    # it landed in backend/data/pdf_store on every suite run)
+    for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "pdfs"))
+    monkeypatch.setattr(storage, "_instance", None)
     db.init_schema()
     db._migrate_schema()
     for uid in ("owner", "stranger", "boss"):
@@ -294,6 +301,61 @@ def test_client_gone_mid_reread_holds_the_read_and_saves_no_project(jobs_db, mon
     # A re-read is never a second project.
     assert saved == []
     assert db.get_project(rid) is None
+
+
+def _reread_stream_deleting(project_id):
+    """A re-read during which he deletes the project it reads."""
+    def stream(pdf_bytes, overrides):
+        yield {"event": "started"}
+        time.sleep(0.4)                      # a step is IN FLIGHT on disconnect
+        yield {"event": "step"}
+        db.delete_project(project_id, user_id="owner")
+        yield {"event": "done", "result": {"status": "ok", "patalpos": [{"nr": "101", "plotas_m2": 12.0}]}}
+    return stream
+
+
+def _count_saves(monkeypatch):
+    saved = []
+    real_upsert = db.upsert_project
+    monkeypatch.setattr(main.db, "upsert_project",
+                        lambda pid, *a, **k: (saved.append(pid), real_upsert(pid, *a, **k)))
+    return saved
+
+
+def test_client_gone_mid_reread_of_a_project_deleted_meanwhile_ends_done_and_keeps_nothing(jobs_db, monkeypatch):
+    """2026-10-05: the drain held the read on the job row of a project that no longer existed (for the 3-day
+    hold) — and, had the hold failed, would have saved the deleted project's read as a NEW project. It ends
+    done, nothing held, nothing saved."""
+    db.upsert_project("p-old", {"name": "Butas", "patalpos": []}, user_id="owner")
+    _stream_env(monkeypatch, stream=_reread_stream_deleting("p-old"))
+    saved = _count_saves(monkeypatch)
+    rid = _disconnect_midstream(reread_of="p-old")
+    job = db.get_extraction_job(rid)
+    assert (job["status"], job["error"]) == ("done", None)
+    assert job["kind"] == "reread" and job["project_id"] == "p-old"
+    assert job["result"] is None
+    assert saved == [] and db.get_project(rid) is None and db.get_project("p-old") is None
+    assert not (jobs_db / "pdfs").exists() or not any((jobs_db / "pdfs").rglob("*.pdf"))
+
+
+def test_a_reread_held_just_as_its_project_is_deleted_is_dropped(jobs_db, monkeypatch):
+    """The delete lands between the drain's check and its hold — after the delete's own purge dropped what
+    was held: the drain drops what it just held."""
+    db.upsert_project("p-old", {"name": "Butas", "patalpos": []}, user_id="owner")
+    _stream_env(monkeypatch, stream=_slow_ok_stream)
+    real_finish = db.finish_extraction_job
+
+    def finish_then_deleted(job_id, status, **kw):
+        ok = real_finish(job_id, status, **kw)
+        if kw.get("result") is not None:
+            db.delete_project("p-old", user_id="owner")
+        return ok
+    monkeypatch.setattr(main.db, "finish_extraction_job", finish_then_deleted)
+    saved = _count_saves(monkeypatch)
+    rid = _disconnect_midstream(reread_of="p-old")
+    job = db.get_extraction_job(rid)
+    assert job["status"] == "done" and job["result"] is None
+    assert saved == [] and db.get_project(rid) is None
 
 
 def test_reread_of_a_foreign_project_is_404_before_anything_runs(jobs_db, monkeypatch):

@@ -215,9 +215,10 @@ def _ask_durys(project: dict, rooms: list[dict]) -> dict | None:
     with casings? A frameless door draws exactly like a framed one, so the plan's symbols cannot settle it —
     only the drawing's TEXT (a door schedule, a note, the openings annotated for frameless doors, the door
     products on a finish board) or the person can. Asked while the frame type rests on the symbols alone or
-    on nothing (universal_rules.settle_frameless_default: `brezinys`, `nera_pozymiu`), or on evidence that
-    names only some doors (`anotacija`, `gaminiai`); the proposal is what the estimate computes with now.
-    The answer lands as `_overrides.vidaus_durys_beapvadines`."""
+    on nothing (universal_rules.settle_frameless_default: `brezinys`, `nera_pozymiu`), on evidence that
+    names only some doors (`anotacija`, `gaminiai`), or on a door schedule some rows of which name both types
+    (`ziniarastis_neaiskus` — then the question is about those doors); the proposal is what the estimate
+    computes with now. The answer lands as `_overrides.vidaus_durys_beapvadines`."""
     from copy import deepcopy
     from .universal_rules import settle_frameless_default, _is_interior_door
     interior = [el for r in rooms for el in (r.get("elementai") or []) if _is_interior_door(el)]
@@ -232,13 +233,24 @@ def _ask_durys(project: dict, rooms: list[dict]) -> dict | None:
         return None
     proposed = 1 if settled.get("value") else 0
     n = sum(int(el.get("kiekis") or 1) for el in interior)
-    item = {"room_nr": "", "room_name": "Visos vidaus durys", "field": "vidaus_durys_beapvadines", "unit": None,
-            "sentence": str(settled.get("sakinys") or ""), "page": None, "proposed": proposed,
-            "proposed_label": _DOORS_CHOICES[0]["label"] if proposed else _DOORS_CHOICES[1]["label"],
-            "choices": _DOORS_CHOICES, "count": n}
+    name = "Visos vidaus durys"
     why = ("Beapvadinės durys plane piešiamos taip pat kaip su apvadais, todėl iš simbolio to nustatyti negalima. "
            "Nuo atsakymo priklauso eilutė „Durų angų paruošimas beapvadinėms durims“: su apvadais ji nereikalinga. "
            "Lauko durys čia neįskaitomos.")
+    if settled.get("source") == "ziniarastis_neaiskus":
+        # the schedule settles its clear rows itself; the answer is about the doors its unclear rows list
+        sch = project.get("_duru_ziniarastis") or {}
+        codes = [str(c) for c in (sch.get("neaiskus_kodai") or []) if c]
+        name = ("Durys " + ", ".join(codes)) if codes else "Neaiškaus tipo žiniaraščio durys"
+        n = int(_f(sch.get("neaiskios")) or 0) or n
+        why = (f"Durų žiniaraštyje šių durų {'eilutėse' if len(codes) > 1 else 'eilutėje'} užrašyta ir „be apvadų“, "
+               "ir „su apvadais“, todėl jų tipo iš brėžinio nustatyti negalima. Nuo atsakymo priklauso, ar jos įeina "
+               "į eilutę „Durų angų paruošimas beapvadinėms durims“; kitos žiniaraščio durys skaičiuojamos taip, "
+               "kaip ten užrašyta.")
+    item = {"room_nr": "", "room_name": name, "field": "vidaus_durys_beapvadines", "unit": None,
+            "sentence": str(settled.get("sakinys") or ""), "page": None, "proposed": proposed,
+            "proposed_label": _DOORS_CHOICES[0]["label"] if proposed else _DOORS_CHOICES[1]["label"],
+            "choices": _DOORS_CHOICES, "count": n}
     return _q("durys", "choices", "Vidaus durys — beapvadinės ar su apvadais?", why, [item])
 
 

@@ -338,9 +338,13 @@ def test_a_sheet_whose_dimension_lines_run_past_their_ends_keeps_its_stated_scal
     dims = read_dimension_strings(_sheet_at(100, vals, "PLANAS M 1:100", past=1.8))
     assert sum(1 for d in dims if d.get("span_source") == "line") >= 10
     assert {d["mastelis"] for d in dims} == {100} and not any("mastelis_atmestas" in d for d in dims)
-    # …but lines so long that even the longest strings measure 1:94,8 are not the stated scale's
+    # …but lines so long that even the longest strings measure 1:94,8 are not drawn at the stated scale. CHANGED
+    # ON PURPOSE 2026-10-05: such a page was refused; it reads like an enlarged print or a sheet mixing scales, so
+    # it is read at what its strings measure (their median, 1:92) and the stated 1:100 is noted beside it
     dims = read_dimension_strings(_sheet_at(100, vals, "PLANAS M 1:100", past=2.2))
-    assert not any(d.get("span_source") for d in dims) and dims[0]["mastelis_atmestas"]["priezastis"] == "nesutampa_su_uzrasytu"
+    assert sum(1 for d in dims if d.get("span_source") == "line") >= 10
+    assert {d["mastelis"] for d in dims} == {92} and not any("mastelis_atmestas" in d for d in dims)
+    assert dims[0]["mastelis_kitas"] == {"ismatuota": 92, "uzrasyta": [100]}
 
 
 def test_centimetre_strings_give_no_plans_scale_and_nothing_on_the_sheet_is_used():
@@ -358,15 +362,75 @@ def test_centimetre_strings_give_no_plans_scale_and_nothing_on_the_sheet_is_used
     assert room["perimetras_m"] == 15.0 and "perimetras_saltinis" not in room
 
 
-def test_a_sheet_whose_strings_disagree_with_its_stated_scale_is_refused():
-    # drawn at 1:100, titled „M 1:50": one of the two is not what it seems — nothing is guessed
+def test_a_sheet_printed_reduced_is_read_at_the_scale_its_strings_measure():
+    """An A1 sheet drawn at 1:50 and printed on A3 states „M 1:50" and measures 1:100. CHANGED ON PURPOSE
+    2026-10-05: Round 13 refused such a page and threw away every correct string on it; its strings and their
+    lines agree with each other in this PDF, so the page is read at 1:100 and the written 1:50 is noted."""
     dims = read_dimension_strings(_sheet_at(100, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2], "PLANAS M 1:50"))
-    assert not any(d.get("span_source") for d in dims)
-    rec = dims[0]["mastelis_atmestas"]
-    assert rec == {"ismatuota": 100, "uzrasyta": [50], "priezastis": "nesutampa_su_uzrasytu"}
-    # the same sheet without a title keeps its own scale
+    assert all(d.get("span_source") == "line" for d in dims) and len(dims) == 6
+    assert {d["mastelis"] for d in dims} == {100} and {d["scale_m_per_pt"] for d in dims} == {round(SCALE * 2, 6)}
+    assert not any("mastelis_atmestas" in d for d in dims)
+    assert dims[0]["mastelis_kitas"] == {"ismatuota": 100, "uzrasyta": [50]}
+    s = apply_dimension_strings([], dims)
+    assert s["mastelis"] == {"1": 100} and s["mastelis_kitas"] == {"1": {"ismatuota": 100, "uzrasyta": [50]}}
+    assert s["mastelis_atmestas"] == {}
+    # the same sheet without a title keeps its own scale, and notes nothing
     dims = read_dimension_strings(_sheet_at(100, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2]))
     assert {d["mastelis"] for d in dims} == {100} and all(d.get("span_source") == "line" for d in dims)
+    assert not any("mastelis_kitas" in d for d in dims)
+
+
+def test_a_fit_to_page_print_keeps_its_measured_scale_not_the_stated_one():
+    """„Fit to page" at 97 %: titled 1:100, measures 1:103 — above the stated scale by more than PDFium's bounds
+    explain, so the page was printed reduced. It is read at 1:103, the label too (snapped to 1:100 the viewer and
+    the check sheet would measure 3 % short)."""
+    dims = read_dimension_strings(_sheet_at(103, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2], "PLANAS M 1:100"))
+    assert all(d.get("span_source") == "line" for d in dims)
+    assert {d["scale_m_per_pt"] for d in dims} == {round(25.4 / 72 / 1000 * 103, 6)}
+    assert {d["mastelis"] for d in dims} == {103}
+    assert dims[0]["mastelis_kitas"] == {"ismatuota": 103, "uzrasyta": [100]}
+
+
+def test_a_sheet_measuring_a_little_under_or_just_over_its_stated_scale_takes_the_stated_one():
+    """Dimension lines drawn past their ends only ever LOWER the 1:N a string measures: objektas_b's 1:100 sheets
+    measure up to 1:96,8 — the stated 1:100, exact. Just above it (1:100,6) is PDFium's bounds, not a print."""
+    for drawn in (96.8, 100.6):
+        dims = read_dimension_strings(_sheet_at(drawn, [1.0, 2.5, 4.0, 0.6, 1.5, 3.2], "PLANAS M 1:100"))
+        assert all(d.get("span_source") == "line" for d in dims), drawn
+        assert {d["scale_m_per_pt"] for d in dims} == {round(SCALE * 2, 6)}, drawn
+        assert {d["mastelis"] for d in dims} == {100}, drawn
+        assert not any("mastelis_kitas" in d or "mastelis_atmestas" in d for d in dims), drawn
+
+
+def test_centimetre_strings_on_a_1_200_sheet_are_refused():
+    """Centimetres read as millimetres on a 1:200 plan measure 1:20 — inside a plan's range, so only the stated
+    scale shows it: 1:20 against 1:200 is a unit off, not a print size. Nothing on the sheet is used."""
+    sheet = _sheet_at(200, [3.5, 4.0, 4.5, 5.0, 5.5, 6.0], "PLANAS M 1:200", text=lambda v: str(round(v * 100)))
+    dims = read_dimension_strings(sheet)
+    assert len(dims) == 6 and dims[0]["value_m"] == 0.35
+    assert not any(d.get("span_source") or d.get("mastelis") or d.get("mastelis_kitas") for d in dims)
+    assert dims[0]["mastelis_atmestas"] == {"ismatuota": 20, "uzrasyta": [200], "priezastis": "kiti_vienetai"}
+    room = _room("01", 14.0, 0.3, 0.3, perim=15.0, page=1)
+    s = apply_dimension_strings([room], dims)
+    assert s["status"] == "insufficient" and s["mastelis"] == {} and s["mastelis_kitas"] == {}
+    assert room["perimetras_m"] == 15.0 and "perimetras_saltinis" not in room
+
+
+def test_the_scale_verdict_table():
+    from extractor.plan_dimensions import _PT_M, _scale_verdict
+    def verdict(median, stated, upper=None):
+        scale, mastelis, refused, note = _scale_verdict(median * _PT_M, stated, (upper or median) * _PT_M)
+        return (round(scale / _PT_M, 2) if scale else None), mastelis, refused, note
+    assert verdict(50.4, None) == (50.4, 50, None, None)                     # nothing stated: as measured
+    assert verdict(10.0, {100}) == (None, None, "ne_plano_mastelis", None)    # no plan's scale at all
+    assert verdict(94.0, {100}, upper=96.8) == (100.0, 100, None, None)       # lines past their ends
+    assert verdict(100.9, {100}) == (100.0, 100, None, None)                  # PDFium's bounds
+    assert verdict(101.6, {100}) == (101.6, 102, None, {"ismatuota": 102, "uzrasyta": [100]})   # reduced
+    assert verdict(25.0, {25, 50}) == (25.0, 25, None, None)                  # a detail's stated scale
+    assert verdict(20.0, {200}) == (None, None, "kiti_vienetai", None)        # centimetres
+    assert verdict(480.0, {50}) == (None, None, "kiti_vienetai", None)        # a unit the other way
+    assert verdict(20.0, {50, 200}) == (None, None, "kiti_vienetai", None)    # off by a unit from ANY stated one
+    assert verdict(70.7, {100}) == (70.7, 71, None, {"ismatuota": 71, "uzrasyta": [100]})       # enlarged
 
 
 def test_a_perimeter_shorter_than_any_room_of_that_area_is_implausible():

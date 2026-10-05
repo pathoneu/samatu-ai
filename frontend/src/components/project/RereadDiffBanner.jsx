@@ -13,23 +13,8 @@ import { RefreshCw, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { updateProject } from '@/lib/projectStore';
-import { ltNumber } from '@/lib/ledger';
-import { rereadDiffIsEmpty, rereadEntriesFor } from '@/lib/mergeReextract';
-
-const UNIT = { plotas_m2: ' m²', perimetras_m: ' m', lubu_aukstis_m: ' m' };
-const COUNTS = new Set(['durys', 'langai']);
-
-// A floor covering is stored as the engine's word for it; he reads the sheet's words.
-const FLOOR_LT = { plyteles: 'plytelės', minksta: 'parketas arba laminatas', be_dangos: 'be dangos' };
-
-function fmt(key, v) {
-  if (v == null || v === '') return '—';
-  if (key === 'grindu_danga') return FLOOR_LT[String(v)] || String(v);
-  if (key === 'paskirtis' || key === 'polygon') return String(v);
-  const n = Number(v);
-  if (!Number.isFinite(n)) return String(v);
-  return `${ltNumber(n, COUNTS.has(key) ? 0 : 2)}${UNIT[key] || ''}`;
-}
+// every value said in words, a line that reads the same before and after left out (lib/rereadDiffText.js)
+import { rereadDiffLines, rereadLinesEmpty, rereadRoomLines, rereadValue } from '@/lib/rereadDiffText';
 
 function when(iso) {
   const d = new Date(iso);
@@ -42,16 +27,13 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
   const diff = project?._reread_diff;
   if (!diff || typeof diff !== 'object') return null;
 
-  const field = (key) => t(`project.reread.fields.${key}`, { defaultValue: key });
   const roomLabel = (r) => [r.nr, r.pavadinimas].filter(Boolean).join(' ');
   const dismiss = () => {
     updateProject(project.id, { _reread_diff: null });
     onProjectChange?.({ ...project, _reread_diff: null });
   };
-  const changed = diff.changed || [];
-  const kept = diff.kept || [];
-  const added = diff.added || [];
-  const removed = diff.removed || [];
+  const lines = rereadDiffLines(diff, t);
+  const { changed, kept, added, removed } = lines;
 
   return (
     <div
@@ -66,7 +48,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
             {diff.at ? <span className="font-normal text-amber-800/80 dark:text-amber-300/70"> · {when(diff.at)}</span> : null}
           </p>
 
-          {rereadDiffIsEmpty(diff) && <p>{t('project.reread.nothing')}</p>}
+          {rereadLinesEmpty(lines) && <p>{t('project.reread.nothing')}</p>}
 
           {changed.length > 0 && (
             <div>
@@ -76,7 +58,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
                   <li key={`c-${r.nr}`}>
                     <span className="font-medium">{roomLabel(r)}</span>
                     {' — '}
-                    {r.fields.map((f) => `${field(f.key)} ${fmt(f.key, f.from)} → ${fmt(f.key, f.to)}`).join('; ')}
+                    {r.lines.join('; ')}
                   </li>
                 ))}
               </ul>
@@ -93,10 +75,10 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
                     <span className="font-medium">{roomLabel(r)}</span>
                     {' — '}
                     {t(`project.reread.kept.${r.why}`, { defaultValue: r.why })}
-                    {r.fields.length > 0 && (
+                    {r.lines.length > 0 && (
                       <>
                         {': '}
-                        {r.fields.map((f) => `${field(f.key)} ${fmt(f.key, f.kept)} (${t('project.reread.read', { value: fmt(f.key, f.read) })})`).join('; ')}
+                        {r.lines.join('; ')}
                       </>
                     )}
                   </li>
@@ -109,7 +91,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
             <p>
               <span className="font-medium">{t('project.reread.addedTitle', { count: added.length })}</span>
               {': '}
-              {added.map((r) => `${roomLabel(r)}${r.plotas_m2 != null ? ` (${fmt('plotas_m2', r.plotas_m2)})` : ''}`).join(', ')}
+              {added.map((r) => `${roomLabel(r)}${r.plotas_m2 != null ? ` (${rereadValue('plotas_m2', r.plotas_m2, t)})` : ''}`).join(', ')}
             </p>
           )}
 
@@ -117,7 +99,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
             <p>
               <span className="font-medium">{t('project.reread.removedTitle', { count: removed.length })}</span>
               {': '}
-              {removed.map((r) => `${roomLabel(r)}${r.plotas_m2 != null ? ` (${fmt('plotas_m2', r.plotas_m2)})` : ''}`).join(', ')}
+              {removed.map((r) => `${roomLabel(r)}${r.plotas_m2 != null ? ` (${rereadValue('plotas_m2', r.plotas_m2, t)})` : ''}`).join(', ')}
             </p>
           )}
         </div>
@@ -137,13 +119,11 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
  */
 export function RereadRoomNote({ project, roomNr }) {
   const { t } = useTranslation();
-  const entries = rereadEntriesFor(project?._reread_diff, roomNr);
+  const entries = rereadRoomLines(project?._reread_diff, roomNr, t);
   if (!entries) return null;
-  const field = (key) => t(`project.reread.fields.${key}`, { defaultValue: key });
-  const changed = entries.changed.map((f) => `${field(f.key)} ${fmt(f.key, f.from)} → ${fmt(f.key, f.to)}`);
+  const changed = entries.changed;
   const kept = entries.kept
-    ? [t(`project.reread.kept.${entries.kept.why}`, { defaultValue: entries.kept.why })]
-      .concat(entries.kept.fields.map((f) => `${field(f.key)} ${fmt(f.key, f.kept)} (${t('project.reread.read', { value: fmt(f.key, f.read) })})`))
+    ? [t(`project.reread.kept.${entries.kept.why}`, { defaultValue: entries.kept.why })].concat(entries.kept.lines)
     : [];
   return (
     <div

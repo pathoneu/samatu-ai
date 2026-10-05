@@ -76,8 +76,10 @@ test('STANDARD_DIMENSIONS: door leaf areas match width×height for each room typ
   }
 });
 
-// PRESETS: bundled override sets used by RulesOverridePanel. Pin the Q-level
-// / waste-pct combinations so a preset edit doesn't silently drift.
+// PRESETS: bundled override sets RulesOverridePanel used (that panel was deleted
+// 2026-10-05; nothing in the app reads them now — whether ltLibrary goes too is
+// the founder's call). Pin the Q-level / waste-pct combinations so a preset edit
+// doesn't silently drift.
 test('PRESETS: findPresetById resolves each bundled preset with its glaistas Q-level', () => {
   assert.equal(findPresetById('standartinis').overrides.glaistas_q_lygis, 'Q2');
   assert.equal(findPresetById('premium').overrides.glaistas_q_lygis, 'Q3');
