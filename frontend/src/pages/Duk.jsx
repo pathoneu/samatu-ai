@@ -10,7 +10,7 @@
  * page AND the FAQPage JSON-LD (setJsonLd) — the two can never drift apart.
  */
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import LegalLayout, { Section, P } from '@/components/legal/LegalLayout';
 import { setJsonLd } from '@/lib/seo';
 

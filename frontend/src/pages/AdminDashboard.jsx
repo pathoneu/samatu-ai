@@ -15,7 +15,7 @@
  * (credentials:'include') and each endpoint 401/403s for anon/non-admin.
  */
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Download, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';

@@ -18,7 +18,7 @@
  * LegalLayout, which derives meta from its props).
  */
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { PathonMark } from '@/components/layout/Logo';
 

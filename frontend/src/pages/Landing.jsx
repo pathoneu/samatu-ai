@@ -21,7 +21,7 @@
  * (walls = perimeter × H − openings), costs = qty × rate, gross = net × 1.21.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { changeAppLanguage } from '@/i18n';
 import { PathonMark } from '@/components/layout/Logo';

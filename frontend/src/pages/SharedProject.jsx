@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Eye, ArrowLeft, Building2 } from 'lucide-react';
 import { API_BASE as API } from '../lib/apiBase';

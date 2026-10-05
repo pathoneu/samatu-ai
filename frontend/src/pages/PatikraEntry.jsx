@@ -5,7 +5,7 @@
  * for — the links every screen of Patikra already uses.
  */
 
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 
 import PatikraQuestions from '@/pages/PatikraQuestions';
 import RoomSheet from '@/pages/RoomSheet';

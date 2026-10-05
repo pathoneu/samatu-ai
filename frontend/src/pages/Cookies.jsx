@@ -14,7 +14,7 @@ import React from 'react';
 import LegalLayout, {
   Section, P, Term, UL, LI, Callout, Code, DefTable,
 } from '@/components/legal/LegalLayout';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { openCookieSettings } from '@/components/CookieBanner';
 

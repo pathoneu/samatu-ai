@@ -13,7 +13,7 @@
  * the typographic scale stays identical across all three.
  */
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { PathonMark } from '@/components/layout/Logo';

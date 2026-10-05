@@ -25,7 +25,7 @@
  * Būtinasis sesijos slapukas veikia nepriklausomai nuo šio pasirinkimo.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import '@/pages/landing/landing.css'; // paper-palette tokens + pl-btn-* (scoped under #plr)
 

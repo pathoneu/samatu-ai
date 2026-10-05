@@ -14,7 +14,7 @@
  * Schema: Article.
  */
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import MarketingLayout from '@/components/marketing/MarketingLayout';
 import {
   Section, P, Term, UL, LI, Callout, Code, DefTable,

@@ -11,7 +11,7 @@ import React from 'react';
 import LegalLayout, {
   Section, SubHead, P, Term, UL, LI, Callout, Todo,
 } from '@/components/legal/LegalLayout';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 
 export default function Privacy() {

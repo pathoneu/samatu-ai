@@ -12,7 +12,7 @@
  * Schema: Article + HowTo (matomi žingsniai 7 sekcijoje — vienintelis šaltinis).
  */
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import MarketingLayout from '@/components/marketing/MarketingLayout';
 import {
   Section, SubHead, P, Term, UL, LI, Callout, Code, DefTable,

@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import { toast } from 'sonner';
 import { useBilling } from '@/hooks/useBilling';
 

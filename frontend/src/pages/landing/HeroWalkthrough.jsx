@@ -14,7 +14,7 @@
  * Then a slow dissolve and the cycle re-plots. prefers-reduced-motion →
  * the fully composed final frame. Scene micro-copy is LT draft.
  */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 
 const mono = "'IBM Plex Mono', monospace";

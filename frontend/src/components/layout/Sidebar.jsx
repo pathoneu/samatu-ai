@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard,

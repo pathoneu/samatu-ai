@@ -4,7 +4,7 @@ import { ConfirmProvider } from '@/components/ui/confirm-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router';
 import React, { Suspense, lazy } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import AppLayout from '@/components/layout/AppLayout';
@@ -98,7 +98,13 @@ function App() {
       <AuthProvider>
         <ConfirmProvider>
         <TooltipProvider delayDuration={200}>
-        <Router>
+        {/* useTransitions={false} keeps navigation as it was on react-router 6
+            (2026-10-05). By default v7 keeps the old page on screen until a lazy
+            page's code arrives: on a slow link (1.6 Mbit/s) opening a project
+            left the dashboard up for ~1.5 s with no sign the click registered,
+            and a second click added a duplicate history entry (Back stayed on
+            the project). With it, „Kraunama…" shows at once, as before. */}
+        <Router useTransitions={false}>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes (no auth required) */}

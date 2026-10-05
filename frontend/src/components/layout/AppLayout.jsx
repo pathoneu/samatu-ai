@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
