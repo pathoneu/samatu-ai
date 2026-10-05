@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Building2, KeyRound, User, Download, Upload, AlertCircle, Bug, Trash2 } from 'lucide-react';
+import { Save, Building2, KeyRound, User, Download, Upload, AlertCircle, Bug, Trash2, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getSettings, saveSettings, getProjects, ensureSettingsPulled, flushSettingsWrites,
@@ -15,7 +16,12 @@ import { downloadErrorLog, getErrorLog, clearErrorLog } from '@/lib/errorTracker
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { useAuth } from '@/lib/authContext';
 import { API_BASE } from '@/lib/apiBase';
+import { confirmMatches, deleteAccount, forgetCachedDrawings } from '@/lib/accountApi';
 import BillingSettings from '@/components/billing/BillingSettings';
+
+// The backup section's anchor — the account-deletion section points the user
+// there to take a copy first.
+const BACKUP_SECTION_ID = 'atsargine-kopija';
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -362,7 +368,131 @@ export default function Settings() {
 
         {/* Sprint §24: Klaidų žurnalas eksportui */}
         <ErrorLogSection />
+
+        {/* 2026-10-05: Paskyros ištrynimas — last, set apart, red. */}
+        <DeleteAccountSection />
       </div>
+    </div>
+  );
+}
+
+function DeleteAccountSection() {
+  const { t } = useTranslation();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!user) return null;
+  const matches = confirmMatches(typed, user.email);
+
+  const scrollToBackup = () => {
+    document.getElementById(BACKUP_SECTION_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleDelete = async () => {
+    if (!matches || deleting) return;
+    setDeleting(true);
+    setError('');
+    let result;
+    try {
+      result = await deleteAccount(typed);
+    } catch (e) {
+      // The server says why in plain words (wrong email, a read still running,
+      // a paid plan); without words — the connection — say it ourselves.
+      setError(e.detail || t('settings.deleteAccount.failGeneric'));
+      setDeleting(false);
+      return;
+    }
+    // Gone on the server. Now this browser's copy of it: the drawings it cached
+    // (IndexedDB), then — through logout, which owns those keys — the cached
+    // projects, company details, price lists and their owner markers.
+    await forgetCachedDrawings(getProjects().map((p) => p.id));
+    await logout();
+    toast.success(t('settings.deleteAccount.toastDeleted', { n: result.deleted_projects }));
+    navigate('/', { replace: true });
+  };
+
+  return (
+    <div className="bg-card border border-destructive/40 rounded-xl p-6 mt-4">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+          <UserX className="w-5 h-5 text-destructive" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-foreground">{t('settings.deleteAccount.heading')}</h2>
+          <p className="text-xs text-muted-foreground">{t('settings.deleteAccount.sub')}</p>
+        </div>
+      </div>
+
+      {user.is_admin ? (
+        <p className="text-sm text-muted-foreground">{t('settings.deleteAccount.adminNote')}</p>
+      ) : (
+        <div className="space-y-4 text-sm">
+          <div>
+            <p className="font-medium text-foreground">{t('settings.deleteAccount.goesTitle')}</p>
+            <ul className="mt-1.5 list-disc pl-5 space-y-1 text-muted-foreground">
+              <li>{t('settings.deleteAccount.goesProjects')}</li>
+              <li>{t('settings.deleteAccount.goesCompany')}</li>
+              <li>{t('settings.deleteAccount.goesLogin')}</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">{t('settings.deleteAccount.keptTitle')}</p>
+            <p className="mt-1 text-muted-foreground">{t('settings.deleteAccount.keptInvoices')}</p>
+          </div>
+          <p className="text-muted-foreground">
+            <Trans
+              i18nKey="settings.deleteAccount.backupHint"
+              components={[
+                <button
+                  key="backup"
+                  type="button"
+                  onClick={scrollToBackup}
+                  className="text-primary underline underline-offset-2 hover:no-underline"
+                />,
+              ]}
+            />
+          </p>
+          <p className="text-muted-foreground">{t('settings.deleteAccount.sameEmail')}</p>
+
+          <div>
+            <Label htmlFor="delete-account-confirm">
+              {t('settings.deleteAccount.confirmLabel', { email: user.email })}
+            </Label>
+            <Input
+              id="delete-account-confirm"
+              type="email"
+              autoComplete="off"
+              spellCheck={false}
+              value={typed}
+              onChange={(e) => { setTyped(e.target.value); setError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleDelete(); }}
+              disabled={deleting}
+              className="mt-1.5"
+            />
+            {!matches && (
+              <p className="text-[11px] text-muted-foreground mt-1">{t('settings.deleteAccount.confirmHint')}</p>
+            )}
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 p-2.5 rounded border border-destructive/30 bg-destructive/5 text-destructive text-xs"
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <Button variant="destructive" onClick={handleDelete} disabled={!matches || deleting}>
+            <UserX className="w-4 h-4 mr-2" />
+            {deleting ? t('settings.deleteAccount.deleting') : t('settings.deleteAccount.button')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -582,7 +712,7 @@ function BackupSection() {
   };
 
   return (
-    <div className="border border-border rounded-xl p-5 space-y-3">
+    <div id={BACKUP_SECTION_ID} className="border border-border rounded-xl p-5 space-y-3 scroll-mt-6">
       <div className="flex items-center gap-2">
         <Download className="w-4 h-4 text-foreground" />
         <h3 className="text-sm font-semibold">{t('settings.backup.heading')}</h3>

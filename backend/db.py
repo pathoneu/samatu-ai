@@ -72,7 +72,8 @@ def init_schema() -> None:
                 is_active     INTEGER NOT NULL DEFAULT 1,
                 created_at    TEXT NOT NULL,
                 last_login_at TEXT,
-                session_version INTEGER NOT NULL DEFAULT 1  -- F2: logout/pw-change nonce
+                session_version INTEGER NOT NULL DEFAULT 1,  -- F2: logout/pw-change nonce
+                deleted_at    TEXT           -- set = a deleted account's tombstone
             );
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
@@ -388,6 +389,16 @@ def upsert_project(project_id: str, payload: dict, user_id: str | None = None,
             created_at = existing["created_at"]
             owner = existing["user_id"] or user_id
         else:
+            # A deleted account gets no new project (2026-10-05). A save still
+            # on its way from another open tab can arrive after the account's
+            # projects were removed; without this it re-created one under the
+            # tombstone, where nobody could see or delete it. Same lock as
+            # `delete_account`, so once that commits no insert gets past here.
+            if user_id:
+                owner_row = c.execute("SELECT deleted_at FROM users WHERE id = ?",
+                                      (user_id,)).fetchone()
+                if owner_row is not None and owner_row["deleted_at"]:
+                    raise PermissionError(f"User {user_id} is a deleted account")
             created_at = payload.get("created_date") or now
             owner = user_id
 
@@ -1277,6 +1288,11 @@ def _migrate_schema() -> None:
                     "current_period_end", "company_code", "pvm_code"):
             if col not in ucols:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+        # Account deletion (2026-10-05): set = the row is a tombstone, kept only
+        # so invoices and billing records still point at an id. See
+        # `delete_account`.
+        if ucols and "deleted_at" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN deleted_at TEXT")
         # consumed_trials: keyed by company code, SURVIVES user deletion —
         # anti-abuse gate for the 1-project free trial.
         c.execute("""
@@ -1524,6 +1540,104 @@ def drop_held_extraction_results(project_id: str) -> int:
             "WHERE project_id = ? AND result IS NOT NULL",
             (project_id,))
         return cur.rowcount
+
+
+# ── Account deletion (2026-10-05) ────────────────────────────────────────────
+#
+# A deleted account leaves a TOMBSTONE, not a hole. Issued invoices must be kept
+# (accounting law; GDPR Art. 17(3)(b)), and they, the billing ledger and the
+# cost ledger point at the user's id — so the users row stays, with everything
+# that identified a person taken off it: the email becomes a placeholder nobody
+# can receive mail at (and the real address is free to register again), the
+# password hash can never verify, the name, company details and Google link are
+# cleared, the account is inactive and every session minted for it is void.
+#
+# The projects are NOT deleted here: the account router removes them one by one
+# through the same path the user's own delete takes, before it calls this.
+#
+# Kept on the tombstone: id, created_at, last_login_at, is_admin (always 0 —
+# admin accounts are refused) and the Stripe mirror (customer/subscription id,
+# plan, status, period end) the kept invoices reconcile against.
+# consumed_trials is not touched: keyed by the normalized company code, it
+# outlives the account on purpose (one free trial per company).
+
+DELETED_EMAIL_DOMAIN = "deleted.invalid"   # RFC 2606 — can never receive mail
+# Not a bcrypt hash, so bcrypt refuses it and auth.verify_password is False.
+_DELETED_PASSWORD_HASH = "!deleted"
+# The account-level rows that go with the account. Literals only: they are
+# interpolated into the DELETE below.
+_ACCOUNT_TABLES = ("user_settings", "extraction_jobs", "price_lists",
+                   "samata_templates")
+# Older than this, a 'running' row is a record that never got its ending, not a
+# read in flight: runs take 15-35 min, and each boot marks every earlier one
+# interrupted. Bounded so a stuck row cannot block a deletion for good.
+_RUN_IN_FLIGHT_HOURS = 6
+
+
+def deleted_email_for(user_id: str) -> str:
+    """The tombstone's placeholder email — unique because the id is."""
+    return f"deleted-{user_id}@{DELETED_EMAIL_DOMAIN}"
+
+
+def user_has_running_extraction(user_id: str) -> bool:
+    """True while one of the user's reads is still running. Its ending can
+    save a project or hold a read for him, so his account must not be deleted
+    under it."""
+    _require_user_id(user_id)
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                           time.gmtime(time.time() - _RUN_IN_FLIGHT_HOURS * 3600))
+    with _conn() as c:
+        row = c.execute(
+            "SELECT 1 FROM extraction_jobs WHERE user_id = ? AND status = 'running' "
+            "AND started_at >= ? LIMIT 1", (user_id, cutoff)).fetchone()
+    return row is not None
+
+
+def delete_account(user_id: str) -> dict | None:
+    """Turn a live account into its tombstone and drop its account-level rows
+    (company settings, extraction-job records with any read held on them,
+    price lists, sąmata templates) in ONE transaction.
+
+    Returns how many rows each of those tables lost, or None when there is no
+    live account under this id — unknown, or already deleted, so a second
+    concurrent call changes nothing."""
+    _require_user_id(user_id)
+    now = _now_iso()
+    with _conn() as c:
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            row = c.execute("SELECT deleted_at FROM users WHERE id = ?",
+                            (user_id,)).fetchone()
+            if row is None or row["deleted_at"]:
+                c.execute("ROLLBACK")
+                return None
+            email = deleted_email_for(user_id)
+            # Taken only if someone registered this exact address, which takes
+            # knowing the id. Never let that block the deletion.
+            if c.execute("SELECT 1 FROM users WHERE email = ? AND id != ?",
+                         (email, user_id)).fetchone():
+                import secrets
+                email = (f"deleted-{user_id}-{secrets.token_hex(4)}"
+                         f"@{DELETED_EMAIL_DOMAIN}")
+            c.execute("""
+                UPDATE users
+                   SET email = ?, password_hash = ?, name = NULL,
+                       company_name = NULL, google_sub = NULL, avatar_url = NULL,
+                       company_code = NULL, pvm_code = NULL, is_active = 0,
+                       session_version = COALESCE(session_version, 1) + 1,
+                       deleted_at = ?
+                 WHERE id = ?
+            """, (email, _DELETED_PASSWORD_HASH, now, user_id))
+            counts = {}
+            for table in _ACCOUNT_TABLES:
+                counts[table] = c.execute(
+                    f"DELETE FROM {table} WHERE user_id = ?", (user_id,)).rowcount
+            c.execute("COMMIT")
+        except BaseException:
+            if c.in_transaction:
+                c.execute("ROLLBACK")
+            raise
+    return counts
 
 
 # ── W3 billing: webhook de-dup + Stripe-state mirror helpers ─────────────────

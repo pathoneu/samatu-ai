@@ -584,6 +584,25 @@
       "toastSaveFailed_other": "Could not save to the server: {{count}} projects. They are not saved yet — import the same file again.",
       "toastImportFail": "Import failed",
       "toastFileReadFail": "Could not read the file"
+    },
+    "deleteAccount": {
+      "heading": "Delete account",
+      "sub": "Permanent — it cannot be restored",
+      "goesTitle": "Deleted for good:",
+      "goesProjects": "all your projects with their drawings and estimates — including those in the bin;",
+      "goesCompany": "company details and logo, price lists and estimate templates;",
+      "goesLogin": "your sign-in — you will be signed out on every device.",
+      "keptTitle": "Kept:",
+      "keptInvoices": "issued invoices and payment records, if any — the law requires keeping them.",
+      "backupHint": "Want to keep a copy? Download it first in <0>“Backup”</0> — it holds your projects, company details and price lists, but not the PDF drawings.",
+      "sameEmail": "You can later create a new, empty account with the same email.",
+      "confirmLabel": "Confirm: type your email ({{email}})",
+      "confirmHint": "The button turns on once the email you typed matches.",
+      "button": "Delete account permanently",
+      "deleting": "Deleting…",
+      "toastDeleted": "Account deleted. Projects deleted: {{n}}.",
+      "failGeneric": "The account could not be deleted. Check your internet connection and try again.",
+      "adminNote": "An administrator account cannot be deleted here — it is needed to run the app."
     }
   },
   "project": {

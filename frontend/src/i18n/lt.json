@@ -589,6 +589,25 @@
       "toastSaveFailed_other": "Nepavyko įrašyti į serverį: {{count}} projektų. Jie dar neišsaugoti — importuokite tą patį failą dar kartą.",
       "toastImportFail": "Importas nepavyko",
       "toastFileReadFail": "Nepavyko nuskaityti failo"
+    },
+    "deleteAccount": {
+      "heading": "Paskyros ištrynimas",
+      "sub": "Negrįžtamas veiksmas — atkurti nebus galima",
+      "goesTitle": "Bus ištrinta visam laikui:",
+      "goesProjects": "visi jūsų projektai su brėžiniais ir sąmatomis — ir tie, kurie šiukšliadėžėje;",
+      "goesCompany": "įmonės duomenys ir logotipas, kainynai ir sąmatų šablonai;",
+      "goesLogin": "prisijungimas — būsite atjungti visuose įrenginiuose.",
+      "keptTitle": "Lieka:",
+      "keptInvoices": "išrašytos sąskaitos faktūros ir mokėjimų įrašai, jei jų yra — įstatymas reikalauja juos saugoti.",
+      "backupHint": "Norite pasilikti kopiją? Pirmiausia atsisiųskite ją skiltyje <0>„Atsarginė kopija“</0> — joje bus projektai, įmonės duomenys ir kainynai, bet ne PDF brėžiniai.",
+      "sameEmail": "Vėliau tuo pačiu el. paštu galėsite susikurti naują, tuščią paskyrą.",
+      "confirmLabel": "Patvirtinkite: įrašykite savo el. paštą ({{email}})",
+      "confirmHint": "Mygtukas įsijungs, kai įrašytas el. paštas sutaps.",
+      "button": "Ištrinti paskyrą visam laikui",
+      "deleting": "Trinama…",
+      "toastDeleted": "Paskyra ištrinta. Ištrintų projektų: {{n}}.",
+      "failGeneric": "Paskyros ištrinti nepavyko. Patikrinkite interneto ryšį ir bandykite dar kartą.",
+      "adminNote": "Administratoriaus paskyros čia ištrinti negalima — ji reikalinga programai valdyti."
     }
   },
   "project": {
