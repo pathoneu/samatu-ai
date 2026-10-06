@@ -301,3 +301,81 @@ def test_the_door_type_is_asked_once_for_the_project_when_only_the_symbols_or_a_
     # exterior doors are not the question's doors
     ext = [_quiet("01", elementai=[{"tipas": "duris", "kiekis": 1, "_exterior": True}])]
     assert all(q["kind"] != "durys" for q in build_questions({"patalpos": ext})["questions"])
+
+
+# ── 2026-10-06: openings a listed window could stand in are named for a look, not offered ───────────────
+
+def _walls(*angos: tuple) -> dict:
+    return {"page": 1, "angos": [{"i": i, "plotis_m": w, "storis_m": 0.3, "line_pct": [[0.1 + 0.02 * k, 0.1], [0.1 + 0.02 * k, 0.12]]}
+                                 for k, (i, w) in enumerate(angos)]}
+
+
+def _outlined(nr: str, pavadinimas: str, elementai: list[dict], *angos: tuple, **kw) -> dict:
+    return _quiet(nr, pavadinimas=pavadinimas, elementai=elementai, _angos_sienose=_walls(*angos),
+                  polygon_source="vektoriniai_konturai", polygon_pct=[[0.1, 0.1], [0.3, 0.1], [0.3, 0.3], [0.1, 0.3]], **kw)
+
+
+def _el(tipas: str, w: int, h: int, n: int = 1) -> dict:
+    return {"tipas": tipas, "kiekis": n, "plotis_mm": w, "aukstis_mm": h}
+
+
+def test_openings_a_listed_window_could_stand_in_are_named_for_a_look_not_offered():
+    """objektas_a on production: „Sienose matau 7 angas, kurių nėra durų ir langų sąraše", all pre-ticked — but
+    102's 3,90 and 0,96 m and 104's 1,00 and 2,30 m openings are most likely the windows those rooms already list
+    (3,00 m ×2, 1,80 m), read at another width; accepting counted them twice (angokraščiai 82,93 → ~112 m, true
+    89,39). 101 and 103 list no window: their openings to the outside are still offered."""
+    import copy
+
+    from extractor import universal_rules as ur
+    rooms = [
+        _outlined("101", "Tambūras", [_el("duris", 1440, 2100), _el("duris", 1150, 2100), _el("pasleptos_duris", 1150, 2100)],
+                  ("102", 1.15), ("103", 1.15), ("laukas", 1.44), ("laukas", 1.3), paskirtis="tamburas"),
+        _outlined("102", "Svetainė, virtuvė", [_el("langas", 3000, 2600, n=2), _el("langas", 2110, 2600), _el("duris", 1730, 2400)],
+                  ("101", 1.15), ("laukas", 2.11), ("laukas", 1.73), ("laukas", 3.9), ("laukas", 0.96)),
+        _outlined("103", "Koridorius", [_el("duris", 1150, 2100)], ("101", 1.15), ("104", 1.15), ("laukas", 1.9),
+                  paskirtis="koridorius"),
+        _outlined("104", "Miegamasis", [_el("langas", 1800, 2000), _el("duris", 1150, 2100)],
+                  ("103", 1.15), ("laukas", 1.0), ("laukas", 2.3), paskirtis="miegamasis"),
+    ]
+    ur.prepare_rooms_for_calc(rooms, overrides={"vidaus_durys_beapvadines": False})
+    stored = copy.deepcopy(rooms)
+    q = _q(build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE}), "angos")
+    assert [(i["room_nr"], i["tipas"], i["plotis_m"], i["i"]) for i in q["items"]] == [
+        ("101", "langas", 1.3, "laukas"), ("103", "langas", 1.9, "laukas")]
+    assert q["title"] == "Sienose matau 2 angas, kurių nėra durų ir langų sąraše"
+    assert [m["room_nr"] for m in q["manual"]] == ["102", "104"]
+    assert q["manual"][0]["sentence"] == (
+        "Sąraše langai 3,00 m (2 vnt.) neįstatyti į angas, o sienose liko angos 3,90 ir 0,96 m — tikriausiai tai tie "
+        "patys langai, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį patalpos lape.")
+    assert q["manual"][1]["sentence"] == (
+        "Sąraše langas 1,80 m neįstatytas į angą, o sienose liko angos 1,00 ir 2,30 m — tikriausiai viena iš jų ir yra "
+        "tas langas, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį patalpos lape.")
+    assert q["manual"][0]["details"].startswith("3 langai, 1 durys. Sienose 5 angos:")       # the room sheet's account
+    # only what is offered and said changed: the rooms — and every quantity made of them — are as stored
+    assert rooms == stored
+
+
+def test_a_room_with_a_door_to_offer_and_a_window_held_back_is_in_both_lists():
+    from extractor import universal_rules as ur
+    rooms = [
+        _outlined("05", "Svetainė", [_el("langas", 2200, 1500), _el("duris", 900, 2100)],
+                  ("07", 0.9), ("06", 0.8), ("laukas", 2.68)),
+        _quiet("06", elementai=[_el("duris", 1400, 2100)]),            # its door is another opening
+        _quiet("07"),
+    ]
+    ur.prepare_rooms_for_calc(rooms, overrides={"vidaus_durys_beapvadines": False})
+    q = _q(build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE}), "angos")
+    assert [(i["room_nr"], i["tipas"], i["plotis_m"], i["i"]) for i in q["items"]] == [("05", "duris", 0.8, "06")]
+    assert [m["room_nr"] for m in q["manual"]] == ["05"]
+    assert q["manual"][0]["sentence"].startswith("Sąraše langas 2,20 m neįstatytas į angą, o sienose liko anga 2,68 m")
+
+
+def test_a_held_back_door_opening_is_said_in_place_of_the_bare_count():
+    from extractor import universal_rules as ur
+    rooms = [_outlined("03", "Koridorius", [_el("duris", 800, 2100), _el("duris", 1200, 2100)], ("07", 0.8), ("vidus", 0.7),
+                       paskirtis="koridorius")]
+    ur.prepare_rooms_for_calc(rooms, overrides={"vidaus_durys_beapvadines": False})
+    q = _q(build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE}), "angos")
+    assert q["items"] == [] and q["manual"][0]["sentence"] == (
+        "Sąraše durys 1,20 m neįstatytos į angą, o sienose liko anga į gretimą patalpą (0,70 m) — tikriausiai tai tos "
+        "pačios durys, tik kito pločio. Patikrinkite brėžinyje; jei durys kitos — pataisykite jų plotį patalpos lape.")

@@ -188,7 +188,11 @@ def _opening_check(fact: dict) -> tuple[str, str]:
     opening with its width, then „2 durys sąraše, kurioms angos sienose nematau" — and he could not tell what
     was wrong or what to do. The mismatch is now said first, in his terms (the list against the walls), with
     the one thing to check; the full account stays beside it for a second look. Counted off the fact's own
-    element rows, so the numbers are the ones the room sheet shows."""
+    element rows, so the numbers are the ones the room sheet shows.
+
+    2026-10-06: leftover openings held back from the one-click list because a listed window (or door) of
+    that kind stands in no opening (`fact["withheld"]`, room_facts._against_the_walls_stood) are said with
+    both widths — the listed unit and the openings left, most likely the same one at another width."""
     said = str(fact.get("sentence") or "").strip()
     listed = unbacked = 0
     for d in fact.get("details") or []:
@@ -199,12 +203,21 @@ def _opening_check(fact: dict) -> tuple[str, str]:
             unbacked += n
         if not d.get("praejimas"):                # a passage is no door of the list
             listed += n
-    if unbacked:
+    held = {str(w.get("tipas") or ""): str(w.get("sentence") or "") for w in fact.get("withheld") or []
+            if isinstance(w, dict) and w.get("sentence")}
+    heads = []
+    if held.get("duris"):
+        heads.append(held["duris"])               # names the doors no opening backs and the openings left
+    elif unbacked:
         doors = f"Sąraše {listed} {element_label('duris', listed)}"
         fits = max(0, listed - unbacked)
         head = (f"{doors}, o sienose — tik {fits} {_anga_word(fits)} durims: {unbacked} durų sienose neradau."
                 if fits else f"{doors}, bet sienose angų joms neradau.")
-        return head + " Atidarykite patalpą ir patikrinkite durų skaičių.", said
+        heads.append(head + " Atidarykite patalpą ir patikrinkite durų skaičių.")
+    if held.get("langas"):
+        heads.append(held["langas"])
+    if heads:
+        return " ".join(heads), said
     if not fact.get("details") and not (fact.get("openings") or {}).get("items"):
         return "Durų ir langų šioje patalpoje neradau. Jei jų yra, atidarykite patalpą ir įrašykite.", ""
     if fact.get("status") == "assumed":
@@ -227,7 +240,9 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
                                aukstis_mm=s.get("aukstis_mm"), i=s.get("i"), plotis_m=s.get("plotis_m"),
                                label=s.get("label"), line_pct=s.get("line_pct"),
                                page=((f.get("openings") or {}).get("page") or (f.get("source") or {}).get("page"))))
-        if not suggestions:
+        # a room whose leftover openings were held back (2026-10-06) is named for a look even when it also
+        # has an opening to offer — the held-back ones are said nowhere else in the question
+        if not suggestions or f.get("withheld"):
             sentence, details = _opening_check(f)
             manual.append({"room_nr": _nr(r), "room_name": str(r.get("pavadinimas") or "").strip(),
                            "sentence": sentence, "details": details})

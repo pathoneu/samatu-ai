@@ -11,6 +11,7 @@ Quantities never change on their own — only when he adds the opening.
 """
 from __future__ import annotations
 
+from extractor import universal_rules as ur
 from extractor.room_facts import build_room_facts
 
 OUTLINE = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
@@ -125,3 +126,104 @@ def test_the_plural_of_anga():
     assert "Sienose tiek pat angų" in f["sentence"]
     five = _fact([DOOR], [_opening("03", 0.8), _opening("04", 0.8), _opening("05", 0.8), _opening("07", 0.8), _opening("08", 0.8)])
     assert "Sienose angų daugiau — 5:" in five["sentence"]
+
+
+# ── 2026-10-06: a listed unit no opening took holds back the leftover openings of its kind ───────────────
+# objektas_a on production: „Sienose matau 7 angas, kurių nėra durų ir langų sąraše", every one pre-ticked —
+# four of them in rooms whose listed windows stood in no opening: most likely those windows, read at another
+# width. Only what is OFFERED and SAID changes here; the walls pass and every quantity stay as they were.
+
+
+def _el(tipas: str, w: int, h: int, n: int = 1) -> dict:
+    return {"tipas": tipas, "kiekis": n, "plotis_mm": w, "aukstis_mm": h}
+
+
+def _stood(nr: str, elementai: list[dict], angos: list[tuple], **room) -> dict:
+    """A room as production stores it: walls read, doors and windows stood in their openings by the pass."""
+    r = {"nr": nr, "puslapio_nr": 2, "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
+         "lubu_aukstis_m": 2.7, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai",
+         "_konturas": {"page": 1}, "elementai": elementai,
+         "_angos_sienose": {"page": 1, "angos": [_opening(i, w, x=round(0.2 + 0.05 * k, 2)) for k, (i, w) in enumerate(angos)]},
+         **room}
+    ur.prepare_rooms_for_calc([r])
+    return r
+
+
+def _angos(room: dict) -> dict:
+    return next(f for f in build_room_facts({"patalpos": [room]}, room["nr"])["facts"] if f["key"] == "angos")
+
+
+def test_listed_windows_no_opening_took_hold_back_the_openings_left_to_the_outside():
+    """objektas_a 102 (production): the pass stood the 2,11 m window and the 1,73 m door, and found no opening for
+    the two 3,00 m windows; the 3,90 and 0,96 m openings it left are those windows at another width. Offered as
+    new windows, pre-ticked, they were counted twice — the project's seven offers would have taken the reveals
+    from 82,93 to ~112 m (true 89,39)."""
+    room = _stood("102", [_el("langas", 3000, 2600, n=2), _el("langas", 2110, 2600), _el("duris", 1730, 2400)],
+                  [("laukas", 2.11), ("laukas", 1.73), ("laukas", 3.9), ("laukas", 0.96)])
+    f = _angos(room)
+    held = ("Sąraše langai 3,00 m (2 vnt.) neįstatyti į angas, o sienose liko angos 3,90 ir 0,96 m — tikriausiai "
+            "tai tie patys langai, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį "
+            "patalpos lape.")
+    assert f["suggestions"] == [] and f["status"] == "assumed"      # named for a look, not offered — still asks
+    assert f["sentence"] == ("3 langai, 1 durys. Sienose 4 angos: į lauką (2,11 m), į lauką (1,73 m), į lauką (3,90 m), "
+                             "į lauką (0,96 m). " + held)
+    assert f["withheld"] == [{"tipas": "langas", "sentence": held, "listed": [{"plotis_m": 3.0, "kiekis": 2}],
+                              "openings": [{"plotis_m": 3.9, "i": "laukas", "line_pct": [[0.3, 0.25], [0.3, 0.29]]},
+                                           {"plotis_m": 0.96, "i": "laukas", "line_pct": [[0.35, 0.25], [0.35, 0.29]]}]}]
+    assert f["value"] == 4                                          # the list is what it was: nothing added or taken
+
+
+def test_one_listed_window_and_two_openings_left_names_both_widths():
+    """objektas_a 104: a 1,80 m window listed, 1,00 and 2,30 m openings to the outside left — one is that window,
+    the other maybe one the list lacks; which is his to see. Once the window stands (he corrects its width), the
+    opening still left is offered again."""
+    room = _stood("104", [_el("langas", 1800, 2000), _el("duris", 1150, 2100)],
+                  [("103", 1.15), ("laukas", 1.0), ("laukas", 2.3)])
+    f = _angos(room)
+    assert f["suggestions"] == [] and f["status"] == "assumed"
+    assert f["sentence"].endswith(
+        "Sąraše langas 1,80 m neįstatytas į angą, o sienose liko angos 1,00 ir 2,30 m — tikriausiai viena iš jų ir yra "
+        "tas langas, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį patalpos lape.")
+    room["elementai"][0].update({"plotis_mm": 2300, "_dydis_user": True})
+    ur.prepare_rooms_for_calc([room])
+    f = _angos(room)
+    assert [(s["tipas"], s["plotis_m"]) for s in f["suggestions"]] == [("langas", 1.0)] and f["withheld"] == []
+
+
+def test_a_room_whose_listed_windows_all_stand_is_still_offered_the_opening_left():
+    """objektas_a 101 and 103 list no window: an opening to the outside nothing stands in can only be one the
+    list lacks — offered as before. So it is where every listed window stands in its own opening."""
+    hall = _stood("101", [_el("duris", 1440, 2100)], [("laukas", 1.44), ("laukas", 1.3)], paskirtis="tamburas")
+    f = _angos(hall)
+    assert [(s["tipas"], s["plotis_m"]) for s in f["suggestions"]] == [("langas", 1.3)] and f["withheld"] == []
+    assert "1 angoje niekas nestovi — patikrinkite brėžinyje ir pridėkite." in f["sentence"]
+    bedroom = _stood("108", [_el("langas", 2060, 1500)], [("laukas", 2.06), ("laukas", 1.2)])
+    f = _angos(bedroom)
+    assert [(s["tipas"], s["plotis_m"]) for s in f["suggestions"]] == [("langas", 1.2)] and f["withheld"] == []
+
+
+def test_more_listed_windows_than_openings_left_says_one_of_them():
+    room = _stood("05", [_el("langas", 3000, 2600, n=2), _el("duris", 900, 2100)], [("03", 0.9), ("laukas", 3.9)])
+    f = _angos(room)
+    assert f["suggestions"] == []
+    assert f["withheld"][0]["sentence"].startswith(
+        "Sąraše langai 3,00 m (2 vnt.) neįstatyti į angas, o sienose liko anga 3,90 m — tikriausiai tai vienas iš tų "
+        "langų, tik kito pločio.")
+
+
+def test_a_listed_door_no_opening_backs_holds_back_the_door_openings_left():
+    """The same for doors: a 1,20 m door the pass stood in no opening, and a 0,70 m opening to the space beside
+    that nothing stands in — named with both widths in place of the bare count, not offered as a second door."""
+    room = _stood("03", [_el("duris", 800, 2100), _el("duris", 1200, 2100)], [("07", 0.8), ("vidus", 0.7)],
+                  paskirtis="koridorius")
+    f = _angos(room)
+    assert f["suggestions"] == [] and f["status"] == "assumed"
+    assert f["sentence"] == (
+        "2 durys. Sienose 2 angos: į patalpą 07 (0,80 m), į gretimą patalpą (0,70 m). Sąraše durys 1,20 m neįstatytos "
+        "į angą, o sienose liko anga į gretimą patalpą (0,70 m) — tikriausiai tai tos pačios durys, tik kito pločio. "
+        "Patikrinkite brėžinyje; jei durys kitos — pataisykite jų plotį patalpos lape.")
+    assert [(w["tipas"], w["listed"]) for w in f["withheld"]] == [("duris", [{"plotis_m": 1.2, "kiekis": 1}])]
+    # a door no opening backs and no opening left: the plain count, as before
+    alone = _stood("01", [_el("duris", 800, 2100), _el("duris", 1200, 2100)], [("07", 0.8)], paskirtis="koridorius")
+    f = _angos(alone)
+    assert f["withheld"] == [] and "1 durys sąraše, kurioms angos sienose nematau — patikrinkite patalpoje." in f["sentence"]

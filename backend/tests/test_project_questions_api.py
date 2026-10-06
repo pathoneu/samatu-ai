@@ -58,3 +58,32 @@ def test_anonymous_and_strangers_get_nothing(tmp_path, monkeypatch):
     assert c.post("/api/auth/login", json={"email": "thief@x.lt", "password": _PW}).status_code == 200
     assert c.get("/api/projects/p1/questions").status_code == 404
     assert c.get("/api/projects/nope/questions").status_code == 404
+
+
+def test_a_stored_project_asks_the_safer_openings_question_without_a_re_read(tmp_path, monkeypatch):
+    """2026-10-06: the questions are built from the stored blob on every read — a project the walls pass stood
+    before this change (objektas_a's 102) names its leftover openings for a look at once instead of offering them
+    as new windows, and the read saves nothing."""
+    from extractor import universal_rules as ur
+    _isolate(tmp_path, monkeypatch)
+    room = {"nr": "102", "pavadinimas": "Svetainė, virtuvė", "paskirtis": "gyvenamoji", "plotas_m2": 40.0,
+            "plotas_saltinis": "eksplikacija", "puslapio_nr": 1, "perimetras_m": 26.0, "lubu_aukstis_m": 2.7,
+            "lubu_aukstis_saltinis": "per_room", "polygon_source": "vektoriniai_konturai",
+            "polygon_pct": [[0.1, 0.1], [0.3, 0.1], [0.3, 0.3], [0.1, 0.3]],
+            "elementai": [{"tipas": "langas", "kiekis": 2, "plotis_mm": 3000, "aukstis_mm": 2600},
+                          {"tipas": "langas", "kiekis": 1, "plotis_mm": 2110, "aukstis_mm": 2600},
+                          {"tipas": "duris", "kiekis": 1, "plotis_mm": 1730, "aukstis_mm": 2400}],
+            "_angos_sienose": {"page": 1, "angos": [
+                {"i": i, "plotis_m": w, "line_pct": [[0.1 + 0.02 * k, 0.1], [0.1 + 0.02 * k, 0.12]]}
+                for k, (i, w) in enumerate([("laukas", 2.11), ("laukas", 1.73), ("laukas", 3.9), ("laukas", 0.96)])]}}
+    ur.prepare_rooms_for_calc([room])                       # what the last recompute stored
+    db.upsert_project("p1", {"name": "P", "tipas": "interjeras", "patalpos": [room],
+                             "puslapiai": [{"nr": 1, "tipas": "floor_plan"}], "_meta": {"model": "x"}})
+    before = copy.deepcopy(db.get_project("p1"))
+    r = TestClient(app).get("/api/projects/p1/questions")
+    assert r.status_code == 200, r.text
+    q = next(x for x in r.json()["questions"] if x["kind"] == "angos")
+    assert q["items"] == [] and [m["room_nr"] for m in q["manual"]] == ["102"]
+    assert q["manual"][0]["sentence"].startswith(
+        "Sąraše langai 3,00 m (2 vnt.) neįstatyti į angas, o sienose liko angos 3,90 ir 0,96 m")
+    assert db.get_project("p1") == before
