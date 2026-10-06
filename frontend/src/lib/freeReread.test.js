@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeFreeReread, freeRereadState } from './freeReread.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import i18next from 'i18next';
+import { mergeFreeReread, freeRereadState, freeRereadDoneText } from './freeReread.js';
+
+// The banner's sentence through the real i18next and the real locale files — the plural forms
+// (Iš 1 / 21 patalpos, iš 3 / 11 patalpų) are i18next's, not this test's.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const locale = (lng) => JSON.parse(readFileSync(join(HERE, `../i18n/${lng}.json`), 'utf8'));
+async function tOf(lng) {
+  const i18n = i18next.createInstance();
+  await i18n.init({ lng, resources: { [lng]: { translation: locale(lng) } }, interpolation: { escapeValue: false } });
+  return i18n.t.bind(i18n);
+}
+const lt = await tOf('lt');
+const en = await tOf('en');
 
 // A project read before the geometry lane existed: guessed perimeters, box outlines, floors by purpose.
 const base = () => ({
@@ -133,4 +149,60 @@ test('an outline the lane drew last time and cannot draw now leaves with the re-
   assert.equal(r1.perimetras_m, 13.9);
   assert.equal(r2.polygon_source, 'vektoriniai_konturai');
   assert.equal(r2.perimetras_saltinis, 'matmenu_eilutes');
+});
+
+const said = (state, t = lt) => freeRereadDoneText({ count: 11, konturai: 0, perimetrai: 0, jusu: 0, dangos: 0, ...state }, t);
+
+test('the notice lists only what the drawing gave — never „— 0"', () => {
+  // 2026-10-06 review: „sienų ilgiai iš plano matmenų — 0, grindų danga iš grindų plano — 0" read like a failure
+  assert.equal(said({ konturai: 11 }),
+    'Brėžinys perskaitytas. Iš 11 patalpų: tikslus kontūras — 11. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
+  assert.equal(said({ konturai: 8, perimetrai: 6, dangos: 11 }),
+    'Brėžinys perskaitytas. Iš 11 patalpų: tikslus kontūras — 8, sienų ilgiai iš plano matmenų — 6, '
+    + 'grindų danga iš grindų plano — 11. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
+  assert.equal(said({ dangos: 4 }),
+    'Brėžinys perskaitytas. Iš 11 patalpų: grindų danga iš grindų plano — 4. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
+  for (const k of ['konturai', 'perimetrai', 'jusu', 'dangos']) {
+    for (const t of [lt, en]) {
+      const text = said({ [k]: 3 }, t);
+      assert.ok(!/— 0\b/.test(text) && !/\{\{|\}\}/.test(text), `${k}: ${text}`);
+    }
+  }
+});
+
+test('his own wall lengths ride with the plan\'s — or stand alone when the plan gave none', () => {
+  assert.equal(said({ konturai: 11, perimetrai: 6, jusu: 1 }),
+    'Brėžinys perskaitytas. Iš 11 patalpų: tikslus kontūras — 11, sienų ilgiai iš plano matmenų — 6 (dar 1 nustatėte patys). '
+    + 'Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
+  assert.equal(said({ konturai: 11, jusu: 2, dangos: 3 }),
+    'Brėžinys perskaitytas. Iš 11 patalpų: tikslus kontūras — 11, sienų ilgiai, kuriuos nustatėte patys — 2, '
+    + 'grindų danga iš grindų plano — 3. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
+});
+
+test('a read that gave none of the three says so plainly — his typed lengths alone are not a result of the read', () => {
+  const nothing = 'Brėžinys perskaitytas, bet jame nerasta nei tikslių patalpų kontūrų, nei sienų ilgių iš plano matmenų, '
+    + 'nei grindų dangų iš grindų plano. Perimetrus ir grindų dangas patikrinkite patalpų lapuose.';
+  assert.equal(said({}), nothing);
+  assert.equal(said({ jusu: 4 }), nothing);
+  assert.equal(freeRereadDoneText(null, lt), nothing);
+  assert.equal(freeRereadDoneText(freeRereadState(null), lt), nothing);
+  assert.match(said({}, en), /^Drawing read, but it gave no exact room outlines/);
+});
+
+test('the room count keeps its Lithuanian form', () => {
+  const head = (count) => said({ count, konturai: 1 }).split(':')[0];
+  assert.equal(head(1), 'Brėžinys perskaitytas. Iš 1 patalpos');
+  assert.equal(head(21), 'Brėžinys perskaitytas. Iš 21 patalpos');
+  assert.equal(head(3), 'Brėžinys perskaitytas. Iš 3 patalpų');
+  assert.equal(head(11), 'Brėžinys perskaitytas. Iš 11 patalpų');
+  assert.equal(said({ count: 1, konturai: 1 }, en).split(':')[0], 'Drawing read. Of 1 room');
+  assert.equal(said({ count: 5, konturai: 1 }, en).split(':')[0], 'Drawing read. Of 5 rooms');
+});
+
+test('the counts come from the merged project — the banner\'s whole path', () => {
+  const { project } = mergeFreeReread(base(), result(), 'T');
+  // 02 and 03 have the lane's outlines, 02's perimeter is his, 01 is verified: two outlines, his one, two coverings
+  assert.equal(freeRereadDoneText(freeRereadState(project), lt),
+    'Brėžinys perskaitytas. Iš 3 patalpų: tikslus kontūras — 2, sienų ilgiai, kuriuos nustatėte patys — 1, '
+    + 'grindų danga iš grindų plano — 2. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
 });

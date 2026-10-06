@@ -39,6 +39,7 @@ import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { isReverseVat, vatPercent } from '@/lib/vatMode';
 import { sendCheck } from '@/lib/exportLines';
 import { loadExcludedSections } from '@/lib/exportSectionSelection';
+import { closesOnEscape } from '@/lib/escapeToClose';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -779,6 +780,19 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  // Esc closes the drawer, as its ✕ does — unless something inside already
+  // handled it or it was typed in a field (lib/escapeToClose.js). On `document`,
+  // so the panel's own key handlers have run before this one decides.
+  useEffect(() => {
+    if (!assumptionsOpen) return undefined;
+    const onKey = (e) => {
+      if (!closesOnEscape(e)) return;
+      e.preventDefault();
+      setAssumptionsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [assumptionsOpen]);
   // A paid re-read whose page was reloaded or closed mid-wait: the server held
   // the read on its job row — merge it now, through the re-read card's own
   // path (hooks/useHeldReread.js, 2026-10-03).

@@ -920,10 +920,17 @@
       "cta": "Perskaityti nemokamai",
       "running": "Skaitau brėžinį…",
       "later": "Ne dabar",
-      "done_one": "Brėžinys perskaitytas. Iš {{count}} patalpos: tikslus kontūras — {{konturai}}, sienų ilgiai iš plano matmenų — {{perimetrai}}{{jusu}}, grindų danga iš grindų plano — {{dangos}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
-      "done_few": "Brėžinys perskaitytas. Iš {{count}} patalpų: tikslus kontūras — {{konturai}}, sienų ilgiai iš plano matmenų — {{perimetrai}}{{jusu}}, grindų danga iš grindų plano — {{dangos}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
-      "done_other": "Brėžinys perskaitytas. Iš {{count}} patalpų: tikslus kontūras — {{konturai}}, sienų ilgiai iš plano matmenų — {{perimetrai}}{{jusu}}, grindų danga iš grindų plano — {{dangos}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
+      "done_one": "Brėžinys perskaitytas. Iš {{count}} patalpos: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
+      "done_few": "Brėžinys perskaitytas. Iš {{count}} patalpų: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
+      "done_other": "Brėžinys perskaitytas. Iš {{count}} patalpų: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
+      "donePart": {
+        "konturai": "tikslus kontūras — {{n}}",
+        "perimetrai": "sienų ilgiai iš plano matmenų — {{n}}",
+        "jusu": "sienų ilgiai, kuriuos nustatėte patys — {{n}}",
+        "dangos": "grindų danga iš grindų plano — {{n}}"
+      },
       "doneTyped": " (dar {{n}} nustatėte patys)",
+      "doneNothing": "Brėžinys perskaitytas, bet jame nerasta nei tikslių patalpų kontūrų, nei sienų ilgių iš plano matmenų, nei grindų dangų iš grindų plano. Perimetrus ir grindų dangas patikrinkite patalpų lapuose.",
       "alreadyRunning": "Šis projektas jau skaitomas — palaukite, kol baigs.",
       "nothingRead": "Šį kartą brėžinio perskaityti nepavyko — projektas nepakeistas.",
       "failed": "Nepavyko perskaityti: {{msg}}"

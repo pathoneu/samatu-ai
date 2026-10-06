@@ -81,3 +81,24 @@ export function freeRereadState(project) {
     dangos: count((r) => r.grindu_danga_saltinis === 'grindu_planas'),
   };
 }
+
+/**
+ * The banner's sentence for that state (`t` = i18next's). Only what the drawing gave is listed: a contractor reads
+ * „sienų ilgiai iš plano matmenų — 0" as a failure (2026-10-06 review). His own wall lengths ride with the plan's,
+ * or stand alone when the plan gave none; a read that gave none of the three says so in one plain sentence.
+ */
+export function freeRereadDoneText(state, t) {
+  const n = (k) => Math.max(0, Number(state?.[k]) || 0);
+  const [konturai, perimetrai, jusu, dangos] = [n('konturai'), n('perimetrai'), n('jusu'), n('dangos')];
+  if (!konturai && !perimetrai && !dangos) return t('project.freeReread.doneNothing');
+  const walls = perimetrai
+    ? t('project.freeReread.donePart.perimetrai', { n: perimetrai })
+      + (jusu ? t('project.freeReread.doneTyped', { n: jusu }) : '')
+    : (jusu ? t('project.freeReread.donePart.jusu', { n: jusu }) : '');
+  const parts = [
+    konturai ? t('project.freeReread.donePart.konturai', { n: konturai }) : '',
+    walls,
+    dangos ? t('project.freeReread.donePart.dangos', { n: dangos }) : '',
+  ].filter(Boolean);
+  return t('project.freeReread.done', { count: n('count'), parts: parts.join(', ') });
+}

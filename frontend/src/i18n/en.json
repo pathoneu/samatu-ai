@@ -912,9 +912,16 @@
       "cta": "Read for free",
       "running": "Reading the drawing…",
       "later": "Not now",
-      "done_one": "Drawing read. Of {{count}} room: exact outline — {{konturai}}, wall lengths from the plan's dimensions — {{perimetrai}}{{jusu}}, floor covering from the floor plan — {{dangos}}. What changed in each room is written on its sheet.",
-      "done_other": "Drawing read. Of {{count}} rooms: exact outline — {{konturai}}, wall lengths from the plan's dimensions — {{perimetrai}}{{jusu}}, floor covering from the floor plan — {{dangos}}. What changed in each room is written on its sheet.",
+      "done_one": "Drawing read. Of {{count}} room: {{parts}}. What changed in each room is written on its sheet.",
+      "done_other": "Drawing read. Of {{count}} rooms: {{parts}}. What changed in each room is written on its sheet.",
+      "donePart": {
+        "konturai": "exact outline — {{n}}",
+        "perimetrai": "wall lengths from the plan's dimensions — {{n}}",
+        "jusu": "wall lengths you set yourself — {{n}}",
+        "dangos": "floor covering from the floor plan — {{n}}"
+      },
       "doneTyped": " ({{n}} more set by you)",
+      "doneNothing": "Drawing read, but it gave no exact room outlines, no wall lengths from the plan's dimensions and no floor coverings from the floor plan. Check the perimeters and floor coverings on the room sheets.",
       "alreadyRunning": "This project is already being read — wait for it to finish.",
       "nothingRead": "The drawing could not be read this time — the project is unchanged.",
       "failed": "Could not read: {{msg}}"

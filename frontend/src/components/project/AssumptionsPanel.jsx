@@ -126,14 +126,19 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
   );
 }
 
+// The control sits beside the label and note while both fit, and drops BELOW
+// them when it does not: the note keeps at least 13rem, the control is never
+// wider than the row. A `shrink-0` control used to squeeze the note to one word
+// per line, and the four reveal kinds (~500 px in a ~480 px row) pushed the
+// drawer into a horizontal scroll. (2026-10-06.)
 function Row({ label, note, children }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0 gap-4">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2 border-b border-border/40 last:border-0">
+      <div className="min-w-0 flex-1 basis-52">
         <span className="text-sm text-foreground">{label}</span>
         {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="max-w-full">{children}</div>
     </div>
   );
 }
@@ -533,7 +538,7 @@ export default function AssumptionsPanel({
             label={t('project.assumptions.concealedMixers')}
             note={t('project.assumptions.concealedMixersNote')}
           >
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {[['true', t('project.assumptions.concealedYes')],
                 ['false', t('project.assumptions.concealedNo')]].map(([val, lbl]) => {
                 const on = String(safeAssumptions.santechnika_potinkinis ?? true) === val;
@@ -569,7 +574,7 @@ export default function AssumptionsPanel({
             label={t('project.assumptions.framelessDoors')}
             note={[t('project.assumptions.framelessDoorsNote'), rawData?._paruosimas?.frameless?.sakinys].filter(Boolean).join(' ')}
           >
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {[['true', t('project.assumptions.framelessYes')],
                 ['false', t('project.assumptions.framelessNo')]].map(([val, lbl]) => {
                 const current = safeAssumptions.vidaus_durys_beapvadines ?? rawData?._paruosimas?.frameless?.value ?? false;
@@ -652,7 +657,7 @@ export default function AssumptionsPanel({
               label={t('project.assumptions.ledEstimate')}
               note={t('project.assumptions.ledEstimateNote', ledEstimateText(ledEstimates))}
             >
-              <div className="flex gap-1">
+              <div className="flex flex-wrap gap-1">
                 {[['false', t('project.assumptions.ledEstimateLeave')],
                   ['true', t('project.assumptions.ledEstimateAccept')]].map(([val, lbl]) => {
                   const on = String(ledBilled) === val;
