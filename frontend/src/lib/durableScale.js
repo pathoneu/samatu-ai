@@ -109,22 +109,40 @@ export const METERS_PER_POINT_AT_1_TO_1 = 0.0254 / 72;
  * calibration still wins the merge; this only fills pages nobody calibrated.
  */
 /**
- * `{page: ratio}` the extraction read off the drawing: the dimension-pair
- * lane's, else the geometry lane's (2026-09-19 — exact, from the sheets' own
- * dimension lines; objektas_h had no pairs and said „nekalibruotas" although
+ * `{page: {ratio, lane}}` — each sheet's ratio and the lane that read it: 'poros' (the dimension-pair lane,
+ * `_meta.plan_dimension_lane.mastelis`) or 'geometrija' (the geometry lane, `_meta.geometrija.masteliai` — exact,
+ * from the sheets' own dimension lines; 2026-09-19: objektas_h had no pairs and said „nekalibruotas" although
  * every sheet's scale was known).
+ *
+ * Merged PER PAGE (2026-10-06, objektas_a on production): the pair lane read sheets 4, 8, 9, 11… and the geometry
+ * lane also sheet 2, the main floor plan, at 1:82 — but the pair lane's map was returned whole whenever it had any
+ * page, so sheet 2 said „Mastelis nenustatytas". The pair lane's ratio wins on a page it has; the geometry lane's
+ * fills every other page.
  */
-export function laneMastelisOf(project) {
-  const pairs = project?._meta?.plan_dimension_lane?.mastelis;
-  if (pairs && typeof pairs === 'object' && Object.keys(pairs).length) return pairs;
+function laneRatiosOf(project) {
+  const meta = project?._meta || {};
   const out = {};
-  const exact = project?._meta?.geometrija?.masteliai;
+  const exact = meta.geometrija?.masteliai;
   if (exact && typeof exact === 'object') {
     for (const [page, v] of Object.entries(exact)) {
       const ratio = Number(v?.mastelis);
-      if (ratio > 0) out[page] = ratio;
+      if (ratio > 0) out[page] = { ratio, lane: 'geometrija' };
     }
   }
+  const pairs = meta.plan_dimension_lane?.mastelis;
+  if (pairs && typeof pairs === 'object') {
+    for (const [page, v] of Object.entries(pairs)) {
+      const ratio = Number(v);
+      if (ratio > 0) out[page] = { ratio, lane: 'poros' };
+    }
+  }
+  return out;
+}
+
+/** `{page: ratio}` the extraction read off the drawing — both lanes, merged per page (`laneRatiosOf`). */
+export function laneMastelisOf(project) {
+  const out = {};
+  for (const [page, { ratio }] of Object.entries(laneRatiosOf(project))) out[page] = ratio;
   return out;
 }
 
@@ -133,6 +151,19 @@ export const DRAWING_SCALES = Object.freeze([20, 25, 30, 40, 50, 75, 100, 125, 1
 // A sheet read at the scale it writes carries exactly that scale's metres per point (the lane rounds them to six
 // places: ≤ 7·10⁻⁵ off at 1:20); a scale measured from the strings is off by far more.
 const STATED_EXACT = 1.5e-4;
+// The pair lane gives what the strings measure as the nearest drawing scale within 3 % (backend
+// plan_dimensions._mastelis: 1:49,4 → 1:50), the geometry lane as measured (→ 1:49).
+const PAIR_SNAP = 0.03;
+
+/** Is the geometry lane's record of a sheet (`{m_per_pt, mastelis}`) about this 1:N — however the lanes rounded it? */
+function measuredAs(record, ratio) {
+  if (!record) return false;
+  if (Number(record.mastelis) === ratio) return true;
+  const denom = Number(record.m_per_pt) / METERS_PER_POINT_AT_1_TO_1;
+  if (!(denom > 0)) return false;
+  const nearest = DRAWING_SCALES.reduce((a, s) => (Math.abs(s - denom) < Math.abs(a - denom) ? s : a));
+  return (Math.abs(nearest - denom) / denom <= PAIR_SNAP ? nearest : Math.round(denom)) === ratio;
+}
 
 /**
  * Where each lane scale comes from — `{page: {kilme, uzrasyta}}`.
@@ -146,23 +177,29 @@ const STATED_EXACT = 1.5e-4;
  *                although the sheet writes another (`uzrasyta`: what it writes — the lane's `mastelis_kitas`);
  *   'matmenys'   from the dimension strings, but whether written or measured cannot be told (the pair lane
  *                keeps only a rounded ratio, and the geometry lane has no record of that sheet).
+ *
+ * Each page is judged by what is known about ITS ratio — the one `laneMastelisOf` gives it (2026-10-06: the two
+ * lanes are merged per page): the note of the lane that read the ratio first, and a record of the other lane only
+ * when that lane measured the same ratio on the sheet (`measuredAs`) — a record of another ratio says nothing
+ * about this one.
  */
 export function laneScaleOriginOf(project) {
   const meta = project?._meta || {};
   const geo = meta.geometrija || {};
   const exact = geo.masteliai || {};
-  const others = { ...(meta.plan_dimension_lane?.mastelis_kitas || {}), ...(geo.masteliai_kiti || {}) };
+  const notes = { poros: meta.plan_dimension_lane?.mastelis_kitas || {}, geometrija: geo.masteliai_kiti || {} };
   const out = {};
-  for (const [page, ratio] of Object.entries(laneMastelisOf(project))) {
-    const r = Number(ratio);
-    if (!(r > 0)) continue;
-    const other = others[page];
-    if (other && typeof other === 'object') {
+  for (const [page, { ratio: r, lane }] of Object.entries(laneRatiosOf(project))) {
+    const own = notes[lane]?.[page];
+    const theirs = notes[lane === 'poros' ? 'geometrija' : 'poros']?.[page];
+    const other = [own, theirs].find((n, i) => n && typeof n === 'object'
+      && (i === 0 || !(Number(n.ismatuota) > 0) || Number(n.ismatuota) === r));
+    if (other) {
       const uzrasyta = (Array.isArray(other.uzrasyta) ? other.uzrasyta : []).map(Number).filter((n) => n > 0);
       out[page] = { kilme: 'ismatuotas', uzrasyta };
       continue;
     }
-    const g = exact[page];
+    const g = measuredAs(exact[page], r) ? exact[page] : null;
     const mpp = Number(g?.m_per_pt);
     if (mpp > 0) {
       const written = DRAWING_SCALES.includes(r) && Number(g.mastelis) === r

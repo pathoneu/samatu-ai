@@ -146,13 +146,88 @@ test('the dimension-string lane\'s ratios become exact page scales, labelled fro
   assert.deepEqual(pageScalesFromLane(null), {});
 });
 
-test('laneMastelisOf: the pair lane first, else the geometry lane\'s exact sheet scales', async () => {
+// ── the two lanes' scales, merged per page (2026-10-06) ─────────────────────
+
+test('laneMastelisOf, pair lane only: its ratios, nothing invented', async () => {
+  const { laneMastelisOf, laneScaleOriginOf } = await import('./durableScale.js');
+  const project = { _meta: { plan_dimension_lane: { mastelis: { 4: 82, '11': 50, 9: 'x', 13: 0 } } } };
+  assert.deepEqual(laneMastelisOf(project), { 4: 82, 11: 50 });
+  assert.deepEqual(laneScaleOriginOf(project), {
+    4: { kilme: 'ismatuotas', uzrasyta: [] },     // 1:82 is no drawing's scale — measured
+    11: { kilme: 'matmenys', uzrasyta: [] },      // a rounded 1:50: written or measured cannot be told
+  });
+  assert.deepEqual(laneMastelisOf({ _meta: {} }), {});
+  assert.deepEqual(laneMastelisOf(null), {});
+});
+
+test('laneMastelisOf, geometry lane only: its exact sheet scales', async () => {
   const { laneMastelisOf } = await import('./durableScale.js');
-  assert.deepEqual(laneMastelisOf({ _meta: { plan_dimension_lane: { mastelis: { 2: 50 } }, geometrija: { masteliai: { 1: { mastelis: 115 } } } } }), { 2: 50 });
   assert.deepEqual(
     laneMastelisOf({ _meta: { plan_dimension_lane: { mastelis: {} }, geometrija: { masteliai: { 1: { m_per_pt: 0.04065, mastelis: 115 }, 6: { mastelis: 115 }, 9: { mastelis: 0 } } } } }),
     { 1: 115, 6: 115 },
   );
-  assert.deepEqual(laneMastelisOf({ _meta: {} }), {});
-  assert.deepEqual(laneMastelisOf(null), {});
+});
+
+test('objektas_a on production: the main floor plan (sheet 2) gets the geometry lane\'s 1:82 beside the pair lane\'s sheets', async () => {
+  const { laneMastelisOf, laneScaleOriginOf, laneScalesOf } = await import('./durableScale.js');
+  const { scaleStatusText } = await import('./scaleLabel.js');
+  // the reading's own records: the pair lane never read sheets 2 and 3, the geometry lane did
+  const project = { _meta: {
+    plan_dimension_lane: { mastelis: { 4: 82, 8: 83, 9: 83, 11: 50, 12: 50, 13: 50, 14: 52, 15: 50, 17: 50 }, mastelis_kitas: {} },
+    geometrija: { masteliai: {
+      2: { m_per_pt: 0.029101, mastelis: 82 }, 3: { m_per_pt: 0.029101, mastelis: 82 }, 4: { m_per_pt: 0.029101, mastelis: 82 },
+      8: { m_per_pt: 0.029226, mastelis: 83 }, 9: { m_per_pt: 0.029155, mastelis: 83 }, 11: { m_per_pt: 0.017795, mastelis: 50 },
+      12: { m_per_pt: 0.017422, mastelis: 49 }, 13: { m_per_pt: 0.017778, mastelis: 50 }, 14: { m_per_pt: 0.018256, mastelis: 52 },
+      15: { m_per_pt: 0.01753, mastelis: 50 }, 17: { m_per_pt: 0.018116, mastelis: 51 },
+    }, masteliai_kiti: {} },
+  } };
+  const merged = laneMastelisOf(project);
+  assert.deepEqual(Object.keys(merged).map(Number).sort((a, b) => a - b), [2, 3, 4, 8, 9, 11, 12, 13, 14, 15, 17]);
+  assert.equal(merged[2], 82);
+  assert.equal(merged[3], 82);
+  const scales = laneScalesOf(project);
+  assert.equal(scales[2].calibrated, true);
+  assert.equal(scales[2].label, '1:82');
+  assert.equal(scaleStatusText(scales[2]), 'Mastelis 1:82 (išmatuotas pagal matmenis)');
+  // the label says where sheet 2's scale came from: the geometry lane's own record (1:82,49 measured, not written)
+  assert.deepEqual(laneScaleOriginOf(project)[2], { kilme: 'ismatuotas', uzrasyta: [] });
+  // a sheet both lanes read keeps the pair lane's ratio — and what it said before: every sheet of that reading
+  // was measured from its strings (1:50 on sheets 11–17 is the pair lane's rounding of 1:49,4 … 1:51,4)
+  assert.equal(merged[4], 82);
+  assert.equal(merged[11], 50);
+  const origin = laneScaleOriginOf(project);
+  for (const p of [2, 3, 4, 8, 9, 11, 12, 13, 14, 15, 17]) assert.deepEqual(origin[p], { kilme: 'ismatuotas', uzrasyta: [] }, `sheet ${p}`);
+});
+
+test('both lanes on the same sheet: the pair lane\'s ratio wins, and only a record of THAT ratio tells its origin', async () => {
+  const { laneMastelisOf, laneScaleOriginOf } = await import('./durableScale.js');
+  const exact50 = Math.round(50 * METERS_PER_POINT_AT_1_TO_1 * 1e6) / 1e6;
+  const project = { _meta: {
+    plan_dimension_lane: { mastelis: { 2: 50, 8: 83, 12: 50, 20: 115, 21: 50 } },
+    geometrija: {
+      masteliai: {
+        2: { m_per_pt: exact50, mastelis: 50 },          // agrees, at exactly the written 1:50
+        8: { m_per_pt: 0.029226, mastelis: 83 },         // agrees, measured
+        12: { m_per_pt: 0.017422, mastelis: 49 },        // 1:49,4 — the pair lane's 1:50 is the same measurement, snapped
+        20: { m_per_pt: 0.040598, mastelis: 115 },
+        21: { m_per_pt: 0.028928, mastelis: 82 },        // another measurement altogether
+      },
+      masteliai_kiti: {
+        20: { ismatuota: 115, uzrasyta: [100] },         // the same ratio: the sheet writes 1:100
+        21: { ismatuota: 82, uzrasyta: [50] },           // about 1:82 — says nothing of the pair lane's 1:50
+      },
+    },
+  } };
+  assert.deepEqual(laneMastelisOf(project), { 2: 50, 8: 83, 12: 50, 20: 115, 21: 50 });
+  const origin = laneScaleOriginOf(project);
+  assert.deepEqual(origin[2], { kilme: 'uzrasytas', uzrasyta: [] });
+  assert.deepEqual(origin[8], { kilme: 'ismatuotas', uzrasyta: [] });
+  assert.deepEqual(origin[12], { kilme: 'ismatuotas', uzrasyta: [] }, 'objektas_a sheet 12: measured, not written');
+  assert.deepEqual(origin[20], { kilme: 'ismatuotas', uzrasyta: [100] });
+  // a record of 1:82 tells nothing of the pair lane's 1:50: written or measured cannot be told — and never
+  // „1:50, the sheet writes 1:50"
+  assert.deepEqual(origin[21], { kilme: 'matmenys', uzrasyta: [] });
+  // a page whose pair ratio is no number is the geometry lane's
+  const gap = { _meta: { plan_dimension_lane: { mastelis: { 2: 0 } }, geometrija: { masteliai: { 2: { m_per_pt: 0.029101, mastelis: 82 } } } } };
+  assert.deepEqual(laneMastelisOf(gap), { 2: 82 });
 });

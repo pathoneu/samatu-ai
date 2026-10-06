@@ -7,6 +7,7 @@ the designer moves it up to ~1 m away when the wall is crowded — so the ENDS
 decide, not the distance. Synthetic drawings only."""
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -173,6 +174,58 @@ def test_an_outline_that_disagrees_with_the_table_states_nothing():
     out = _run([two_rooms()], [r])
     assert r["perimetras_saltinis"] == "konturo_ivertis" and "nesutampa su lentele" in r["_perimetras_priezastis"]
     assert abs(r["_perimetras_ivertis_m"] - 14.0) < 0.2 and out["blank"] == ["01"]
+
+
+def test_an_outline_off_the_table_offers_its_length_matched_to_the_table_area():
+    """2026-10-06 (objektas_a on production): an outline the lane kept although its area is off the table's
+    offered its own length — 13,98 m around a 13,51 m² room, shorter than any room of that area can be. A shape
+    similar to the outline with the table's area has every length × √(table / outline); the outline's own
+    length stays beside it for the check sheet."""
+    r = _room("01", 0.2, 0.2, 4.2, 3.2)                      # the outline: 4 × 3 m — 12 m², 14 m around
+    r["plotas_m2"] = 13.5                                     # the table: 12,5 % more
+    r["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
+    out = _run([two_rooms()], [r])
+    factor = math.sqrt(13.5 / 12.0)
+    assert r["perimetras_saltinis"] == "konturo_ivertis" and out["blank"] == ["01"]
+    assert "nesutampa su lentele" in r["_perimetras_priezastis"] and r["_perimetras_ivertis_saltinis"] == "konturas"
+    rec = r["_perimetras_suma"]["pagal_plota"]
+    assert abs(rec["konturo_m"] - 14.0) < 0.2 and rec["konturo_m"] == r["_perimetras_suma"]["kontrole_m"]
+    assert rec["konturo_plotas_m2"] == 12.0 and rec["lenteles_plotas_m2"] == 13.5 and abs(rec["koeficientas"] - factor) < 1e-4
+    assert r["perimetras_m"] == r["_perimetras_ivertis_m"] == rec["ivertis_m"] == round(rec["konturo_m"] * factor, 2)
+    assert r["perimetras_m"] >= 4 * math.sqrt(13.5)          # no shorter than the square of the table's area
+    # …and the other way: an outline larger than the table gives a shorter estimate
+    big = _room("01", 0.2, 0.2, 4.2, 3.2)
+    big["plotas_m2"] = 10.5
+    big["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
+    _run([two_rooms()], [big])
+    assert big["perimetras_m"] == round(big["_perimetras_suma"]["kontrole_m"] * math.sqrt(10.5 / 12.0), 2) < 14.0
+
+
+def test_only_the_lanes_flagged_outline_within_the_band_is_matched_to_the_table():
+    sheet = two_rooms()
+    # room 1's 3 m walls carry no string: its perimeter is an estimate whatever the areas say
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and min(abs(d[1] - x) for x in (0.35, 4.05, 4.55)) < 1e-6)]
+    sheet.dims.append(("2000", 9.0, 5.0, 9.0, 7.0))
+    # the outline agrees with the table (the lane did not flag it) — its own length, though the areas differ by 5 %
+    agrees = _room("01", 0.2, 0.2, 4.2, 3.2, plotas_m2=12.6)
+    agrees["_konturas"]["plotas_m2"] = 12.0
+    # farther off the table than the lane keeps an outline at all — left as it was
+    far = _room("01", 0.2, 0.2, 4.2, 3.2, plotas_m2=17.0)
+    far["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
+    # a person's outline, still carrying an older record of the lane's — his polygon, never rescaled
+    his = _room("01", 0.2, 0.2, 4.2, 3.2, plotas_m2=13.5, polygon_source="corrected")
+    his["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
+    for r in (agrees, far, his):
+        _run([sheet], [r])
+        assert r["perimetras_saltinis"] == "konturo_ivertis", r.get("_perimetras_priezastis")
+        assert r["perimetras_m"] == r["_perimetras_ivertis_m"] == r["_perimetras_suma"]["kontrole_m"]
+        assert "pagal_plota" not in r["_perimetras_suma"]
+    # a perimeter the strings state is read, not estimated — whatever the areas
+    stated = _room("01", 0.2, 0.2, 4.2, 3.2, plotas_m2=12.6)
+    stated["_konturas"]["plotas_m2"] = 12.0
+    _run([two_rooms()], [stated])
+    assert stated["perimetras_saltinis"] == "matmenu_eilutes" and stated["perimetras_m"] == 14.0
+    assert "pagal_plota" not in stated["_perimetras_suma"]
 
 
 def test_a_slanted_wall_has_no_string_the_reader_can_read():

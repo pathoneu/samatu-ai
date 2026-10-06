@@ -38,7 +38,9 @@ perimetras_saltinis="matmenu_eilutes" + _perimetras_suma, or the outline's
 length as perimetras_m with perimetras_saltinis="konturo_ivertis" (an ESTIMATE:
 the sheet shows a blank and offers it; the sąmata rows need a number) +
 _perimetras_priezastis + _perimetras_ivertis_m + _perimetras_ivertis_saltinis=
-"konturas". Rooms whose perimeter someone STATED
+"konturas" — the length matched to the table's area when the lane's outline is off
+it (`_matched_to_table`, `_perimetras_suma["pagal_plota"]` keeps the outline's own
+length). Rooms whose perimeter someone STATED
 (plan pair, table, user) are left alone; rooms whose outline is only Vision's
 box or a browser flood-fill are skipped — those cannot say which strings are
 its walls; an outline
@@ -53,6 +55,7 @@ from typing import Sequence
 from shapely.geometry import Point, Polygon
 
 from .sheet_alignment import base_page, to_base
+from .vector_rooms import SOURCE as VECTOR_SOURCE
 
 NEAR_M = 1.2                # a wall's string is written at most this far from it
 END_TOL_M = 0.12            # …and its row starts and ends this close to the wall's corners
@@ -74,6 +77,34 @@ KEEP = ("plano_matmenys", "eksplikacija", "user_override", "manual", SOURCE)
 # outlines that follow the WALLS (traced from them, or drawn by a person) — a browser flood-fill
 # contour or Vision's box is a place on the plan, not the room's walls
 WALL_OUTLINES = ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual")
+# 2026-10-06 (objektas_a on production): every room's perimeter was its outline's length, and four were SHORTER
+# than any room of their area can be (104: 13,98 m around 13,51 m² — a square needs 14,70). Each of those outlines
+# was kept although its area is off the table's (vector_rooms: by more than AREA_TOL, up to AREA_WARN — the lane's
+# `plotas_nesutampa`). The table's area is the one the rows bill, and a shape similar to the outline with that area
+# has every length × √(table / outline) — so the outline's length, as the ESTIMATE, is matched to the table's area.
+# Only for the lane's own outline it flagged so, and only this far off (vector_rooms.AREA_WARN: farther, the lane
+# keeps no outline at all); never a person's outline (a polygon he drew or pointed at — even one that still carries
+# an older record of the lane's), never a read or summed perimeter. The outline's own length stays beside it
+# (`_perimetras_suma["pagal_plota"]`).
+AREA_MATCH_MAX = 0.25
+
+
+def _matched_to_table(room: dict, kont: dict, length_m: float) -> dict | None:
+    """The outline's length matched to the table's area — {konturo_m (the outline's own length),
+    konturo_plotas_m2, lenteles_plotas_m2, koeficientas, ivertis_m} — or None: not the lane's outline, the lane
+    did not flag its area, an area is missing, or the two are farther apart than AREA_MATCH_MAX."""
+    if room.get("polygon_source") != VECTOR_SOURCE or not kont.get("plotas_nesutampa") or not length_m or length_m <= 0:
+        return None
+    try:
+        drawn = float(kont.get("plotas_m2") or 0)
+        table = float(room.get("plotas_m2") or 0)
+    except (TypeError, ValueError):
+        return None
+    if drawn <= 0 or table <= 0 or abs(drawn - table) / table > AREA_MATCH_MAX:
+        return None
+    factor = math.sqrt(table / drawn)
+    return {"konturo_m": round(length_m, 2), "konturo_plotas_m2": round(drawn, 2), "lenteles_plotas_m2": round(table, 2),
+            "koeficientas": round(factor, 4), "ivertis_m": round(length_m * factor, 2)}
 
 
 IMAGINARY_TOL_PT = 1.5
@@ -440,10 +471,15 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
             # room's perimeter: the sąmata rows (grindjuostės, silikonavimas, hidroizoliacijos juosta…)
             # are built straight from `perimetras_m`, and a None there silently zeroed objektas_g's
             # bathroom rows (eval 2026-09-19: rows within ±10 % fell 15 → 10 %). The SOURCE carries the truth.
-            room["perimetras_m"] = control_total if control_total > 0 else None
-            room["perimetras_saltinis"] = ESTIMATE_SOURCE if control_total > 0 else None
+            estimate = control_total
+            matched = _matched_to_table(room, kont, control_total)
+            if matched:                                # an outline whose area is off the table's: its length × √(table / outline)
+                estimate = matched["ivertis_m"]
+                suma["pagal_plota"] = matched
+            room["perimetras_m"] = estimate if estimate > 0 else None
+            room["perimetras_saltinis"] = ESTIMATE_SOURCE if estimate > 0 else None
             room["_perimetras_priezastis"] = reason
-            room["_perimetras_ivertis_m"] = control_total
+            room["_perimetras_ivertis_m"] = estimate
             room["_perimetras_ivertis_saltinis"] = "konturas"
             summary["blank"].append(nr)
         room["_perimetras_suma"] = suma

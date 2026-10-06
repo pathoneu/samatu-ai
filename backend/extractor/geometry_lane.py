@@ -149,7 +149,10 @@ def _forget_open_space(room: dict) -> None:
 # bounding-box pair the outline is as long as becomes the perimeter; walls adding up to less than any room of that
 # area could have are not taken; the door schedule (it rides along with the free re-read) reads „be apvadų" as
 # frameless and „910x2100" sizes, and a row naming both frame types is left to him.
-LANE_VERSION = 10
+# 11 (2026-10-06, objektas_a on production): an outline kept although its area is off the table's gives its length
+# as the estimate matched to the table's area — × √(table / outline), a similar shape — never shorter than any room
+# of that area could be (104: 13,98 → 14,96 m around 13,51 m²); the outline's own length stays beside it.
+LANE_VERSION = 11
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

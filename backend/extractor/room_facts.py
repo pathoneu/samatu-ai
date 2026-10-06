@@ -498,6 +498,19 @@ def _outline_rect_pct(room: dict) -> list[float] | None:
     return _clamp_rect([min(xs) - m, min(ys) - m, max(xs) + m, max(ys) + m])
 
 
+def _outline_matched_to_table(room: dict, value: float | None) -> dict | None:
+    """dimension_sum's record of the outline's length matched to the table's area (`_perimetras_suma
+    ["pagal_plota"]`: the outline's own length and both areas) — only while `value` is the number it gave."""
+    suma = room.get("_perimetras_suma")
+    rec = suma.get("pagal_plota") if isinstance(suma, dict) else None
+    if not isinstance(rec, dict) or value is None:
+        return None
+    out = {k: _f(rec.get(k)) for k in ("ivertis_m", "konturo_m", "konturo_plotas_m2", "lenteles_plotas_m2")}
+    if any(v is None or v <= 0 for v in out.values()) or abs(out["ivertis_m"] - float(value)) >= 0.005:
+        return None
+    return out
+
+
 def _fact_perimetras(project: dict, room: dict,
                      region: list[float] | None) -> dict:
     measured = _f(room.get("perimetras_m"))
@@ -569,9 +582,18 @@ def _fact_perimetras(project: dict, room: dict,
         est = round(float(room["_perimetras_ivertis_m"] if measured is None else measured), 2)
         why = str(room.get("_perimetras_priezastis") or "ne visos sienos plane turi matmenį").rstrip(".")
         page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
+        matched = _outline_matched_to_table(room, est)
         if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas":
             sentence = (f"Perimetro nesudėjau: {why}. Šiai patalpai tenka {lt_num(est)} m — priimkite arba įrašykite "
                         f"tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
+        elif matched:
+            # 2026-10-06: the outline's length matched to the table's area (dimension_sum._matched_to_table) — the
+            # outline's own length and both areas said, so he sees why the number is not the outline's
+            sentence = (f"Perimetro nesudėjau: {why}. Sienų kontūras brėžinyje — {lt_num(matched['konturo_m'])} m, "
+                        f"bet jo plotas {lt_num(matched['konturo_plotas_m2'])} m², o lentelėje "
+                        f"{lt_num(matched['lenteles_plotas_m2'])} m². Kontūrą pritaikiau prie lentelės ploto: tokios pat "
+                        f"formos patalpos sienos būtų {lt_num(est)} m — priimkite arba įrašykite tikrą. "
+                        f"Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
         else:
             sentence = (f"Perimetro nesudėjau: {why}. Pagal sienų kontūrą brėžinyje būtų {lt_num(est)} m — "
                         f"priimkite arba įrašykite tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
@@ -595,8 +617,12 @@ def _fact_perimetras(project: dict, room: dict,
         if est is not None and abs(est - measured) < 0.005:
             # he took the number the sheet offered — say which number that was, not „you typed it"
             why = str(room.get("_perimetras_priezastis") or "").rstrip(".")
+            matched = _outline_matched_to_table(room, measured)
             head = ("Priėmėte šiai patalpai tenkančią bendros erdvės sienų dalį"
                     if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas"
+                    else (f"Priėmėte įvertį pagal sienų kontūrą, pritaikytą prie lentelės ploto: kontūras brėžinyje "
+                          f"{lt_num(matched['konturo_m'])} m, jo plotas {lt_num(matched['konturo_plotas_m2'])} m², "
+                          f"lentelėje {lt_num(matched['lenteles_plotas_m2'])} m²") if matched
                     else "Priėmėte įvertį pagal sienų kontūrą brėžinyje")
             sentence = head + (f" (plane sienų ilgių nesudėjau: {why})." if why else ".")
             page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")

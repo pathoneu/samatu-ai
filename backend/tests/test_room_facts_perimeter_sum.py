@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from extractor.room_facts import build_room_facts  # noqa: E402
+from extractor.user_text import is_banned  # noqa: E402
 
 OUTLINE = [[0.5, 0.2], [0.7, 0.2], [0.7, 0.4], [0.5, 0.4]]
 
@@ -108,6 +109,37 @@ def test_a_stored_blank_from_before_the_estimate_became_a_number_still_reads_as_
             "_konturas": {"page": 1}, "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai"}
     p = _perimetras(room)
     assert p["value"] is None and p["suggestion"]["value"] == 21.23
+
+
+def test_an_outline_matched_to_the_table_area_says_so_with_its_own_length():
+    """2026-10-06 (objektas_a room 104): the outline's area is off the table's, so the estimate is its length
+    matched to the table's area (dimension_sum._matched_to_table) — the sentence says that, with the outline's
+    own length and both areas, so he sees why the number is not the outline's."""
+    match = {"konturo_m": 13.98, "konturo_plotas_m2": 11.8, "lenteles_plotas_m2": 13.51, "koeficientas": 1.07, "ivertis_m": 14.96}
+    room = {"nr": "104", "pavadinimas": "Darbo kambarys", "plotas_m2": 13.51, "puslapio_nr": 2, "lubu_aukstis_m": 2.8,
+            "perimetras_m": 14.96, "perimetras_saltinis": "konturo_ivertis",
+            "_perimetras_priezastis": "kontūro plotas nesutampa su lentele — kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju",
+            "_perimetras_ivertis_m": 14.96, "_perimetras_ivertis_saltinis": "konturas",
+            "_perimetras_suma": {"suma_m": 0.0, "kontrole_m": 13.98, "sutampa": False, "lapai": [], "eilutes": [], "pagal_plota": match},
+            "_konturas": {"page": 2, "plotas_m2": 11.8, "plotas_nesutampa": True}, "polygon_pct": OUTLINE,
+            "polygon_source": "vektoriniai_konturai"}
+    p = _perimetras(room)
+    assert p["value"] is None and p["status"] == "missing" and p["suggestion"] == {"value": 14.96, "label": "Priimti 14,96 m"}
+    s = p["sentence"]
+    assert "nesutampa su lentele" in s and "13,98 m" in s and "11,80 m²" in s and "13,51 m²" in s
+    assert "pritaikiau prie lentelės ploto" in s and "14,96 m" in s and not is_banned(s)
+    # he takes it: the sentence still says what that number was
+    room["perimetras_saltinis"] = "user_override"
+    p = _perimetras(room)
+    assert p["value"] == 14.96 and "pritaikytą prie lentelės ploto" in p["sentence"] and "13,98 m" in p["sentence"]
+    assert not is_banned(p["sentence"])
+    # a number of his own is not the matched one
+    room["perimetras_m"] = 15.2
+    assert "pritaik" not in _perimetras(room)["sentence"]
+    # a record of another number (an older estimate) says nothing about this one
+    room.update({"perimetras_m": 14.5, "perimetras_saltinis": "konturo_ivertis", "_perimetras_ivertis_m": 14.5})
+    s = _perimetras(room)["sentence"]
+    assert "pritaik" not in s and "Pagal sienų kontūrą brėžinyje būtų 14,50 m" in s
 
 
 # ── what the drawing pane needs: the walls and the outline, on the fact ─────────
