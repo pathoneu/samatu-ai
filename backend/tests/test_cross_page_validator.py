@@ -171,9 +171,10 @@ def test_multi_floor_emits_breakdown_info():
     multi = [w for w in out if w["field"] == "aukstai.bendras_plotas_m2"]
     assert len(multi) == 1
     assert multi[0]["level"] == "info"
-    assert "1A=35" in multi[0]["message_lt"]
-    assert "2A=30" in multi[0]["message_lt"]
-    assert "65" in multi[0]["message_lt"]
+    # floor by floor, decimal comma (2026-10-06: was „1A=35.0 m²")
+    assert "1 a. 35,00 m²" in multi[0]["message_lt"]
+    assert "2 a. 30,00 m²" in multi[0]["message_lt"]
+    assert "65,00 m²" in multi[0]["message_lt"]
 
 
 def test_multi_floor_warns_when_floor_suspiciously_small():

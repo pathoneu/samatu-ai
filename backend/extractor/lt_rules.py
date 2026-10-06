@@ -8,6 +8,37 @@ Per user directive: warnings only, NOT value mutations.
 """
 from __future__ import annotations
 
+from .universal_rules import lt_num, paskirtis_label
+
+
+# ── How a warning reads (2026-10-06) ─────────────────────────────────────────
+# Every message below lands in the Sąmata step's „Patikrinimai" list as it is.
+# A contractor walkthrough read „Tambūras (nr=01): … paskirčiai 'tamburas' …
+# pažymėkite Prielaidų skydelyje" there. So: the room by its name only (the list
+# already prints its number in front, from `patalpa_nr`), the purpose by its
+# label, numbers with a decimal comma, the settings panel by the name on its
+# button („Nustatymai"), and every message ends with what to check and where.
+
+def _who(name: str | None) -> str:
+    """„Tambūras: " in front of a room's message — never its number again."""
+    name = (name or "").strip()
+    return f"{name}: " if name else ""
+
+
+def _purpose(paskirtis: str | None) -> str:
+    """„paskirčiai „Tambūras““, or plain words when the purpose has no label."""
+    label = paskirtis_label(paskirtis)
+    return f"paskirčiai „{label}“" if label else "šios paskirties patalpai"
+
+
+def _lt_norm(v: float) -> str:
+    """A norm figure as the table holds it, decimal comma: 8 → „8", 3.8 → „3,8"."""
+    v = float(v)
+    for digits in (0, 1):
+        if round(v, digits) == v:
+            return lt_num(v, digits)
+    return lt_num(v, 2)
+
 
 # ═════════════════════════════════════════════════════════════════════════
 # STR 1.05.06:2010 — MANSARDINIS SVORIS
@@ -131,7 +162,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
 
     for r in rooms:
         paskirtis = (r.get("paskirtis") or "").lower()
-        pavadinimas = r.get("pavadinimas") or "?"
+        who = _who(r.get("pavadinimas"))
         nr = str(r.get("nr") or "?")
         plotas = float(r.get("plotas_m2") or 0)
         perim = float(r.get("perimetras_m") or 0)
@@ -146,9 +177,10 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "level": "WARN",
                     "patalpa_nr": nr,
                     "message": (
-                        f"{pavadinimas} (nr={nr}): plotas {plotas:.1f} m² per mažas "
-                        f"'{paskirtis}' patalpai (STR norma {lo}–{hi} m²). "
-                        f"Patikrink mastelį arba paskirtį."
+                        f"{who}Plotas {lt_num(plotas, 1)} m² per mažas {_purpose(paskirtis)} "
+                        f"(STR norma {_lt_norm(lo)}–{_lt_norm(hi)} m²). Patikrinkite plotą "
+                        f"eksplikacijoje ir brėžinio mastelį; jei paskirtis kita, pakeiskite "
+                        f"ją Patikros žingsnyje, šios patalpos lape."
                     ),
                 })
             elif plotas > hi * 1.5:
@@ -156,9 +188,11 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "level": "WARN",
                     "patalpa_nr": nr,
                     "message": (
-                        f"{pavadinimas} (nr={nr}): plotas {plotas:.1f} m² per didelis "
-                        f"'{paskirtis}' patalpai (STR norma {lo}–{hi} m²). "
-                        f"Galimai atvira erdvė arba paskirtis blogai."
+                        f"{who}Plotas {lt_num(plotas, 1)} m² per didelis {_purpose(paskirtis)} "
+                        f"(STR norma {_lt_norm(lo)}–{_lt_norm(hi)} m²) — galbūt tai atvira "
+                        f"erdvė su kita patalpa arba paskirtis nustatyta neteisingai. "
+                        f"Patikrinkite plotą eksplikacijoje; jei paskirtis kita, pakeiskite "
+                        f"ją Patikros žingsnyje, šios patalpos lape."
                     ),
                 })
 
@@ -166,7 +200,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
         if H > 0:
             min_H = _LUBU_AUKSTIS_MIN.get(paskirtis, 2.20)
             # `code` + `field` are what SanityWarningsBanner keys the
-            # "Atidaryti Prielaidas" jump off — a height warning the user can
+            # "Atidaryti nustatymus" jump off — a height warning the user can
             # act on in one click instead of hunting for the control.
             if H < min_H:
                 warnings.append({
@@ -175,13 +209,14 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "field": "lubu_aukstis_m",
                     "patalpa_nr": nr,
                     "value": round(H, 2),
-                    "expected": f"≥{min_H:.2f} m",
+                    "expected": f"≥{lt_num(min_H)} m",
                     "message": (
-                        f"{pavadinimas} (nr={nr}): lubų aukštis {H:.2f} m žemiau STR "
-                        f"minimumo {min_H:.2f} m (paskirtis: {paskirtis})."
+                        f"{who}Lubų aukštis {lt_num(H)} m žemesnis, nei STR leidžia "
+                        f"{_purpose(paskirtis)} (norma ≥{lt_num(min_H)} m). Patikrinkite "
+                        f"aukštį pjūvyje."
                     ),
-                    "hint": "Patikrinkite lubų aukštį Prielaidose — jį galima "
-                            "nurodyti kiekvienai patalpai atskirai.",
+                    "hint": "Lubų aukštį pakeiskite per mygtuką „Nustatymai“ — jį "
+                            "galima nurodyti kiekvienai patalpai atskirai.",
                 })
             if H < _LUBU_AUKSTIS_ABSOLUTE_RANGE[0] or H > _LUBU_AUKSTIS_ABSOLUTE_RANGE[1]:
                 warnings.append({
@@ -190,15 +225,16 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "field": "lubu_aukstis_m",
                     "patalpa_nr": nr,
                     "value": round(H, 2),
-                    "expected": (f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[0]}–"
-                                 f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[1]} m"),
+                    "expected": (f"{_lt_norm(_LUBU_AUKSTIS_ABSOLUTE_RANGE[0])}–"
+                                 f"{_lt_norm(_LUBU_AUKSTIS_ABSOLUTE_RANGE[1])} m"),
                     "message": (
-                        f"{pavadinimas} (nr={nr}): lubų aukštis {H:.2f} m neįprastas "
-                        f"(norma {_LUBU_AUKSTIS_ABSOLUTE_RANGE[0]}–"
-                        f"{_LUBU_AUKSTIS_ABSOLUTE_RANGE[1]} m)."
+                        f"{who}Lubų aukštis {lt_num(H)} m neįprastas (norma "
+                        f"{_lt_norm(_LUBU_AUKSTIS_ABSOLUTE_RANGE[0])}–"
+                        f"{_lt_norm(_LUBU_AUKSTIS_ABSOLUTE_RANGE[1])} m). Patikrinkite "
+                        f"aukštį pjūvyje arba lubų plane."
                     ),
-                    "hint": "Patikrinkite lubų aukštį Prielaidose — jį galima "
-                            "nurodyti kiekvienai patalpai atskirai.",
+                    "hint": "Lubų aukštį pakeiskite per mygtuką „Nustatymai“ — jį "
+                            "galima nurodyti kiekvienai patalpai atskirai.",
                 })
 
         # Perimeter vs area consistency
@@ -210,8 +246,10 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "level": "INFO",
                     "patalpa_nr": nr,
                     "message": (
-                        f"{pavadinimas} (nr={nr}): perimetras {perim:.1f} m per mažas "
-                        f"plotui {plotas:.1f} m² (min ~{min_perim:.1f} m)."
+                        f"{who}Perimetras {lt_num(perim, 1)} m per mažas {lt_num(plotas, 1)} m² "
+                        f"plotui (turėtų būti apie {lt_num(min_perim, 1)} m ar daugiau). "
+                        f"Patikrinkite perimetrą ir plotą Patikros žingsnyje, šios "
+                        f"patalpos lape."
                     ),
                 })
             elif perim > max_perim * 1.3:
@@ -219,8 +257,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
                     "level": "INFO",
                     "patalpa_nr": nr,
                     "message": (
-                        f"{pavadinimas} (nr={nr}): perimetras {perim:.1f} m per didelis "
-                        f"(galimai L-formos arba sudėtinga konfigūracija)."
+                        f"{who}Perimetras {lt_num(perim, 1)} m per didelis {lt_num(plotas, 1)} m² "
+                        f"plotui — toks būna tik L formos ar sudėtingesnės patalpos. "
+                        f"Patikrinkite perimetrą Patikros žingsnyje, šios patalpos lape."
                     ),
                 })
 
@@ -239,7 +278,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
             warnings.append({
                 "level": "WARN" if risky else "INFO",
                 "patalpa_nr": nr,
-                "message": f"{pavadinimas} (nr={nr}): {note}",
+                "message": f"{who}{note}",
             })
 
         # Ceiling-finish assumptions (2026-07-29). Withholding a ceiling from
@@ -251,7 +290,7 @@ def apply_lt_sanity(parsed: dict) -> dict:
             warnings.append({
                 "level": "WARN",
                 "patalpa_nr": nr,
-                "message": f"{pavadinimas} (nr={nr}): {note}",
+                "message": f"{who}{note}",
             })
 
     # ── Where each room's ceiling height came from (2026-07-29) ──────────
@@ -273,12 +312,11 @@ def apply_lt_sanity(parsed: dict) -> dict:
                 "level": "WARN",
                 "patalpa_nr": None,
                 "message": (
-                    f"Lubų aukštis nuskaitytas iš lubų plano altitudžių, "
-                    f"pažymėtų PAČIOJE patalpoje (nr. {marker_nrs}). "
-                    f"Patalpoms nr. {other_nrs} altitudės ties jų kontūru "
-                    f"nerasta — joms taikytas bendras projekto aukštis. "
-                    f"Patikrinkite šias patalpas lubų plane ir, jei aukštis "
-                    f"kitoks, įveskite jį Prielaidose."
+                    f"Lubų aukštis paimtas iš lubų plano altitudžių, pažymėtų "
+                    f"pačiose patalpose (nr. {marker_nrs}). Patalpose nr. "
+                    f"{other_nrs} altitudės nerasta — joms taikytas bendras "
+                    f"projekto aukštis. Patikrinkite šias patalpas lubų plane ir, "
+                    f"jei aukštis kitas, pakeiskite jį per mygtuką „Nustatymai“."
                 ),
             })
         else:
@@ -303,12 +341,11 @@ def apply_lt_sanity(parsed: dict) -> dict:
             "level": "WARN",
             "patalpa_nr": r.get("nr"),
             "message": (
-                f"{r.get('pavadinimas') or ''} (nr={r.get('nr')}): lubų plane "
-                f"pažymėta altitudė {float(conflict['marker_m']):.2f} m, bet "
-                f"nuskaitytas aukštis {float(conflict['kept_m']):.2f} m — "
-                f"galimai dviejų lygių / dvigubo aukščio patalpa. Paliktas "
-                f"didesnis aukštis. Patikrinkite pjūvį ir, jei zonos "
-                f"skirtingos, įveskite jas Prielaidose."
+                f"{_who(r.get('pavadinimas'))}Lubų plane pažymėta altitudė "
+                f"{lt_num(float(conflict['marker_m']))} m, bet perskaitytas aukštis "
+                f"{lt_num(float(conflict['kept_m']))} m — galbūt patalpa dviejų lygių "
+                f"ar dvigubo aukščio. Skaičiuojama su didesniu aukščiu. Patikrinkite "
+                f"pjūvyje; jei aukštis kitas, pakeiskite jį per mygtuką „Nustatymai“."
             ),
         })
 
@@ -335,20 +372,20 @@ def apply_lt_sanity(parsed: dict) -> dict:
         ]
         high_nrs = ", ".join(str(r.get("nr") or "?") for r in high_rooms)
         low_txt = (
-            f" Patikrintini kambariai (nominaliai iki 3 m): {', '.join(low_nrs)}."
+            f" Patikrinkite patalpas, kurių lubos žemesnės nei 3 m: {', '.join(low_nrs)}."
             if low_nrs else ""
         )
         warnings.append({
             "level": "WARN",
             "patalpa_nr": None,
             "message": (
-                f"Virš 3 m kiekis (dažymas, GKP lubos, pastolių poreikis) "
-                f"apskaičiuotas TIK iš kambarių, kurių nominalus lubų aukštis "
-                f"≥ 3 m (nr. {high_nrs}). Daliniai aukšti ruožai — karnizai, "
-                f"soffitai, dvigubo aukščio zonos žemesniuose kambariuose — "
-                f"automatiškai neaptinkami, todėl virš-3 m kiekis yra APATINĖ "
-                f"RIBA.{low_txt} Patikrinkite pjūvį ir lubų planą; rastą zoną "
-                f"įveskite Prielaidose."
+                f"Virš 3 m kiekiai (dažymas, GKP lubos, pastoliai) skaičiuoti tik "
+                f"iš patalpų, kurių lubų aukštis 3 m ar didesnis (nr. {high_nrs}). "
+                f"Aukšti ruožai žemesnėse patalpose — karnizai, lubų nuleidimai, "
+                f"dvigubo aukščio dalys — automatiškai neaptinkami, todėl tikras "
+                f"virš 3 m kiekis gali būti didesnis.{low_txt} Radę tokį ruožą "
+                f"pjūvyje ar lubų plane, papildykite virš 3 m eilučių kiekius "
+                f"sąmatoje."
             ),
         })
 
@@ -365,8 +402,8 @@ def apply_lt_sanity(parsed: dict) -> dict:
             "message": (
                 "Sienų plotas skaičiuotas kaip perimetras × aukštis − angos. "
                 "Vidinės pertvaros, nesiliečiančios su kambario perimetru "
-                "(pvz. lovos galvūgalio sienelė), į kiekį NEĮTRAUKTOS – jei "
-                "tokių yra, pridėkite jas Prielaidose."
+                "(pvz., lovos galvūgalio sienelė), į kiekį neįtrauktos — jei "
+                "tokių yra, pridėkite jų plotą prie sienų dažymo kiekio sąmatoje."
             ),
         })
 
@@ -377,8 +414,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
             "level": "WARN",
             "patalpa_nr": None,
             "message": (
-                f"Bendras plotas {total_area:.0f} m² — labai retas LT projektas. "
-                f"Patikrink mastelį."
+                f"Bendras patalpų plotas {lt_num(total_area, 0)} m² — neįprastai "
+                f"didelis. Patikrinkite brėžinio mastelį ir ar tos pačios patalpos "
+                f"neįskaičiuotos du kartus."
             ),
         })
 
@@ -389,8 +427,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
             "level": "WARN",
             "patalpa_nr": None,
             "message": (
-                f"Tik {n} patalp(os) atpažintos. Tipiniam butui min 3, namui min 5. "
-                f"Galimai AI praleido kambarius."
+                f"Rasta tik {n} {'patalpa' if n == 1 else 'patalpos'} — bute "
+                f"paprastai būna bent 3, name — bent 5. Patikrinkite, ar "
+                f"perskaitytos visos patalpos: palyginkite su eksplikacija ir planu."
             ),
         })
     elif n > 30:
@@ -398,8 +437,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
             "level": "WARN",
             "patalpa_nr": None,
             "message": (
-                f"{n} patalpų — neįprastai daug. Galimai AI dvigubai įtraukė tas pačias "
-                f"patalpas iš skirtingų puslapių."
+                f"Patalpų rasta: {n} — neįprastai daug. Galbūt tos pačios patalpos "
+                f"įtrauktos du kartus iš skirtingų lapų. Patikrinkite patalpų sąrašą "
+                f"Patikros žingsnyje."
             ),
         })
 
@@ -416,8 +456,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
                 "level": "INFO",
                 "patalpa_nr": str(r.get("nr") or "?"),
                 "message": (
-                    f"{pav1!r} ir {pav2!r} gali buti tas pats kambarys "
-                    f"(vienoda paskirtis + plotas)."
+                    f"„{pav1}“ ir „{pav2}“ gali būti ta pati patalpa (vienoda "
+                    f"paskirtis ir plotas). Patikrinkite eksplikacijoje ir plane, "
+                    f"ar ji neįskaičiuota du kartus."
                 ),
             })
         seen[key] = r.get("pavadinimas") or "?"

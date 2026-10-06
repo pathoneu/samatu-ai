@@ -57,9 +57,10 @@ def test_withheld_ceiling_is_disclosed_not_dropped():
     notes = q["_ceiling_finish_assumptions"]
     assert len(notes) == 1
     assert NOTE_MARK in notes[0]
-    # Names the paskirtis that drove it and points at the override path.
-    assert "garazas" in notes[0]
-    assert "Prielaid" in notes[0]
+    # Names the paskirtis that drove it — by the label he sees, not the code —
+    # and says where to check and what to correct (2026-10-06).
+    assert "„Garažas“" in notes[0] and "garazas" not in notes[0]
+    assert "lubų plane" in notes[0] and "sąmatoje" in notes[0]
 
 
 def test_disclosure_surfaces_as_lt_sanity_warning():
@@ -103,12 +104,30 @@ def test_garage_with_walls_paint_factor_override_keeps_its_ceiling():
     assert q["_ceiling_paint_source"] == "standard"
 
 
-def test_explicit_zero_wall_override_still_keeps_ceiling():
-    """walls_paint_factor_override=0.0 is a deliberate statement about WALLS.
-    It must not be read as a statement about the ceiling."""
+def test_explicit_zero_wall_override_keeps_the_raw_ceiling_out():
+    """walls_paint_factor_override=0.0 is his „Nedažomos" — what the Patikra
+    question proposes for this very garage. It CONFIRMS the room is unfinished,
+    so the gate stays open: until 2026-10-06 any override shut it and the
+    confirmation put the 44 m² ceiling back into the paint lines. Only an
+    override above 0 (the test above) says the room is finished. The note says
+    it was his choice, not a missing finish on the drawing."""
     q = calc_room_quantities(_garage(walls_paint_factor_override=0.0))
     assert q["walls_paintable_m2"] == 0.0
-    assert q["ceiling_paintable_m2"] == 44.0
+    assert q["ceiling_paintable_m2"] == 0.0
+    assert q["_ceiling_paint_source"] == "unfinished_room_standard"
+    notes = q["_ceiling_finish_assumptions"]
+    assert len(notes) == 1 and NOTE_MARK in notes[0]
+    assert "pažymėjote kaip nedažomas" in notes[0] and "apdailos nerasta" not in notes[0]
+
+
+def test_explicit_zero_wall_override_does_not_strip_a_finished_rooms_ceiling():
+    """The same „Nedažomos" in a living room under a read concrete slab: its
+    room type is finished, so his word about the WALLS leaves the ceiling
+    painted."""
+    q = calc_room_quantities(_room(lubu_tipas="betonas", walls_paint_factor_override=0.0))
+    assert q["walls_paintable_m2"] == 0.0
+    assert q["ceiling_paintable_m2"] == 30.0
+    assert q["_ceiling_paint_source"] == "standard"
 
 
 def test_garage_with_gkp_soffit_keeps_its_ceiling():

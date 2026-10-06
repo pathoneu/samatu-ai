@@ -160,7 +160,8 @@ def test_ambiguous_name_emits_warning_skips_override():
     assert n == 0
     assert parsed["patalpos"][0]["plyteles_sienos_m2"] == 8.0  # unchanged
     assert parsed["patalpos"][1]["plyteles_sienos_m2"] == 6.0  # unchanged
-    # Warnings emitted for both
-    warnings = parsed.get("_lt_warnings", [])
+    # Warnings emitted for both — in `warnings`, the list the later steps keep
+    # (apply_lt_sanity rebuilds `_lt_warnings` and erased them, 2026-10-06)
+    warnings = parsed.get("warnings", [])
     assert len(warnings) == 2
     assert all("dubliuojasi" in w["message"] for w in warnings)

@@ -402,10 +402,18 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
 
       {question.manual?.length > 0 && (
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">{t('project.questions.manualTitle')}</p>
-          <ul className="mt-1 rounded-[2px] border border-border">
+          {/* 2026-10-06 (contractor walkthrough): the shouting caps line is gone. A calm line separates these
+              rooms only from the one-click rows above; alone, the question's own title and reason say it. */}
+          {question.items.length > 0 && (
+            <p className="text-[15px] font-semibold text-foreground">{t('project.questions.manualTitle')}</p>
+          )}
+          <ul className={`${question.items.length > 0 ? 'mt-1 ' : ''}rounded-[2px] border border-border`}>
             {question.manual.map((m) => (
-              <li key={m.room_nr} className={`border-t border-border px-3 py-2 first:border-t-0 ${focusNr === m.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}>
+              <li
+                key={m.room_nr}
+                className={`border-t border-border px-3 py-2.5 first:border-t-0 ${focusNr === m.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
+                data-testid={`opening-manual-${m.room_nr}`}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button" onClick={() => onFocus?.(m.room_nr)}
@@ -418,7 +426,17 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
                     {t('project.questions.openRoom')}
                   </button>
                 </div>
-                <p className="mt-0.5 text-[13px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(m.sentence || '')}</p>
+                {/* what does not match and what to check first; the room sheet's full account (which openings)
+                    one click away — secondary, never the first thing he has to read */}
+                <p className="mt-1 text-[15px] leading-snug text-foreground">{cleanUserText(m.sentence || '')}</p>
+                {m.details && (
+                  <details className="mt-1.5 text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+                    <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {t('project.questions.manualDetails')}
+                    </summary>
+                    <p className="mt-1">{cleanUserText(m.details)}</p>
+                  </details>
+                )}
               </li>
             ))}
           </ul>

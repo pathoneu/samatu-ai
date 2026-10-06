@@ -1027,17 +1027,17 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
         if reason.startswith("duplicate_of:"):
             of = reason.split(":", 1)[1]
             of_name = (by_nr.get(of) or {}).get("pavadinimas") or of
-            msg = (f"Patalpa „{name}\" ({_lt_num(r.get('plotas_m2'))} m²) plane persidengia su "
-                   f"patalpa „{of_name}\" ir savo ploto užrašo neturi – greičiausiai ta pati "
+            msg = (f"Patalpa „{name}“ ({_lt_num(r.get('plotas_m2'))} m²) plane persidengia su "
+                   f"patalpa „{of_name}“ ir savo ploto užrašo neturi – greičiausiai ta pati "
                    "patalpa įskaičiuota du kartus. Patikrinkite ir nereikalingą išjunkite.")
         elif reason == "label_differs" and isinstance(r.get("_plotas_uzrasas_kitas"), dict):
             other = r["_plotas_uzrasas_kitas"]
-            msg = (f"Patalpos „{name}\" vietoje plane (psl. {other.get('page')}) užrašyta "
+            msg = (f"Patalpos „{name}“ vietoje plane (psl. {other.get('page')}) užrašyta "
                    f"{_lt_num(other.get('value_m2'))} m², o skaičiuoju su {_lt_num(r.get('plotas_m2'))} m² – "
                    "skirtumas per didelis, kad būtų tas pats plotas. Patikrinkite, kurios patalpos tai "
                    "užrašas, ir įrašykite tikrą plotą.")
         else:
-            msg = (f"Patalpos „{name}\" ({_lt_num(r.get('plotas_m2'))} m²) ploto užrašo plane "
+            msg = (f"Patalpos „{name}“ ({_lt_num(r.get('plotas_m2'))} m²) ploto užrašo plane "
                    "neradau, nors kitos patalpos jį turi – patikrinkite, ar tokia patalpa yra "
                    "ir ar ji nesidubliuoja.")
         out.append({"level": "WARN", "code": "room_area_unconfirmed", "severity": "high",
@@ -1053,7 +1053,7 @@ def lane_warnings(lane: dict, rooms: Sequence[dict]) -> list[dict]:
             out.append({
                 "level": "WARN", "code": "plan_area_unclaimed", "severity": "med", "room": inside,
                 "message": (f"Plane (psl. {u.get('page')}) užrašytas plotas {_lt_num(u.get('value_m2'))} m² "
-                            f"stovi patalpos „{name}\" vietoje, bet jos plotas "
+                            f"stovi patalpos „{name}“ vietoje, bet jos plotas "
                             f"{_lt_num((by_nr.get(inside) or {}).get('plotas_m2'))} m² – patikrinkite, kuriai "
                             "patalpai šis užrašas priklauso."),
             })

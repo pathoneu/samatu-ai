@@ -32,6 +32,7 @@ import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
 import { insertRowInSection, manualRowId, nextEilNr } from '@/lib/darbuRows';
 import { findRowById } from '@/lib/ledger';
+import { rowNeedsPrice } from '@/lib/exportLines';
 import { parseLtNumber, isValidAmount, MAX_AMOUNT } from '@/lib/parseLtNumber';
 
 // A well-formed number over the cap gets magnitude advice, not format advice —
@@ -88,7 +89,10 @@ function groupByCategory(darbu_sarasas, otherLabel) {
 
 // ── Vienas darbo eilutės redaktorius (inline) ────────────────────────────────
 
-function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger }) {
+function WorkRow({
+  item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger,
+  focusPriceNonce = 0, onPriceFocused,
+}) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
@@ -108,6 +112,17 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
     setDraftPrice(item.kaina ? String(item.kaina).replace('.', ',') : '');
     setEditingPrice(true);
   };
+
+  // „Įrašyti kainas" (2026-10-06): this is the first row that would reach the
+  // client without a price. Bring it to the middle of the screen and open its
+  // price, so he types straight away — Enter then opens the next row's price.
+  // Opening is harmless: leaving the field empty changes nothing.
+  useEffect(() => {
+    if (!focusPriceNonce) return;
+    priceCellRef.current?.scrollIntoView({ block: 'center' });
+    beginPriceEdit();
+    onPriceFocused?.();
+  }, [focusPriceNonce]);
 
   const advanceToNextPriceCell = () => {
     // setTimeout(0), NOT requestAnimationFrame: rAF never fires while the tab
@@ -504,6 +519,10 @@ function WorkRow({ item, onChange, onRemove, onJumpToSource, targetPage, onOpenL
 export default function ProjectMainView({
   project, onProjectChange, onShowDrawing, onJumpToPage,
   onOpenAssumptions, focusSanityNonce = 0,
+  // „Įrašyti kainas" from the Siųsti step or a dialog there (2026-10-06):
+  // { nonce, excluded } — open the price of the first row that would reach the
+  // client without one. Acted on once; onPriceFocusDone clears it upstream.
+  priceFocus = null, onPriceFocusDone,
 }) {
   const { t } = useTranslation();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
@@ -581,6 +600,36 @@ export default function ProjectMainView({
   }), [darbai, takeoffQuery]);
   const grouped = useMemo(() => groupByCategory(visibleDarbai, t('project.mainView.otherWorks')), [visibleDarbai, t]);
   const categories = Object.keys(grouped);
+
+  // „Įrašyti kainas" (2026-10-06): the request from the Siųsti step (prop) or
+  // from this page's own export dialog. The search is cleared so the row can
+  // be seen; the target is the first row IN SCREEN ORDER (grouped by section)
+  // that the document would print without a price (lib/exportLines.js).
+  const [pendingPriceFocus, setPendingPriceFocus] = useState(null);
+  const priceFocusSeq = useRef(0);
+  const focusPrices = (excluded = null) => {
+    setTakeoffQuery('');
+    priceFocusSeq.current += 1;
+    setPendingPriceFocus({ nonce: priceFocusSeq.current, excluded: excluded || null });
+  };
+  useEffect(() => {
+    if (!priceFocus?.nonce) return;
+    focusPrices(priceFocus.excluded);
+    onPriceFocusDone?.();
+  }, [priceFocus?.nonce]);
+  const priceTarget = useMemo(() => {
+    if (!pendingPriceFocus || hisLayout) return null;
+    for (const rows of Object.values(grouped)) {
+      const hit = rows.find((r) => rowNeedsPrice(r, pendingPriceFocus.excluded));
+      if (hit) return hit;
+    }
+    return null;
+  }, [pendingPriceFocus, grouped, hisLayout]);
+  // Nothing to open (every row priced, or his own layout is on screen): drop
+  // the request instead of letting it fire on some later edit.
+  useEffect(() => {
+    if (pendingPriceFocus && !priceTarget) setPendingPriceFocus(null);
+  }, [pendingPriceFocus, priceTarget]);
   // The one honest line under the table (design §E4).
   const rowSummary = useMemo(() => summarizeSamataRows(darbai), [darbai]);
 
@@ -744,7 +793,8 @@ export default function ProjectMainView({
             <div className="flex items-center gap-2 shrink-0">
               {/* The paid re-read moved to the Nustatymai drawer (council cut
                   list, 2026-09-13): beside Export it read as a routine step. */}
-              <ExportDropdown project={projectWithDarbai} onProjectChange={onProjectChange} />
+              <ExportDropdown project={projectWithDarbai} onProjectChange={onProjectChange}
+                onGoToPrices={focusPrices} />
             </div>
           </div>
 
@@ -1037,6 +1087,8 @@ export default function ProjectMainView({
                             targetPage={targetPage}
                             onJumpToSource={onJumpToPage}
                             onOpenLedger={setDetailRow}
+                            focusPriceNonce={item === priceTarget ? pendingPriceFocus?.nonce : 0}
+                            onPriceFocused={() => setPendingPriceFocus(null)}
                           />
                         );
                       })}

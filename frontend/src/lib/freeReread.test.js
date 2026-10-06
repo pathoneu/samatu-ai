@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeFreeReread, freeRereadSummary } from './freeReread.js';
+import { mergeFreeReread, freeRereadState } from './freeReread.js';
 
 // A project read before the geometry lane existed: guessed perimeters, box outlines, floors by purpose.
 const base = () => ({
@@ -89,9 +89,28 @@ test('a lane that read nothing new still records that it looked — so the offer
   assert.deepEqual(diff.changed, []);
 });
 
-test('what the banner says afterwards', () => {
-  assert.deepEqual(freeRereadSummary(result().santrauka), { konturai: 2, perimetrai: 1, tusti: 1, dangos: 3 });
-  assert.deepEqual(freeRereadSummary(null), { konturai: 0, perimetrai: 0, tusti: 0, dangos: 0 });
+test('what the banner says afterwards: the project as it stands after the read', () => {
+  const { project } = mergeFreeReread(base(), result(), 'T');
+  // 01 keeps its facts (verified); 02's walls are added up from the strings — but 02's perimeter is HIS
+  // (user_override), so the merge keeps his number: it counts as typed by him, not as the drawing's
+  assert.deepEqual(freeRereadState(project), { count: 3, konturai: 2, perimetrai: 0, jusu: 1, dangos: 2 });
+  assert.deepEqual(freeRereadState(null), { count: 0, konturai: 0, perimetrai: 0, jusu: 0, dangos: 0 });
+});
+
+test('walls an earlier read took from the dimensions still count — a second read does not say „0"', () => {
+  // 2026-10-06 (objektas_h): six rooms' walls were added up from the dimension strings on an earlier read; a
+  // later read keeps their figure and adds nothing up again, so the lane's own count for that run was 0
+  const rooms = [
+    { nr: '01', perimetras_saltinis: 'matmenu_eilutes', polygon_source: 'corrected', grindu_danga_saltinis: 'grindu_planas' },
+    { nr: '02', perimetras_saltinis: 'matmenu_eilutes', polygon_source: 'vektoriniai_konturai', grindu_danga_saltinis: 'grindu_planas' },
+    { nr: '03', perimetras_saltinis: 'user_override', polygon_source: 'vektoriniai_konturai', grindu_danga_saltinis: 'grindu_planas' },
+    { nr: '04', perimetras_saltinis: 'plano_matmenys', polygon_source: 'synthesized_from_bbox', grindu_danga_saltinis: 'user_override' },
+    { nr: '05', perimetras_saltinis: 'konturo_ivertis', polygon_source: 'sienu_konturas' },
+  ];
+  assert.deepEqual(freeRereadState({ v8_rooms: rooms, patalpos: [] }),
+    { count: 5, konturai: 4, perimetrai: 3, jusu: 1, dangos: 3 });
+  // a project with only `patalpos` reads those
+  assert.equal(freeRereadState({ patalpos: rooms.slice(0, 2) }).count, 2);
 });
 
 test('an outline the lane drew last time and cannot draw now leaves with the re-read — a verified room keeps it', () => {

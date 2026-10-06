@@ -39,6 +39,19 @@ export function parseExcludedSections(raw) {
   return new Set();
 }
 
+/**
+ * The exclusions stored for one project. Never throws: a private window, a
+ * blocked storage or a corrupt value all read as „nothing excluded".
+ * (Shared by the export dialog and the Siųsti step's count, 2026-10-06.)
+ */
+export function loadExcludedSections(projectId, storage = globalThis.localStorage) {
+  try {
+    return parseExcludedSections(storage?.getItem(exportSelectionKey(projectId)));
+  } catch {
+    return new Set();
+  }
+}
+
 export function serializeExcludedSections(excluded) {
   return JSON.stringify({
     v: EXPORT_SELECTION_VERSION,

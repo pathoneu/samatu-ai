@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from .room_facts import _FLOOR_LT, _f, build_room_facts, lt_num
+from .room_facts import _DOOR_TIPAI, _FLOOR_LT, _anga_word, _f, build_room_facts, element_label, lt_num
 from .scope import is_room_excluded, normalize_apimtis
 
 ORDER = ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila")
@@ -180,6 +180,41 @@ def _ask_numbers(kind: str, rows: list[tuple[dict, dict]], one: str, many: str, 
     return _q(kind, "numbers", title, why, items, unit=asked[0][1].get("unit"))
 
 
+def _opening_check(fact: dict) -> tuple[str, str]:
+    """(what does not match and what to check — two short sentences; the room sheet's full account, for a
+    second look) for a room whose doors and windows no one click can settle.
+
+    2026-10-06, contractor walkthrough on objektas_h: the question printed the fact's own sentence — every
+    opening with its width, then „2 durys sąraše, kurioms angos sienose nematau" — and he could not tell what
+    was wrong or what to do. The mismatch is now said first, in his terms (the list against the walls), with
+    the one thing to check; the full account stays beside it for a second look. Counted off the fact's own
+    element rows, so the numbers are the ones the room sheet shows."""
+    said = str(fact.get("sentence") or "").strip()
+    listed = unbacked = 0
+    for d in fact.get("details") or []:
+        if not isinstance(d, dict) or (d.get("tipas") or "") not in _DOOR_TIPAI:
+            continue
+        n = int(_f(d.get("kiekis")) or 0)
+        if d.get("be_angos"):                     # a door the walls show no opening for (universal_rules)
+            unbacked += n
+        if not d.get("praejimas"):                # a passage is no door of the list
+            listed += n
+    if unbacked:
+        doors = f"Sąraše {listed} {element_label('duris', listed)}"
+        fits = max(0, listed - unbacked)
+        head = (f"{doors}, o sienose — tik {fits} {_anga_word(fits)} durims: {unbacked} durų sienose neradau."
+                if fits else f"{doors}, bet sienose angų joms neradau.")
+        return head + " Atidarykite patalpą ir patikrinkite durų skaičių.", said
+    if not fact.get("details") and not (fact.get("openings") or {}).get("items"):
+        return "Durų ir langų šioje patalpoje neradau. Jei jų yra, atidarykite patalpą ir įrašykite.", ""
+    if fact.get("status") == "assumed":
+        # the walls show more openings than the list has doors and windows, and none of them is one a click
+        # could add (a door to a room that has its doors, a window to a room that has its windows)
+        return ("Sienose matau daugiau angų, nei sąraše yra durų ir langų. Atidarykite patalpą ir patikrinkite, "
+                "ar sąraše nieko netrūksta."), said
+    return said, ""
+
+
 def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
     asked = [(r, f) for r, f in rows if f["key"] == "angos"]
     if not asked:
@@ -193,8 +228,9 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
                                label=s.get("label"), line_pct=s.get("line_pct"),
                                page=((f.get("openings") or {}).get("page") or (f.get("source") or {}).get("page"))))
         if not suggestions:
+            sentence, details = _opening_check(f)
             manual.append({"room_nr": _nr(r), "room_name": str(r.get("pavadinimas") or "").strip(),
-                           "sentence": f.get("sentence") or ""})
+                           "sentence": sentence, "details": details})
     n = len(items)
     if n:
         anga = "angą, kurios" if n % 10 == 1 and n % 100 != 11 else "angas, kurių" if n % 10 in range(2, 10) and n % 100 not in range(12, 20) else "angų, kurių"
@@ -204,7 +240,9 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
     else:
         m = len(manual)
         title = f"Durys ir langai: patikrinkite {m} {_rooms_word(m)}"
-        why = "Šiose patalpose durų ir langų sąrašo vienu paspaudimu papildyti negaliu — pažiūrėkite patalpos lape."
+        # each room says what to check (`_opening_check`); this only says why there is no „Tinka" here
+        why = ("Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta žemiau." if m == 1 else
+               "Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta prie kiekvienos patalpos.")
     q = _q("angos", "openings", title, why, items, unit="vnt.")
     q["manual"] = manual
     return q

@@ -29,7 +29,7 @@ from .prompt import (
 from models_config import model_for
 from . import ledger as _ledger
 from . import run_usage as _run_usage
-from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units, lt_num
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -407,13 +407,13 @@ _CONSISTENCY_LT: dict[str, tuple[str, str]] = {
     ),
     "wall_floor_ratio": (
         "Sienų ir grindų ploto santykis netipinis",
-        "Tikėtina 2–5×. Patikrinkite lubų aukštį Prielaidose arba ar visos "
-        "patalpos rastos.",
+        "Tikėtina 2–5×. Patikrinkite, ar rastos visos patalpos ir ar teisingi "
+        "jų lubų aukščiai — aukštį galima pakeisti per mygtuką „Nustatymai“.",
     ),
     "height_plausibility": (
         "Dalies patalpų lubų aukštis neįtikėtinas (norma 2,4–4,0 m)",
-        "Patikrinkite lubų aukštį Prielaidose — jį galima nurodyti kiekvienai "
-        "patalpai atskirai.",
+        "Patikrinkite aukštį pjūvyje; lubų aukštį galima pakeisti per mygtuką "
+        "„Nustatymai“ — kiekvienai patalpai atskirai.",
     ),
     "perim_geometry": (
         "Dalies patalpų perimetras per mažas jų plotui",
@@ -422,10 +422,34 @@ _CONSISTENCY_LT: dict[str, tuple[str, str]] = {
     "height_uniformity": (
         "Visoms patalpoms priskirtas vienodas standartinis lubų aukštis — "
         "galimai numatytoji reikšmė, o ne perskaityta iš brėžinio",
-        "Patikrinkite pjūvį arba antspaudą ir, jei reikia, nurodykite aukštį "
-        "Prielaidose.",
+        "Patikrinkite pjūvyje arba antspaude ir, jei reikia, pakeiskite aukštį "
+        "per mygtuką „Nustatymai“.",
     ),
 }
+
+
+def perimeter_warning(fr: dict) -> dict:
+    """The Patikrinimai row for one room `vision.perimeter_validator` flagged —
+    a perimeter no closed outline of that area can have. LT, not English: it
+    renders verbatim and is counted/expanded by default (2026-08 loudness
+    pass). The list prints the room's number in front (`patalpa_nr`), so the
+    message names it by its name only (2026-10-06)."""
+    name = str(fr.get("room_name") or "").strip()
+    return {
+        "level": "WARN",
+        "code": "perimeter_out_of_bounds",
+        "field": "perimetras_m",
+        "patalpa_nr": fr["room_nr"],
+        "message": (f"{name + ': ' if name else ''}Perimetras {lt_num(fr['perim_m'], 1)} m "
+                    f"neįmanomas {lt_num(fr['area_m2'], 1)} m² plotui"),
+        "expected": f"{lt_num(fr['lower_bound_m'], 1)}–{lt_num(fr['upper_bound_m'], 1)} m",
+        "actual": f"{lt_num(fr['perim_m'], 1)} m",
+        "hint": ("Patikrinkite patalpos matmenis ir brėžinio mastelį — perimetras "
+                 "nesiderina su plotu. Perimetrą galima pataisyti Patikros "
+                 "žingsnyje, šios patalpos lape."),
+        "source": "perimeter_validator",
+    }
+
 
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
 # parents[1] = backend/ (extractor/vision_call.py → extractor/ → backend/)
@@ -870,6 +894,9 @@ def annotate_tile_elevation_evidence(parsed: dict) -> int:
     return n
 
 
+ELEVATION_TWIN_CODE = "elevation_twin_name"
+
+
 def _apply_wall_elevation_tile_override(parsed: dict) -> int:
     """Sprint §35 (2026-04-29): when _wall_elevations data exists with
     mm-precision tile zones, override paskirtis-based plyteles_sienos_m2
@@ -884,7 +911,11 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
     got the same wall data applied to both → inflated counts.
 
     Returns count of rooms updated. Non-mutating where data missing.
-    Adds lt_sanity warning when ambiguous name match attempted.
+    When an elevation names a room whose name two rooms share, it is applied to
+    neither and each gets a note in `parsed["warnings"]` (code
+    ELEVATION_TWIN_CODE) — the pipeline-notes list every later step keeps. It
+    used to go into `_lt_warnings`, which apply_lt_sanity rebuilds from scratch
+    a few steps later, so the note never reached the screen (2026-10-06).
     """
     elevations = parsed.get("_wall_elevations") or []
     if not elevations:
@@ -913,7 +944,7 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
     ambiguous_names = {n for n, c in name_counts.items() if c > 1}
 
     updated = 0
-    warnings = parsed.setdefault("_lt_warnings", [])
+    twin_notes: list[dict] = []
     for r in rooms:
         nr_key = str(r.get("nr") or "").strip()
         name = (r.get("pavadinimas") or "").strip().lower()
@@ -922,15 +953,22 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
         if not walls:
             # Fallback to name match — but only if name is unambiguous
             if name in ambiguous_names:
-                warnings.append({
+                if not by_name.get(name):
+                    continue        # no elevation carries this name — nothing was left unapplied
+                # the list prints the room's number in front (`patalpa_nr`)
+                who = f"{r['pavadinimas'].strip()}: " if (r.get("pavadinimas") or "").strip() else ""
+                twin_notes.append({
                     "level": "WARN",
+                    "code": ELEVATION_TWIN_CODE,
+                    "source": "wall_elevation",
                     "field": "plyteles_sienos_m2",
                     "patalpa_nr": r.get("nr"),
                     "message": (
-                        f"Patalpa „{r.get('pavadinimas','?')}" + f"" + f"" +
-                        f" (Nr. {r.get('nr','?')}) — wall_elevation duomenys praleisti, " +
-                        f"nes pavadinimas dubliuojasi tarp kelių patalpų. Pridėk unikalų " +
-                        f"`nr` lauką wall_elevation entry'jėje."
+                        f"{who}Sienų plytelės iš išklotinių šiai patalpai nepritaikytos — jos "
+                        f"pavadinimas dubliuojasi su kita patalpa, todėl neaišku, kuriai "
+                        f"patalpai išklotinė priklauso. Patikrinkite šios patalpos sienų "
+                        f"plyteles išklotinėse ir, jei reikia, pataisykite plytelių kiekį "
+                        f"sąmatoje."
                     ),
                 })
                 continue
@@ -963,6 +1001,15 @@ def _apply_wall_elevation_tile_override(parsed: dict) -> int:
         if prior is not None and prior != r["plyteles_sienos_m2"]:
             r["_plyteles_sienos_m2_prior"] = round(prior, 2)
         updated += 1
+
+    prior_notes = parsed.get("warnings")
+    prior_notes = prior_notes if isinstance(prior_notes, list) else []
+    had_twins = any(isinstance(w, dict) and w.get("code") == ELEVATION_TWIN_CODE for w in prior_notes)
+    if twin_notes or had_twins:
+        # a run replaces the previous run's notes, never stacks them
+        parsed["warnings"] = [w for w in prior_notes
+                              if not (isinstance(w, dict) and w.get("code") == ELEVATION_TWIN_CODE)
+                              ] + twin_notes
 
     if updated > 0:
         print(f"[extractor] wall_elevation override applied to {updated}/{len(rooms)} rooms")
@@ -1331,15 +1378,20 @@ def _warn_apdailos_degraded(parsed: dict, reason: str | None,
     produced per-room paint areas differing by 350% and both looked clean.
     Failing loudly is the honest behavior (CLAUDE.md §"Honest disclosure").
     """
-    head = ("Apdailos/išklotinių lapas nuskaitytas tik iš dalies – LIKUSIŲ patalpų"
+    head = ("Apdailos/išklotinių lapas nuskaitytas tik iš dalies — likusių patalpų"
             if partial else
-            "Apdailos/išklotinių lapas nenuskaitytas – sienų")
+            "Apdailos/išklotinių lapas nenuskaitytas — sienų")
     msg = (f"{head} apdaila (dažoma / plytelės / plokštė) nustatyta pagal "
            "patalpų paskirties standartus, ne pagal projektą. Ypač "
-           "patikrinkite garažo, tambūro ir drėgnų patalpų dažomus plotus.")
+           "patikrinkite garažo, tambūro ir drėgnų patalpų dažomus plotus "
+           "išklotinėse ir Patikros žingsnyje, patalpų lapuose.")
+    warning = {"level": "WARN", "message": msg}
     if reason:
-        msg += f" (priežastis: {reason})"
-    parsed.setdefault("warnings", []).append({"level": "WARN", "message": msg})
+        # The reader's failure text („no JSON in response", „stop_reason=…")
+        # is for diagnosing the run, not for him: it stays on the stored
+        # warning, off the screen — like the doors reader's `_page_errors`.
+        warning["_reason"] = reason
+    parsed.setdefault("warnings", []).append(warning)
 
 
 def _resolve_paint_class(user_default: int, inferred: int | None,
@@ -1781,14 +1833,17 @@ def _warn_failed_room_calcs(parsed: dict, failed_rooms: list[dict]) -> None:
     for room in failed_rooms:
         nr = str(room.get("nr") or "").strip()
         name = str(room.get("pavadinimas") or "").strip()
-        label = " ".join(x for x in (nr, f"„{name}“" if name else "") if x)
+        # The list prints the number in front of the message (`patalpa_nr`); the
+        # message names the room by its name, or by its number when it has none.
+        label = f"„{name}“" if name else nr
         ws.append({
             "level": "WARNING", "severity": "med", "code": ROOM_CALC_FAILED_CODE,
             "patalpa_nr": nr, "field": "patalpa", "source": "room_calc",
             "message": (f"Patalpos {label} kiekių apskaičiuoti nepavyko — sąmatoje gali "
                         "trūkti jos sienų, lubų, kampų ir angokraščių.").replace("  ", " "),
-            "hint": ("Patikrinkite šios patalpos plotą, perimetrą, aukštį ir lubų tipą, "
-                     "pataisykite ir perskaičiuokite."),
+            "hint": ("Patikrinkite šios patalpos plotą, perimetrą, aukštį ir lubų tipą "
+                     "Patikros žingsnyje, jos lape, ir pataisykite — kiekiai "
+                     "persiskaičiuos."),
         })
     parsed["warnings"] = ws
 
@@ -2066,16 +2121,17 @@ def _validate_room_bboxes(vision_result: dict) -> dict:
         "code": "bbox_pct_floor_plan_unlikely",
         "severity": "warning",
         "message": (
-            f"Patalpų bbox suma užima tik {union_area*100:.1f}% puslapio — "
-            "gali būti, kad AI nukreipė į pavadinimų etiketes ar elevation "
-            "brėžinius vietoje tikrojo floor plan'o."
+            f"Patalpų vietos brėžinyje kartu užima tik {lt_num(union_area * 100, 1)} % "
+            "lapo — galbūt patalpos pažymėtos ne aukšto plane, o ties užrašais, "
+            "išklotinėse ar mazguose."
         ),
         "hint": (
-            "Re-extract'ink projektą — sustiprintas prompt'as nukreipia AI "
-            "į floor plan'ą (top-down view), ne į išklotines/mazgus."
+            "Brėžinio žingsnyje patikrinkite, ar patalpos pažymėtos aukšto plane. "
+            "Jei ne, brėžinį galima perskaityti iš naujo per mygtuką „Nustatymai“ "
+            "(skiltis „Brėžinys“)."
         ),
-        "expected": "≥5% puslapio ploto kambariams",
-        "actual": f"{union_area*100:.2f}%",
+        "expected": "≥5 % lapo ploto",
+        "actual": f"{lt_num(union_area * 100, 2)} %",
     })
     return {**vision_result, "warnings": warnings_list}
 
@@ -2185,10 +2241,11 @@ _ANCHOR_TOLERANCE = 0.30   # ±30% of Σ room plotai — outside that it isn't o
 # kept as the fallback for a room from an older engine, which carries no code.
 _WALLS_OUT_LT = {
     "override": ("Pažymėta, kad šios patalpos sienos nedažomos — pakeisti "
-                 "galima Prielaidų skydelyje"),
+                 "galima per mygtuką „Nustatymai“ (Sienų apdaila)"),
     "full_tile": "Visos sienos dengiamos plytelėmis",
     "paskirtis": ("Pagal patalpos paskirtį sienos neapdailinamos — jei "
-                  "dažomos, pažymėkite Prielaidų skydelyje"),
+                  "dažomos, pažymėkite tai per mygtuką „Nustatymai“ (Sienų "
+                  "apdaila)"),
     "geometrija": "Nepavyko nustatyti sienų ploto — patikrinkite matmenis",
     "pasirinkimas": "Neįtraukta jūsų pasirinkimu",
 }
@@ -2202,11 +2259,11 @@ _GRIND_OUT_LT = {
 }
 # Same for the ceiling side (`_ceiling_paint_source`).
 _CEILING_OUT_LT = {
-    "override_off": ("Pažymėta, kad šios patalpos lubos nedažomos — pakeisti "
-                     "galima Prielaidų skydelyje"),
+    "override_off": ("Pažymėta, kad šios patalpos lubos nedažomos — jei "
+                     "dažomos, pataisykite lubų dažymo kiekį sąmatoje"),
     "unfinished_room_standard": ("Pagal patalpos paskirtį lubos "
-                                 "neapdailinamos — jei dažomos, pažymėkite "
-                                 "Prielaidų skydelyje"),
+                                 "neapdailinamos — jei dažomos, pataisykite "
+                                 "lubų dažymo kiekį sąmatoje"),
     "pasirinkimas": "Lubos ne jūsų darbas — neįtrauktos jūsų pasirinkimu",
 }
 
@@ -2522,7 +2579,7 @@ def _ceiling_base_meta(parsed: dict, rooms: list[dict], stretch_nrs: set[str],
                 "level": "WARN",
                 "code": "eksplikacija_total_ignored",
                 "message": (
-                    f"Eksplikacijos suma „{anchor.get('label') or 'Iš viso'}\" "
+                    f"Eksplikacijos suma „{anchor.get('label') or 'Iš viso'}“ "
                     f"({_lt_num(total)} m²) per daug skiriasi nuo suskaičiuotų "
                     f"patalpų ploto ({_lt_num(rooms_sum)} m²), todėl lubų kiekis "
                     "imtas iš patalpų sąrašo. Patikrinkite, ar eksplikacijoje "
@@ -3267,17 +3324,17 @@ def _emit_mixer_lines(pozicijos: list, skyrius: str, family: str, kiekis,
     if not concealed:
         pozicijos.append({**base, "aprasymas": single + todo, "_assumption": (
             f"Virštinkinis {lt} — vienas darbas, viena eilutė "
-            f"({'nurodyta prielaidose' if source == 'override' else 'pagal brėžinį'})."
+            f"({'jūsų pasirinkimas nustatymuose' if source == 'override' else 'pagal brėžinį'})."
             + kur
         )})
         return
-    note = (f"Potinkinis {lt} — LT konvencija: potinkinė dalis "
-            f"montuojama prieš plyteles, virštinkinė po jų, tad tai DU atskiri "
-            f"darbai. Kiekis abiem eilutėms tas pats.")
+    note = (f"Potinkinis {lt}: potinkinė dalis montuojama prieš plyteles, "
+            f"virštinkinė — po jų, todėl tai du atskiri darbai. Kiekis abiem "
+            f"eilutėms tas pats.")
     if source == "assumption":
-        note += (" PRIELAIDA: brėžinyje nenurodyta, ar maišytuvas potinkinis — "
-                 "priimta LT standartinė praktika. Jei virštinkinis, pakeisk "
-                 "prielaidose (santechnika_potinkinis).")
+        note += (" Prielaida: brėžinyje nenurodyta, ar maišytuvas potinkinis — "
+                 "priimta įprasta praktika. Jei virštinkinis, pasirinkite "
+                 "„Virštinkiniai“ per mygtuką „Nustatymai“ (Potinkiniai maišytuvai).")
     note += kur
     for label in (potinkine, virstinkine):
         pozicijos.append({**base, "aprasymas": label + todo, "_assumption": note})
@@ -3628,7 +3685,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     if rotband_src == "pasirinkimas" else
                     f"Prielaida: {int(round(rotband_share * 100))} % dažomų sienų ploto lyginama "
                     "(mūro / betono sienos, ne GKP pertvaros). Brėžinys sienų tipų nenurodo — "
-                    "nustatykite savo dalį skiltyje „Ką skaičiuoti\"."),
+                    "nustatykite savo dalį Patikros žingsnyje, skiltyje „Ką skaičiuoti“."),
             })
         pozicijos.extend([
             {"skyrius": SK_GD, "aprasymas": "Sienų pirminis glaistymas Q1",
@@ -3843,7 +3900,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         elif _frameless_assumed:
             _door_line["_assumption"] = ("Vidaus durys laikomos beapvadinėmis — projekte yra paslėptų (beapvadinių) "
                                          "durų, todėl ir nepažymėtos vidaus durys skaičiuojamos taip pat. Jei dalis durų "
-                                         "su apvadais, pakeiskite Prielaidose (vidaus durys beapvadinės: ne).")
+                                         "su apvadais, pasirinkite „Su apvadais“ per mygtuką „Nustatymai“ (Vidaus "
+                                         "durys).")
         if _prep_source in ("brezinys", "nera_pozymiu", "anotacija", "gaminiai", "ziniarastis_neaiskus"):
             _door_line["confidence"] = "geltona"
             _door_line["_confidence_reason"] = str(_prep.get("sakinys") or "")
@@ -4730,16 +4788,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if _hidden:
         _many = len(_hidden) > 1
         _san_notes.append(
-            f"Santechnika: {_lt_join(_hidden)} {'priimti POTINKINIAIS' if _many else 'priimtas POTINKINIU'} "
-            f"(LT standartinė praktika) — brėžinyje tai nenurodyta, todėl "
+            f"Santechnika: {_lt_join(_hidden)} {'priimti potinkiniais' if _many else 'priimtas potinkiniu'} "
+            f"(įprasta praktika) — brėžinyje tai nenurodyta, todėl "
             f"{'darbai padalinti' if _many else 'darbas padalintas'} į potinkinės ir virštinkinės "
-            f"dalies eilutes. Jei {'virštinkiniai' if _many else 'virštinkinis'}, pakeiskite "
-            f"prielaidą „santechnika_potinkinis“.")
+            f"dalies eilutes. Jei {'jie virštinkiniai' if _many else 'jis virštinkinis'}, pasirinkite "
+            f"„Virštinkiniai“ per mygtuką „Nustatymai“ (Potinkiniai maišytuvai).")
     if _shown:
         _many = len(_shown) > 1
         _san_notes.append(
-            f"Santechnika: {_lt_join(_shown)} {'priimti VIRŠTINKINIAIS' if _many else 'priimtas VIRŠTINKINIU'} "
-            f"— {'po vieną montavimo eilutę' if _many else 'viena montavimo eilutė'}.")
+            f"Santechnika: {_lt_join(_shown)} {'priimti virštinkiniais' if _many else 'priimtas virštinkiniu'} "
+            f"— {'po vieną montavimo eilutę' if _many else 'viena montavimo eilutė'}. Pakeisti galima "
+            f"per mygtuką „Nustatymai“ (Potinkiniai maišytuvai).")
     _record_san_assumptions(parsed, _san_notes)
 
     # ════════════════════════════════════════════════════════════════════════
@@ -6331,10 +6390,11 @@ def extract_interior(
                 warnings.append({
                     "level": "WARN",
                     "message": (
-                        f"Patalpose suskaičiuota {room_n} {label}, bet "
-                        f"specifikacijos lentelėje {sched_n}. Skirtumas "
-                        f"{abs(room_n - sched_n)} vnt. — patikrinkite ar visi "
-                        f"{label} priskirti patalpoms."
+                        f"{label.capitalize()} skaičius patalpose — {room_n}, "
+                        f"specifikacijos lentelėje — {sched_n} (skirtumas "
+                        f"{abs(room_n - sched_n)} vnt.). Patikrinkite specifikacijos "
+                        f"lentelėje ir patalpų lapuose (Patikros žingsnyje), ar "
+                        f"visos angos priskirtos patalpoms."
                     ),
                 })
         parsed["warnings"] = warnings
@@ -6437,13 +6497,14 @@ def extract_interior(
                     "code": "ceiling_height_from_section_marker",
                     "severity": "info" if on_grid else "warn",
                     "message": (
-                        f"Lubų aukštis paimtas iš pjūvio žymeklio "
-                        f"{marker_raw} → {cand_m:.2f} m "
-                        f"(psl. {candidate['page']}). Patikrink Prielaidose."
+                        f"Lubų aukštis paimtas iš pjūvio žymeklio „{marker_raw}“: "
+                        f"{lt_num(cand_m)} m (psl. {candidate['page']}). Patikrinkite "
+                        f"pjūvyje; jei aukštis kitas, pakeiskite jį per mygtuką "
+                        f"„Nustatymai“."
                         + ("" if on_grid else
-                           " DĖMESIO: reikšmė nėra apvalūs milimetrai — "
-                           "gali būti ne aukščio žymuo (pvz. telefono numeris "
-                           "ar brėžinio kodas).")
+                           " Dėmesio: reikšmė nėra apvalūs milimetrai — gal tai "
+                           "ne aukščio žymuo (pvz., telefono numeris ar brėžinio "
+                           "kodas).")
                     ),
                 })
                 parsed["warnings"] = warnings_list
@@ -7234,7 +7295,8 @@ def extract_interior(
         existing_warnings = parsed.get("warnings") or []
         existing_warnings.append({
             "level": "WARN",
-            "message": f"Python skaičiavimo klaida: {exc}",
+            "message": ("Patalpų kiekių apskaičiuoti nepavyko — kiekiai gali būti "
+                        "neišsamūs. Patikrinkite patalpų kiekius Patikros žingsnyje."),
         })
         parsed["warnings"] = existing_warnings
 
@@ -7269,7 +7331,9 @@ def extract_interior(
         existing_warnings.append({
             "level": "ERROR",
             "source": "pozicijos_build_failure",
-            "message": f"Pozicijos rekonstrukcija nepavyko: {exc}. Reikia rankomis sukurti.",
+            "message": ("Sąmatos eilučių sudaryti nepavyko — sąmata tuščia. "
+                        "Eilutes įrašykite rankomis sąmatoje arba brėžinį "
+                        "perskaitykite iš naujo per mygtuką „Nustatymai“."),
         })
         parsed["warnings"] = existing_warnings
 
@@ -7283,7 +7347,8 @@ def extract_interior(
         existing_warnings = parsed.get("warnings") or []
         existing_warnings.append({
             "level": "WARN",
-            "message": f"Santrauka recompute klaida: {exc}",
+            "message": ("Projekto suvestinės perskaičiuoti nepavyko — bendros "
+                        "sumos gali būti senos. Patikrinkite sumas sąmatoje."),
         })
         parsed["warnings"] = existing_warnings
 
@@ -7298,19 +7363,13 @@ def extract_interior(
     # cross-checks plotai/elementai/schedules/eksplikacija. Adds entries to
     # parsed["warnings"] so they propagate into the lt_sanity UI banner below.
     try:
-        from .cross_page_validator import validate_consistency
+        from .cross_page_validator import as_pipeline_warnings, validate_consistency
         cross_warnings = validate_consistency(parsed)
         if cross_warnings:
             existing = parsed.get("warnings") or []
-            for w in cross_warnings:
-                existing.append({
-                    "level": w["level"].upper(),
-                    "field": w.get("field", ""),
-                    "message": w.get("message_lt", ""),
-                    "suggestion": w.get("suggestion", ""),
-                    "discrepancy_pct": w.get("discrepancy_pct"),
-                    "source": "cross_page_validator",
-                })
+            # the one converter „Atnaujinti patikrinimus" uses too — this copy read
+            # `message_lt` only and showed the floor rules as empty rows (2026-10-06)
+            existing.extend(as_pipeline_warnings(cross_warnings))
             parsed["warnings"] = existing
             print(f"[extractor] cross_page_validator emitted {len(cross_warnings)} warnings")
     except Exception as exc:
@@ -7420,21 +7479,7 @@ def extract_interior(
             for fr in perim_report["flagged_rooms"]:
                 # LT, not English: this row renders verbatim in the banner and
                 # is now counted/expanded by default (2026-08 loudness pass).
-                existing.append({
-                    "level": "WARN",
-                    "code": "perimeter_out_of_bounds",
-                    "field": "perimetras_m",
-                    "patalpa_nr": fr["room_nr"],
-                    "message": (f"{fr['room_name']} (nr={fr['room_nr']}): perimetras "
-                                f"{fr['perim_m']:.1f} m neįmanomas "
-                                f"{fr['area_m2']:.1f} m² plotui"),
-                    "expected": (f"{fr['lower_bound_m']:.1f}–"
-                                 f"{fr['upper_bound_m']:.1f} m"),
-                    "actual": f"{fr['perim_m']:.1f} m",
-                    "hint": "Patikrinkite patalpos matmenis ir brėžinio mastelį "
-                            "— perimetras nesiderina su plotu.",
-                    "source": "perimeter_validator",
-                })
+                existing.append(perimeter_warning(fr))
             parsed["warnings"] = existing
             print(f"[extractor] perimeter_validator flagged "
                   f"{perim_report['n_needs_reextraction']}/{perim_report['n_total']} rooms")
@@ -7473,19 +7518,19 @@ def extract_interior(
             existing.append({
                 "level": "INFO", "code": "room_table_from_plan_labels", "severity": "low",
                 "message": (
-                    f"Patalpų eksplikacijos lentelės nėra – patalpų plotai paimti iš "
-                    f"brėžinyje prie patalpų užrašytų plotų ({_lane.get('candidates')} "
-                    f"užrašai, psl. {_pg})."
+                    f"Patalpų eksplikacijos lentelės nėra — patalpų plotai paimti iš "
+                    f"brėžinyje prie patalpų užrašytų plotų (užrašų: "
+                    f"{_lane.get('candidates')}, psl. {_pg})."
                 ),
             })
         else:
             existing.append({
                 "level": "INFO", "code": "room_table_missing",
                 "message": (
-                    "Šis projektas neturi rastos eksplikacijos lentelės. Rezultatai "
-                    "išvesti iš brėžinio matmenų ir gali svyruoti tarp paleidimų "
-                    "(±10–20% kambarių skaičiui, daugiau plytelių zonoms). "
-                    "Rekomenduojama peržiūrėti rankiniu būdu arba paleisti 2–3 kartus."
+                    "Patalpų eksplikacijos lentelės brėžinyje nerasta — patalpos ir "
+                    "jų plotai nustatyti iš brėžinio matmenų, todėl gali būti "
+                    "netikslūs (ypač plytelių plotai). Patikrinkite patalpų sąrašą "
+                    "ir plotus Patikros žingsnyje."
                 ),
             })
         parsed["warnings"] = existing

@@ -165,6 +165,32 @@ def test_doors_and_windows_nobody_can_add_with_one_click_still_ask_for_a_look():
     q = _q(out, "angos")
     assert q["items"] == [] and [m["room_nr"] for m in q["manual"]] == ["09"]
     assert q["title"] == "Durys ir langai: patikrinkite 1 patalpą"
+    # 2026-10-06 (contractor walkthrough): no shouting, and each room says what to check in plain words
+    assert q["why"] == "Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta žemiau."
+    assert q["manual"][0]["sentence"] == ("Durų ir langų šioje patalpoje neradau. "
+                                          "Jei jų yra, atidarykite patalpą ir įrašykite.")
+    assert q["manual"][0]["details"] == ""
+
+
+def test_more_openings_than_the_list_names_says_so_and_keeps_the_openings_for_a_second_look():
+    """An older blob the walls pass has not seen (no marks on its elements): only the totals are compared.
+    A door and a window are listed, the walls show three openings — nothing a click could add, so he is
+    told the list may be short, not handed the opening widths to work it out."""
+    walls = {"page": 1, "angos": [
+        {"plotis_m": 0.8, "storis_m": 0.1, "i": "02", "line_pct": [[0.2, 0.2], [0.2, 0.25]]},
+        {"plotis_m": 0.9, "storis_m": 0.1, "i": "03", "line_pct": [[0.3, 0.3], [0.3, 0.35]]},
+        {"plotis_m": 1.2, "storis_m": 0.3, "i": "laukas", "line_pct": [[0.1, 0.1], [0.15, 0.1]]},
+    ]}
+    room = _quiet("01", polygon_source="vektoriniai_konturai", _angos_sienose=walls,
+                  polygon_pct=[[0.1, 0.1], [0.4, 0.1], [0.4, 0.4], [0.1, 0.4]],
+                  elementai=[{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2100},
+                             {"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500}])
+    q = _q(build_questions({"patalpos": [room], "_duru_ziniarastis": _SCHEDULE}), "angos")
+    assert q["items"] == [] and [m["room_nr"] for m in q["manual"]] == ["01"]
+    m = q["manual"][0]
+    assert m["sentence"] == ("Sienose matau daugiau angų, nei sąraše yra durų ir langų. "
+                             "Atidarykite patalpą ir patikrinkite, ar sąraše nieko netrūksta.")
+    assert "Sienose angų daugiau — 3" in m["details"]
 
 
 def test_floor_coverings_and_wall_finishes_chosen_by_purpose_are_offered_as_choices():

@@ -24,9 +24,23 @@ from __future__ import annotations
 # Sprint §AUDIT (2026-04-29): unused import removed.
 from typing import Any
 
-from .universal_rules import normalize_paskirtis
+from .universal_rules import lt_num, normalize_paskirtis
 
-__all__ = ["validate_consistency"]
+__all__ = ["validate_consistency", "as_pipeline_warnings"]
+
+
+def _room(r: dict) -> str:
+    """„01 Tambūras" — the room as the contractor names it. These warnings carry
+    no `patalpa_nr` (the Patikrinimai list prints none in front of them), so the
+    message names the room in full. (2026-10-06: it used to be «Tambūras»,
+    with numbers like „2.8 m" and „12.3%" beside it.)"""
+    label = " ".join(str(v).strip() for v in (r.get("nr"), r.get("pavadinimas"))
+                     if v is not None and str(v).strip())
+    return label or "Patalpa"
+
+
+def _psl(r: dict) -> str:
+    return f" (psl. {r.get('puslapio_nr')})" if r.get("puslapio_nr") else ""
 
 
 # Default thresholds. Tunable per-rule if needed; for now one global value.
@@ -72,17 +86,21 @@ def _rule_room_dimension_sanity(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "warning",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.forma",
-                "message_lt": f"Patalpos «{r.get('pavadinimas')}» forma neįprasta — plotas ({plotas} m²) labai mažas perimetro ({perim} m) atžvilgiu. Galimai ne stačiakampis arba klaidingas matmuo.",
+                "message_lt": (f"{_room(r)}: forma neįprasta — plotas {lt_num(plotas)} m² labai mažas "
+                               f"{lt_num(perim)} m perimetrui. Galbūt patalpa ne stačiakampė arba "
+                               f"matmuo neteisingas. Patikrinkite patalpos matmenis brėžinyje{_psl(r)}."),
                 "discrepancy_pct": round((SHAPE_RATIO_LO - ratio) * 100, 1),
-                "suggestion": f"Patikrinkite patalpos «{r.get('pavadinimas')}» matmenis brėžinyje" + (f" (psl. {r.get('puslapio_nr')})" if r.get("puslapio_nr") else ""),
+                "suggestion": f"Patikrinkite patalpos {_room(r)} matmenis brėžinyje{_psl(r)}.",
             })
         elif ratio > SHAPE_RATIO_HI:
             out.append({
                 "level": "info",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.forma",
-                "message_lt": f"Patalpos «{r.get('pavadinimas')}» plotas didelis perimetro atžvilgiu — patalpa labai kompaktiška ar perimetras nepilnas.",
+                "message_lt": (f"{_room(r)}: plotas didelis perimetro atžvilgiu — patalpa labai "
+                               f"kompaktiška arba perimetras nepilnas. Patikrinkite, ar į perimetrą "
+                               f"įskaičiuotos visos sienos (Patikros žingsnyje, šios patalpos lape)."),
                 "discrepancy_pct": round((ratio - SHAPE_RATIO_HI) * 100, 1),
-                "suggestion": "Patikrinkite ar perimetro reikšmė pilna (visi sienų ilgiai sumuoti).",
+                "suggestion": "Patikrinkite, ar perimetras pilnas (sudėti visų sienų ilgiai).",
             })
     return out
 
@@ -98,7 +116,9 @@ def _rule_lubu_aukstis_in_range(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "warning",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.lubu_aukstis_m",
-                "message_lt": f"Patalpos «{r.get('pavadinimas')}» lubų aukštis ({H} m) per mažas — LT praktikoje mažiausias normalus aukštis 2.30 m.",
+                "message_lt": (f"{_room(r)}: lubų aukštis {lt_num(H)} m per mažas — įprastai jis ne "
+                               f"mažesnis kaip {lt_num(MIN_LUBU_AUKSTIS_M)} m. Patikrinkite pjūvyje arba "
+                               f"lubų plano aukščio žymėjime."),
                 "discrepancy_pct": round((MIN_LUBU_AUKSTIS_M - H) / MIN_LUBU_AUKSTIS_M * 100, 1),
                 "suggestion": "Patikrinkite pjūvio brėžinį ar lubų plano aukščio žymėjimą.",
             })
@@ -106,9 +126,11 @@ def _rule_lubu_aukstis_in_range(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "warning",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.lubu_aukstis_m",
-                "message_lt": f"Patalpos «{r.get('pavadinimas')}» lubų aukštis ({H} m) neįprastai didelis — patikrink ar tai nėra dvigubas pirmasis aukštas.",
+                "message_lt": (f"{_room(r)}: lubų aukštis {lt_num(H)} m neįprastai didelis — gal tai "
+                               f"dvigubo aukščio erdvė, o gal matmuo perskaitytas klaidingai. "
+                               f"Patikrinkite pjūvyje."),
                 "discrepancy_pct": round((H - MAX_LUBU_AUKSTIS_M) / MAX_LUBU_AUKSTIS_M * 100, 1),
-                "suggestion": "Patikrinkite ar matmuo perskaitytas teisingai (mm vs cm).",
+                "suggestion": "Patikrinkite, ar matmuo perskaitytas teisingai (milimetrai, ne centimetrai).",
             })
     return out
 
@@ -134,9 +156,11 @@ def _rule_ceiling_area_matches_floor(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "warning",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.ceiling_vs_floor",
-                "message_lt": f"Patalpos «{r.get('pavadinimas')}» lubų plotas ({ceiling} m²) skiriasi nuo grindų ploto ({plotas} m²) {diff:.1f}%. Tikėtina lubų tipas «{lubu_tipas}» arba klaidinga eksplikacijos reikšmė.",
+                "message_lt": (f"{_room(r)}: lubų plotas ({lt_num(ceiling)} m²) skiriasi nuo grindų ploto "
+                               f"({lt_num(plotas)} m²) {lt_num(diff, 1)} % — galbūt lubos ne plokščios arba "
+                               f"eksplikacijoje klaidingas plotas. Patikrinkite lubų planą ir eksplikaciją."),
                 "discrepancy_pct": round(diff, 1),
-                "suggestion": "Jei lubos pakabinamos arba mansardinės — patikslink lubų tipą prielaidose.",
+                "suggestion": "Jei lubos nuožulnios ar su nuleidimais, pataisykite lubų kiekius sąmatoje.",
             })
     return out
 
@@ -164,9 +188,11 @@ def _rule_doors_consistency(rooms: list[dict], schedule: dict | None) -> list[di
         out.append({
             "level": "warning",
             "field": "durys.count",
-            "message_lt": f"Durų skaičius patalpose ({rooms_count} vnt) ir durų specifikacijoje ({schedule_count} vnt) skiriasi {diff_pct:.1f}%. Galima viena iš jų neteisingai perskaityta.",
+            "message_lt": (f"Durų skaičius patalpose ({rooms_count} vnt.) ir durų specifikacijoje "
+                           f"({schedule_count} vnt.) skiriasi {lt_num(diff_pct, 1)} % — vienas iš jų galėjo "
+                           f"būti perskaitytas neteisingai. Patikrinkite durų specifikaciją ir aukšto planą."),
             "discrepancy_pct": round(diff_pct, 1),
-            "suggestion": "Patikrinkite durų specifikacijos lentelę ir floor plan'ą.",
+            "suggestion": "Patikrinkite durų specifikacijos lentelę ir aukšto planą.",
         })
     return out
 
@@ -193,7 +219,9 @@ def _rule_windows_consistency(rooms: list[dict], schedule: dict | None) -> list[
         out.append({
             "level": "warning",
             "field": "langai.count",
-            "message_lt": f"Langų skaičius patalpose ({rooms_count} vnt) ir langų specifikacijoje ({schedule_count} vnt) skiriasi {diff_pct:.1f}%.",
+            "message_lt": (f"Langų skaičius patalpose ({rooms_count} vnt.) ir langų specifikacijoje "
+                           f"({schedule_count} vnt.) skiriasi {lt_num(diff_pct, 1)} %. Patikrinkite langų "
+                           f"specifikaciją ir fasadus."),
             "discrepancy_pct": round(diff_pct, 1),
             "suggestion": "Patikrinkite langų specifikacijos lentelę ir fasadus.",
         })
@@ -220,9 +248,12 @@ def _rule_total_area_vs_eksplikacija(rooms: list[dict], parsed: dict) -> list[di
         out.append({
             "level": level,
             "field": "bendras_plotas_m2",
-            "message_lt": f"Bendras patalpų plotas ({rooms_total} m²) skiriasi nuo eksplikacijos sumos ({eks_total} m²) {diff_pct:.1f}%. Galima patalpos buvo praleistos arba dubliuotos.",
+            "message_lt": (f"Bendras patalpų plotas ({lt_num(rooms_total)} m²) skiriasi nuo "
+                           f"eksplikacijos sumos ({lt_num(eks_total)} m²) {lt_num(diff_pct, 1)} % — galbūt "
+                           f"dalis patalpų praleista arba įskaičiuota du kartus. Patikrinkite patalpų "
+                           f"sąrašą pagal eksplikaciją (Patikros žingsnyje)."),
             "discrepancy_pct": round(diff_pct, 1),
-            "suggestion": "Patikrinkite ar visos eksplikacijos patalpos perėjo į apdailos sąrašą.",
+            "suggestion": "Patikrinkite, ar visos eksplikacijos patalpos yra patalpų sąraše.",
         })
     return out
 
@@ -254,20 +285,21 @@ def _rule_multi_floor_reconciliation(rooms: list[dict], parsed: dict) -> list[di
         floor_area = round(sum(float(r.get("plotas_m2") or 0) for r in floor_rooms), 2)
         grand_total += floor_area
         breakdown_parts.append(
-            f"{floor_nr}A={floor_area} m² ({len(floor_rooms)} pat.)"
+            f"{floor_nr} a. {lt_num(floor_area)} m² ({len(floor_rooms)} pat.)"
         )
         if floor_area > 0 and floor_area < 10:
             out.append({
                 "level": "warning",
                 "field": f"aukstas_{floor_nr}.plotas_m2",
                 "message_lt": (
-                    f"Aukšto {floor_nr} bendras plotas tik {floor_area} m² — "
-                    f"galimai praleistos patalpos. Tikėjomės ≥10 m²."
+                    f"{floor_nr} aukšto patalpų plotas tik {lt_num(floor_area)} m² — "
+                    f"galbūt praleistos patalpos (tikėtina bent 10 m²). Patikrinkite, "
+                    f"ar visos šio aukšto patalpos yra sąraše (Patikros žingsnyje)."
                 ),
                 "discrepancy_pct": 0.0,
                 "suggestion": (
-                    "Patikrinkite ar visos patalpos to aukšto eksplikacijos perėjo "
-                    "į galutinį sąrašą."
+                    "Patikrinkite, ar visos šio aukšto eksplikacijos patalpos yra "
+                    "patalpų sąraše."
                 ),
             })
 
@@ -275,9 +307,10 @@ def _rule_multi_floor_reconciliation(rooms: list[dict], parsed: dict) -> list[di
         "level": "info",
         "field": "aukstai.bendras_plotas_m2",
         "message_lt": (
-            f"Daugia-aukštis projektas ({len(grouped)} aukštai): "
+            f"Kelių aukštų projektas (aukštų: {len(grouped)}): "
             + " + ".join(breakdown_parts)
-            + f" = {round(grand_total, 2)} m² iš viso."
+            + f" = {lt_num(round(grand_total, 2))} m² iš viso. Kiekvieno aukšto "
+            "kiekius patikrinkite atskirai."
         ),
         "discrepancy_pct": 0.0,
         "suggestion": (
@@ -305,13 +338,15 @@ def _rule_multi_floor_reconciliation(rooms: list[dict], parsed: dict) -> list[di
                         "level": "warning",
                         "field": f"aukstas_{floor_nr}.plotas_m2",
                         "message_lt": (
-                            f"Aukšto {floor_nr}: galutinis sąrašas {final_sum} m² vs "
-                            f"eksplikacija {eks_sum} m² ({diff_pct:.1f}% skirtumas)."
+                            f"{floor_nr} aukštas: patalpų sąraše {lt_num(final_sum)} m², o "
+                            f"eksplikacija rodo {lt_num(eks_sum)} m² (skirtumas "
+                            f"{lt_num(diff_pct, 1)} %). Patikrinkite šio aukšto "
+                            f"eksplikaciją — galbūt praleistos arba dubliuotos patalpos."
                         ),
                         "discrepancy_pct": round(diff_pct, 1),
                         "suggestion": (
-                            f"Patikrinkite to aukšto eksplikaciją — galimai "
-                            f"praleistos arba dubliuotos patalpos."
+                            "Patikrinkite šio aukšto eksplikaciją — galbūt "
+                            "praleistos arba dubliuotos patalpos."
                         ),
                     })
     return out
@@ -330,9 +365,12 @@ def _rule_hidroizoliacija_in_wet_rooms(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "warning",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.hidroizoliacija_m2",
-                "message_lt": f"Drėgnoje patalpoje «{r.get('pavadinimas')}» hidroizoliacija nepriskaičiuota — pagal LT STR 2.04.01 ji privaloma.",
+                "message_lt": (f"{_room(r)}: drėgnoje patalpoje hidroizoliacija nepriskaičiuota — "
+                               f"pagal STR 2.04.01 ji privaloma. Patikrinkite patalpos paskirtį "
+                               f"(Patikros žingsnyje, šios patalpos lape); jei paskirtis teisinga, "
+                               f"pridėkite hidroizoliaciją sąmatoje."),
                 "discrepancy_pct": 100.0,
-                "suggestion": "Įjunkite hidroizoliacijos skaičiavimą prielaidose arba patikrinkite paskirtį.",
+                "suggestion": "Patikrinkite patalpos paskirtį; jei ji teisinga, pridėkite hidroizoliaciją sąmatoje.",
             })
     return out
 
@@ -351,7 +389,8 @@ def _rule_plyteles_in_vonios(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "info",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.plyteles_sienos_m2",
-                "message_lt": f"Patalpoje «{r.get('pavadinimas')}» sienų plytelių nėra — ar tikrai dažomos sienos (vonios praktiškai visada turi plyteles ant sienų)?",
+                "message_lt": (f"{_room(r)}: sienų plytelių nėra — ar tikrai sienos dažomos? Voniose "
+                               f"sienos beveik visada klijuojamos plytelėmis. Patikrinkite išklotinėse."),
                 "discrepancy_pct": 0.0,
                 "suggestion": "Jei tikrai be plytelių — viskas gerai; kitaip patikrinkite sienų išklotinę.",
             })
@@ -382,9 +421,11 @@ def _rule_paint_consumption_sane(rooms: list[dict]) -> list[dict]:
             out.append({
                 "level": "info",
                 "field": f"{r.get('pavadinimas') or r.get('nr')}.dazai_l",
-                "message_lt": f"Patalpoje «{r.get('pavadinimas')}» dažų sąnauda {per_m2:.2f} l/m² nukrypsta nuo standartinės (~0.20 l/m²). Galima neteisinga prielaida.",
+                "message_lt": (f"{_room(r)}: dažų sąnauda {lt_num(per_m2)} l/m² nukrypsta nuo įprastos "
+                               f"(~{lt_num(0.20)} l/m²). Patikrinkite dažų kiekį sąmatos skyriuje "
+                               f"„Medžiagos“."),
                 "discrepancy_pct": round(abs(per_m2 - 0.20) / 0.20 * 100, 1),
-                "suggestion": "Tikrinkite glaistymo lygį prielaidose.",
+                "suggestion": "Patikrinkite dažų kiekį sąmatos skyriuje „Medžiagos“.",
             })
     return out
 
@@ -423,9 +464,12 @@ def _rule_rangovas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dic
             out.append({
                 "level": "warning" if (ratio < lo * 0.7 or ratio > hi * 1.3) else "info",
                 "field": "santrauka.dazomas_plotas_total_m2",
-                "message_lt": f"Dažomas plotas ({dazomas:.1f} m²) palyginus su grindų plotu ({plotas:.1f} m²) duoda santykį {ratio:.2f}× — LT pro praktikoje tipiškai {lo:.1f}-{hi:.1f}×. Galimas matmenų klaidos arba neįprasta pastato forma.",
+                "message_lt": (f"Dažomas plotas ({lt_num(dazomas, 1)} m²) sudaro {lt_num(ratio)}× grindų "
+                               f"ploto ({lt_num(plotas, 1)} m²) — įprastai {lt_num(lo, 1)}–{lt_num(hi, 1)}×. "
+                               f"Galbūt klaidingi matmenys arba neįprasta pastato forma. Patikrinkite "
+                               f"lubų aukščius ir perimetrus (Patikros žingsnyje)."),
                 "discrepancy_pct": round(((ratio - (lo+hi)/2) / ((lo+hi)/2)) * 100, 1),
-                "suggestion": "Patikrink lubų aukščio + perimetro reikšmes. Jei kambariai netipiškos formos — galima ignoruoti.",
+                "suggestion": "Patikrinkite lubų aukščius ir perimetrus. Jei patalpos netipinės formos, įspėjimą galima paslėpti.",
             })
 
     # Grindjuostės / plotas
@@ -439,9 +483,12 @@ def _rule_rangovas_empirical_ratios(rooms: list[dict], parsed: dict) -> list[dic
             out.append({
                 "level": "warning",
                 "field": "santrauka.grindjuosciu_m_total",
-                "message_lt": f"Grindjuostės ({grindjuosciu:.1f} m) santykis su plotu ({plotas:.1f} m²) yra {ratio:.2f} m/m² — viršija LT empirinį maksimumą {hi:.2f}. Galimas dvigubas vidinių sienų skaičiavimas.",
+                "message_lt": (f"Grindjuosčių {lt_num(grindjuosciu, 1)} m — {lt_num(ratio)} m kiekvienam "
+                               f"grindų m² ({lt_num(plotas, 1)} m²), daugiau nei įprasta (iki {lt_num(hi)} m). "
+                               f"Galbūt bendros sienos įskaičiuotos du kartus. Patikrinkite grindjuosčių "
+                               f"kiekį sąmatoje."),
                 "discrepancy_pct": round((ratio - hi) / hi * 100, 1),
-                "suggestion": "Patikrink ar pozicijos generator'iaus grindjuostės cap'ą įjungtas (turėtų būti).",
+                "suggestion": "Patikrinkite, ar bendros patalpų sienos neįskaičiuotos du kartus.",
             })
 
     return out
@@ -478,16 +525,20 @@ def _rule_floor_consistency(rooms: list[dict]) -> list[dict]:
     # Rule a: nr prefix vs aukstas mismatch
     for r, nr_f, decl in zip(rooms, nr_floors, declared_floors):
         if decl is not None and decl != nr_f and nr_f >= 1:
+            # by its name — the list prints its number in front (`patalpa_nr`)
+            name = str(r.get("pavadinimas") or "").strip()
             out.append({
                 "level": "warning",
                 "field": "aukstas",
                 "patalpa_nr": r.get("nr"),
                 "value": decl,
                 "expected": nr_f,
-                "message": (
-                    f"Patalpa „{r.get('pavadinimas','?')}" + f"" + f" (Nr. {r.get('nr','?')}) " +
-                    f"pažymėta kaip aukstas={decl}, bet numerio prefiksas rodo aukstas={nr_f}. "
-                    f"Patikrink ar Vision teisingai atskyrė aukštus."
+                # `message_lt` like every other rule here — the extraction run copies
+                # only that key, so `message` reached the list empty (2026-10-06)
+                "message_lt": (
+                    f"{name + ': ' if name else ''}Pažymėta, kad patalpa yra {decl} "
+                    f"aukšte, bet pagal numerį ji {nr_f} aukšte. Patikrinkite "
+                    f"brėžinyje, kuriam aukštui ji priklauso."
                 ),
             })
 
@@ -500,10 +551,11 @@ def _rule_floor_consistency(rooms: list[dict]) -> list[dict]:
             "field": "aukstas",
             "value": None,
             "expected": "1..N",
-            "message": (
-                f"Daugiabučio projektas (rasta iki {inferred_max} aukšto pagal numerius), bet "
-                f"Vision neuzpildė `aukstas` lauko nei vienam kambariui. Patikrink prielaidų skyriuje "
-                f"per-room aukštus arba pakartok extraction'ą."
+            "message_lt": (
+                f"Pagal patalpų numerius projekte yra iki {inferred_max} aukštų, bet nė "
+                f"vienai patalpai aukštas nepažymėtas. Patikrinkite, ar patalpos "
+                f"teisingai suskirstytos į aukštus — kiekvieno aukšto kiekius "
+                f"patikrinkite atskirai."
             ),
         })
 
@@ -542,6 +594,29 @@ def validate_consistency(parsed: dict) -> list[dict]:
     LEVEL_ORDER = {"error": 0, "warning": 1, "info": 2}
     warnings.sort(key=lambda w: (LEVEL_ORDER.get(w.get("level"), 99), w.get("field") or ""))
     return warnings
+
+
+def as_pipeline_warnings(cross_warnings: list[dict] | None) -> list[dict]:
+    """The rules' warnings in the shape `parsed["warnings"]` carries — ONE converter for
+    the extraction run (vision_call step 4.05) and „Atnaujinti patikrinimus"
+    (api/revalidate). The two hand-rolled copies drifted: the extraction run read
+    `message_lt` only and dropped `patalpa_nr`, so the floor rules (which wrote
+    `message`) reached the list as EMPTY rows until the checks were refreshed
+    (2026-10-06)."""
+    rows: list[dict] = []
+    for w in cross_warnings or []:
+        if not isinstance(w, dict):
+            continue
+        rows.append({
+            "level": str(w.get("level") or "WARN").upper(),
+            "field": w.get("field", ""),
+            "patalpa_nr": w.get("patalpa_nr"),
+            "message": w.get("message_lt") or w.get("message") or "",
+            "suggestion": w.get("suggestion"),
+            "discrepancy_pct": w.get("discrepancy_pct"),
+            "source": "cross_page_validator",
+        })
+    return rows
 
 
 # ── Smoke test ───────────────────────────────────────────────────────────────

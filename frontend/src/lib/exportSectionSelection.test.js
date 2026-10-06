@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  exportSelectionKey,
+  loadExcludedSections,
   parseExcludedSections,
   serializeExcludedSections,
   selectedFor,
@@ -51,4 +53,14 @@ test('exclusions for sections that vanished are kept, not resurrected as checked
   const excluded = parseExcludedSections(serializeExcludedSections(new Set(['Senas skyrius'])));
   assert.equal(selectedFor(SECTIONS, excluded).size, 3);       // not shown now
   assert.ok(!selectedFor([...SECTIONS, 'Senas skyrius'], excluded).has('Senas skyrius'));
+});
+
+test('loadExcludedSections reads one project and never throws', () => {
+  const store = new Map([[exportSelectionKey('p1'), serializeExcludedSections(new Set(['Medžiagos']))]]);
+  const storage = { getItem: (k) => (store.has(k) ? store.get(k) : null) };
+  assert.deepEqual([...loadExcludedSections('p1', storage)], ['Medžiagos']);
+  assert.equal(loadExcludedSections('p2', storage).size, 0);
+  const blocked = { getItem: () => { throw new Error('SecurityError'); } };
+  assert.equal(loadExcludedSections('p1', blocked).size, 0);
+  assert.equal(loadExcludedSections('p1', null).size, 0, 'no storage at all');
 });

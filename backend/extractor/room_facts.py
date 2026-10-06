@@ -50,7 +50,10 @@ from __future__ import annotations
 from typing import Any
 
 from .page_classifier import canonical_tipas
-from .universal_rules import REMOVED_OPENINGS_KEY, kiekis_units
+# `lt_num` lives in universal_rules since 2026-10-06 — the rule engine's notes
+# need it too, and universal_rules cannot import this module. project_questions
+# still imports it from here.
+from .universal_rules import REMOVED_OPENINGS_KEY, kiekis_units, lt_num, paskirtis_label
 
 # ── the six facts, in the order the check sheet walks them ──────────────────
 FACT_KEYS = ("plotas", "perimetras", "aukstis", "apdaila", "angos", "grindys")
@@ -66,13 +69,6 @@ STATUSES = ("read", "assumed", "missing")
 MARKER_MARGIN_PCT = 0.06
 # Same idea for a room whose only anchor is its printed number.
 ROOM_MARKER_MARGIN_PCT = 0.10
-
-
-def lt_num(v: float | int | None, digits: int = 2) -> str:
-    """`165.61` → `165,61` — LT decimal comma, for strings the user reads."""
-    if v is None:
-        return "—"
-    return f"{float(v):.{digits}f}".replace(".", ",")
 
 
 def _f(v: Any) -> float | None:
@@ -1508,8 +1504,9 @@ def _fact_grindys(project: dict, room: dict,
         return _fact("grindys", value, None, "read", "grindu_planas", page,
                      rect, "Grindų danga pažymėta šiai patalpai." + tail, editable)
 
-    paskirtis = (room.get("paskirtis") or "").strip()
-    by_purpose = "parinkta pagal patalpos paskirtį" + (f" („{paskirtis}“)" if paskirtis else "")
+    # the purpose by the label he picks it by on this sheet, never the code
+    label = paskirtis_label(room.get("paskirtis"))
+    by_purpose = "parinkta pagal patalpos paskirtį" + (f" („{label}“)" if label else "")
     two = room.get("_grindu_dangos_dvi")
     if isinstance(two, dict) and len(two.get("tekstai") or []) >= 2:
         page = int(two.get("page") or page or 0) or page

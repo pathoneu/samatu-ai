@@ -281,7 +281,7 @@ def test_recompute_reports_failed_rooms_and_pozicijos_build(monkeypatch):
     msgs = [w["message"] for w in out["lt_sanity"]["warnings"]
             if w.get("field") == "recompute"]
     assert any("Nepavyko perskaičiuoti patalpų" in m for m in msgs)
-    assert any("pozicij" in m for m in msgs)
+    assert any("sąmatos eilučių" in m for m in msgs)
     # the banner counter must see them
     assert out["lt_sanity"]["summary"]["warnings_count"] >= 2
 

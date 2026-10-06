@@ -16,17 +16,9 @@ import { triggerDownload } from '@/lib/downloadBlob';
 import { ensureSettingsPulled } from '@/lib/projectStore';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samataTemplateApi';
-import { exportRows as templateExportRows, lacksPrice, scaleExportRow } from '@/lib/samataTemplate';
+import { exportRows as templateExportRows, scaleExportRow } from '@/lib/samataTemplate';
 import { resolveStaleRows } from '@/lib/mergeDarbuSarasas';
-
-// "1 eilutė / 2 eilutės / 11 eilučių" — LT plural, so the unpriced-lines
-// warning doesn't read like machine output.
-function ltEilutes(n) {
-  const d10 = n % 10, d100 = n % 100;
-  if (d10 === 1 && d100 !== 11) return `${n} eilutė`;
-  if (d10 >= 2 && d10 <= 9 && (d100 < 10 || d100 > 20)) return `${n} eilutės`;
-  return `${n} eilučių`;
-}
+import { asksAboutPricesAfterDialog, exportLines, linesForExport } from '@/lib/exportLines';
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
@@ -67,10 +59,12 @@ function collectWarnings(project) {
 
 function buildPayload(project, allowedSkyriai = null) {
   // allowedSkyriai: Set<string> | null. If null = include everything.
-  const keep = (skyrius) => !allowedSkyriai || allowedSkyriai.has(skyrius);
   // SM02: daugiabučiams kiekiai padauginti × aukštų skaičiaus.
   const floorCount = getFloorCount(project);
-  const mult = (n) => (n || 0) * floorCount;
+  // The printed lines live in lib/exportLines.js (2026-10-06), so the warnings
+  // before sending — the Siųsti step, this dialog, the client link — count
+  // exactly the rows this payload carries.
+  const eilutes = exportLines(project, allowedSkyriai);
 
   // V8 darbu_sarasas — primary source
   if (Array.isArray(project.darbu_sarasas) && project.darbu_sarasas.length > 0) {
@@ -79,22 +73,7 @@ function buildPayload(project, allowedSkyriai = null) {
       : project.name;
     return {
       projektas,
-      eilutes: project.darbu_sarasas
-        .filter(it => (it.kiekis || 0) > 0)
-        .map((it, i) => {
-          const kiekis = mult(it.kiekis);
-          return {
-            nr: String(it.eil_nr || i + 1),
-            aprasymas: it.aprasymas || '',
-            mato_vnt: it.mato_vnt || it.vnt || '',
-            kiekis,
-            kaina: it.kaina || 0,
-            suma: kiekis * (it.kaina || 0),
-            skyrius: it.skyrius || it.kategorija || 'Apdaila',
-            confidence: it.confidence || 'medium',
-          };
-        })
-        .filter(it => keep(it.skyrius)),
+      eilutes,
       patalpos: project.v8_rooms || project.patalpos || [],
       tipas: project.tipas || project.type || 'kz',
       perspejimani: collectWarnings(project),
@@ -105,19 +84,7 @@ function buildPayload(project, allowedSkyriai = null) {
   // Fallback (KŽ projektai)
   return {
     projektas: floorCount > 1 ? `${project.name} (× ${floorCount} aukštai)` : project.name,
-    eilutes: (project.rows || [])
-      .map(r => {
-        const kiekis = mult(r.kiekis);
-        return {
-          nr: r.nr || '', aprasymas: r.aprasymas || '',
-          mato_vnt: r.mato_vnt || '',
-          kiekis,
-          kaina: r.kaina || 0,
-          suma: kiekis * (r.kaina || 0),
-          skyrius: r.skyrius || '',
-        };
-      })
-      .filter(it => keep(it.skyrius || '')),
+    eilutes,
     tipas: project.tipas || 'kz',
     aukstu_skaicius: floorCount,
   };
@@ -175,7 +142,11 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
 
 // `onProjectChange` (2026-09-29): stores his PVM choice on the project as
 // `vat_mode`, so the on-screen totals and every export agree.
-export default function ExportDropdown({ project, onProjectChange }) {
+// `onGoToPrices(excludedSkyriai)` (2026-10-06): the dialog's „Įrašyti kainas" —
+// closes the dialog and opens the Sąmata step at the first unpriced row. The
+// sections he unticked come along (null for his own layout, whose sections are
+// not ours), so the row it opens is one this document would print.
+export default function ExportDropdown({ project, onProjectChange, onGoToPrices }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(null);
   const [filterFor, setFilterFor] = useState(null); // 'excel' | 'pdf' | 'excel-template' | null
@@ -253,42 +224,20 @@ export default function ExportDropdown({ project, onProjectChange }) {
   };
 
   const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija }) => {
-    // Guard: exporting a sąmata where every line is 0,00 € sends the client a
-    // quantities-only "free" quote by accident. Nudge to price first. (2026-06-19)
-    // Check ALL candidate lists, not just pozicijos: interior prices live in
-    // darbu_sarasas, and a Prielaidos recompute leaves project.pozicijos unpriced
-    // — so reading pozicijos alone false-warns on a fully-priced export.
-    const priced = [project.darbu_sarasas, project.rows, project.pozicijos]
-      .filter(Array.isArray).flat();
-    const anyPrice = priced.some((r) => Number(r?.kaina) > 0);
-    if (priced.length > 0 && !anyPrice) {
+    // Prices (2026-10-06 walkthrough): the dialog he just confirmed already says
+    // „N eilučių be kainos — klientas jas matys su 0,00 € suma", counted on these
+    // very lines (lib/exportLines.js), so the two confirms that followed it —
+    // „Nė viena pozicija neturi kainos", „N eilučių be kainos — eksportuoti vis
+    // tiek?" — only repeated it. One case the line cannot cover still asks once:
+    // a sąmata with no price at all whose document has no line with a quantity
+    // (his own layout, every cell still blank) — asksAboutPricesAfterDialog.
+    const lines = linesForExport(project, { format, templateRows, allowedSkyriai: skyriai });
+    if (asksAboutPricesAfterDialog(project, lines)) {
       const ok = await confirm({
-        title: 'Eksportuoti be kainų?',
-        description: 'Nė viena pozicija neturi kainos — dokumente bus tik kiekiai, o suma 0,00 €. Rekomenduojama pirma pritaikyti kainyną.',
-        confirmText: 'Eksportuoti vis tiek',
-        cancelText: 'Grįžti ir įvesti kainas',
-      });
-      if (!ok) return;
-    }
-    // Partial-price guard (2026-07-28 walkthrough): the check above only fires
-    // when EVERY line is unpriced, so a sąmata where 3 of 40 positions still sat
-    // at 0,00 € went to the client silently. Count on the payload actually being
-    // exported (skyriai filter applied, kiekis = 0 placeholder rows are dropped
-    // by buildPayload, so they can't inflate the warning). In his own layout the
-    // rows are the rendered ones; blank cells are by design and are not counted.
-    const exportedRows = (format === 'excel-template'
-      ? templateExportRows(templateRows || [], skyriai)
-      : (buildPayload(project, skyriai).eilutes || []))
-      .filter((r) => (r.kiekis || 0) > 0);
-    // A merged line of his counts when part of its quantity has no price yet
-    // (lacksPrice), not when it is priced at several prices.
-    const unpricedRows = exportedRows.filter(lacksPrice);
-    if (unpricedRows.length > 0 && unpricedRows.length < exportedRows.length) {
-      const ok = await confirm({
-        title: `${ltEilutes(unpricedRows.length)} be kainos — eksportuoti vis tiek?`,
-        description: 'Šios pozicijos dokumente bus su 0,00 € suma. Galite grįžti ir įvesti kainas arba pritaikyti kainyną.',
-        confirmText: 'Eksportuoti',
-        cancelText: 'Atšaukti',
+        title: t('project.send.noPriceAtAllTitle'),
+        description: t('project.send.noPriceAtAllDesc'),
+        confirmText: t('project.send.noPriceAtAllConfirm'),
+        cancelText: t('project.send.noPriceAtAllCancel'),
       });
       if (!ok) return;
     }
@@ -400,6 +349,10 @@ export default function ExportDropdown({ project, onProjectChange }) {
           onConfirm={handleConfirm}
           onVatModeChange={(mode) => onProjectChange?.({ ...project, vat_mode: mode })}
           onStaleChoice={onProjectChange ? handleStaleChoice : undefined}
+          onGoToPrices={onGoToPrices ? (excluded) => {
+            setFilterFor(null);
+            onGoToPrices(filterFor === 'excel-template' ? null : excluded);
+          } : undefined}
         />
       )}
     </div>

@@ -16,7 +16,7 @@ import { Loader2, ScanLine, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { fetchFreeRereadStatus, runFreeReread } from '@/lib/freeRereadApi';
-import { freeRereadSummary } from '@/lib/freeReread';
+import { freeRereadState } from '@/lib/freeReread';
 import { flushProjectSaves, getProject, updateProject } from '@/lib/projectStore';
 import { recordPilot } from '@/lib/telemetry';
 
@@ -42,9 +42,12 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
   }, [id]);
 
   if (done) {
+    // the project as it stands after the read (lib/freeReread.freeRereadState) — never a count of what this one
+    // run added, which read „0" for walls an earlier read had already taken from the dimensions
+    const typed = done.jusu > 0 ? t('project.freeReread.doneTyped', { n: done.jusu }) : '';
     return (
       <div className={`rounded-[2px] border border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.06)] px-3 py-2 text-[14px] ${className}`} role="status" data-testid="free-reread-done">
-        {t('project.freeReread.done', done)}
+        {t('project.freeReread.done', { ...done, jusu: typed })}
       </div>
     );
   }
@@ -60,11 +63,11 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
     setBusy(true);
     try {
       const base = getProject(id) || project;
-      const { project: merged, santrauka } = await runFreeReread(base);
+      const { project: merged } = await runFreeReread(base);
       updateProject(id, merged);
       await flushProjectSaves();
       recordPilot(id, 'free_reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
-      setDone(freeRereadSummary(santrauka));
+      setDone(freeRereadState(merged));
       setOffer(false);
       onComplete?.(merged);
     } catch (err) {

@@ -51,7 +51,9 @@ def test_room_that_raises_stays_listed_marked_and_warned(caplog):
     w = warns[0]
     assert w["patalpa_nr"] == "04"
     msg = w["message"] + " " + w["hint"]
-    assert "04" in w["message"] and "Virtuvė" in w["message"]
+    # named by its name; the number rides on `patalpa_nr`, which the list
+    # prints in front of the message — never twice (2026-10-06)
+    assert "Virtuvė" in w["message"] and "04" not in w["message"]
     assert not user_text.is_banned(msg)
     assert "lower" not in msg and "list" not in msg  # no exception text on screen
 

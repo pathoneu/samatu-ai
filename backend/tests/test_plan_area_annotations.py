@@ -436,7 +436,7 @@ def test_lane_warnings_say_what_to_check_for_each_finding():
     ws = lane_warnings(lane, rooms)
     codes = [(w["code"], w["level"], w["severity"]) for w in ws]
     assert codes == [("room_area_unconfirmed", "WARN", "high"), ("plan_area_unclaimed", "WARN", "med")]
-    assert "persidengia su patalpa „Patalpa 06\"" in ws[0]["message"] and ws[0]["room"] == "07"
+    assert "persidengia su patalpa „Patalpa 06“" in ws[0]["message"] and ws[0]["room"] == "07"
     assert "6,90 m²" in ws[1]["message"] and "trūksta patalpos" in ws[1]["message"]
     assert lane_warnings({"status": "insufficient"}, rooms) == []
 

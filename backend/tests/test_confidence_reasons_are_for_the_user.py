@@ -213,3 +213,415 @@ def test_door_reconciliation_reasons_are_clean():
         assert not m, f"banned token {m.group(0)!r} in door reason: {r}"
     assert any("specifikacij" in (o.get("reason") or "") for o in outs), \
         "the guidance strings must actually be exercised"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Patikrinimai — the rows the Sąmata step lists (2026-10-06)
+# ═════════════════════════════════════════════════════════════════════════════
+# Contractor walkthrough on localhost, „Patikrinimai → Verta patikrinti":
+#   „[01]Tambūras (nr=01): Sienos neįtrauktos į dažomą plotą – standartinė
+#    prielaida paskirčiai 'tamburas'; projekto apdailos duomenų nerasta. Jei
+#    sienos dažomos, pažymėkite Prielaidų skydelyje."
+#   „… Virtuvės plytelių juosta 0.60 m aukščio palei 3.0 m stalviršio …"
+# The room's number twice (the list prints it in front, from `patalpa_nr`), a
+# purpose CODE in Python quotes, a settings panel by a name the screen no
+# longer shows (its button says „Nustatymai"), numbers with a decimal POINT in a
+# Lithuanian sentence. The net below drives every builder that writes such a
+# row — plus the ledger's exclusion reasons, which name the same panel — and
+# rejects the whole class. A source-level net covers the builders that live
+# inside the extraction run and cannot be driven alone.
+
+import ast  # noqa: E402
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from extractor.universal_rules import PASKIRTIS_LT, ROOM_TYPE_RULES  # noqa: E402
+
+_LT_LETTERS = "A-Za-zĄČĘĖĮŠŲŪŽąčęėįšųūž"
+# What the engine writes for a purpose, a ceiling or a floor — never shown raw.
+_CODES = sorted({*ROOM_TYPE_RULES, *PASKIRTIS_LT, "gkp", "pakabinamos", "tempiamos",
+                 "itempiamos", "betonas", "medis", "plyteles", "minksta", "be_dangos"},
+                key=len, reverse=True)
+_QUOTED_CODE = re.compile(r"[\"'«„“]\s*(?:%s)\s*[\"'»“”]" % "|".join(map(re.escape, _CODES)))
+_ASCII_QUOTED = re.compile(r"'[^'\n]+'|(?<![\w\"])\"[^\"\n]+\"")
+_APOSTROPHE_WORD = re.compile(rf"[A-Za-z]'[{_LT_LETTERS}]")
+_QUOTED_SPAN = re.compile(r"„[^“”]*[“”]")          # his drawing's own words, as written
+_DOTTED = re.compile(r"(?<![\w.])\d+\.\d+(?!\.?\d)")  # 0.60 — not STR 2.04.01
+_OLD_PANEL = re.compile(r"Prielaidų skydel|Prielaidose|[Pp]rielaidų skyri|„Prielaidos")
+_INFORMAL = re.compile(r"\b(?:Patikrink|Pridėk|Įvesk|Pakeisk|Pažymėk|Pakartok)\b", re.IGNORECASE)
+_AI = re.compile(rf"(?<![{_LT_LETTERS}])AI(?![{_LT_LETTERS}])")
+_DEV = re.compile(r"\b(?:bbox|prompt\w*|floor plan\w*|elevation|re-?extract\w*|extraction\w*|"
+                  r"wall_elevation|Python|recompute|pozicij\w*)\b|`", re.IGNORECASE)
+_SNAKE = re.compile(r"(?<![\w./-])[a-z]+(?:_[a-z0-9]+)+(?!\w)")   # santechnika_potinkinis
+
+
+def plain_lt_problems(text: str, allow=()) -> list[str]:
+    """Everything that makes a Patikrinimai row read like a debug log. `allow`
+    = the project's own identifiers (room numbers, names) — blanked out first,
+    because a room called „1.2" is his numbering, not a decimal."""
+    if not isinstance(text, str) or not text:
+        return []
+    for a in sorted((str(x) for x in allow if x), key=len, reverse=True):
+        text = text.replace(a, "…")
+    found = []
+    if "(nr=" in text:
+        found.append("„(nr=“ — the list already prints the room's number in front")
+    for pat, why in ((_QUOTED_CODE, "a purpose/ceiling code in quotes — show its label"),
+                     (_ASCII_QUOTED, "ASCII quotes — Lithuanian text quotes „…“"),
+                     (_APOSTROPHE_WORD, "an English apostrophe word"),
+                     (_OLD_PANEL, "the settings panel by a name the screen no longer shows (it is „Nustatymai“)"),
+                     (_INFORMAL, "informal imperative — the app says „Patikrinkite“"),
+                     (_AI, "„AI“ — say what was read from the drawing"),
+                     (_DEV, "developer words"),
+                     (_SNAKE, "a setting's code name — name the control his screen shows"),
+                     (BANNED, "methodology jargon / a confidential term")):
+        m = pat.search(text)
+        if m:
+            found.append(f"{why}: {m.group(0)!r}")
+    m = _DOTTED.search(_QUOTED_SPAN.sub("„…“", text))
+    if m:
+        found.append(f"a decimal point in a number: {m.group(0)!r} — use lt_num()")
+    return found
+
+
+def _assert_plain(rows, allow=()):
+    """`rows` = [(where, text)]; every text must read plain."""
+    bad = [f"{where}: {problems} — {text}" for where, text in rows
+           for problems in [plain_lt_problems(text, allow)] if problems]
+    assert not bad, "Patikrinimai text reads like a debug log:\n" + "\n".join(bad)
+
+
+def _warning_texts(warnings, tag):
+    out = []
+    for w in warnings or []:
+        if not isinstance(w, dict):
+            continue
+        for key in ("message", "message_lt", "hint", "expected", "suggestion"):
+            if isinstance(w.get(key), str) and w[key]:
+                out.append((f"{tag}.{key}", w[key]))
+    return out
+
+
+def test_the_net_catches_the_walkthrough_rows():
+    """The two strings the founder read must trip the net — else it protects
+    nothing."""
+    first = ("Tambūras (nr=01): Sienos neįtrauktos į dažomą plotą – standartinė prielaida "
+             "paskirčiai 'tamburas'; projekto apdailos duomenų nerasta. Jei sienos dažomos, "
+             "pažymėkite Prielaidų skydelyje.")
+    second = ("Virtuvė/valgomasis (nr=04): Virtuvės plytelių juosta 0.60 m aukščio palei 3.0 m "
+              "stalviršio — prielaida (brėžinys stalviršio ilgio neduoda). Pakeiskite Prielaidų "
+              "skydelyje.")
+    one = " ".join(plain_lt_problems(first))
+    assert "(nr=" in one and "code in quotes" in one and "„Nustatymai“" in one
+    two = " ".join(plain_lt_problems(second))
+    assert "decimal point" in two and "„Nustatymai“" in two
+    # …and the forms we write instead pass
+    assert plain_lt_problems("Tambūras: Plotas 0,9 m² per mažas paskirčiai „Tambūras“ "
+                             "(STR norma 1,5–10 m²). Pagal STR 2.04.01 — patikrinkite per "
+                             "mygtuką „Nustatymai“; pjūvio žymeklis „+2.800“.") == []
+
+
+def test_purpose_labels_are_the_ones_on_his_screen():
+    """`PASKIRTIS_LT` mirrors the frontend's own labels — the room sheet select
+    where he changes a purpose, and the room card for the classes that select
+    does not offer — so a row says the same word he picks it by."""
+    lt = json.loads((Path(__file__).resolve().parents[2] / "frontend" / "src" / "i18n"
+                     / "lt.json").read_text(encoding="utf-8"))
+    sheet = {k[len("paskirtis_"):]: v for k, v in lt["project"]["roomSheet"].items()
+             if k.startswith("paskirtis_")}
+    card = lt["project"]["roomCard"]["paskirtis"]
+    fold = {"tambūras": "tamburas", "sandėliukas": "sandeliukas", "laiptinė": "laiptine"}
+    for code, label in PASKIRTIS_LT.items():
+        key = fold.get(code, code)
+        want = sheet.get(key) or card.get(key) or card.get(code)
+        assert want == label, f"{code}: backend {label!r}, screen {want!r}"
+    # every class the engine has a rule for has a label
+    assert set(ROOM_TYPE_RULES) <= set(PASKIRTIS_LT)
+
+
+def _rule_rooms():
+    """Rooms that trip every per-room branch of lt_rules and every finish note
+    of universal_rules. Numbers carry letters („T1") so a number repeated in
+    its own message cannot hide behind an area or a height."""
+    from extractor.universal_rules import calc_room_quantities
+
+    specs = [
+        # too small for its purpose, low ceiling, perimeter too short; walls
+        # and ceiling left out by the purpose standard
+        {"nr": "T1", "pavadinimas": "Tambūras", "paskirtis": "tamburas",
+         "plotas_m2": 0.9, "perimetras_m": 2.0, "lubu_aukstis_m": 2.0},
+        # too big, ceiling out of range and above 3 m, perimeter too long
+        {"nr": "G2", "pavadinimas": "Garažas", "paskirtis": "garazas",
+         "plotas_m2": 80.0, "perimetras_m": 100.0, "lubu_aukstis_m": 4.8},
+        # below the STR minimum for a bedroom
+        {"nr": "M3", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
+         "plotas_m2": 12.0, "perimetras_m": 14.0, "lubu_aukstis_m": 2.4},
+        # the kitchen splashback along an assumed counter
+        {"nr": "K4", "pavadinimas": "Virtuvė/valgomasis", "paskirtis": "virtuve",
+         "plotas_m2": 12.0, "perimetras_m": 14.0, "lubu_aukstis_m": 2.7},
+        # a wet room on the purpose default band, above 3 m
+        {"nr": "V5", "pavadinimas": "Vonia", "paskirtis": "vonia",
+         "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 3.4},
+        # the pipeline's bathroom default (no wall elevation pages)
+        {"nr": "S6", "pavadinimas": "San. mazgas", "paskirtis": "san",
+         "plotas_m2": 4.0, "perimetras_m": 8.0, "lubu_aukstis_m": 2.7,
+         "_bathroom_paint_above_tile_m": 2.0},
+        # the elevation measured the walls and found no tile
+        {"nr": "L7", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla",
+         "plotas_m2": 5.0, "perimetras_m": 9.0, "lubu_aukstis_m": 2.7,
+         "_tile_elevation_evidence": {"walls_measured": 2, "tile_zones_seen": 0}},
+        # the finish table paints a garage the standard leaves raw
+        {"nr": "G8", "pavadinimas": "Garažas", "paskirtis": "garazas",
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8,
+         "sienu_apdailos_breakdown": {"dazymas_share": 1.0}},
+        # a sauna: wood-lined ceiling, left out
+        {"nr": "P9", "pavadinimas": "Pirtis", "paskirtis": "pirtis",
+         "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 2.4},
+    ]
+    rooms = []
+    for spec in specs:
+        r = {**spec, "elementai": []}
+        rooms.append({**r, **calc_room_quantities(r)})
+    # a wet room with no tile evidence at all (his rules: no band)
+    wet = {"nr": "V10", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 5.0,
+           "perimetras_m": 9.0, "lubu_aukstis_m": 2.7, "elementai": []}
+    rules = {"vonia": {**ROOM_TYPE_RULES["vonia"], "tile_walls_to_m": 0}}
+    rooms.append({**wet, **calc_room_quantities(wet, rules=rules)})
+    rooms[0]["_height_source"] = "positioned_marker"
+    rooms[1]["_height_marker_conflict"] = {"marker_m": 2.8, "kept_m": 5.7}
+    return rooms
+
+
+def test_rule_engine_rows_read_plain():
+    from extractor.lt_rules import apply_lt_sanity
+
+    rooms = _rule_rooms()
+    rows = []
+    for r in rooms:
+        for note in (r.get("_wall_finish_assumptions") or []) + (r.get("_ceiling_finish_assumptions") or []):
+            rows.append((f"room {r['nr']} note", note))
+    warnings = apply_lt_sanity({"patalpos": rooms})["_lt_warnings"]
+    rows += _warning_texts(warnings, "lt_rules")
+    # the project-level branches each need their own project
+    dup = [{"nr": f"D{i}", "pavadinimas": "Koridorius", "paskirtis": "koridorius",
+            "plotas_m2": 6.0, "perimetras_m": 10.0} for i in (1, 2)]
+    for tag, parsed in (
+        ("few rooms + duplicate", {"patalpos": dup}),
+        ("many rooms", {"patalpos": [{"nr": f"N{i}", "pavadinimas": f"Kambarys {i}",
+                                      "plotas_m2": 30.0} for i in range(31)]}),
+        ("all heights from markers", {"patalpos": [{**r, "_height_source": "positioned_marker"}
+                                                   for r in rooms[:3]]}),
+    ):
+        rows += _warning_texts(apply_lt_sanity(parsed)["_lt_warnings"], tag)
+    _assert_plain(rows)
+
+    joined = " | ".join(t for _, t in rows)
+    for fired in ("per mažas paskirčiai „Tambūras“", "per didelis paskirčiai „Garažas“",
+                  "žemesnis, nei STR leidžia", "neįprastas (norma", "Perimetras 2,0 m per mažas",
+                  "per didelis 80,0 m² plotui", "Sienos neįtrauktos į dažomą plotą",
+                  "Sienos dažomos pagal projekto apdailos duomenis", "Lubos neįtrauktos",
+                  "lubos dengiamos medžiu", "Atatvaro plytelių juosta skaičiuota 0,60 m",
+                  "3,0 m ilgio stalviršį", "Plytelių aukštis brėžinyje nerastas",
+                  "Drėgnos patalpos sienų plytelių", "Išklotinėse šios patalpos sienose",
+                  "Plytelių juosta (iki", "Virš 3 m kiekis skaičiuotas", "altitudė 2,80 m",
+                  "gali būti didesnis", "nesiliečiančios", "neįprastai didelis", "Rasta tik 2",
+                  "Patalpų rasta: 31", "gali būti ta pati patalpa", "Visų patalpų",
+                  "„Nustatymai“"):
+        assert fired in joined, f"branch did not fire: {fired!r}"
+
+    # a room-level row names the room once — its number is in front of it
+    for w in warnings:
+        nr = str(w.get("patalpa_nr") or "")
+        if nr:
+            assert nr not in w["message"], w["message"]
+
+
+def test_extraction_rows_read_plain():
+    """The rows the extraction run itself writes, through the builders that can
+    be driven alone, and the ledger's reasons for leaving a room out."""
+    from extractor import vision_call as vc
+
+    rows = []
+    for name, table in (("walls", vc._WALLS_OUT_LT), ("floor", vc._GRIND_OUT_LT),
+                        ("ceiling", vc._CEILING_OUT_LT)):
+        rows += [(f"ledger.{name}.{k}", v) for k, v in table.items()]
+    for k, (msg, hint) in vc._CONSISTENCY_LT.items():
+        rows += [(f"consistency.{k}", msg), (f"consistency.{k}.hint", hint)]
+
+    w = vc.perimeter_warning({"room_nr": "T1", "room_name": "Svetainė", "perim_m": 7.08,
+                              "area_m2": 3.52, "lower_bound_m": 7.5, "upper_bound_m": 18.76})
+    assert w["patalpa_nr"] == "T1" and "T1" not in w["message"]
+    rows += _warning_texts([w], "perimeter")
+
+    for partial in (False, True):
+        parsed: dict = {}
+        vc._warn_apdailos_degraded(parsed, "no JSON in response", partial=partial)
+        rows += _warning_texts(parsed["warnings"], f"apdailos(partial={partial})")
+
+    boxed = {"patalpos": [{"pavadinimas": f"R{i}", "bbox_pct": {"x": 0.4, "y": 0.4, "w": 0.02, "h": 0.02}}
+                          for i in range(10)]}
+    rows += _warning_texts(vc._validate_room_bboxes(boxed)["warnings"], "bbox")
+
+    failing = {"patalpos": [{"nr": "K4", "pavadinimas": "Virtuvė", "paskirtis": "virtuve",
+                             "plotas_m2": 26.0, "perimetras_m": 20.8, "lubu_aukstis_m": 2.8,
+                             "lubu_tipas": ["gkp", "tempiamos"], "elementai": []}]}
+    calc = [x for x in vc._recompute_per_room_via_python(failing, None).get("warnings") or []
+            if isinstance(x, dict) and x.get("code") == "room_calc_failed"]
+    assert calc and "K4" not in calc[0]["message"]
+    rows += _warning_texts(calc, "room_calc_failed")
+
+    twins = {"_wall_elevations": [{"room_name": "Vonia", "wall_id": "A", "wall_total_width_mm": 1500,
+                                   "tile_zones": [{"from_floor_mm": 0, "to_floor_mm": 1500}]}],
+             "patalpos": [{"nr": "V1", "pavadinimas": "Vonia"}, {"nr": "V2", "pavadinimas": "Vonia"}]}
+    vc._apply_wall_elevation_tile_override(twins)
+    assert twins.get("warnings")        # the list that is kept (2026-10-06), not _lt_warnings
+    rows += _warning_texts(twins["warnings"], "elevation twins")
+    _assert_plain(rows)
+
+
+def test_cross_check_rows_read_plain():
+    from extractor.cross_page_validator import validate_consistency
+
+    def room(nr, name, pask, **kw):
+        return {"nr": nr, "pavadinimas": name, "paskirtis": pask, "elementai": [], **kw}
+
+    parsed = {
+        "patalpos": [
+            room("101", "Svetainė", "gyvenamoji", plotas_m2=40.0, perimetras_m=60.0,
+                 lubu_aukstis_m=2.1, ceiling_paintable_m2=30.0, lubu_tipas="gkp",
+                 dazymo_plotas_m2=400.0, dazai_l=200.0, grindjuosciu_m=80.0, puslapio_nr=3,
+                 aukstas=2, elementai=[{"tipas": "duris", "kiekis": 2}, {"tipas": "langas", "kiekis": 3}]),
+            room("201", "Vonia", "vonia", plotas_m2=6.0, perimetras_m=7.0, lubu_aukstis_m=5.0, aukstas=2),
+            room("202", "WC", "wc", plotas_m2=2.0, perimetras_m=6.0, lubu_aukstis_m=2.7, aukstas=2),
+            room("301", "Sandėliukas", "sandeliukas", plotas_m2=5.0, perimetras_m=9.0,
+                 lubu_aukstis_m=2.7, aukstas=3),
+        ],
+        "schedule_tables": {"durys": [{"kiekis": 5}], "langai": [{"kiekis": 7}]},
+        "_eksplikacija": {"patalpos": [{"nr": "101", "plotas_m2": 60.0, "aukstas": 2},
+                                       {"nr": "201", "plotas_m2": 3.0, "aukstas": 2}]},
+    }
+    no_floors = {"patalpos": [room("1-01", "Holas", "holas", plotas_m2=10.0),
+                              room("2-01", "Holas", "holas", plotas_m2=10.0)]}
+    out = validate_consistency(parsed) + validate_consistency(no_floors)
+    rows = _warning_texts(out, "cross_page")
+    _assert_plain(rows)
+    joined = " | ".join(t for _, t in rows)
+    for fired in ("forma neįprasta", "kompaktiška", "per mažas — įprastai", "neįprastai didelis",
+                  "lubų plotas", "Durų skaičius", "Langų skaičius", "Bendras patalpų plotas",
+                  "Kelių aukštų projektas", "hidroizoliacija", "sienų plytelių nėra",
+                  "dažų sąnauda", "Dažomas plotas", "Grindjuosčių", "Pažymėta, kad patalpa yra"):
+        assert fired in joined, f"rule did not fire: {fired!r}"
+
+
+def test_quantity_logic_rows_read_plain(monkeypatch):
+    from extractor import sanity_checks as sc
+    from extractor.plan_area_annotations import lane_warnings
+    from extractor.scale_validator import validate_scale
+
+    rooms = [
+        {"nr": "1", "pavadinimas": "Svetainė", "plotas_m2": 20.0, "perimetras_m": 9.0,
+         "walls_paintable_m2": 120.0, "ceiling_paintable_m2": 12.0, "grindjuosciu_m": 40.0,
+         "dazai_l": 1.0, "gkp_lubu_standart_m2": 30.0,
+         "elementai": [{"type": "langas", "reveal_length_m": 0}, {"tipas": "duris"}]},
+        {"nr": "2", "pavadinimas": "Kambarys", "plotas_m2": 15.0, "perimetras_m": 16.0,
+         "walls_paintable_m2": 40.0, "ceiling_paintable_m2": 15.0,
+         "elementai": [{"type": "langas", "reveal_length_m": 12.0}]},
+    ]
+    vr = {"patalpos": rooms, "pozicijos": [{"aprasymas": "GKP lapai luboms", "vnt": "vnt", "kiekis": 40}]}
+    rows = _warning_texts(sc.run_all_checks(vr), "sanity_checks")
+    rows += _warning_texts(sc.run_all_checks({"patalpos": rooms[:1]}), "sanity_checks(zero reveals)")
+
+    def boom(*_a, **_k):
+        raise KeyError("plotas_m2")
+    monkeypatch.setattr(sc, "_ALL_CHECKS", [boom])
+    crashed = sc.run_all_checks(vr)
+    assert crashed and "boom" not in crashed[0]["message"]
+    rows += _warning_texts(crashed, "sanity_checks(crash)")
+
+    rows += [("scale", w) for w in validate_scale(
+        scale_factor=50.0, rendered_dpi=200,
+        rooms=[{"pavadinimas": "Svetainė", "width_m": 3.0, "height_m": 4.0, "diagonal_px": 394}])]
+
+    plan_rooms = [{"nr": "06", "pavadinimas": "Kambarys", "plotas_m2": 7.01},
+                  {"nr": "07", "pavadinimas": "Kambarys 2", "plotas_m2": 5.64,
+                   "_area_unconfirmed_reason": "duplicate_of:06"},
+                  {"nr": "08", "pavadinimas": "Sandėliukas", "plotas_m2": 3.1,
+                   "_area_unconfirmed_reason": "label_differs",
+                   "_plotas_uzrasas_kitas": {"page": 2, "value_m2": 4.25}},
+                  {"nr": "09", "pavadinimas": "Rūbinė", "plotas_m2": 2.2}]
+    lane = {"status": "applied", "geometry": "shared_frame", "unconfirmed": ["07", "08", "09"],
+            "unclaimed": [{"page": 2, "value_m2": 6.9}, {"page": 2, "value_m2": 4.1, "patalpoje": "06"}]}
+    rows += _warning_texts(lane_warnings(lane, plan_rooms), "plan labels")
+    assert len(rows) > 12
+    _assert_plain(rows)
+
+
+def test_every_corpus_project_lists_plain_rows():
+    """The whole list a corpus project shows, rebuilt by today's code: the
+    per-room engine's notes, the STR rules, the §6 logic checks, the cross-page
+    checks, everything the row builder writes — through the same mirror the
+    Patikrinimai list reads. Stored warnings from older runs are dropped first:
+    only what the code says TODAY is judged."""
+    from extractor.cross_page_validator import validate_consistency
+    from extractor.lt_rules import apply_lt_sanity
+    from extractor.sanity_checks import run_all_checks
+    from extractor.sanity_mirror import build_lt_sanity
+    from extractor.vision_call import _build_pozicijos_from_rooms, _recompute_per_room_via_python
+
+    root = Path(__file__).resolve().parents[2]
+    fixtures = sorted((root / "ground_truth").glob("*/ai_extract.json"))
+    assert fixtures, "no corpus fixture to scan — this test would pass vacuously"
+    seen = 0
+    for fixture in fixtures:
+        src = json.loads(fixture.read_text(encoding="utf-8"))
+        parsed = {k: v for k, v in src.items()
+                  if k not in ("darbu_sarasas", "pozicijos", "warnings", "_lt_warnings", "lt_sanity")}
+        parsed["pozicijos"] = []
+        parsed = _recompute_per_room_via_python(parsed, parsed.get("_overrides") or {})
+        parsed = _build_pozicijos_from_rooms(parsed)
+        parsed = apply_lt_sanity(parsed)
+        parsed["warnings"] = (parsed.get("warnings") or []) + run_all_checks(parsed) + [
+            {"level": w["level"].upper(), "message": w.get("message_lt") or w.get("message", "")}
+            for w in validate_consistency(parsed)]
+        shown = build_lt_sanity(parsed)["warnings"]
+        ids = [v for r in parsed.get("patalpos") or [] for v in (r.get("nr"), r.get("pavadinimas")) if v]
+        rows = [(f"{fixture.parent.name} {t}", x) for t, x in _warning_texts(shown, "row")]
+        rows += [(f"{fixture.parent.name} ledger", e["excluded_because"])
+                 for p in parsed.get("pozicijos") or [] for e in (p.get("excluded") or [])
+                 if e.get("excluded_because")]
+        seen += len(rows)
+        _assert_plain(rows, allow=ids)
+    assert seen > 40, "the corpus produced almost no rows — did the builders stop?"
+
+
+# The builders inside the extraction run that cannot be driven alone (the
+# section-marker height row, the specification count row, the failure rows) —
+# and every module that writes one. Scanned as source: the literal fragments
+# below can only be the old wording.
+_ROW_BUILDERS = (
+    "extractor/lt_rules.py", "extractor/universal_rules.py", "extractor/vision_call.py",
+    "extractor/cross_page_validator.py", "extractor/sanity_checks.py",
+    "extractor/scale_validator.py", "extractor/plan_area_annotations.py",
+    "extractor/room_facts.py", "extractor/project_questions.py", "extractor/sanity_mirror.py",
+    "api/recompute_quantities.py", "api/revalidate.py", "main.py",
+)
+_OLD_FRAGMENTS = re.compile(r"\(nr=|Prielaidų skydel|Prielaidose|[Pp]rielaidų skyri|"
+                            r"paskirčiai '|skiltyje „Prielaidos")
+
+
+def test_no_row_builder_writes_the_old_fragments():
+    backend = Path(__file__).resolve().parents[1]
+    hits = []
+    for rel in _ROW_BUILDERS:
+        tree = ast.parse((backend / rel).read_text(encoding="utf-8"))
+        docstrings = {id(n.body[0].value) for n in ast.walk(tree)
+                      if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                      and n.body and isinstance(n.body[0], ast.Expr)
+                      and isinstance(n.body[0].value, ast.Constant)}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and id(node) not in docstrings):
+                m = _OLD_FRAGMENTS.search(node.value)
+                if m:
+                    hits.append(f"{rel}:{node.lineno} {m.group(0)!r}: {node.value[:90]!r}")
+    assert not hits, "old Patikrinimai wording in a row builder:\n" + "\n".join(hits)

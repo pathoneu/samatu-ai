@@ -60,7 +60,7 @@ def test_a_room_the_floor_plan_says_nothing_about_still_asks_but_lets_him_answer
     assert f["status"] == "assumed" and f["value"] == "parketas arba laminatas"
     assert f["source"]["page"] == 7
     assert f["sentence"] == ("Kokia čia grindų danga? Grindų plane (7 psl.) šiai patalpai dangos neradau — parinkta pagal "
-                             "patalpos paskirtį („miegamoji“). Patikrinkite grindų plane ir pasirinkite.")
+                             "patalpos paskirtį („Miegamasis“). Patikrinkite grindų plane ir pasirinkite.")
     assert f["editable"] == {"field": "grindu_danga", "kind": "choice"}
     assert "pakeiskite paskirtį" not in f["sentence"]
 
@@ -68,7 +68,7 @@ def test_a_room_the_floor_plan_says_nothing_about_still_asks_but_lets_him_answer
 def test_a_project_without_a_floor_sheet_asks_the_old_question_with_the_new_answer():
     f = _grindys({"paskirtis": "miegamoji", "pvc_grindys_m2": 14.26})
     assert f["status"] == "assumed"
-    assert f["sentence"] == ("Kokia čia grindų danga? Brėžinys nesako — parinkta pagal patalpos paskirtį („miegamoji“). "
+    assert f["sentence"] == ("Kokia čia grindų danga? Brėžinys nesako — parinkta pagal patalpos paskirtį („Miegamasis“). "
                              "Patikrinkite grindų plane ir pasirinkite.")
     assert f["editable"] == {"field": "grindu_danga", "kind": "choice"}
 

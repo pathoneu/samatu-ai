@@ -67,8 +67,8 @@ def check_paintable_wall_to_floor(rooms):
     return Warning(
         code="paintable_floor_ratio",
         message=f"Dažomas sienų plotas {_lt(ratio)}× grindų ploto",
-        hint="Tikėtina 2,5–4×. Patikrinkite lubų aukštį Prielaidose ir ar "
-             "langai bei durys atimti.",
+        hint="Tikėtina 2,5–4×. Patikrinkite lubų aukštį (keičiamas per mygtuką "
+             "„Nustatymai“) ir ar langai bei durys atimti.",
         severity="med" if 2.0 < ratio < 4.5 else "high",
         expected="2,5–4,0×",
         actual=f"{_lt(ratio)}×",
@@ -92,8 +92,8 @@ def check_ceiling_to_floor(rooms):
     return Warning(
         code="ceiling_floor_mismatch",
         message=f"Lubų plotas {_lt(ratio)}× grindų ploto",
-        hint="Plokščioms luboms tikėtina ~1,0×. Jei yra soffitai ar "
-             "pakabinamos lubos — patikrinkite jų plotus.",
+        hint="Plokščioms luboms tikėtina ~1,0×. Jei yra lubų nuleidimų ar "
+             "pakabinamų lubų — patikrinkite jų plotus lubų plane.",
         severity="low" if 0.85 < ratio < 1.15 else "med",
         # Kept parenthesis-free: the UI renders this inline as
         # "(tikėtina …)", and a nested paren reads as a typo. The soffit
@@ -208,7 +208,7 @@ def check_paint_quantity(rooms):
         message=(f"Dažų sąnaudos {_lt(rate, 3)} l/m² "
                  f"({_lt(paint_l, 1)} l / {paint_m2:.0f} m²)"),
         hint="Tikėtina ~0,22 l/m² (2 sluoksniai, 9 m²/l). Patikrinkite dažų "
-             "klasę Prielaidose — Q4 paviršius sugeria daugiau.",
+             "kiekį sąmatos skyriuje „Medžiagos“.",
         severity="low",
         expected="0,18–0,27 l/m²",
         actual=f"{_lt(rate, 3)} l/m²",
@@ -244,7 +244,7 @@ def check_gk_sheets_math(rooms, vision_result=None):
         return None
     return Warning(
         code="gk_sheets_off",
-        message=(f"GKP lapų skaičius nesutampa: pozicijoje {actual_sheets:.0f} vnt., "
+        message=(f"GKP lapų skaičius nesutampa: eilutėje {actual_sheets:.0f} vnt., "
                  f"apskaičiuota {_lt(expected_sheets, 1)} vnt. (leistina ±5 %)"),
         hint="Lapų skaičius = GKP lubų plotas / 3,0 m² (1,2 × 2,5 m lapas), "
              "suapvalinus į viršų, × 1,10 atliekoms. Patikrinkite lubų GKP "
@@ -278,9 +278,10 @@ def check_window_reveals(rooms):
         return Warning(
             code="window_reveals_zero",
             message=f"Rasta {window_count} langų, bet angokraščių ilgis 0 m",
-            hint="Langai neperkelti į angokraščių poziciją — standartiniam "
+            hint="Langai neįskaičiuoti į angokraščių eilutę — standartiniam "
                  "langui ~5–7 m (2 × aukštis + 2 × plotis). Patikrinkite langų "
-                 "matmenis Prielaidose arba įveskite angokraščius rankiniu būdu.",
+                 "matmenis per mygtuką „Nustatymai“ (Langai) arba įrašykite "
+                 "angokraščių kiekį sąmatoje.",
             severity="med",
             expected=f"~{window_count * 5.4:.0f} m",
             actual="0 m",
@@ -338,9 +339,10 @@ def run_all_checks(vision_result: dict) -> list[dict]:
                   f"{type(exc).__name__}: {exc}")
             warnings.append({
                 "code": "sanity_check_error",
-                "message": (f"Nepavyko atlikti vienos kiekių logikos patikros "
-                            f"({check_fn.__name__}) — šio patikrinimo "
-                            f"rezultato nėra."),
+                # the check's Python name stays in the log line above — it
+                # means nothing to him
+                "message": ("Nepavyko atlikti vienos kiekių logikos patikros — "
+                            "šio patikrinimo rezultato nėra."),
                 "hint": "Kiekius patikrinkite rankiniu būdu.",
                 "severity": "low",
                 "expected": "—",

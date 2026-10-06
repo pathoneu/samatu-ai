@@ -17,6 +17,8 @@ from statistics import median
 import math
 import re
 
+from .universal_rules import lt_num
+
 # 1 inch = 25.4 mm
 _MM_PER_INCH = 25.4
 # Tolerance: warn if measured diagonal differs from expected by >5%
@@ -88,10 +90,14 @@ def validate_scale(scale_factor: float, rendered_dpi: int,
         deviation = abs(actual - expected) / expected
         if deviation > _TOLERANCE_PCT:
             ratio = actual / expected
+            # LT, decimal comma, the room in „…" — this string lands in the
+            # Patikrinimai list as it is (2026-10-06).
+            name = room.get("name") or room.get("pavadinimas") or "?"
             warnings.append(
-                f"Mastelis (scale) nesutampa patalpoje '{room.get('name', '?')}': "
-                f"matavimas rodo ~{ratio:.2f}× nuo deklaruoto {int(scale_factor)} "
-                f"(nukrypimas {deviation*100:.1f}%). Patikrink M 1:{int(scale_factor)}."
+                f"Mastelis nesutampa patalpoje „{name}“: išmatuota ~"
+                f"{lt_num(ratio, 2)}× nuo nurodyto M 1:{int(scale_factor)} (nukrypimas "
+                f"{lt_num(deviation * 100, 1)} %). Patikrinkite, ar brėžinio mastelis "
+                f"tikrai M 1:{int(scale_factor)}."
             )
     return warnings
 

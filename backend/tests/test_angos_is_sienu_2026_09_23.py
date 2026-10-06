@@ -128,7 +128,11 @@ def test_the_question_names_the_room_whose_door_the_walls_do_not_back():
     out = build_questions({"patalpos": [hall], "_overrides": {"vidaus_durys_beapvadines": False}})
     q = next(x for x in out["questions"] if x["kind"] == "angos")
     assert q["items"] == [] and q["manual"][0]["room_nr"] == "01"
-    assert "angos sienose nematau" in q["manual"][0]["sentence"]
+    # 2026-10-06: what does not match comes first, in two short sentences; the room sheet's full account
+    # stays beside it for a second look
+    assert q["manual"][0]["sentence"] == ("Sąraše 2 durys, o sienose — tik 1 anga durims: 1 durų sienose neradau. "
+                                          "Atidarykite patalpą ir patikrinkite durų skaičių.")
+    assert "angos sienose nematau" in q["manual"][0]["details"]
 
 
 def test_a_room_with_no_door_counted_gets_one_from_its_walls_and_a_wide_door_into_a_bathroom_counts():

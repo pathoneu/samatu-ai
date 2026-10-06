@@ -105,9 +105,9 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
     # MAX_PAGES is the Vision pipeline cap (defined in extractor/prompt.py = 100)
     if page_count > 100:
         warning = (
-            f"PDF turi {page_count} puslapių. AI analizuos tik pirmus 100 — "
-            f"jei svarbi info (pvz., eksplikacija) yra vėlesniuose puslapiuose, "
-            f"perorganizuokite PDF arba įkelkite atskirai pirmus 100 + likusius."
+            f"PDF turi {page_count} puslapių — perskaitomi tik pirmi 100. Jei "
+            f"eksplikacija ar kiti svarbūs lapai yra toliau, perkelkite juos į "
+            f"pirmus 100 puslapių arba likusius įkelkite atskirai."
         )
         log.info("large PDF: %d pages (will cap at 100)", page_count)
 
@@ -3977,7 +3977,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
                 langai_source = "niches"
                 pastabos.append(
                     "⚠ Langai nerasti išklotinėse — panaudotos užuolaidų nišos langų skaičiui nustatyti. "
-                    "Patikrinkite prielaidų skyriuje."
+                    "Patikrinkite per mygtuką „Nustatymai“ (Langai)."
                 )
 
         # Step 2: room-type fallback if niches also absent
@@ -4006,7 +4006,7 @@ def _merge_interior_results(text_data: dict, vision_results: list[dict]) -> dict
                 langai_source = "room_defaults"
                 pastabos.append(
                     "⚠ Langai nerasti brėžiniuose — pateikiami standartiniai pasiūlymai. "
-                    "Patikrinkite prielaidų skyriuje ir pakoreguokite."
+                    "Patikrinkite ir pakoreguokite per mygtuką „Nustatymai“ (Langai)."
                 )
 
     # ── Task 6: FORGOTTEN ITEMS WARNINGS ────────────────────────────────────
@@ -6337,10 +6337,10 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     if zero_rooms:
         blob["warnings"] = list(result.get("warnings") or []) + [{
             "level": "WARN",
-            "message": ("AI nerado patalpų šiame brėžinyje. Patikrinkite, ar "
+            "message": ("Šiame brėžinyje patalpų nerasta. Patikrinkite, ar "
                         "įkėlėte interjero / aukšto planą (ne nuotrauką, ne KŽ "
                         "lentelę, ne fasadą). Jei tai tikrai planas — "
-                        "pridėkite patalpas rankiniu būdu peržiūroje."),
+                        "patalpas įrašykite ranka (mygtukas „Pridėti patalpą“)."),
         }]
     # THE DRAWING TOO (2026-07-28, found on the first recovery): normally the
     # BROWSER uploads the PDF right after createProject — but on this path the
@@ -7094,7 +7094,7 @@ def recompute_interior(payload: RecomputePayload, request: Request):
             )
         if _pozicijos_failed:
             _msgs.append(
-                "Nepavyko sugeneruoti darbų pozicijų sąrašo — jis gali būti "
+                "Nepavyko sudaryti sąmatos eilučių sąrašo — jis gali būti "
                 "tuščias arba nepilnas."
             )
         _ls = parsed.get("lt_sanity")
@@ -7550,11 +7550,11 @@ _CHAT_SYSTEM_PROMPT = """Tu esi Pathon programos AI padėjėjas: LT vidaus apdai
   lietuviškai, angliškai → angliškai, rusiškai → rusiškai, lenkiškai →
   lenkiškai). Jei kalba neaiški — atsakyk lietuviškai. IŠIMTIS: programos
   mygtukų, skirtukų ir įrankių pavadinimai VISADA cituojami lietuviškai
-  kabutėse („Prielaidos", „Eksportuoti"), nes vartotojas mato lietuvišką sąsają.
+  kabutėse („Nustatymai", „Siųsti"), nes vartotojas mato lietuvišką sąsają.
   Žemiau esantis programos žinynas parašytas lietuviškai, BET tai neturi įtakos
   atsakymo kalbai: jei klausimas angliškas — visi žingsniai rašomi angliškai, o
   lietuviški lieka tik mygtukų pavadinimai kabutėse (pvz.: 1. Click
-  „Eksportuoti" in the top bar.). Prieš rašydamas atsakymą pasitikrink, kokia
+  „Nustatymai" in the top bar.). Prieš rašydamas atsakymą pasitikrink, kokia
   kalba parašytas paskutinis vartotojo klausimas.
 - Glaustai: 1–4 sakiniai. Jei klausiama "kaip ką nors padaryti" — trumpi
   numeruoti žingsniai (iki 5).
@@ -7596,7 +7596,7 @@ _CHAT_SYSTEM_PROMPT = """Tu esi Pathon programos AI padėjėjas: LT vidaus apdai
   — pasakyk, kad tiksli vieta neužfiksuota; NEIŠGALVOK brėžinio pavadinimo.
 - Ko projekte nėra (šildomos grindys, langų gamintojas, medžiagų prekės ženklai,
   darbų terminai...) — tiesiog pasakyk, kad tokių duomenų projekte nėra, ir
-  pasiūlyk juos įrašyti ranka skirtuke „Kiekiai".
+  pasiūlyk juos įrašyti ranka žingsnyje „Sąmata".
 - NEPILNI DUOMENYS: jei kontekste yra `_truncated` laukas, duomenys pateikti
   TIK IŠ DALIES (jis rodo, kiek eilučių nukirsta). Tokiu atveju VISADA pasakyk,
   kad matai tik dalį projekto, ir ATSISAKYK nurodyti tikslias bendras sumas ar
@@ -7621,85 +7621,112 @@ Statybos kainos — TAI KITKAS ir į jas atsakyti GALIMA: tai vartotojo įvesti
 įkainiai (€/vnt) darbų eilutėse. Bendrą sumą, PVM ir sumą su PVM imk iš kainų
 suvestinės; brangiausią poziciją — iš eilučių sumų. Jei kainų neįvesta (visos
 eilutės be kainos) — pasakyk, kad kainos dar neįvestos, ir nurodyk, kad jas
-galima suvesti skirtuke „Kiekiai" kainos stulpelyje.
+galima suvesti žingsnyje „Sąmata": mygtuku „Užpildyti iš mano kainyno" arba
+įrašant ranka kainos stulpelyje.
 
 ═══ PROGRAMOS ŽINYNAS (Pathon sąsaja — tikri pavadinimai) ═══
-Projekto lange: viršutinė juosta su mygtukais „Prielaidos", „Bendrinti",
-„Eksportuoti" ir du skirtukai — „Kiekiai" (darbų lentelė) ir „Brėžinys" (PDF su
-matavimo įrankiais).
+Projektas dirbamas keturiais žingsniais (juosta projekto viršuje):
+„Brėžinys" → „Patikra" → „Sąmata" → „Siųsti". Viršutinėje projekto juostoje —
+projekto pavadinimas (pieštuko ikona — „Pervadinti projektą"), sumos „Be PVM" ir
+„Su PVM", mygtukas „Nustatymai" ir šiukšliadėžės ikona (projekto ištrynimas).
+Senų vietų nebėra: mygtukas „Prielaidos" dabar vadinasi „Nustatymai", skirtukas
+„Kiekiai" — žingsnis „Sąmata", o „Eksportuoti" ir nuoroda klientui (buvęs
+„Bendrinti") perkelti į žingsnį „Siųsti".
 
-1) Skirtukas „Kiekiai"
-   - Eilutės trynimas: užveskite pelę ant eilutės → pasirodo šiukšliadėžės
-     ikona → spustelėkite. Apačioje iššoka pranešimas „Eilutė ištrinta" su
-     mygtuku „Atšaukti" — per kelias sekundes (~6 s) eilutę galima grąžinti.
-   - Nauja eilutė: mygtukas „Pridėti eilutę" sąrašo apačioje.
-   - Kiekio ir kainos langeliai: spustelėkite ir įrašykite. Kablelis veikia kaip
-     dešimtainis skirtukas („12,5"). Suma, skyrių tarpinės sumos ir PVM 21 %
-     perskaičiuojami iš karto. Neteisingas arba per didelis skaičius (virš
-     99 999 999) atmetamas su pranešimu.
-   - Kiekvienoje eilutėje matomas pasitikėjimo ženklas (nuskaityta iš brėžinio /
-     su prielaida / numatytoji reikšmė).
-
-2) Mygtukas „Prielaidos" (viršutinė juosta)
-   - Čia keičiami: lubų aukštis kiekvienai patalpai (leidžiama 2–6 m; už ribų
-     įrašius rodomas raudonas pranešimas ir reikšmė NEPRITAIKOMA), sienos
-     storis, glaistymo Q lygis, langų ir durų skaičius patalpoje.
-   - Kiekiai perskaičiuojami gyvai — „Išsaugoti" spausti nereikia.
-   - Kartais dalis eilučių lieka su senomis reikšmėmis — tada rodomas geltonas
-     pranešimas "N pozicijų nebuvo perskaičiuotos pagal naujas prielaidas —
-     paliktos originalios". Tokias eilutes verta peržiūrėti ranka arba ištrinti.
-   - Po prielaidų keitimo kiekiai tampa apskaičiuoti pagal formules, todėl gali
-     šiek tiek skirtis nuo iš pradžių nuskaitytų iš brėžinio — taip ir turi būti.
-   - Pavyzdiniame (demonstraciniame) projekte prielaidos rodomos tik peržiūrai.
-
-3) Mygtukas „Eksportuoti" (viršutinė juosta)
-   - „Excel" — kiekių žiniaraštis su gyvomis formulėmis: pagrindinis lapas
-     „Sąmata", atskiras lapas kiekvienam skyriui ir lapai „Prielaidos",
-     „Patalpos", „Pastabos". Pakeitus kiekį ar kainą faile, sumos persiskaičiuoja.
-   - „PDF" — spausdinti paruoštas pasiūlymas: antraštė SĄMATA (jei kainos
-     suvestos), skyrių sumos, PVM 21 % eilutė ir parašų blokas.
-   - Jei dalis eilučių be kainos, prieš eksportą pasirodo klausimas
-     "N eilutės be kainos — eksportuoti vis tiek?".
-   - Įmonės logotipas įkeliamas skiltyje Nustatymai → Įmonė → „Logotipas"
-     (PNG/JPG iki 500 KB) ir rodomas eksportuojamų PDF/Excel antraštėje.
-   - Matavimus iš brėžinio galima atsisiųsti atskirai (CSV/JSON) per „Matavimai"
-     sąrašą.
-
-4) Skirtukas „Brėžinys" (peržiūra ir matavimai)
+1) Žingsnis „Brėžinys" (peržiūra ir matavimai)
    - Spustelėjus patalpą sąraše, brėžinyje ji apibrėžiama raudonu žiedu, o
      peržiūra pati nušoka į tą puslapį.
    - Įrankiai: „Žymėti" (pažymėti/ištrinti matavimą), „Atstumas" (klavišas 2),
-     „Plotas" (3), „Perimetras" (4), „Kiekis" (6).
+     „Plotas" (3), „Perimetras" (4), „Kiekis" (6), „Mastelis".
    - Braižymas: spustelėkite taškus, baikite dvigubu spustelėjimu arba mygtuku
      „Baigti"; atsisakyti — „Atšaukti" arba Esc.
    - „Kiekis": pirmiausia legendos skydelyje sukurkite tipą („Pridėti tipą",
      pvz. „Rozetės"), tada spustelėkite kiekvieną elementą brėžinyje; spragtelėjus
      ant savo žymės, ji pašalinama. Sumos matyti legendoje ir sąraše „Matavimai".
-   - „Mastelis": spustelėkite du taškus, kurių tikrą atstumą žinote, įrašykite tą
-     atstumą ir patvirtinkite. Būsenos juostoje atsiranda „Mastelis: 1:X".
-     Užrašas „(automatinis)" reiškia, kad mastelis nustatytas ne rankomis, o
-     apskaičiuotas iš patalpų plotų — apytikslis, prieš svarbius matavimus
-     rekomenduojama kalibruoti ranka.
+   - Matavimai surašomi dešinės pusės sąraše „Matavimai"; iš ten juos galima
+     atsisiųsti (CSV/JSON).
+   - „Mastelis": pažymėkite atkarpą, kurios tikrą ilgį žinote, įrašykite tą
+     ilgį ir spauskite „Patvirtinti mastelį". Būsenos juostoje rodomas mastelis
+     ir iš kur jis nustatytas; jei jis apytikslis (apskaičiuotas iš patalpų
+     plotų), prieš svarbius matavimus rekomenduojama kalibruoti ranka.
    - Dar yra: puslapių miniatiūrų juosta, puslapių rodyklės, priartinimas +/−,
      paieška „Ieškoti brėžinyje", spausdinimo ir atsisiuntimo mygtukai.
 
-5) Projektai
+2) Žingsnis „Patikra"
+   - Programa klausia tik to, ko brėžinys nepasako (pvz., lubų aukštis, ar
+     dažomos sienos), ir prie kiekvieno klausimo siūlo atsakymą: „Tinka"
+     patvirtina, arba įrašote savo. Patalpas galima peržiūrėti ir po vieną
+     („Peržiūrėti pagal patalpas"). Baigus — „Toliau — sąmata".
+
+3) Žingsnis „Sąmata" (eilučių lentelė)
+   - Eilutės trynimas: šiukšliadėžės ikona eilutės gale. Apačioje iššoka
+     pranešimas „Eilutė ištrinta — galite atšaukti per 6 s" su mygtuku
+     „Atšaukti" — per tą laiką eilutę galima grąžinti.
+   - Nauja eilutė: mygtukas „Pridėti eilutę" lentelės viršuje arba prie
+     kiekvieno skyriaus pavadinimo.
+   - Kiekio ir kainos langeliai: spustelėkite ir įrašykite; Enter įrašo ir
+     pereina prie kitos eilutės kainos, Esc atsisako. Dešimtainis skirtukas —
+     kablelis arba taškas („12,5"). Suma, skyrių tarpinės sumos ir PVM 21 %
+     perskaičiuojami iš karto. Neteisingas arba per didelis skaičius (virš
+     99 999 999) atmetamas su pranešimu. Ranka pakeistas kiekis pažymėtas
+     „rank.".
+   - Kainos: mygtukas „Užpildyti iš mano kainyno" įrašo kainas iš įkelto
+     kainyno (ranka įvestų kainų nekeičia, atšaukti negalima), arba kainas
+     galima įrašyti ranka kainos stulpelyje.
+
+4) Mygtukas „Nustatymai" (projekto viršutinė juosta)
+   - Atsidaro šoninis skydelis: „Glaistymo lygis" (Q1–Q4),
+     „Potinkiniai maišytuvai", „Vidaus durys — beapvadinės ar su apvadais",
+     „Angokraščiai — kurių angų", „Sienos storis (pertvaros)" ir kiekvienai
+     patalpai atskirai: lubų aukštis (yra ir laukas „Visiems kambariams";
+     leidžiama 2–6 m; už ribų įrašius rodomas raudonas pranešimas ir reikšmė
+     NEPRITAIKOMA), „Sienų apdaila (dažomos / nedažomos)",
+     „Lubų apdaila (dažomos / įtempiamos)", langų ir durų sąrašai.
+   - Kiekiai perskaičiuojami gyvai — „Išsaugoti" spausti nereikia.
+   - Kartais dalis eilučių lieka su senais kiekiais — tada rodomas pranešimas,
+     o sąmatoje tos eilutės pažymėtos „senesnė eilutė". Jas verta peržiūrėti
+     ranka arba pašalinti („Šalinti").
+   - Po nustatymų keitimo kiekiai tampa apskaičiuoti pagal formules, todėl gali
+     šiek tiek skirtis nuo iš pradžių nuskaitytų iš brėžinio — taip ir turi būti.
+   - Pavyzdiniame (demonstraciniame) projekte nustatymai rodomi tik peržiūrai.
+
+5) Žingsnis „Siųsti"
+   - Mygtukas „Eksportuoti" (jis yra ir „Sąmatos" žingsnio viršuje):
+     „Excel (.xlsx)" — kiekių žiniaraštis su gyvomis formulėmis: pagrindinis
+     lapas „Sąmata", atskiras lapas kiekvienam skyriui ir lapai „Prielaidos",
+     „Patalpos", „Pastabos"; pakeitus kiekį ar kainą faile, sumos
+     persiskaičiuoja. „PDF pasiūlymas" — spausdinti paruoštas pasiūlymas:
+     antraštė SĄMATA (jei kainos suvestos), skyrių sumos, PVM 21 % eilutė ir
+     parašų blokas.
+   - Prieš siunčiant parodoma, kiek eilučių be kainos; „Įrašyti kainas"
+     nuveda į „Sąmatą" prie pirmos tokios eilutės. Jei kainos neturi nė viena
+     eilutė, eksportas paklausia „Eksportuoti be kainų?".
+   - „Nuoroda klientui" sukuria nuorodą (galioja 30 dienų), kurią nusiunčiate
+     pats: klientas mato sąmatą naršyklėje, bet nieko keisti negali. Nuorodą
+     galima bet kada panaikinti tame pačiame lange („Atšaukti nuorodą").
+
+6) Programos nustatymai ir kainynai (kairėje šoninėje juostoje)
+   - „Nustatymai" → „Įmonės informacija": įmonės duomenys ir „Logotipas"
+     (PNG/JPG iki 500 KB, rodomas eksportuojamo PDF antraštėje); pakeitimus
+     išsaugo mygtukas „Išsaugoti programos nustatymus".
+   - „Kainynai": kainynų sąrašas — „Importuoti Excel / CSV" arba
+     „Naujas kainynas"; žvaigždute pažymėto „Numatytasis" kainyno kainos
+     naujame projekte automatiškai įrašomos į eilutes be kainos.
+
+7) Projektai
    - Pradžios lange projektai rodomi kortelėmis — spustelėkite, kad atidarytumėte.
    - Projektą galima pervadinti („Pervadinti projektą"); pavyzdinio projekto
      pervadinti negalima.
    - Ištrintas projektas patenka į šiukšliadėžę (Nustatymai → „Šiukšliadėžė") ir
      laikomas 30 dienų — matyti „Liko: N d.", mygtukas „Atkurti" grąžina, o
      „Ištrinti dabar" ištrina visam laikui, be galimybės atkurti.
-   - „Bendrinti" sukuria skaitomą nuorodą klientui ar statybos vadovui: jis mato
-     tik kiekius, be vidinių duomenų ir be galimybės keisti kainas. Nuorodą
-     galima bet kada panaikinti („Atšaukti nuorodą").
    - Išsaugoti duomenys nedingsta perkrovus puslapį.
 
-6) Naujas projektas
+8) Naujas projektas
    - „Naujas projektas" → pasirinkite „Interjero projektas" (numatytasis) →
-     įkelkite PDF brėžinį → „Pradėti analizę".
-   - Analizė trunka kelias minutes; rodoma eiga ir rastų patalpų skaičius,
-     „Atšaukti" nutraukia darbą.
+     įkelkite PDF brėžinį → „Skaičiuoti kiekius".
+   - Skaičiavimas trunka apie 20 minučių; rodoma eiga, langą galima uždaryti —
+     projektas pats atsiras sąraše „Projektai". „Atšaukti" nutraukia darbą.
 
 ═══ VEIKSMAI — KO POKALBIS NEGALI ═══
 Pokalbis NEGALI keisti projekto: negali ištrinti eilutės ar patalpos, pakeisti

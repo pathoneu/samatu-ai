@@ -197,13 +197,21 @@ def _walls_paint_choice(per_room_paint, nr: str) -> float | None:
 
 
 def _with_paint_choice(calc_in: dict, rt: dict, wp: float) -> dict:
-    """The calculator input with his paint choice applied (`rt` is the room's rules, set in place).
+    """The calculator input with his paint choice applied (`rt` is the room's rules, set in place for
+    „Dažomos" only).
     „Nedažomos" travels as the per-room factor override, the one input EVERY wall branch honours first:
     `walls_paint` alone was overruled by a finishes read, the bathroom paint-above-tile default and the
     elevation read (audit calc-engine-3, 2026-09-29) — and the room now says why it has no paint
-    (`_walls_unpainted_reason = "override"`)."""
+    (`_walls_unpainted_reason = "override"`). The room's rule is left as it was: the unfinished-ceiling
+    gate (universal_rules.calc_room_quantities) reads it as the room-type standard, so a raw garage keeps
+    its bare ceiling when he confirms its walls are not painted, and a living room under a read concrete
+    slab keeps its painted ceiling when he says its walls are not (2026-10-06).
+    „Dažomos" sets the rule to painted: every branch without a stronger read paints the walls, and the
+    room counts as finished — its ceiling with it."""
+    if wp <= 0:
+        return {**calc_in, "walls_paint_factor_override": 0.0}
     rt["walls_paint"] = wp
-    return {**calc_in, "walls_paint_factor_override": 0.0} if wp <= 0 else calc_in
+    return calc_in
 
 
 # What a room keeps when the calculator's result is merged into it — ONE list for both paths:
@@ -1319,10 +1327,11 @@ def recompute(
             "pozicijos": len(pozicijos),
             "recovered": recovered,
             "message": (
-                f"Kiekių lentelė nesutapo su pozicijomis ({len(darbu_sarasas)} / "
-                f"{len(pozicijos)}). Kainos perkeltos pagal pavadinimą "
-                f"({recovered} eil.); patikrinkite "
-                + (f"{_lost} eilučių kainas." if _lost else "sumas.")
+                f"Kiekių lentelė nesutapo su perskaičiuotomis eilutėmis "
+                f"({len(darbu_sarasas)} / {len(pozicijos)}). Kainos perkeltos pagal "
+                f"pavadinimą ({recovered} eil.); "
+                + (f"patikrinkite kainas sąmatoje (be kainos liko eilučių: {_lost})."
+                   if _lost else "patikrinkite sumas sąmatoje.")
             ),
         })
 
@@ -1332,10 +1341,11 @@ def recompute(
     carried = [n for n in merge_notes if n.get("reason") == "orphan_carried"]
     lt_warnings: list[dict] = []
     if carried:
-        msg = (f"{len(carried)} pozicijų nebuvo perskaičiuotos pagal naujas "
-               f"prielaidas — paliktos originalios: "
+        msg = (f"Šios eilutės nebuvo perskaičiuotos pagal naujus nustatymus ir "
+               f"paliktos su senais kiekiais ({len(carried)}): "
                + ", ".join(str(n.get("aprasymas") or "—") for n in carried[:8])
-               + ("…" if len(carried) > 8 else ""))
+               + ("…" if len(carried) > 8 else "")
+               + ". Patikrinkite jas sąmatoje arba pašalinkite.")
         degradations.append({
             "field": "pozicijos",
             "reason": "orphans_carried",

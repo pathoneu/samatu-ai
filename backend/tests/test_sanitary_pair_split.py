@@ -149,10 +149,13 @@ def test_guessed_concealment_is_disclosed_as_an_assumption():
     notes = out["_sanitary_assumptions"]
     assert notes, "a guessed concealment must be disclosed"
     # one note per assumption, naming every fixture it covers — singular
-    # „priimtas POTINKINIU" for one family, plural „priimti POTINKINIAIS" for more
-    assert any("POTINKINI" in n for n in notes), notes
+    # „priimtas potinkiniu" for one family, plural „priimti potinkiniais" for more
+    assert any("potinkini" in n for n in notes), notes
     assert len(notes) == 1, notes
-    assert any("santechnika_potinkinis" in n for n in notes), notes
+    # it names the control by what his screen shows — never the setting's key
+    # (2026-10-06: it said „pakeiskite prielaidą „santechnika_potinkinis“")
+    assert any("„Nustatymai“" in n and "Potinkiniai maišytuvai" in n for n in notes), notes
+    assert not any("santechnika_potinkinis" in n for n in notes), notes
     # …and it reaches the UI channel, tagged so a rebuild can retract it.
     tagged = [w for w in out.get("warnings") or []
               if w.get("field") == _SAN_ASSUMPTION_FIELD]

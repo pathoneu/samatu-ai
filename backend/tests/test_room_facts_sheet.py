@@ -286,7 +286,8 @@ def test_a_default_is_asked_not_stated():
     assert g["status"] == "assumed" and g["sentence"].startswith("Kokia čia grindų danga?")
     # the answer is a direct choice of covering since 2026-09-20 — changing the
     # room's purpose moved its walls too (tests/test_room_facts_grindys.py)
-    assert "miegamoji" in g["sentence"] and "pasirinkite" in g["sentence"]
+    # the purpose by the label he picks it by, not the code (2026-10-06)
+    assert "„Miegamasis“" in g["sentence"] and "pasirinkite" in g["sentence"]
     assert g["editable"] == {"field": "grindu_danga", "kind": "choice"}
     read = {"patalpos": [{"nr": "1", "puslapio_nr": 2, "lubu_aukstis_m": 3.1,
                           "lubu_aukstis_saltinis": "section_pjuvis", "tile_floor_override": True,

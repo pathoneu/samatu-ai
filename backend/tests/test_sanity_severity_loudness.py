@@ -211,6 +211,6 @@ def test_the_full_extract_shape_reaches_the_banner_loud():
     row = next(w for w in mirror["warnings"]
                if w["code"] == "paintable_floor_ratio")
     assert row["severity"] == "high"
-    assert "Prielaidose" in row["hint"]        # the actionable jump target
+    assert "„Nustatymai“" in row["hint"]       # the button he presses
     assert row["actual"] == "5,00×"            # LT decimal comma
     assert mirror["summary"]["high"] == 1

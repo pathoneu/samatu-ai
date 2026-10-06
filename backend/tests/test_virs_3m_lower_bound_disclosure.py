@@ -161,6 +161,11 @@ def _sanity(rooms: list[dict]) -> list[dict]:
     return apply_lt_sanity(parsed)["_lt_warnings"]
 
 
+# The words that say the above-3m tier is a lower bound. It used to shout
+# „APATINĖ RIBA"; since 2026-10-06 it says it the way he would.
+LOWER_BOUND = "virš 3 m kiekis gali būti didesnis"
+
+
 def _has(warnings: list[dict], level: str, needle: str) -> bool:
     return any(w["level"] == level and needle in w["message"] for w in warnings)
 
@@ -177,8 +182,8 @@ def test_project_warns_that_virs_3m_is_a_lower_bound():
     the virš-3m tier must be declared a lower bound, and the ≤3 m rooms that
     need checking must be named."""
     warnings = _sanity([OBJEKTAS_A_102, _without_extras(ROOM_110_GT)])
-    assert _has(warnings, "WARN", "APATINĖ RIBA")
-    lb = [w for w in warnings if "APATINĖ RIBA" in w["message"]][0]
+    assert _has(warnings, "WARN", LOWER_BOUND)
+    lb = [w for w in warnings if LOWER_BOUND in w["message"]][0]
     assert lb["patalpa_nr"] is None            # project-level, not room-level
     assert "102" in lb["message"]              # the room that defines the tier
     assert "110" in lb["message"]              # the room to go check
@@ -188,13 +193,13 @@ def test_warning_is_suppressed_once_a_partial_zone_is_known():
     """With the zone supplied (truth file or a human correction), the engine is
     no longer guessing — the lower-bound warning must not nag."""
     warnings = _sanity([OBJEKTAS_A_102, ROOM_110_GT])
-    assert not _has(warnings, "WARN", "APATINĖ RIBA")
+    assert not _has(warnings, "WARN", LOWER_BOUND)
 
 
 def test_no_warning_when_the_project_has_no_high_tier():
     """A flat 2.8 m project bills nothing above 3 m — no warning to give."""
     warnings = _sanity([_without_extras(ROOM_110_GT)])
-    assert not _has(warnings, "WARN", "APATINĖ RIBA")
+    assert not _has(warnings, "WARN", LOWER_BOUND)
 
 
 def test_off_perimeter_partitions_are_disclosed():

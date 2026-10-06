@@ -83,15 +83,9 @@ def _revalidate_payload(payload: dict) -> dict:
         w for w in (parsed.get("warnings") or [])
         if w.get("source") not in ("cross_page_validator", "revalidate")
     ]
-    for w in cross_warnings:
-        existing.append({
-            "level": (w.get("level") or "WARN").upper(),
-            "field": w.get("field", ""),
-            "patalpa_nr": w.get("patalpa_nr"),
-            "message": w.get("message_lt") or w.get("message", ""),
-            "suggestion": w.get("suggestion"),
-            "source": "cross_page_validator",
-        })
+    # the converter the extraction run uses too (2026-10-06: two copies had drifted)
+    from extractor.cross_page_validator import as_pipeline_warnings
+    existing.extend(as_pipeline_warnings(cross_warnings))
     parsed["warnings"] = existing
 
     # 2. apply_lt_sanity (STR rules, mansardinis svoris, area/perimeter sanity).

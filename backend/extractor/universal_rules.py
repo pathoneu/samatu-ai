@@ -369,6 +369,75 @@ ROOM_TYPE_RULES = {
 }
 
 
+# ── Words the contractor reads (2026-10-06) ──────────────────────────────────
+# The notes this module writes (`_wall_finish_assumptions`,
+# `_ceiling_finish_assumptions`) and the warnings lt_rules / sanity_checks /
+# cross_page_validator build reach the Sąmata step's „Patikrinimai" list word
+# for word. A founder walkthrough found them reading like a debug log —
+# „paskirčiai 'tamburas'", „0.60 m", „pažymėkite Prielaidų skydelyje" (that
+# button has said „Nustatymai" for weeks). These two helpers keep a purpose
+# code and a decimal number in his words.
+
+# Room purpose code → the label the app shows for it. Mirrors the frontend:
+# lt.json `project.roomSheet.paskirtis_*` (the select on the room sheet where he
+# changes a purpose) and, for the classes that select does not offer,
+# `project.roomCard.paskirtis.*`. test_confidence_reasons_are_for_the_user pins
+# the two sides together.
+PASKIRTIS_LT: dict[str, str] = {
+    "gyvenamoji": "Gyvenamoji",
+    "miegamoji": "Miegamasis",
+    "valgomasis": "Valgomasis",
+    "virtuve": "Virtuvė",
+    "vonia": "Vonia",
+    "wc": "WC",
+    "san": "San. mazgas",
+    "koridorius": "Koridorius",
+    "holas": "Holas",
+    "rubine": "Rūbinė",
+    "drabuzine": "Drabužinė",
+    "katiline": "Katilinė",
+    "skalbykla": "Skalbykla",
+    "tamburas": "Tambūras",
+    "tambūras": "Tambūras",
+    "garazas": "Garažas",
+    "sandeliukas": "Sandėliukas",
+    "sandėliukas": "Sandėliukas",
+    "laiptine": "Laiptinė",
+    "laiptinė": "Laiptinė",
+    "kabinetas": "Kabinetas / darbo kambarys",
+    "techpatalpa": "Techninė patalpa",
+    "terasa": "Terasa / balkonas",
+    "pirtis": "Pirtis / sauna",
+    "baseinas": "Baseinas",
+}
+
+
+def paskirtis_label(paskirtis: str | None) -> str | None:
+    """`"tamburas"` → `"Tambūras"`. None when the purpose is empty or has no
+    label — the caller then leaves the purpose out instead of printing a code."""
+    raw = (paskirtis or "").strip()
+    if not raw:
+        return None
+    return PASKIRTIS_LT.get(raw.lower()) or PASKIRTIS_LT.get(normalize_paskirtis(raw))
+
+
+def _purpose_phrase(paskirtis: str | None) -> str:
+    """„paskirčiai „Garažas““ in a finish note, or plain words without a label."""
+    label = paskirtis_label(paskirtis)
+    return f"paskirčiai „{label}“" if label else "šios paskirties patalpose"
+
+
+def lt_num(v: float | int | None, digits: int = 2) -> str:
+    """`165.61` → `165,61` — LT decimal comma, for strings the user reads.
+
+    Moved here from room_facts (which re-exports it) so the rule engine and the
+    validators that import it can use the same formatter without an import
+    cycle."""
+    if v is None:
+        return "—"
+    return f"{float(v):.{digits}f}".replace(".", ",")
+
+
 def default_paint_prefs() -> dict:
     """The canonical DEFAULT Setup-Wizard answers for every preference that
     changes a paint / tile quantity — derived from ROOM_TYPE_RULES so the two
@@ -1651,7 +1720,7 @@ def reconcile_doors_with_schedule(rooms: list[dict], schedule: dict | None) -> d
 def _frameless_sentence(source: str, schedule: dict | None, value: bool = False) -> str:
     said = str((schedule or {}).get("sakinys") or "").strip()
     if source == "jusu":
-        return "Jūsų pasirinkimas Prielaidose."
+        return "Jūsų pasirinkimas — pakeisti galima per mygtuką „Nustatymai“."
     if source in ("ziniarastis", "ziniarastis_misrus"):
         return said
     if source == "ziniarastis_neaiskus":
@@ -2165,8 +2234,9 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         # nothing, so it keeps falling through.
         out["source"] = "elevation"
         out["assumption"] = (
-            "Išklotinėse šios patalpos sienose plytelių zonų nepažymėta – "
-            "plytelės sienose neskaičiuojamos. Pakeiskite Prielaidų skydelyje.")
+            "Išklotinėse šios patalpos sienose plytelių nepažymėta, todėl sienų "
+            "plytelės neskaičiuojamos. Jei sienos klijuojamos plytelėmis, "
+            "pridėkite jas sąmatoje.")
         return out
 
     if apdailos:
@@ -2194,9 +2264,10 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         out["height_m"] = bathroom_default_h
         out["missing"] = True
         out["assumption"] = (
-            f"Plytelių aukštis nenuskaitytas – priimta standartinė "
-            f"{bathroom_default_h:.2f} m juosta, sienos virš jos dažomos. "
-            f"Pakeiskite Prielaidų skydelyje.")
+            f"Plytelių aukštis brėžinyje nerastas — skaičiuota standartinė "
+            f"{lt_num(bathroom_default_h)} m aukščio plytelių juosta, sienos virš "
+            f"jos dažomos. Patikrinkite išklotinėse; jei aukštis kitas, "
+            f"pataisykite plytelių ir dažymo kiekius sąmatoje.")
         return out
 
     if default_tile_h > 0:
@@ -2211,8 +2282,10 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         if paskirtis == "virtuve" and default_tile_h <= 1.0 and counter > 0 and perimeter_m > 0:
             out["share"] = max(0.0, min(1.0, counter / perimeter_m))
             out["assumption"] = (
-                f"Virtuvės plytelių juosta {default_tile_h:.2f} m aukščio palei {counter:.1f} m stalviršio — "
-                f"prielaida (brėžinys stalviršio ilgio neduoda). Pakeiskite Prielaidų skydelyje.")
+                f"Atatvaro plytelių juosta skaičiuota {lt_num(default_tile_h)} m aukščio palei "
+                f"{lt_num(counter, 1)} m ilgio stalviršį — brėžinyje stalviršio ilgio nėra, todėl tai "
+                f"prielaida. Patikrinkite baldų plane; jei stalviršis kitokio ilgio, pataisykite "
+                f"virtuvės atatvaro plytelių kiekį sąmatoje.")
             return out
         # NOTE the default band (0.6–2.4 m) is deliberately BELOW a typical
         # ceiling, so `is_full_tile` stays False: without evidence we do not
@@ -2222,11 +2295,13 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         # already edits directly in the Prielaidos panel; warning about every
         # kitchen would bury the signal.
         if is_wet:
+            label = paskirtis_label(paskirtis)
             out["assumption"] = (
-                f"Plytelių zona nenuskaityta iš projekto – priimta standartinė "
-                f"{default_tile_h:.2f} m juosta pagal patalpos paskirtį "
-                f"('{paskirtis}'), sienos virš juostos skaičiuojamos kaip "
-                f"dažomos. Patikrinkite Prielaidų skydelyje.")
+                f"Plytelių aukštis brėžinyje nerastas — skaičiuota standartinė "
+                f"{lt_num(default_tile_h)} m aukščio plytelių juosta pagal patalpos "
+                f"paskirtį{f' („{label}“)' if label else ''}, sienos virš jos dažomos. "
+                f"Patikrinkite išklotinėse; jei aukštis kitas, pataisykite plytelių "
+                f"ir dažymo kiekius sąmatoje.")
         return out
 
     if is_wet:
@@ -2234,9 +2309,10 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
         # loud assumption, not a silent "paint every wall".
         out["missing"] = True
         out["assumption"] = (
-            "Drėgnos patalpos plytelių zona nenuskaityta – plytelės "
+            "Drėgnos patalpos sienų plytelių brėžinyje nerasta — plytelės "
             "neskaičiuotos, visos sienos laikomos dažomomis. Patikrinkite "
-            "Prielaidų skydelyje.")
+            "išklotinėse; jei sienos klijuojamos plytelėmis, pataisykite "
+            "plytelių ir dažymo kiekius sąmatoje.")
     return out
 
 
@@ -2566,9 +2642,10 @@ def calc_room_quantities(room: dict,
                     # it contradicts both the room-type standard and their own
                     # Setup Wizard default.
                     wall_finish_notes.append(
-                        f"Sienos dažomos pagal projekto apdailos duomenis "
-                        f"(standartinė prielaida šiai paskirčiai "
-                        f"'{paskirtis}' – nedažoma).")
+                        f"Sienos dažomos pagal projekto apdailos duomenis, nors "
+                        f"{_purpose_phrase(paskirtis)} jos įprastai nedažomos. Jei "
+                        f"sienos nedažomos, pažymėkite tai per mygtuką „Nustatymai“ "
+                        f"(Sienų apdaila).")
             walls_paintable = walls_paintable_gross * walls_paint_factor
         # 2026-06-11 (Rangovas B experiment): molio tinkas / decor-coated walls
         # are a SEPARATE finish — the contractor bills them as their own m² line
@@ -2618,10 +2695,11 @@ def calc_room_quantities(room: dict,
                 # when it is wrong — the contractor bills 31.45 m² of garage
                 # wall paint the standard says doesn't exist.
                 wall_finish_notes.append(
-                    f"Sienos neįtrauktos į dažomą plotą – standartinė "
-                    f"prielaida paskirčiai '{paskirtis}'; projekto apdailos "
-                    f"duomenų nerasta. Jei sienos dažomos, pažymėkite "
-                    f"Prielaidų skydelyje.")
+                    f"Sienos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+                    f"jos įprastai nedažomos, o brėžinyje šios patalpos sienų "
+                    f"apdailos nerasta. Patikrinkite išklotinėse ar apdailų "
+                    f"lentelėje; jei sienos dažomos, pažymėkite tai per mygtuką "
+                    f"„Nustatymai“ (Sienų apdaila).")
         # The glaistymas/dažymas base is gross − openings − the TILED zone
         # (2026-09-05, `_tile_zone_in_paint_base`). The 2026-07-05 „bug 3" fix
         # had put the band back INTO the base („glaistymas under tile"); the
@@ -2646,9 +2724,10 @@ def calc_room_quantities(room: dict,
         # per-room line („Dažoma sienų dalis virš plytelių juostos") explains
         # that case without flagging a read as a guess.
         wall_finish_notes.append(
-            f"Plytelių juosta (iki {float(tile_read['height_m'] or 0):.2f} m, "
-            f"{tile_zone_deducted:.2f} m²) į dažomą sienų plotą neįtraukta – "
-            f"po plytelėmis neglaistoma ir nedažoma.")
+            f"Plytelių juosta (iki {lt_num(float(tile_read['height_m'] or 0))} m aukščio, "
+            f"{lt_num(tile_zone_deducted)} m²) į dažomą sienų plotą neįtraukta — "
+            f"po plytelėmis neglaistoma ir nedažoma. Plytelių aukštį patikrinkite "
+            f"išklotinėse.")
 
     # Add per-room "extra walls" (LED feature partitions, soffit step walls,
     # other paintable surfaces not captured by perim × H). These are sourced
@@ -2766,23 +2845,30 @@ def calc_room_quantities(room: dict,
     #
     # The gate is deliberately narrow — EVERY condition must hold:
     #   · the paskirtis standard says the room has no interior wall finish,
-    #   · nothing overrode it (no apdailos read, no walls_paint_factor_override
-    #     — Objektas A's garage IS painted and keeps its ceiling paint through both
-    #     the cached-Vision factor 1.0 and the GT override 0.7988),
+    #   · nothing PAINTED it (no apdailos read, no walls_paint_factor_override
+    #     above 0 — Objektas A's garage IS painted and keeps its ceiling paint
+    #     through both the cached-Vision factor 1.0 and the GT override 0.7988),
     #   · the walls are unpainted because there is NO finish, not because they
     #     are tiled to the ceiling (a full-tile bathroom still gets a painted
     #     ceiling),
     #   · the ceiling is a raw slab — no GKP / tempiamos / pakabinamos,
     #   · and it carries no GKP soffit (gkp_extra_area_m2), which would mean
     #     part of the ceiling IS finished.
+    # An override of 0 is his „Nedažomos" (api.recompute_quantities
+    # ._with_paint_choice): it CONFIRMS the room is unfinished, so it keeps the
+    # gate open. Until 2026-10-06 any override shut it, and confirming the raw
+    # garage's proposed „Nedažomos" (the Patikra question proposes exactly
+    # that) brought its 44 m² ceiling back into the paint lines.
     # `ceiling_paint_override` (per-room bool) is the escape hatch, mirroring
     # tile_floor_override / walls_paint_factor_override.
     ceiling_paint_override = room.get("ceiling_paint_override")
+    walls_marked_unpainted = (walls_paint_factor_override is not None
+                              and float(walls_paint_factor_override) <= 0)
     ceiling_unfinished = (
         ceiling_paint_override is None
         and rt_rules.get("walls_paint") == 0.0
         and walls_paint_factor == 0.0
-        and walls_paint_factor_override is None
+        and (walls_paint_factor_override is None or walls_marked_unpainted)
         and not is_full_tile
         # "betonas" = raw slab (garažas / tambūras / terasa); "medis" = the
         # wood lining of a pirtis. Both are surfaces the painter never touches,
@@ -2798,11 +2884,16 @@ def calc_room_quantities(room: dict,
     elif ceiling_unfinished:
         ceiling_paintable = 0.0
         ceiling_paint_source = "unfinished_room_standard"
+        ceiling_is = ("lubos dengiamos medžiu" if ceiling_type == "medis"
+                      else "lubos — neapdailinta betoninė perdanga")
+        # Why the walls are bare: his own choice, or no finish on the drawing.
+        walls_why = ("o sienas pažymėjote kaip nedažomas" if walls_marked_unpainted
+                     else "o brėžinyje šios patalpos apdailos nerasta (sienos "
+                          "taip pat nedažomos)")
         ceiling_finish_notes.append(
-            f"Lubos neįtrauktos į dažomą plotą – standartinė prielaida "
-            f"paskirčiai '{paskirtis}': neapdailinta betoninė perdanga, "
-            f"projekto apdailos duomenų nerasta (sienos taip pat nedažomos). "
-            f"Jei lubos glaistomos/dažomos, pažymėkite Prielaidų skydelyje.")
+            f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+            f"{ceiling_is}, {walls_why}. Patikrinkite lubų plane; jei lubos glaistomos "
+            f"ir dažomos, pataisykite lubų dažymo kiekį sąmatoje.")
     elif ceiling_paint_override is not None:
         ceiling_paint_source = "override_on"
     else:
@@ -2841,11 +2932,11 @@ def calc_room_quantities(room: dict,
     walls_lower_bound = (extra_walls_m2 <= 0 and extra_walls_virs_3m_m2 <= 0)
     if virs_3m_source == "nominal_height":
         wall_finish_notes.append(
-            f"Virš 3 m kiekis apskaičiuotas iš viso kambario nominalaus lubų "
-            f"aukščio ({H:.2f} m) – visas kambarys priskirtas virš-3 m juostai. "
-            f"Daliniai aukšti ruožai (karnizai, soffitai, dvigubo aukščio "
-            f"zonos) automatiškai neaptinkami – jei tokių yra kituose "
-            f"kambariuose, įveskite juos Prielaidose.")
+            f"Virš 3 m kiekis skaičiuotas iš visos patalpos lubų aukščio "
+            f"({lt_num(H)} m) — visa patalpa priskirta virš 3 m eilutėms. Aukšti "
+            f"ruožai žemesnėse patalpose (karnizai, lubų nuleidimai, dvigubo "
+            f"aukščio dalys) automatiškai neaptinkami — jei tokių yra, "
+            f"papildykite virš 3 m eilučių kiekius sąmatoje.")
 
     # Dažymo plotas (sienos + lubos)
     dazymo_plotas = walls_paintable + ceiling_paintable

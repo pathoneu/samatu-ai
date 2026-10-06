@@ -37,6 +37,8 @@ import { toast } from 'sonner';
 import { API_BASE } from '@/lib/apiBase';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { isReverseVat, vatPercent } from '@/lib/vatMode';
+import { sendCheck } from '@/lib/exportLines';
+import { loadExcludedSections } from '@/lib/exportSectionSelection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -793,6 +795,18 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // lands on the Sąmata step somewhere above the warnings the user clicked.
   const [sanityFocus, setSanityFocus] = useState(0);
   const showSanity = () => { setStep('samata'); setSanityFocus(n => n + 1); };
+  // „Įrašyti kainas" (2026-10-06) — from the Siųsti step, an export dialog or
+  // the client-link dialog: open the Sąmata step at the first row that would
+  // reach the client without a price. `excluded` = the sections he unticked
+  // for that document. ProjectMainView acts on it once and clears it, so a
+  // later visit to the step does not jump again.
+  const [priceFocus, setPriceFocus] = useState(null);
+  const priceFocusSeq = useRef(0);
+  const showPrices = (excluded = null) => {
+    setStep('samata');
+    priceFocusSeq.current += 1;
+    setPriceFocus({ nonce: priceFocusSeq.current, excluded: excluded || null });
+  };
   const [doubleSides, setDoubleSides] = useState(false);
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set()); // Task 6
   const [isRecomputing, setIsRecomputing] = useState(false);
@@ -1125,6 +1139,8 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           // control it names is one click away.
           onOpenAssumptions={openAssumptions}
           focusSanityNonce={sanityFocus}
+          priceFocus={priceFocus}
+          onPriceFocusDone={() => setPriceFocus(null)}
         />
       )}
 
@@ -1259,6 +1275,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
             setProject(updated);
             updateProject(project.id, updated);
           }}
+          onGoToPrices={showPrices}
         />
       )}
 
@@ -1801,12 +1818,19 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 //
 // Design §E5: three actions and, before sending, ONE sentence — not a list of
 // warnings. „3 eilutės be kiekio bus praleistos. Siųsti?"
+//
+// 2026-10-06 (contractor walkthrough): the sentence picked the quantity case
+// over the price case, so 94 rows about to reach the client at 0,00 € went
+// unmentioned behind „10 eilučių be kiekio bus praleista". The price comes
+// first now — it is the one that costs him money — with the way to fix it one
+// click away; the quantity case follows in the same box. Both are counted on
+// the rows the Excel / PDF actually print (lib/exportLines.js), with the
+// sections he unticked in the export dialog last time.
 
-function SendStep({ project, onProjectChange }) {
+function SendStep({ project, onProjectChange, onGoToPrices }) {
   const { t } = useTranslation();
-  const rows = project.darbu_sarasas || [];
-  const noQty = rows.filter((r) => !Number(r?.kiekis)).length;
-  const noPrice = rows.filter((r) => Number(r?.kiekis) && !Number(r?.kaina)).length;
+  const excluded = loadExcludedSections(project.id);
+  const { rows: rowCount, noQty, noPrice } = sendCheck(project, excluded);
   return (
     <div className="border border-border rounded-xl bg-card p-6 space-y-5">
       <div>
@@ -1819,8 +1843,9 @@ function SendStep({ project, onProjectChange }) {
       </div>
 
       {/* The one sentence before sending. Never a wall of warnings. */}
-      <p
-        className="rounded border px-3 py-2.5"
+      <div
+        role="status"
+        className="rounded border px-3 py-2.5 space-y-2"
         style={{
           fontSize: 15,
           borderColor: (noQty || noPrice)
@@ -1830,16 +1855,40 @@ function SendStep({ project, onProjectChange }) {
           color: 'hsl(var(--foreground))',
         }}
       >
-        {noQty > 0
-          ? t('project.send.checkNoQty', { count: noQty })
-          : noPrice > 0
-            ? t('project.send.checkNoPrice', { count: noPrice })
-            : t('project.send.checkOk', { count: rows.length })}
-      </p>
+        {noPrice > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="flex-1" style={{ minWidth: 240 }}>
+              {t('project.send.checkNoPrice', { count: noPrice })}
+            </p>
+            {onGoToPrices && (
+              <button
+                type="button"
+                onClick={() => onGoToPrices(excluded)}
+                title={t('project.send.goToPricesTitle')}
+                className="inline-flex items-center gap-2 shrink-0 rounded border border-border-strong bg-background text-foreground hover:bg-muted/50 transition-colors"
+                style={{ minHeight: 44, padding: '0 16px', fontSize: 15 }}
+              >
+                {t('project.send.goToPrices')}
+                <ArrowRight className="w-4 h-4" aria-hidden />
+              </button>
+            )}
+          </div>
+        )}
+        {noQty > 0 && (
+          <p>
+            {noPrice > 0
+              ? t('project.send.checkNoQtySkipped', { count: noQty })
+              : t('project.send.checkNoQty', { count: noQty })}
+          </p>
+        )}
+        {!noQty && !noPrice && (
+          <p>{t('project.send.checkOk', { count: rowCount })}</p>
+        )}
+      </div>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <ExportDropdown project={project} onProjectChange={onProjectChange} />
-        <ShareButton project={project} />
+        <ExportDropdown project={project} onProjectChange={onProjectChange} onGoToPrices={onGoToPrices} />
+        <ShareButton project={project} onGoToPrices={onGoToPrices} />
       </div>
 
       <div className="border-t border-border/50 pt-4 text-muted-foreground space-y-1" style={{ fontSize: 14 }}>

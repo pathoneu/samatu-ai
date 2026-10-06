@@ -1413,14 +1413,15 @@ export async function importProjectsBackup(jsonText, opts = {}) {
   let parsed;
   try {
     parsed = JSON.parse(jsonText);
-  } catch (e) {
-    throw new Error(`Negaliu nuskaityti backup'o: failas neturi tinkamo JSON formato (${e.message})`);
+  } catch {
+    // Settings → „Atsarginė kopija" shows this as it is (2026-10-06: in his words — no format names)
+    throw new Error('Šio failo perskaityti nepavyko — tai ne Pathon atsarginė kopija arba failas sugadintas.');
   }
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
-    throw new Error('Failas neatitinka backup struktūros (laukiamas { version, projects: [], settings })');
+    throw new Error('Šis failas nėra Pathon atsarginė kopija.');
   }
   if (parsed.version > BACKUP_VERSION) {
-    throw new Error(`Backup'as iš naujesnės versijos (${parsed.version}). Atnaujink Pathon ir bandyk vėl.`);
+    throw new Error('Ši atsarginė kopija padaryta naujesne programos versija. Perkraukite puslapį ir bandykite dar kartą.');
   }
   // Sprint §AUDIT (2026-04-29): explicit version migration table. Old
   // backups silently succeeded; now we apply known migrations + warn user

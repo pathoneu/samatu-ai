@@ -124,7 +124,8 @@ def test_missing_tile_read_is_disclosed_not_silent():
     assert q["_tile_read_missing"] is True
     assert q["_wall_finish_assumptions"], "an assumption must be recorded"
     note = q["_wall_finish_assumptions"][0]
-    assert "2.00 m" in note and "Prielaid" in note
+    # decimal comma, and it says where to check and what to correct (2026-10-06)
+    assert "2,00 m" in note and "išklotinėse" in note and "sąmatoje" in note
     # and the assumed band is the documented room-type default, not a guess
     assert q["plyteles_sienos_m2"] == pytest.approx(
         12.4 * ROOM_TYPE_RULES["san"]["tile_walls_to_m"], abs=0.01)
@@ -314,7 +315,7 @@ def test_assumptions_surface_as_lt_warnings():
     parsed = {"patalpos": [{**room, **calc_room_quantities(room)}]}
     out = apply_lt_sanity(parsed)
     msgs = [w["message"] for w in out["_lt_warnings"]]
-    assert any("Plytelių zona nenuskaityta" in m for m in msgs), msgs
+    assert any("Plytelių aukštis brėžinyje nerastas" in m for m in msgs), msgs
 
 
 def test_apdailos_reader_failure_is_persisted_as_a_warning():
@@ -326,4 +327,8 @@ def test_apdailos_reader_failure_is_persisted_as_a_warning():
     _warn_apdailos_degraded(parsed, "no JSON in response")
     assert parsed["warnings"][0]["level"] == "WARN"
     msg = parsed["warnings"][0]["message"]
-    assert "Apdailos" in msg and "garažo" in msg and "no JSON in response" in msg
+    assert "Apdailos" in msg and "garažo" in msg
+    # the reader's own failure text stays on the stored warning for diagnosis,
+    # off the screen (2026-10-06)
+    assert "no JSON in response" not in msg
+    assert parsed["warnings"][0]["_reason"] == "no JSON in response"

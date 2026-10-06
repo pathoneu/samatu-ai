@@ -108,3 +108,15 @@ test('the banned list itself is well formed (a broken regex would pass silently)
       `${name}: the pattern does not match its own name — is it right?`);
   }
 });
+
+test('no screen sends him to a „Prielaidos" place — the top-bar button says „Nustatymai"', () => {
+  // 2026-10-06: project.interior.windowsNotFoundDesc still said „skiltyje
+  // „Prielaidos"" — a panel that has been the „Nustatymai" button for weeks.
+  // „prielaida" the NOUN (an assumption) is fine; a quoted place name is not.
+  const stale = appStrings().filter(([, v]) => /„Prielaid/.test(v)).map(([k, v]) => `${k}: ${v}`);
+  assert.deepEqual(stale, [], `strings that name the old panel:\n${stale.join('\n')}`);
+  assert.match(lt.project.interior.windowsNotFoundDesc, /per mygtuką „Nustatymai“/);
+  const en = JSON.parse(readFileSync(join(HERE, '../i18n/en.json'), 'utf8'));
+  assert.doesNotMatch(en.project.interior.windowsNotFoundDesc, /Assumptions/);
+  assert.match(en.project.interior.windowsNotFoundDesc, /“Settings” button/);
+});

@@ -5,12 +5,13 @@
  * copies to clipboard. DELETE revokes.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Share2, Check, Copy, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { API_BASE as API } from '@/lib/apiBase';
+import { linesWithoutPrice, sharedLines } from '@/lib/exportLines';
 
 // `expires_at` is a UTC ISO string ("2026-08-26T09:12:33.441+00:00") or null
 // when the link was issued with expires_in_days: 0 (= never expires). Slice the
@@ -19,8 +20,14 @@ import { API_BASE as API } from '@/lib/apiBase';
 const shareExpiryDate = (iso) =>
   (typeof iso === 'string' && iso.length >= 10 ? iso.slice(0, 10) : null);
 
-export default function ShareButton({ project }) {
+// `onGoToPrices` (2026-10-06): „Įrašyti kainas" beside the unpriced count —
+// closes this dialog and opens the Sąmata step at the first unpriced row.
+export default function ShareButton({ project, onGoToPrices }) {
   const { t } = useTranslation();
+  // The link lists every section, so every row with a quantity and no price
+  // reaches the client at 0,00 € (lib/exportLines.sharedLines).
+  const unpriced = useMemo(
+    () => linesWithoutPrice(sharedLines(project)).length, [project]);
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -140,6 +147,22 @@ export default function ShareButton({ project }) {
             <p className="text-xs text-muted-foreground mb-4">
               {t('project.share.modalDesc')}
             </p>
+
+            {unpriced > 0 && (
+              <div className="mb-4" role="status">
+                <p className="text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
+                  {t('project.send.checkNoPrice', { count: unpriced })}
+                </p>
+                {onGoToPrices && (
+                  <button type="button" disabled={loading}
+                    onClick={() => { setOpen(false); onGoToPrices(null); }}
+                    title={t('project.send.goToPricesTitle')}
+                    className="mt-2 px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-muted disabled:opacity-50">
+                    {t('project.send.goToPrices')}
+                  </button>
+                )}
+              </div>
+            )}
 
             {!token ? (
               <button

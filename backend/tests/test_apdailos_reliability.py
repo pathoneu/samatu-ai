@@ -280,7 +280,7 @@ def test_partial_merge_leaves_unread_rooms_visibly_unread():
     assert float(read["walls_paintable_m2"]) > 20.0            # recovered
     assert unread_dry["_walls_paint_factor"] == 0.0            # still the default
     assert unread_dry["_wall_finish_assumptions"]              # …and it says so
-    assert "apdailos duomen" in unread_dry["_wall_finish_assumptions"][0]
+    assert "sienų apdailos nerasta" in unread_dry["_wall_finish_assumptions"][0]
     assert unread_wet["_tile_read_missing"] is True            # tile band assumed
     assert unread_wet["_wall_finish_assumptions"]
 

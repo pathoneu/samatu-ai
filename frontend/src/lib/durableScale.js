@@ -128,7 +128,58 @@ export function laneMastelisOf(project) {
   return out;
 }
 
-export function pageScalesFromLane(mastelisByPage) {
+/** The drawing scales a sheet can state (backend plan_dimensions._STANDARD_SCALES, 1:20 … 1:500). */
+export const DRAWING_SCALES = Object.freeze([20, 25, 30, 40, 50, 75, 100, 125, 150, 200, 250, 500]);
+// A sheet read at the scale it writes carries exactly that scale's metres per point (the lane rounds them to six
+// places: ≤ 7·10⁻⁵ off at 1:20); a scale measured from the strings is off by far more.
+const STATED_EXACT = 1.5e-4;
+
+/**
+ * Where each lane scale comes from — `{page: {kilme, uzrasyta}}`.
+ *
+ * 2026-10-06 (contractor walkthrough on objektas_h): the status bar said „1:115 (iš brėžinio)", which reads as a
+ * scale written on the sheet; 1:115 is what the dimension strings MEASURE on a sheet printed at another size
+ * than it was drawn. So:
+ *   'uzrasytas'  the sheet writes this scale and its dimension strings agree — the lane took the written one
+ *                (its metres per point are exactly the scale's);
+ *   'ismatuotas' measured from the dimension strings: a ratio no drawing is drawn at, or one the strings measure
+ *                although the sheet writes another (`uzrasyta`: what it writes — the lane's `mastelis_kitas`);
+ *   'matmenys'   from the dimension strings, but whether written or measured cannot be told (the pair lane
+ *                keeps only a rounded ratio, and the geometry lane has no record of that sheet).
+ */
+export function laneScaleOriginOf(project) {
+  const meta = project?._meta || {};
+  const geo = meta.geometrija || {};
+  const exact = geo.masteliai || {};
+  const others = { ...(meta.plan_dimension_lane?.mastelis_kitas || {}), ...(geo.masteliai_kiti || {}) };
+  const out = {};
+  for (const [page, ratio] of Object.entries(laneMastelisOf(project))) {
+    const r = Number(ratio);
+    if (!(r > 0)) continue;
+    const other = others[page];
+    if (other && typeof other === 'object') {
+      const uzrasyta = (Array.isArray(other.uzrasyta) ? other.uzrasyta : []).map(Number).filter((n) => n > 0);
+      out[page] = { kilme: 'ismatuotas', uzrasyta };
+      continue;
+    }
+    const g = exact[page];
+    const mpp = Number(g?.m_per_pt);
+    if (mpp > 0) {
+      const written = DRAWING_SCALES.includes(r) && Number(g.mastelis) === r
+        && Math.abs(mpp / (r * METERS_PER_POINT_AT_1_TO_1) - 1) <= STATED_EXACT;
+      out[page] = { kilme: written ? 'uzrasytas' : 'ismatuotas', uzrasyta: [] };
+    } else {
+      out[page] = { kilme: DRAWING_SCALES.includes(r) ? 'matmenys' : 'ismatuotas', uzrasyta: [] };
+    }
+  }
+  return out;
+}
+
+/**
+ * `{page: PageScale}` from the lane's ratios. `origins` (laneScaleOriginOf) rides along as `kilme` /
+ * `uzrasyta`, so the status bar can say where the scale comes from (lib/scaleLabel.js).
+ */
+export function pageScalesFromLane(mastelisByPage, origins = null) {
   const out = {};
   if (!mastelisByPage || typeof mastelisByPage !== 'object') return out;
   for (const [page, ratio] of Object.entries(mastelisByPage)) {
@@ -136,7 +187,16 @@ export function pageScalesFromLane(mastelisByPage) {
     const r = Number(ratio);
     if (!Number.isInteger(p) || p <= 0 || !(r > 0)) continue;
     const mpp = r * METERS_PER_POINT_AT_1_TO_1;
-    out[p] = { metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true, source: 'plan', label: `1:${r}` };
+    const origin = origins?.[page] || origins?.[p];
+    out[p] = {
+      metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true, source: 'plan', label: `1:${r}`,
+      ...(origin ? { kilme: origin.kilme, uzrasyta: origin.uzrasyta || [] } : {}),
+    };
   }
   return out;
+}
+
+/** The page scales the drawing gave this project, each with where it comes from. */
+export function laneScalesOf(project) {
+  return pageScalesFromLane(laneMastelisOf(project), laneScaleOriginOf(project));
 }

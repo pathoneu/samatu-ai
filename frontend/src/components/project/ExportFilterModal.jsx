@@ -11,10 +11,11 @@ import { useTranslation } from 'react-i18next';
 import { ltCount } from '@/lib/ltPlural';
 import { VAT_REVERSE, VAT_STANDARD, vatChoice } from '@/lib/vatMode';
 import { staleRowsForExport, staleRowCarryTargets } from '@/lib/mergeDarbuSarasas';
+import { exportSections, linesForExport, linesWithoutPrice } from '@/lib/exportLines';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import {
   exportSelectionKey,
-  parseExcludedSections,
+  loadExcludedSections,
   serializeExcludedSections,
   selectedFor,
   toggleSection,
@@ -23,14 +24,8 @@ import {
 // The persisted value is the set of EXPLICITLY EXCLUDED skyriai, so a skyrius
 // that shows up later (re-extraction, recompute, a new Matavimai line) is
 // included by default instead of being silently dropped from the export.
-function loadExcluded(projectId) {
-  try {
-    return parseExcludedSections(localStorage.getItem(exportSelectionKey(projectId)));
-  } catch {
-    return new Set();
-  }
-}
-
+// Reading it lives in lib/exportSectionSelection.js — the Siųsti step counts
+// with the same stored choice.
 function saveExcluded(projectId, excluded) {
   try {
     localStorage.setItem(exportSelectionKey(projectId), serializeExcludedSections(excluded));
@@ -56,32 +51,40 @@ export default function ExportFilterModal({
   // Stale rows (audit exports-money-4, 2026-09-30): called with 'remove' |
   // 'carry' when he answers the stale-row line; the parent edits the sąmata.
   onStaleChoice,
+  // „Įrašyti kainas" (2026-10-06): called with the sections he unticked; the
+  // parent closes this dialog and opens the first unpriced row. Optional —
+  // without it the line still says how many rows go out without a price.
+  onGoToPrices,
 }) {
   const { t } = useTranslation();
-  // Build unique-skyrius list with row count + total kiekis per skyrius.
-  const sections = useMemo(() => {
-    const map = new Map();
-    const items = rows
-      ? rows
-      : (project.darbu_sarasas || []).filter(it => (it.kiekis || 0) > 0);
-    for (const it of items) {
-      const s = it.skyrius || it.kategorija || 'Kiti darbai';
-      const cur = map.get(s) || { count: 0 };
-      cur.count += 1;
-      map.set(s, cur);
-    }
-    return [...map.entries()]
-      .map(([name, info]) => ({ name, ...info }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'lt'));
-  }, [project.darbu_sarasas, rows]);
+  // The sections with their row counts — the lines this document prints, grouped
+  // by the very name the export's section filter checks (lib/exportLines.js
+  // exportSections). 2026-10-06: this list named a row without a section
+  // „Kiti darbai" while the export filed it under „Apdaila", so with every
+  // section ticked the row could still be left out of the file silently. His own
+  // layout's rows are all listed, blank cells too — blank is a state of his sheet.
+  const sections = useMemo(
+    () => exportSections(linesForExport(project, { format, templateRows: rows })),
+    [project, format, rows],
+  );
 
   // State = what the user explicitly UNCHECKED. The checked set is derived from
   // the sections that exist right now, so no reconciliation effect is needed and
   // a newly-appearing skyrius can never arrive pre-unchecked.
-  const [excluded, setExcluded] = useState(() => loadExcluded(project.id));
+  const [excluded, setExcluded] = useState(() => loadExcludedSections(project.id));
   const selected = useMemo(
     () => selectedFor(sections.map(s => s.name), excluded),
     [sections, excluded],
+  );
+
+  // Rows this document prints with a quantity and no price — 0,00 € on paper.
+  // Counted on the very lines the export sends (lib/exportLines.js), so it
+  // follows the ticked sections. Says it; never blocks the export.
+  const unpricedCount = useMemo(
+    () => linesWithoutPrice(linesForExport(project, {
+      format, templateRows: rows, allowedSkyriai: selected,
+    })).length,
+    [project, format, rows, selected],
   );
 
   // Per-export client/objektas (2026-06-19) — rendered into the PDF/Excel header
@@ -300,7 +303,7 @@ export default function ExportFilterModal({
                         onChange={() => toggle(s.name)}
                         className="w-4 h-4 accent-foreground"
                       />
-                      <span className="flex-1 text-sm text-foreground">{s.name}</span>
+                      <span className="flex-1 text-sm text-foreground">{s.name || 'Be skyriaus'}</span>
                       <span className="text-[11px] text-muted-foreground tabular-nums">
                         {ltCount(s.count, 'eilutė', 'eilutės', 'eilučių')}
                       </span>
@@ -311,6 +314,21 @@ export default function ExportFilterModal({
             </ul>
           )}
         </div>
+
+        {unpricedCount > 0 && (
+          <div className="px-5 py-3 border-t border-border" role="status">
+            <p className="text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
+              {t('project.send.checkNoPrice', { count: unpricedCount })}
+            </p>
+            {onGoToPrices && (
+              <button type="button" onClick={() => onGoToPrices(excluded)} disabled={loading}
+                title={t('project.send.goToPricesTitle')}
+                className="mt-2 px-2.5 py-1 text-xs rounded border border-border bg-background hover:bg-muted disabled:opacity-50">
+                {t('project.send.goToPrices')}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
           <button

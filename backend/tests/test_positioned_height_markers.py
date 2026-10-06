@@ -340,4 +340,4 @@ def test_split_level_conflict_keeps_the_taller_reading_and_discloses():
     msgs = [w["message"] for w in (out["_lt_warnings"] or [])
             if "dvigubo aukščio" in w["message"]]
     assert len(msgs) == 1
-    assert "2.80" in msgs[0] and "5.70" in msgs[0]
+    assert "2,80 m" in msgs[0] and "5,70 m" in msgs[0]     # LT decimal comma

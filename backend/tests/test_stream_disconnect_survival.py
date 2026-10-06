@@ -82,7 +82,7 @@ def test_orphan_save_persists_zero_room_run_as_empty(monkeypatch):
     blob = saved["blob"]
     assert blob["status"] == "empty"
     assert blob["total_rows"] == 0
-    assert any("nerado patalpų" in (w.get("message") or "")
+    assert any("patalpų nerasta" in (w.get("message") or "")
                for w in blob["warnings"]), "must explain WHY it is empty"
     assert blob["_saved_by"] == "stream_disconnect_recovery"
 

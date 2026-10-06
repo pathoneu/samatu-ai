@@ -52,13 +52,32 @@ export function mergeFreeReread(base, result, now = new Date().toISOString()) {
   return { project, diff };
 }
 
-/** The four counts the banner reports afterwards. */
-export function freeRereadSummary(santrauka) {
-  const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+// Outlines that follow the walls — the lane's, the raster lane's, or his own (backend dimension_sum.WALL_OUTLINES).
+const WALL_OUTLINES = new Set(['vektoriniai_konturai', 'sienu_konturas', 'corrected', 'manual']);
+// Wall lengths read off the plan's dimension strings — added up wall by wall (dimension_sum), or the two sides of
+// a rectangle the strings close (plan_dimensions).
+const FROM_DIMENSIONS = new Set(['matmenu_eilutes', 'plano_matmenys']);
+// A wall length that is his — typed, or a proposal he confirmed in Patikra (both are stored as his): never re-read,
+// so never counted as the drawing's.
+const TYPED_BY_HIM = new Set(['user_override', 'manual']);
+
+/**
+ * What the banner reports afterwards: the project AS IT STANDS after the read, whichever read did it.
+ *
+ * 2026-10-06 (contractor walkthrough on objektas_h): it used to print the lane's counts of THIS run, and a
+ * room whose walls an earlier read had already added up keeps its figure and is not added up again — so the
+ * notice said „sienų ilgiai sudėti iš matmenų: 0" on a project where six rooms' walls came from the drawing's
+ * dimensions. Counted on the merged rooms, it says what he now has.
+ */
+export function freeRereadState(project) {
+  const stored = Array.isArray(project?.v8_rooms) && project.v8_rooms.length ? project.v8_rooms : project?.patalpos;
+  const rooms = (Array.isArray(stored) ? stored : []).filter(isObj);
+  const count = (pick) => rooms.filter(pick).length;
   return {
-    konturai: n(santrauka?.konturai),
-    perimetrai: n(santrauka?.perimetrai_sudeti),
-    tusti: n(santrauka?.perimetrai_tusti),
-    dangos: n(santrauka?.grindu_dangos),
+    count: rooms.length,
+    konturai: count((r) => WALL_OUTLINES.has(String(r.polygon_source || ''))),
+    perimetrai: count((r) => FROM_DIMENSIONS.has(String(r.perimetras_saltinis || ''))),
+    jusu: count((r) => TYPED_BY_HIM.has(String(r.perimetras_saltinis || ''))),
+    dangos: count((r) => r.grindu_danga_saltinis === 'grindu_planas'),
   };
 }

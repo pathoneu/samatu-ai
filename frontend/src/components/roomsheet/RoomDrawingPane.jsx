@@ -27,7 +27,7 @@ import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { buildCheckOverlay } from '@/lib/checkOverlay';
 import { displayPointOf } from '@/lib/roomOutline';
-import { laneMastelisOf, pageScalesFromLane } from '@/lib/durableScale';
+import { laneScalesOf } from '@/lib/durableScale';
 import { cleanUserText } from '@/lib/userText';
 
 const WALL_LEGEND = [
@@ -92,7 +92,7 @@ export default function RoomDrawingPane({
     [room, facts, sutapdinimas, activeFactKey, pickFirst, proposal],
   );
   const check = useMemo(() => ({ pages: overlay.pages }), [overlay.pages]);
-  const laneScales = useMemo(() => pageScalesFromLane(laneMastelisOf(project)), [project]);
+  const laneScales = useMemo(() => laneScalesOf(project), [project]);
 
   const go = (target) => {
     if (!target?.page) return;

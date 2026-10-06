@@ -28,6 +28,7 @@ import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/l
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
+import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
@@ -295,37 +296,9 @@ function isoALabel(wMm, hMm) {
   return hit ? hit[0] : null;
 }
 
-// Human scale text for the status bar. PageScale stores metres of reality per
-// PDF point; 1 pt = 1/72 inch of paper, so ratio = mpp / (0.0254/72). A named
-// label (e.g. standard "1:50") wins over the computed ratio.
-function scaleStatusText(pageScale) {
-  if (!pageScale?.calibrated) return 'Mastelis: nekalibruotas — spustelėkite čia';
-  // The dimension strings on the sheet gave the ratio — exact, from the drawing.
-  if (pageScale.source === 'plan' && pageScale.label) return `Mastelis: ${pageScale.label} (iš brėžinio)`;
-  if (pageScale.label) return `Mastelis: ${pageScale.label}`;
-  const mpp = pageScale.metersPerPointX || 0;
-  const ratio = mpp > 0 ? Math.round((mpp * 72) / 0.0254) : 0;
-  if (ratio <= 0) return 'Mastelis: kalibruotas';
-  // Auto scale is derived from the eksplikacija areas — honest ~ + disclosure.
-  return pageScale.source === 'auto' ? `Mastelis: ~1:${ratio} (automatinis)` : `Mastelis: 1:${ratio}`;
-}
-
-// Tooltip for the scale readout. The whole viewer's numbers depend on the
-// scale, but nothing explained what "automatinis" or the "~" meant, or why
-// 1:105 is not a drafting scale. Say it in one line per state.
-// (2026-07-28 explainability pass.)
-function scaleStatusTitle(pageScale) {
-  if (!pageScale?.calibrated) {
-    return 'Mastelis dar nenustatytas — matavimai bus be metrų. Spustelėkite ir pažymėkite atkarpą, kurios tikrą ilgį žinote.';
-  }
-  if (pageScale.source === 'plan') {
-    return 'Mastelis perskaitytas iš brėžinyje užrašytų matmenų — tikslus. Spustelėkite, jei norite kalibruoti pagal kitą žinomą atstumą.';
-  }
-  if (pageScale.source === 'auto') {
-    return 'Mastelis apskaičiuotas iš patalpų plotų eksplikacijoje — todėl apytikslis (~). Norėdami tikslesnio, spustelėkite ir nustatykite mastelį pagal žinomą atstumą.';
-  }
-  return 'Mastelis kalibruotas rankiniu būdu pagal jūsų nurodytą atstumą. Spustelėkite, jei norite kalibruoti iš naujo.';
-}
+// The scale readout and its tooltip — what the page's scale is and where it
+// comes from (written on the sheet, measured from the dimensions, the room
+// areas, or his own) — live in lib/scaleLabel.js (2026-10-06), tested there.
 
 /**
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
