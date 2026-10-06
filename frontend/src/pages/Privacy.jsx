@@ -161,11 +161,13 @@ export default function Privacy() {
 
       <Section n={5} title="Saugojimo terminai">
         <UL>
-          <LI><Term>Paskyros duomenys</Term> — kol paskyra aktyvi; ištrynus paskyrą — iki 30 dienų (atkūrimo langas), po to visiškai pašalinami.</LI>
+          <LI><Term>Paskyros duomenys</Term> — kol paskyra aktyvi. Paskyrą galite ištrinti nustatymuose: ji ištrinama iš karto, atkurti nebus galima. Kartu ištrinami visi projektai su brėžiniais ir sąmatomis (ir tie, kurie šiukšliadėžėje), įmonės duomenys ir logotipas, nustatymai, kainynai ir sąmatų šablonai, o jūs atjungiami visuose įrenginiuose.</LI>
+          <LI><Term>Ištrintos paskyros įrašas</Term> — lieka tik minimalus įrašas be el. pašto, vardo, įmonės duomenų ir Google paskyros susiejimo, kad išrašytos sąskaitos faktūros ir mokėjimų įrašai liktų galiojantys.</LI>
           <LI><Term>Projektų failai ir sąmatos</Term> — kol egzistuoja projektas; galite juos ištrinti bet kada.</LI>
           <LI><Term>Brėžiniai, perduoti AI apdorojimui</Term> — pas AI paslaugų teikėją laikomi ne ilgiau, nei numatyta jo politikoje (Anthropic — įprastai iki 30 dienų).</LI>
           <LI><Term>Serverio žurnalai (su IP)</Term> — iki 90 dienų, po to automatiškai šalinami.</LI>
           <LI><Term>Apskaitos ir mokėjimų įrašai</Term> — pagal LR mokesčių ir apskaitos teisės aktus (paprastai 10 metų).</LI>
+          <LI><Term>Naktinės atsarginės kopijos</Term> — laikomos 30 dienų, todėl ištrinti duomenys iš jų pašalinami per 30 dienų.</LI>
         </UL>
       </Section>
 
