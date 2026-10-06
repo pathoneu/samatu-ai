@@ -90,6 +90,10 @@ _ASSUMPTION_FIELDS = {
     # vidaus_durys: bool}; read by universal_rules.settle_reveals_scope. Scope, not a reading: the drawing
     # shows the openings, the contractor decides which reveals are his.
     "angokrasciai_apimtis",
+    # 2026-10-06: is an LED niche length estimated from the room type billed? True once he chose
+    # „Priimti įvertinimą" in Nustatymai; read by niche_inference.estimate_accepted. Every room's billed
+    # metres are rebuilt below (vision_call.refresh_led_metres), the same way the other two paths do.
+    "led_nisu_ivertinimas",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2
@@ -1209,6 +1213,13 @@ def recompute(
                 "_overrides": overrides,
                 "_paruosimas": _paruosimas,           # the pass's verdicts for the rows (2026-09-23)
             }
+            # His answer to „LED nišos be perskaityto ilgio" moves every room's billed metres (2026-10-06):
+            # the same per-room function the extraction and /recompute-interior run, and BEFORE the scope
+            # marks below, so a room he does not do stays zeroed.
+            from extractor.vision_call import refresh_led_metres
+            for _r in rooms:
+                if isinstance(_r, dict) and isinstance(_r.get("elementai"), list):
+                    refresh_led_metres(_r, overrides)
             # Apimtis (2026-09-06): the contractor's „ką skaičiuoti" rides in
             # `_overrides.apimtis`; enforced exactly as in /recompute-interior
             # (extractor/scope.py) so a Prielaidos edit cannot undo it.

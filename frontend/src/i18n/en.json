@@ -1161,6 +1161,14 @@
         "true": "Two lines per mixer: rough-in body + visible trim",
         "false": "One line per mixer"
       },
+      "ledEstimate": "LED niches with no length read",
+      "ledEstimateNote": "In rooms {{rooms}} no niche length was read from the drawing — in brackets, an estimate from the room type, {{total}} m in total. It is not a measurement: accept it only after checking the ceiling plan. Until you accept it, the niche rows count only the length that was read.",
+      "ledEstimateLeave": "Leave blank",
+      "ledEstimateAccept": "Accept the estimate",
+      "ledEstimateTitles": {
+        "false": "The niche rows carry only the length read from the drawing; the estimate stays on the blank row “LED nišos — suveskite ilgį”",
+        "true": "The estimate is added to the niche rows (niche framing, filling, painting)"
+      },
       "puttyLevelPlain": {
         "Q1": "Q1 — under heavy wallpaper",
         "Q2": "Q2 — under matt paint (the usual one)",

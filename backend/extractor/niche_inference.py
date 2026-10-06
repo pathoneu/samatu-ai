@@ -43,6 +43,12 @@ gate inference on per-room locator coverage (suppress only when the
 locator demonstrably imaged the room's ceiling plan and found 0),
 which needs a coverage map not yet persisted in the extract. Until
 then, route over-bills through the contractor /calibrate UI.
+
+2026-10-06 (founder decision): the ratios were fitted on one contractor's
+sąmata, and the engine may not learn from a sąmata — so an estimate is no
+longer BILLED unless he accepts it (`LED_ESTIMATE_OPT_IN` below). The
+inference still runs and the estimate is still shown: as a blank row naming
+the rooms and metres, and as a choice in Nustatymai.
 """
 from __future__ import annotations
 
@@ -104,6 +110,42 @@ LED_ESTIMATE_ROOM_SENTENCE = (
     "Nišos ilgis įvertintas pagal patalpos tipą — brėžinyje neišmatuotas. "
     "Patikrinkite lubų plane, ar čia yra LED niša, ir įrašykite tikrą ilgį.")
 
+# ── The estimate is HIS choice (2026-10-06, founder decision) ────────────────
+# Re-applied from docs/superpowers/patches/2026-10-03-round12-led-optin.patch.
+# On: an estimated length is NOT billed until he accepts it in Nustatymai
+# (`_overrides[LED_ESTIMATE_CHOICE_KEY] = True`). The three LED rows carry the
+# metres read off the drawing; one blank row („LED nišos — suveskite ilgį")
+# names the rooms where no niche length was read with the estimate for each.
+# Accepted, the estimate is billed exactly as before, with the disclosure
+# above. Off (False): the 2026-10-03 behaviour — billed and disclosed.
+# Measured 2026-10-03 (and again 2026-10-06, see the round report): on the
+# corpus the estimate is closer to the contractor's billed length than a blank
+# (objektas_b LED −18 % → −52 %, objektas_d −2,5 % → −47 %); the founder chose
+# the rule over the closer number.
+LED_ESTIMATE_OPT_IN = True
+LED_ESTIMATE_CHOICE_KEY = "led_nisu_ivertinimas"
+# Per room: the estimated metres held back from `nisu_metrai` while he has not
+# accepted them. Absent when nothing is held back.
+HELD_ESTIMATE_KEY = "_nisu_ivertinta_m"
+# The condition the blank row exists under: both merges (api/recompute_quantities,
+# frontend mergeDarbuSarasas) drop it un-edited once he accepts, instead of
+# carrying it back as a stale row.
+WAITING_ROW_CONDITION = "led_nisu_ivertinimas_laukia"
+WAITING_ROW_LABEL = "LED nišos — suveskite ilgį"
+
+
+def estimate_accepted(overrides: dict | None) -> bool:
+    """Is an estimated niche length billed? Always with LED_ESTIMATE_OPT_IN
+    off; with it on, only once he chose „Priimti įvertinimą"."""
+    if not LED_ESTIMATE_OPT_IN:
+        return True
+    v = overrides.get(LED_ESTIMATE_CHOICE_KEY) if isinstance(overrides, dict) else None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v >= 0.5
+    return str(v).strip().lower() in ("true", "1", "priimti")
+
 
 def _lt(v: float) -> str:
     return f"{float(v):.2f}".replace(".", ",")
@@ -122,6 +164,27 @@ def estimated_niche_m(room: dict) -> float:
     return round(total, 2)
 
 
+def held_estimate_m(room: dict) -> float:
+    """Estimated metres this room holds back from its billed length (0 = none)."""
+    try:
+        return max(0.0, float(room.get(HELD_ESTIMATE_KEY) or 0))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
+
+def billed_estimate_m(room: dict) -> float:
+    """Metres of this room's BILLED niche length (`nisu_metrai`) that are an
+    estimate: none while the estimate waits for his answer, else the estimate
+    capped at what the room bills (a room its scope zeroed bills none)."""
+    if held_estimate_m(room) > 0:
+        return 0.0
+    try:
+        billed = float(room.get("nisu_metrai") or 0)
+    except (TypeError, ValueError):
+        billed = 0.0
+    return round(min(estimated_niche_m(room), billed), 2)
+
+
 def led_estimated_rooms(rooms: list[dict]) -> list[tuple[dict, float]]:
     """(room, estimated metres) for every room whose billed niche length
     (`nisu_metrai`) holds an estimate. Capped at what the room bills, so a
@@ -130,11 +193,7 @@ def led_estimated_rooms(rooms: list[dict]) -> list[tuple[dict, float]]:
     for r in rooms or []:
         if not isinstance(r, dict):
             continue
-        try:
-            billed = float(r.get("nisu_metrai") or 0)
-        except (TypeError, ValueError):
-            billed = 0.0
-        est = round(min(estimated_niche_m(r), billed), 2)
+        est = billed_estimate_m(r)
         if est > 0:
             out.append((r, est))
     return out
@@ -168,6 +227,47 @@ def led_estimate_disclosure(estimated: list[tuple[dict, float]], total_m: float)
                         "(patalpos perimetras × tokio tipo patalpoms būdinga dalis), "
                         "ne brėžinio matmuo."),
         "_led_ivertinta_m": est_m,
+    }
+
+
+def led_estimate_waiting(rooms: list[dict]) -> list[tuple[dict, float]]:
+    """(room, estimated metres) for every room whose estimate waits for his
+    answer. A room whose finishing his „ką skaičiuoti" took out is not named —
+    its billed metres are zeroed by the same choice (extractor/scope.py)."""
+    out: list[tuple[dict, float]] = []
+    for r in rooms or []:
+        if not isinstance(r, dict) or r.get("_neskaiciuoti"):
+            continue
+        if "apdaila" in (r.get("_neskaiciuoti_sritys") or []):
+            continue
+        m = round(held_estimate_m(r), 2)
+        if m > 0:
+            out.append((r, m))
+    return out
+
+
+def led_estimate_waiting_row(waiting: list[tuple[dict, float]]) -> dict | None:
+    """The blank row (no quantity: he fills it in, or accepts the estimate in
+    Nustatymai) that names the rooms where no niche length was read and the
+    estimate for each. None when nothing waits. The section is the caller's."""
+    if not waiting:
+        return None
+    total = round(sum(m for _, m in waiting), 2)
+    where = ", ".join(f"{_room_label(r)} (įvertinimas {_lt(m)} m)" for r, m in waiting)
+    return {
+        "aprasymas": WAITING_ROW_LABEL,
+        "vnt": "m", "kiekis": None, "saltinis": "checklist", "confidence": "low",
+        "_only_while": WAITING_ROW_CONDITION,
+        "_led_ivertinta_m": total,
+        "_confidence_reason": (
+            f"Nišų ilgio brėžinyje neperskaičiau patalpose {where}. Patikrinkite lubų "
+            "plane, ar šiose patalpose yra LED nišos."),
+        "_assumption": (
+            f"Pagal patalpos tipą įvertinta iš viso {_lt(total)} m — tai ne brėžinio matmuo, "
+            "todėl į nišų eilutes neįtraukta. Jei įvertinimas tinka, per mygtuką „Nustatymai“ "
+            "prie „LED nišos be perskaityto ilgio“ pasirinkite „Priimti įvertinimą“ — šie "
+            "metrai bus pridėti prie nišų eilučių. Jei ilgį išmatavote patys, įrašykite jį "
+            "šioje eilutėje."),
     }
 
 # ── Enumerated-exclusion gate (2026-08-04) ────────────────────────────────────

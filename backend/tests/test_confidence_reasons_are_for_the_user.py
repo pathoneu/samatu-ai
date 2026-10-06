@@ -247,6 +247,17 @@ _ASCII_QUOTED = re.compile(r"'[^'\n]+'|(?<![\w\"])\"[^\"\n]+\"")
 _APOSTROPHE_WORD = re.compile(rf"[A-Za-z]'[{_LT_LETTERS}]")
 _QUOTED_SPAN = re.compile(r"„[^“”]*[“”]")          # his drawing's own words, as written
 _DOTTED = re.compile(r"(?<![\w.])\d+\.\d+(?!\.?\d)")  # 0.60 — not STR 2.04.01
+# The drawing's own numbering is no decimal, the same way his quoted text is
+# not: a page, sheet or section number („psl. 2.3", „lapas 4.1", „4.1–5.1
+# punktas") and a code with letters in front („D-2.1", „M-3.2"). The reading
+# model's warnings cite them and extractor/model_warnings.py keeps them as
+# written (2026-10-06); a number with a unit after it is a quantity all the same.
+_NO_UNIT = r"(?!\d|\.\d|\s?(?:m²|m2|m³|mm|cm|kg|m\b|l\b|%))"
+_DRAWING_NUMBERING = re.compile(
+    rf"(?<!\w)(?:psl\.?|lap\w*|brėž\w*\.?|pav\.?|nr\.?|p\.|punkt\w*|skyr\w*)\s*"
+    rf"\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?{_NO_UNIT}"
+    r"|(?<![\w.,])\d+(?:\.\d+)?(?:\s*[–—-]\s*\d+(?:\.\d+)?)?\s*(?:punkt\w*|skyr\w*|lap\w*|psl\b|p\.)"
+    r"|(?<![\w.])[^\W\d_]+-\d+(?:\.\d+)+", re.IGNORECASE)
 _OLD_PANEL = re.compile(r"Prielaidų skydel|Prielaidose|[Pp]rielaidų skyri|„Prielaidos")
 _INFORMAL = re.compile(r"\b(?:Patikrink|Pridėk|Įvesk|Pakeisk|Pažymėk|Pakartok)\b", re.IGNORECASE)
 _AI = re.compile(rf"(?<![{_LT_LETTERS}])AI(?![{_LT_LETTERS}])")
@@ -278,7 +289,7 @@ def plain_lt_problems(text: str, allow=()) -> list[str]:
         m = pat.search(text)
         if m:
             found.append(f"{why}: {m.group(0)!r}")
-    m = _DOTTED.search(_QUOTED_SPAN.sub("„…“", text))
+    m = _DOTTED.search(_DRAWING_NUMBERING.sub("…", _QUOTED_SPAN.sub("„…“", text)))
     if m:
         found.append(f"a decimal point in a number: {m.group(0)!r} — use lt_num()")
     return found
@@ -603,6 +614,7 @@ _ROW_BUILDERS = (
     "extractor/cross_page_validator.py", "extractor/sanity_checks.py",
     "extractor/scale_validator.py", "extractor/plan_area_annotations.py",
     "extractor/room_facts.py", "extractor/project_questions.py", "extractor/sanity_mirror.py",
+    "extractor/niche_inference.py",
     "api/recompute_quantities.py", "api/revalidate.py", "main.py",
 )
 _OLD_FRAGMENTS = re.compile(r"\(nr=|Prielaidų skydel|Prielaidose|[Pp]rielaidų skyri|"
@@ -625,3 +637,102 @@ def test_no_row_builder_writes_the_old_fragments():
                 if m:
                     hits.append(f"{rel}:{node.lineno} {m.group(0)!r}: {node.value[:90]!r}")
     assert not hits, "old Patikrinimai wording in a row builder:\n" + "\n".join(hits)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# The reading model's own warnings and the LED estimate rows (2026-10-06)
+# ═════════════════════════════════════════════════════════════════════════════
+# The model's warnings reach the same list as it wrote them — „… priimta
+# 101=3.40 ir 102=3.40." on a production run of objektas_a. Their numbers are
+# now written his way (extractor/model_warnings.py, at extraction); the rest of
+# their wording is the prompt's, and changing the prompt needs a paid eval. So
+# the whole net is asked of the sentences that were plain apart from their
+# numbers, and the number class of every model-written sentence in the corpus.
+
+from extractor.model_warnings import plain_numbers, room_identifiers  # noqa: E402
+
+_PROD_ROOMS = [{"nr": "101", "pavadinimas": "Tambūras", "paskirtis": "tamburas"},
+               {"nr": "102", "pavadinimas": "Svetainė, virtuvė", "paskirtis": "gyvenamoji"}]
+
+
+def _model_written(warnings) -> list[str]:
+    """The model's own entries in a stored extract: level + message (+ room),
+    nothing the pipeline adds (its code / source / severity)."""
+    out = []
+    for w in warnings or []:
+        if isinstance(w, str):
+            out.append(w)
+        elif isinstance(w, dict) and not set(w) - {"level", "message", "patalpa_nr"}:
+            if isinstance(w.get("message"), str) and w["message"]:
+                out.append(w["message"])
+    return out
+
+
+def _classes(problems: list[str]) -> set[str]:
+    return {p.split(":")[0] for p in problems}
+
+
+def test_the_net_lets_the_drawings_own_numbering_through():
+    for text in ("Žr. psl. 2.3 ir lapas 4.1.", "Apdaila — 4.1–5.1 punktas.", "Durys D-2.1, mazgas M-3.2."):
+        assert plain_lt_problems(text) == [], text
+    # …while a number with a unit is a quantity wherever it stands
+    for text in ("Lape 2.5 m ilgio niša.", "Durų plotis 0.90 m.", "Psl. 2.5 m² plotas."):
+        assert "decimal point" in " ".join(plain_lt_problems(text)), text
+
+
+def test_the_production_warning_reads_plain_once_its_numbers_are_his():
+    raw = ("Trijų +3400 žymeklių priskyrimas tarp 101 ir 102 nėra visiškai vienareikšmis; "
+           "priimta 101=3.40 ir 102=3.40.")
+    assert "decimal point" in " ".join(plain_lt_problems(raw))
+    out = plain_numbers(raw, room_identifiers(_PROD_ROOMS), _PROD_ROOMS)
+    assert out.endswith("priimta 101 — 3,40 m ir 102 — 3,40 m.")
+    assert plain_lt_problems(out, allow=room_identifiers(_PROD_ROOMS)) == []
+
+
+def test_every_model_written_warning_in_the_corpus_has_his_numbers():
+    root = Path(__file__).resolve().parents[2]
+    fixtures = sorted((root / "ground_truth").glob("*/ai_extract.json"))
+    assert fixtures, "no corpus fixture to scan — this test would pass vacuously"
+    changed, clean = 0, 0
+    for fixture in fixtures:
+        src = json.loads(fixture.read_text(encoding="utf-8"))
+        rooms = [r for r in src.get("patalpos") or [] if isinstance(r, dict)]
+        ids = room_identifiers(rooms)
+        for raw in _model_written(src.get("warnings")):
+            out = plain_numbers(raw, ids, rooms)
+            before, after = plain_lt_problems(raw, allow=ids), plain_lt_problems(out, allow=ids)
+            where = f"{fixture.parent.name}: {out}"
+            assert not [p for p in after if p.startswith("a decimal point")], where
+            assert _classes(after) <= _classes(before), f"the rewrite added a problem — {where}"
+            changed += out != raw
+            clean += not after and bool(before)
+    assert changed >= 6, f"only {changed} corpus sentences rewritten — is the corpus still the one measured?"
+    assert clean >= 4, "no sentence went from flagged to plain — the net and the rewrite disagree"
+
+
+def test_the_led_estimate_rows_read_plain():
+    from extractor.niche_inference import LED_ESTIMATE_CHOICE_KEY, LED_ESTIMATE_ROOM_SENTENCE
+    from extractor.vision_call import _build_pozicijos_from_rooms, _recompute_per_room_via_python
+
+    def project():
+        return {"patalpos": [
+            {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
+             "perimetras_m": 22.0, "lubu_aukstis_m": 2.7,
+             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 8.0, "_source": "niche_locator"}]},
+            {"nr": "02", "pavadinimas": "Koridorius", "paskirtis": "koridorius", "plotas_m2": 8.0,
+             "perimetras_m": 12.0, "lubu_aukstis_m": 2.7,
+             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 6.6,
+                            "_source": "statistical_inference"}]}], "santrauka": {}}
+
+    rows = []
+    for overrides in ({}, {LED_ESTIMATE_CHOICE_KEY: True}):
+        built = _build_pozicijos_from_rooms(_recompute_per_room_via_python(project(), overrides))
+        for r in built["pozicijos"]:
+            if "niš" not in str(r.get("aprasymas") or "").lower():
+                continue
+            rows += [(f"{r['aprasymas']}.{k}", r[k]) for k in ("_confidence_reason", "_assumption")
+                     if isinstance(r.get(k), str) and r[k]]
+    rows.append(("LED_ESTIMATE_ROOM_SENTENCE", LED_ESTIMATE_ROOM_SENTENCE))
+    assert any("suveskite ilgį" in where for where, _ in rows)
+    assert any("Nišų formavimas" in where for where, _ in rows)
+    _assert_plain(rows, allow=("01", "02", "Svetainė", "Koridorius"))

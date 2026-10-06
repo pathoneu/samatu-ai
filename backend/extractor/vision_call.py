@@ -34,7 +34,9 @@ from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
 from .niche_inference import (
-    LED_ESTIMATE_ROOM_SENTENCE, estimated_niche_m, led_estimate_disclosure, led_estimated_rooms,
+    HELD_ESTIMATE_KEY, INFERRED_SOURCE, LED_ESTIMATE_ROOM_SENTENCE, billed_estimate_m,
+    estimate_accepted, estimated_niche_m, led_estimate_disclosure, led_estimate_waiting,
+    led_estimate_waiting_row, led_estimated_rooms,
 )
 
 log = logging.getLogger(__name__)
@@ -1437,7 +1439,7 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "", evidence: bool | No
     return round(perim * 1.05, 2)
 
 
-def _calc_nisu_metrai_m(elementai: list) -> float:
+def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> float:
     """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
 
     ilgis_m = TOTAL niche length in this room across all segments.
@@ -1447,9 +1449,15 @@ def _calc_nisu_metrai_m(elementai: list) -> float:
 
     Fallback path (no ilgis_m, only plotis_mm) keeps kiekis as a multiplier
     because plotis_mm is per-window and naturally pairs with a count.
+
+    `include_estimates=False` leaves out the niches `niche_inference`
+    estimated from the room type — billed only once he accepts the estimate
+    (2026-10-06, see `refresh_led_metres`).
     """
     total = 0.0
     for el in (elementai or []):
+        if not include_estimates and el.get("_source") == INFERRED_SOURCE:
+            continue
         if (el.get("tipas") or "").lower() == "nisa_led":
             ilgis = float(el.get("ilgis_m") or 0)
             if ilgis > 0:
@@ -1460,6 +1468,22 @@ def _calc_nisu_metrai_m(elementai: list) -> float:
                 if plotis_mm > 0:
                     total += (plotis_mm / 1000 + 0.40) * kiekis
     return round(total, 2)
+
+
+def refresh_led_metres(room: dict, overrides: dict | None) -> None:
+    """The room's billed LED niche metres (`nisu_metrai`) and the estimate held
+    back from them (`_nisu_ivertinta_m`, absent when nothing is held back).
+    2026-10-06: a length estimated from the room type waits for his „Priimti
+    įvertinimą" in Nustatymai (`niche_inference.estimate_accepted`). One
+    function for the extraction and both recompute paths, so the three agree."""
+    accepted = estimate_accepted(overrides)
+    elementai = room.get("elementai") or []
+    room["nisu_metrai"] = _calc_nisu_metrai_m(elementai, include_estimates=accepted)
+    held = 0.0 if accepted else estimated_niche_m(room)
+    if held > 0:
+        room[HELD_ESTIMATE_KEY] = held
+    else:
+        room.pop(HELD_ESTIMATE_KEY, None)
 
 
 def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
@@ -1702,6 +1726,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
 
     rules = translate_user_prefs_to_room_rules(rules_override or {})
     rooms = parsed.get("patalpos") or []
+    # his answers as the project-level pass reads them — the LED estimate choice (2026-10-06) too
+    led_view = {**(parsed.get("_overrides") or {}), **(rules_override or {})}
     # 2026-09-23: the project-level pass — doors two rooms list paired, the frameless-door assumption
     # settled, cornice evidence — before any room is computed (the same pass the recomputes run)
     parsed["_paruosimas"] = prepare_rooms_for_calc(
@@ -1811,7 +1837,7 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
 
         # 4–6. Everything the calculator does NOT return but every row builder
         # reads — shared with /recompute-interior (2026-09-07).
-        derive_room_extras(room, counts, rules_override)
+        derive_room_extras(room, counts, rules_override, led_overrides=led_view)
     _warn_failed_room_calcs(parsed, failed_rooms)
     return parsed
 
@@ -1848,10 +1874,15 @@ def _warn_failed_room_calcs(parsed: dict, failed_rooms: list[dict]) -> None:
     parsed["warnings"] = ws
 
 
-def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) -> None:
+def derive_room_extras(room: dict, counts: dict, rules_override: dict | None,
+                       led_overrides: dict | None = None) -> None:
     """Steps 4–6 of the per-room engine, applied IN PLACE after
     `calc_room_quantities`: hidroizoliacija, glaistas (kg), dažai (l), gruntas
     (l), lubų karnizas, LED nišų metrai, the audit fields and the readable trace.
+
+    `led_overrides` — where his answer to „LED nišos be perskaityto ilgio" is
+    read from when it is not `rules_override` (the extraction tail passes the
+    project's `_overrides` merged with it, as `prepare_rooms_for_calc` does).
 
     One function for both the extraction pipeline and `/recompute-interior`
     (2026-09-07). Until then the room-sheet recompute refreshed the areas but
@@ -1888,8 +1919,8 @@ def derive_room_extras(room: dict, counts: dict, rules_override: dict | None) ->
     room["lubu_karnizo_m"] = _calc_lubu_karnizas_m(
         perim, room.get("paskirtis", ""), evidence=room.get(KARNIZAS_KEY))
 
-    # 4.5 LED nišų metrai
-    room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
+    # 4.5 LED nišų metrai — an estimate from the room type only once he accepts it (2026-10-06)
+    refresh_led_metres(room, rules_override if led_overrides is None else led_overrides)
 
     # 5. Audit field
     room["_computed_by"] = "python_deterministic"
@@ -3509,8 +3540,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             return SHOWER_READ_SENTENCE if r.get(SHOWER_KEY) is True else SHOWER_ASSUMED_SENTENCE
 
         # …and a niche length estimated from the room type says so in the room
+        # (only while the estimate is billed — waiting for his answer it is not, 2026-10-06)
         def _led_why(r: dict) -> str:
-            return LED_ESTIMATE_ROOM_SENTENCE if estimated_niche_m(r) > 0 else "LED nišos lubose"
+            return LED_ESTIMATE_ROOM_SENTENCE if billed_estimate_m(r) > 0 else "LED nišos lubose"
 
         rules: list[tuple[str, object, str, str, object]] = [
             ("Sienų lyginimas Knauf Rotband", None, "m2", "Dalis dažomų sienų", lambda r: _pask(r) is not None),
@@ -4037,6 +4069,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
         ])
+    # 2026-10-06: rooms where no niche length was read and the room-type estimate
+    # waits for his answer — one blank row naming them with the estimate for each
+    # (niche_inference.LED_ESTIMATE_OPT_IN). Emitted with or without read metres.
+    _led_waiting_row = led_estimate_waiting_row(led_estimate_waiting(rooms))
+    if _led_waiting_row:
+        pozicijos.append({"skyrius": SK_GKP, **_led_waiting_row})
 
     # ════════════════════════════════════════════════════════════════════════
     # GKP MONTAVIMAS (~5-9 lines)
@@ -5937,6 +5975,11 @@ def extract_interior(
         _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
         return parsed
 
+    # The reading model's own warnings, the very objects Pass 1 returned — the
+    # notes every later step appends are not in this list. Written in plain
+    # numbers at Step 3.9, after every step that reads them (2026-10-06).
+    _model_warnings = list(parsed["warnings"]) if isinstance(parsed.get("warnings"), list) else []
+
     # `_meta.pages_sent` alone can't be audited — it says how many pages the
     # model saw but not how many existed or what we withheld. Record the full
     # decision next to it so a wrong sąmata can be traced to a dropped page.
@@ -7351,6 +7394,20 @@ def extract_interior(
                         "sumos gali būti senos. Patikrinkite sumas sąmatoje."),
         })
         parsed["warnings"] = existing_warnings
+
+    # Step 3.9 (2026-10-06): the reading model's own warnings in the numbers his
+    # screen writes — decimal commas, „101 — 3,40 m" instead of „101=3.40" —
+    # before the checks and the „Verta patikrinti" list read them. Model-written
+    # texts only (captured right after Pass 1), and after the height salvage
+    # and the LED room-list gate, which read the same texts by machine; the
+    # prompt is untouched (extractor/model_warnings.py).
+    try:
+        from .model_warnings import normalise_model_warnings
+        _n_plain = normalise_model_warnings(parsed, _model_warnings)
+        if _n_plain:
+            print(f"[extractor] model warnings: {_n_plain} written in plain numbers")
+    except Exception as exc:
+        print(f"[extractor] model warning normaliser failed (non-fatal): {exc}")
 
     # Step 4: Apply LT sanity checks (adds _lt_warnings, does NOT mutate values)
     try:

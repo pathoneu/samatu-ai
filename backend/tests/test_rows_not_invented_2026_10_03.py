@@ -18,6 +18,7 @@ import pytest
 from extractor.confidence import (
     KAMPAI_REASON, ROOM_DEFAULT_REASON, apply_confidence,
 )
+from extractor.niche_inference import LED_ESTIMATE_CHOICE_KEY
 from extractor.universal_rules import calc_room_quantities
 from extractor.vision_call import (
     SHOWER_ASSUMED_SENTENCE, SHOWER_KEY, _build_pozicijos_from_rooms,
@@ -68,16 +69,16 @@ def _with_plumbing(parsed: dict) -> dict:
     return p
 
 
-def _extract_tail(parsed: dict) -> dict:
+def _extract_tail(parsed: dict, overrides: dict | None = None) -> dict:
     """What the extraction does from the plumbing reader on: the reader step
     marks the rooms, then the per-room tail runs (Step 2.9)."""
     p = copy.deepcopy(parsed)
     mark_shower_rooms(p)
-    return _recompute_per_room_via_python(p, {})
+    return _recompute_per_room_via_python(p, overrides or {})
 
 
-def _build(parsed: dict) -> list[dict]:
-    return _build_pozicijos_from_rooms(_extract_tail(parsed))["pozicijos"]
+def _build(parsed: dict, overrides: dict | None = None) -> list[dict]:
+    return _build_pozicijos_from_rooms(_extract_tail(parsed, overrides))["pozicijos"]
 
 
 def _row(rows, prefix):
@@ -328,10 +329,14 @@ def _led_project(read_m: float | None) -> dict:
 
 
 _LED_ROWS = ("Nišų formavimas GKP konstrukcijoje", "LED nišų glaistymas")
+# Since 2026-10-06 an estimate is billed only once he accepts it in Nustatymai
+# (niche_inference.LED_ESTIMATE_OPT_IN, tests/test_led_estimate_choice_2026_10_06.py);
+# the disclosure below is what the rows say after he did.
+_ACCEPTED = {LED_ESTIMATE_CHOICE_KEY: True}
 
 
 def test_led_rows_with_an_estimate_are_never_green_and_name_the_rooms():
-    rows = _build(_led_project(read_m=8.0))
+    rows = _build(_led_project(read_m=8.0), _ACCEPTED)
     for prefix in _LED_ROWS:
         row = _row(rows, prefix)
         assert row["kiekis"] == pytest.approx(14.6), prefix     # quantity unchanged
@@ -344,7 +349,7 @@ def test_led_rows_with_an_estimate_are_never_green_and_name_the_rooms():
 
 
 def test_led_rows_all_estimated_are_red():
-    rows = _build(_led_project(read_m=None))
+    rows = _build(_led_project(read_m=None), _ACCEPTED)
     assert _row(rows, "Nišų formavimas GKP konstrukcijoje")["confidence"] == "raudona"
 
 

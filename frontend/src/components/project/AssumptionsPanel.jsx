@@ -9,6 +9,7 @@ import { parseLtNumber } from '@/lib/parseLtNumber';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { rulesWithScope } from '@/lib/scope';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
+import { estimatedLedRooms, ledEstimateBilled, ledEstimateText } from '@/lib/ledEstimate';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
 // keystroke fired its own request and the answers raced (2026-07-27 audit).
@@ -425,6 +426,10 @@ export default function AssumptionsPanel({
   const avgH  = rooms.length > 0
     ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
     : 2.80;
+  // LED niches with no length read (2026-10-06): the rooms, their estimate, and whether the
+  // niche rows carry it right now (his answer, or — before he gave one — what the rows do)
+  const ledEstimates = estimatedLedRooms(rooms);
+  const ledBilled = ledEstimateBilled(rooms, safeAssumptions.led_nisu_ivertinimas);
 
   return (
     <div ref={rootRef} className={bare ? '' : 'border border-border rounded-xl overflow-hidden'}>
@@ -636,6 +641,47 @@ export default function AssumptionsPanel({
               })}
             </div>
           </Row>
+
+          {/* LED nišos be perskaityto ilgio (2026-10-06, founder decision). A niche length estimated from the
+              room type is billed only once he accepts it — `_overrides.led_nisu_ivertinimas`, read by
+              niche_inference.estimate_accepted on every path. Until then the niche rows carry the metres read
+              off the drawing and the blank row „LED nišos — suveskite ilgį" names these rooms. Shown only when
+              the project HAS such an estimate. */}
+          {ledEstimates.length > 0 && (
+            <Row
+              label={t('project.assumptions.ledEstimate')}
+              note={t('project.assumptions.ledEstimateNote', ledEstimateText(ledEstimates))}
+            >
+              <div className="flex gap-1">
+                {[['false', t('project.assumptions.ledEstimateLeave')],
+                  ['true', t('project.assumptions.ledEstimateAccept')]].map(([val, lbl]) => {
+                  const on = String(ledBilled) === val;
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        const v = val === 'true';
+                        setField('led_nisu_ivertinimas', v);
+                        handleRecompute('led_nisu_ivertinimas', v);
+                      }}
+                      title={t(`project.assumptions.ledEstimateTitles.${val}`)}
+                      aria-pressed={on}
+                      data-assumption={`led_nisu_ivertinimas:${val}`}
+                      className={`rounded border font-medium transition-colors ${
+                        on
+                          ? 'bg-primary/10 text-foreground border-primary'
+                          : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
+                      }`}
+                      style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
+                    >
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
+            </Row>
+          )}
 
           {/* Sienos storis */}
           <Row

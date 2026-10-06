@@ -73,8 +73,11 @@ EXPECTED_SKIPPED = {"positioned_marker_lane_skipped", "apdailos_skipped"}
 # The metrics plain --recompute gets wrong on objektas_h because it does not run the
 # drawing lanes (perimeters added from the strings, outlines, openings as drawn, floor
 # coverings). When a lane starts or stops moving one, update this set — and say why.
+# 2026-10-06: `led_nisos_m` left it — the lanes moved the LED metres only through the
+# room-type estimate (perimeter × a ratio), which is no longer billed until he accepts it
+# (niche_inference.LED_ESTIMATE_OPT_IN); the read niche metres do not depend on a lane.
 LANES_MOVE = {
-    "dazymo_walls_plus_ceilings_combined_m2", "led_nisos_m", "plyteles_grindys_total_m2",
+    "dazymo_walls_plus_ceilings_combined_m2", "plyteles_grindys_total_m2",
     "plyteles_sienos_total_m2", "kampu_metrai_m", "rotband_lyginimas_m2",
     "plyteles_sienos_grindys_combined_m2", "pvc_grindys_m2", "grindjuostes_total_m",
     "plyteliu_grindjuostes_m", "pasleptu_duru_staktos_m", "angokrasciu_m",
@@ -283,3 +286,23 @@ def test_the_eval_reproduces_production_on_its_own_output(run):
         assert again["santrauka"] == prod["santrauka"], replay
         assert _rows(again) == _rows(prod), replay
         assert _room_diffs(again, prod) == {}, replay
+
+
+# ── (d) the model's own warnings, in his numbers (2026-10-06) ───────────────
+def test_the_models_warnings_reach_the_list_in_his_numbers(run):
+    """Step 3.9 runs on production's path: the warnings the model wrote (the
+    stored ones, answered back by the stub) come out with decimal commas, and
+    the list the screen reads shows them so (extractor/model_warnings.py)."""
+    from extractor.model_warnings import plain_numbers, room_identifiers
+
+    result = run["result"]
+    rooms = result["patalpos"]
+    said = [w["message"] for w in gr._vision_warnings(run["frozen"])]
+    want = [plain_numbers(m, room_identifiers(rooms), rooms) for m in said]
+    assert want != said, "no stored warning carries a number to rewrite — nothing is tested"
+    stored = [w.get("message") for w in result.get("warnings") or [] if isinstance(w, dict)]
+    shown = [w.get("message") for w in (result.get("lt_sanity") or {}).get("warnings") or []]
+    for before, after in zip(said, want):
+        assert after in stored and after in shown, after
+        if before != after:
+            assert before not in stored and before not in shown, before
