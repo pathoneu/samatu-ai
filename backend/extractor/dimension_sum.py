@@ -87,6 +87,10 @@ WALL_OUTLINES = ("vektoriniai_konturai", "sienu_konturas", "corrected", "manual"
 # an older record of the lane's), never a read or summed perimeter. The outline's own length stays beside it
 # (`_perimetras_suma["pagal_plota"]`).
 AREA_MATCH_MAX = 0.25
+# Why such an outline adds up no strings — the cause its perimeter fact names („Perimetro nesudėjau: …"). Until
+# 2026-10-06 it went on „— kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju", which contradicted the fact's
+# own „sienas skaičiuoju su … m"; room_facts renders the copies older projects still carry in these words too.
+AREA_MISMATCH_REASON = "kontūro plotas nesutampa su lentele"
 
 
 def _matched_to_table(room: dict, kont: dict, length_m: float) -> dict | None:
@@ -447,7 +451,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                 "is_konturo_m": round(from_outline + from_piers, 2) if not missing else 0.0, "pakartota": repeated,
                 "angos_m": from_openings if not missing else 0.0}
         if kont.get("plotas_nesutampa"):
-            reason = "kontūro plotas nesutampa su lentele — kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju"
+            reason = AREA_MISMATCH_REASON
         elif not sienos:
             reason = "kontūras be sienų"
         elif missing:

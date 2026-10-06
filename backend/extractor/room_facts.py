@@ -511,6 +511,18 @@ def _outline_matched_to_table(room: dict, value: float | None) -> dict | None:
     return out
 
 
+# The area-mismatch cause as dimension_sum wrote it before 2026-10-06: „…sienų ilgių nesumuoju" contradicted the
+# sentence's own „sienas skaičiuoju su … m". Projects read before then still carry it.
+_OLD_AREA_MISMATCH_REASON = "kontūro plotas nesutampa su lentele — kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju"
+
+
+def _perimeter_reason(room: dict) -> str:
+    """Why the walls were not added up (dimension_sum's `_perimetras_priezastis`), worded as it is today."""
+    from .dimension_sum import AREA_MISMATCH_REASON
+    why = str(room.get("_perimetras_priezastis") or "").rstrip(".")
+    return AREA_MISMATCH_REASON if why == _OLD_AREA_MISMATCH_REASON else why
+
+
 def _fact_perimetras(project: dict, room: dict,
                      region: list[float] | None) -> dict:
     measured = _f(room.get("perimetras_m"))
@@ -580,7 +592,7 @@ def _fact_perimetras(project: dict, room: dict,
         # but it was not READ, so the sheet shows a blank, says why, and offers
         # the number: one click to accept, or type the real one.
         est = round(float(room["_perimetras_ivertis_m"] if measured is None else measured), 2)
-        why = str(room.get("_perimetras_priezastis") or "ne visos sienos plane turi matmenį").rstrip(".")
+        why = _perimeter_reason(room) or "ne visos sienos plane turi matmenį"
         page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
         matched = _outline_matched_to_table(room, est)
         if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas":
@@ -588,8 +600,9 @@ def _fact_perimetras(project: dict, room: dict,
                         f"tikrą. Kol neįrašyta, sienas skaičiuoju su {lt_num(est)} m.")
         elif matched:
             # 2026-10-06: the outline's length matched to the table's area (dimension_sum._matched_to_table) — the
-            # outline's own length and both areas said, so he sees why the number is not the outline's
-            sentence = (f"Perimetro nesudėjau: {why}. Sienų kontūras brėžinyje — {lt_num(matched['konturo_m'])} m, "
+            # outline's own length and both areas said, so he sees why the number is not the outline's. The numbers
+            # are the reason; a „Perimetro nesudėjau: …" in front only repeated it.
+            sentence = (f"Sienų kontūras brėžinyje — {lt_num(matched['konturo_m'])} m, "
                         f"bet jo plotas {lt_num(matched['konturo_plotas_m2'])} m², o lentelėje "
                         f"{lt_num(matched['lenteles_plotas_m2'])} m². Kontūrą pritaikiau prie lentelės ploto: tokios pat "
                         f"formos patalpos sienos būtų {lt_num(est)} m — priimkite arba įrašykite tikrą. "
@@ -616,15 +629,16 @@ def _fact_perimetras(project: dict, room: dict,
         est = _f(room.get("_perimetras_ivertis_m"))
         if est is not None and abs(est - measured) < 0.005:
             # he took the number the sheet offered — say which number that was, not „you typed it"
-            why = str(room.get("_perimetras_priezastis") or "").rstrip(".")
-            matched = _outline_matched_to_table(room, measured)
-            head = ("Priėmėte šiai patalpai tenkančią bendros erdvės sienų dalį"
-                    if room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas"
+            why = _perimeter_reason(room)
+            open_space = room.get("_perimetras_ivertis_saltinis") == "atviros_erdves_konturas"
+            matched = None if open_space else _outline_matched_to_table(room, measured)
+            head = ("Priėmėte šiai patalpai tenkančią bendros erdvės sienų dalį" if open_space
                     else (f"Priėmėte įvertį pagal sienų kontūrą, pritaikytą prie lentelės ploto: kontūras brėžinyje "
                           f"{lt_num(matched['konturo_m'])} m, jo plotas {lt_num(matched['konturo_plotas_m2'])} m², "
                           f"lentelėje {lt_num(matched['lenteles_plotas_m2'])} m²") if matched
                     else "Priėmėte įvertį pagal sienų kontūrą brėžinyje")
-            sentence = head + (f" (plane sienų ilgių nesudėjau: {why})." if why else ".")
+            # the matched head already says both areas — the cause in brackets would only repeat it
+            sentence = head + (f" (plane sienų ilgių nesudėjau: {why})." if why and not matched else ".")
             page = (room.get("_konturas") or {}).get("page") or room.get("puslapio_nr")
             return _fact("perimetras", round(measured, 2), "m", "read", "prielaida", page,
                          _outline_rect_pct(room) or _open_space_rect_pct(room) or region_on_page(room, page, region),

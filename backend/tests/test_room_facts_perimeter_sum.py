@@ -126,20 +126,54 @@ def test_an_outline_matched_to_the_table_area_says_so_with_its_own_length():
     p = _perimetras(room)
     assert p["value"] is None and p["status"] == "missing" and p["suggestion"] == {"value": 14.96, "label": "Priimti 14,96 m"}
     s = p["sentence"]
-    assert "nesutampa su lentele" in s and "13,98 m" in s and "11,80 m²" in s and "13,51 m²" in s
+    assert "13,98 m" in s and "11,80 m²" in s and "13,51 m²" in s
     assert "pritaikiau prie lentelės ploto" in s and "14,96 m" in s and not is_banned(s)
+    # 2026-10-06 review (room 101 on production): the numbers are the reason — no „Perimetro nesudėjau: …" in
+    # front, and never the stored „sienų ilgių nesumuoju" beside „sienas skaičiuoju su 14,96 m"
+    assert s.startswith("Sienų kontūras brėžinyje — 13,98 m, bet jo plotas 11,80 m², o lentelėje 13,51 m².")
+    assert "nesudėjau" not in s and "nesumuoju" not in s and "Kol neįrašyta, sienas skaičiuoju su 14,96 m." in s
     # he takes it: the sentence still says what that number was
     room["perimetras_saltinis"] = "user_override"
     p = _perimetras(room)
     assert p["value"] == 14.96 and "pritaikytą prie lentelės ploto" in p["sentence"] and "13,98 m" in p["sentence"]
-    assert not is_banned(p["sentence"])
+    assert not is_banned(p["sentence"]) and "nesumuoju" not in p["sentence"]
+    assert p["sentence"].startswith("Priėmėte įvertį pagal sienų kontūrą, pritaikytą prie lentelės ploto: kontūras "
+                                    "brėžinyje 13,98 m, jo plotas 11,80 m², lentelėje 13,51 m².")
     # a number of his own is not the matched one
     room["perimetras_m"] = 15.2
     assert "pritaik" not in _perimetras(room)["sentence"]
-    # a record of another number (an older estimate) says nothing about this one
+    # a record of another number (an older estimate) says nothing about this one — the cause is said, in today's words
     room.update({"perimetras_m": 14.5, "perimetras_saltinis": "konturo_ivertis", "_perimetras_ivertis_m": 14.5})
     s = _perimetras(room)["sentence"]
     assert "pritaik" not in s and "Pagal sienų kontūrą brėžinyje būtų 14,50 m" in s
+    assert s.startswith("Perimetro nesudėjau: kontūro plotas nesutampa su lentele. Pagal sienų kontūrą") and "nesumuoju" not in s
+
+
+def test_the_area_mismatch_cause_reads_the_same_from_a_project_stored_before_its_rewording():
+    """Projects read before 2026-10-06 carry dimension_sum's old cause („…kol nepatikrinta, kuris teisus, sienų
+    ilgių nesumuoju") — it contradicted the sentence's „sienas skaičiuoju su … m". It is said in today's words,
+    on the blank and on the accepted estimate; any other cause is said as stored."""
+    from extractor.dimension_sum import AREA_MISMATCH_REASON
+    old = "kontūro plotas nesutampa su lentele — kol nepatikrinta, kuris teisus, sienų ilgių nesumuoju"
+
+    def room(reason, saltinis="konturo_ivertis"):
+        return {"nr": "101", "pavadinimas": "Tambūras", "plotas_m2": 11.01, "puslapio_nr": 1, "lubu_aukstis_m": 2.7,
+                "perimetras_m": 14.01, "perimetras_saltinis": saltinis, "_perimetras_priezastis": reason,
+                "_perimetras_ivertis_m": 14.01, "_perimetras_ivertis_saltinis": "konturas",
+                "_konturas": {"page": 1, "plotas_m2": 9.03, "plotas_nesutampa": True}, "polygon_pct": OUTLINE,
+                "polygon_source": "vektoriniai_konturai"}
+
+    for saltinis in ("konturo_ivertis", "user_override"):
+        stored, fresh = _perimetras(room(old, saltinis))["sentence"], _perimetras(room(AREA_MISMATCH_REASON, saltinis))["sentence"]
+        assert stored == fresh and "nesumuoju" not in stored and "kuris teisus" not in stored, (saltinis, stored)
+        assert AREA_MISMATCH_REASON in stored and not is_banned(stored)
+    assert _perimetras(room(old))["sentence"] == ("Perimetro nesudėjau: kontūro plotas nesutampa su lentele. Pagal sienų "
+                                                  "kontūrą brėžinyje būtų 14,01 m — priimkite arba įrašykite tikrą. "
+                                                  "Kol neįrašyta, sienas skaičiuoju su 14,01 m.")
+    assert _perimetras(room(old, "user_override"))["sentence"] == (
+        "Priėmėte įvertį pagal sienų kontūrą brėžinyje (plane sienų ilgių nesudėjau: kontūro plotas nesutampa su lentele).")
+    # another cause is not touched
+    assert "2 iš 8 sienų be matmens" in _perimetras(room("2 iš 8 sienų be matmens"))["sentence"]
 
 
 # ── what the drawing pane needs: the walls and the outline, on the fact ─────────

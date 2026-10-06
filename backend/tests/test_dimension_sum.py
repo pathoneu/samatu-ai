@@ -174,6 +174,9 @@ def test_an_outline_that_disagrees_with_the_table_states_nothing():
     out = _run([two_rooms()], [r])
     assert r["perimetras_saltinis"] == "konturo_ivertis" and "nesutampa su lentele" in r["_perimetras_priezastis"]
     assert abs(r["_perimetras_ivertis_m"] - 14.0) < 0.2 and out["blank"] == ["01"]
+    # the cause only (2026-10-06): the sheet goes on „…sienas skaičiuoju su … m", so the reason must not say
+    # the walls are not summed („sienų ilgių nesumuoju" did)
+    assert r["_perimetras_priezastis"] == ds.AREA_MISMATCH_REASON and "nesumuoju" not in r["_perimetras_priezastis"]
 
 
 def test_an_outline_off_the_table_offers_its_length_matched_to_the_table_area():
