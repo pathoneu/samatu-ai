@@ -1513,6 +1513,24 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
             els.append(added)
             take(o, len(els) - 1, kind)
             out["added"] = out.get("added", 0) + 1
+        # 4f. units no opening took, of a count HE set (2026-10-06): step 5 sets each piece's count to the units
+        #     that stood, so an element whose units could not all stand lost the rest — his „+" on a window
+        #     that stands was undone on the next recompute, and a width he typed on a 2-unit row (objektas_a
+        #     102: 3000 ×2 → 3900) dropped the second window. In a room whose doors and windows he corrected
+        #     (`_angos_user_at`), or on a size he typed, the units left stay as a piece of their own: a door no
+        #     opening backs (`_be_angos`), a window standing in no opening (no `_anga_ks`); the room sheet names
+        #     both (room_facts._stood_in_walls). A door added from an opening whose units found none is that
+        #     door too, run after run. An element no unit of which stands is kept whole, as before. The
+        #     reader's own list is cut as before: keeping its units too was measured worse (objektas_h 05,
+        #     tests/test_his_opening_units_kept_2026_10_06.py).
+        his_room = bool(r.get(USER_OPENINGS_KEY))
+        for idx, e in enumerate(els):
+            if not (his_room or e.get("_dydis_user")):
+                continue
+            is_door = (e.get("tipas") or "").lower() in _DOOR_KINDS
+            left = _el_units(e) - len(fates.get(idx, []))
+            if left > 0 and (is_door or idx in fates):
+                fates.setdefault(idx, []).extend({"kind": "none" if is_door else "loose"} for _ in range(left))
         # 5. apply — split an element whose units met different fates
         for idx in sorted(fates, reverse=True):
             e = els[idx]
@@ -1537,6 +1555,9 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                 if kind == "none":
                     piece[UNBACKED_KEY] = True
                     out["unbacked"] += len(group)
+                    continue
+                if kind == "loose":
+                    piece.pop(WIDTH_SOURCE_KEY, None)               # it stands in no opening: no wall's width
                     continue
                 piece[OPENING_INDEX_KEY] = [g["k"] for g in group]
                 piece[OPENING_SIDE_KEY] = group[0]["i"]

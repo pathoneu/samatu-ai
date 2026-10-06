@@ -217,6 +217,18 @@ def _opening_check(fact: dict) -> tuple[str, str]:
         heads.append(head + " Atidarykite patalpą ir patikrinkite durų skaičių.")
     if held.get("langas"):
         heads.append(held["langas"])
+    elif int(_f(fact.get("langai_be_angos")) or 0) > 0:
+        # listed windows no opening took, none left beside them (2026-10-06: his „+" is kept, not cut)
+        loose = int(_f(fact.get("langai_be_angos")) or 0)
+        windows = sum(int(_f(d.get("kiekis")) or 0) for d in fact.get("details") or []
+                      if isinstance(d, dict) and d.get("tipas") == "langas")
+        fits = max(0, windows - loose)
+        lango = "lango" if loose % 10 == 1 and loose % 100 != 11 else "langų"
+        head = (f"Sąraše {windows} {element_label('langas', windows)}, o sienose — tik {fits} {_anga_word(fits)} "
+                f"langams: {loose} {lango} sienose neradau." if fits
+                else f"Sąraše {windows} {element_label('langas', windows)}, bet sienose "
+                     + ("angos jam neradau." if element_label("langas", windows) == "langas" else "angų jiems neradau."))
+        heads.append(head + " Atidarykite patalpą ir patikrinkite langų skaičių.")
     if heads:
         return " ".join(heads), said
     if not fact.get("details") and not (fact.get("openings") or {}).get("items"):

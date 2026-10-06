@@ -1392,10 +1392,21 @@ def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stoo
     parts += [w["sentence"] for w in withheld]
     if unbacked and not held_doors:
         parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — patikrinkite patalpoje.")
-    if not suggestions and not unbacked and not named and not withheld and not stood.get("removed"):
+    # …and the listed windows no opening took, with no opening left to name beside them (2026-10-06: a window
+    # he added with „+" where the walls have no free opening is kept, not cut — and said, not „tiek pat")
+    loose = _loose_windows(unplaced_windows) if not held_windows else 0
+    if loose:
+        which = "kuriam" if element_label("langas", loose) == "langas" else "kuriems"
+        parts.append(f"{loose} {element_label('langas', loose)} sąraše, {which} angos sienose nematau — patikrinkite patalpoje.")
+    if not suggestions and not unbacked and not loose and not named and not withheld and not stood.get("removed"):
         parts = [f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje."]
-    return (" ".join(parts) + _drawn_said(stood) + tail_beyond, bool(suggestions or unbacked or withheld),
+    return (" ".join(parts) + _drawn_said(stood) + tail_beyond, bool(suggestions or unbacked or withheld or loose),
             suggestions, withheld)
+
+
+def _loose_windows(unplaced_windows: list[dict]) -> int:
+    """How many listed window units stand in no opening (`_stood_in_walls`)."""
+    return sum(int(w.get("kiekis") or 0) for w in unplaced_windows or [] if isinstance(w, dict))
 
 
 def _against_the_walls(per_type: dict[str, int], openings: list[dict], listed_beyond: set[int] | None = None
@@ -1495,12 +1506,14 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
             walls_said, short, suggestions = _against_the_walls(per_type, openings, _listed_beyond(project, room, openings))
             withheld = []
         # `withheld`: leftover openings named for a look instead of offered (2026-10-06) — the questions
-        # list them among the rooms to check by hand (project_questions._ask_angos)
-        shown = {"openings": {"page": walls_page, "items": openings}, "suggestions": suggestions, "withheld": withheld}
+        # list them among the rooms to check by hand (project_questions._ask_angos); `langai_be_angos`: the
+        # listed window units no opening took, for the question's own sentence (project_questions._opening_check)
+        shown = {"openings": {"page": walls_page, "items": openings}, "suggestions": suggestions, "withheld": withheld,
+                 "langai_be_angos": _loose_windows((stood or {}).get("unplaced_windows"))}
         where = (walls_page, _outline_rect_pct(room))
     else:
         walls_said, short, suggestions = None, False, []
-        shown = {"openings": None, "suggestions": [], "withheld": []}
+        shown = {"openings": None, "suggestions": [], "withheld": [], "langai_be_angos": 0}
         where = (room.get("puslapio_nr"), region)
 
     if not details:
