@@ -53,7 +53,8 @@ from .page_classifier import canonical_tipas
 # `lt_num` lives in universal_rules since 2026-10-06 — the rule engine's notes
 # need it too, and universal_rules cannot import this module. project_questions
 # still imports it from here.
-from .universal_rules import REMOVED_OPENINGS_KEY, kiekis_units, lt_num, paskirtis_label
+from .universal_rules import (DOOR_WIDTH_TOL_M, REMOVED_OPENINGS_KEY, WALL_WIDTH_TOL_M, kiekis_units, lt_num,
+                              paskirtis_label)
 
 # ── the six facts, in the order the check sheet walks them ──────────────────
 FACT_KEYS = ("plotas", "perimetras", "aukstis", "apdaila", "angos", "grindys")
@@ -1165,32 +1166,53 @@ def _listed_beyond(project: dict, room: dict, openings: list[dict]) -> set[int]:
     """The openings (by index) whose door is already in the list of the room BEYOND them (2026-09-23): a
     door between the corridor and a bedroom stands in one of the two lists — proposing it again from the
     other side doubled the reveals and the frameless-door row on objektas_h (70 → 100 m after six adds).
-    A neighbour's interior door of the opening's width (±16 cm) claims it, each door once."""
-    out: set[int] = set()
+    A neighbour's interior door of the opening's width (±16 cm) claims it, each door once.
+
+    2026-10-06 (objektas_a): what decides is where the door STANDS, not its kind. The laundry's door stands in
+    its opening toward the garage — the pass calls it a door to the outside (a garage is outside for the
+    finisher) — and the garage was offered that door again; a door stood toward this room claims whatever its
+    kind. And each door claims the opening CLOSEST to its width, not the first one toward its room: the
+    bedroom's 0,57 m door to the bathroom claimed the bathroom's 1,57 m opening and the bathroom was offered
+    the 0,57 m one — the door itself. Within the walls pass's tolerance first; a door stood toward this room
+    that is nowhere near (a width he typed) still claims the closest one left, by its side alone."""
     by_nr = {str(r.get("nr") or "").strip(): r for r in (project.get("patalpos") or []) if isinstance(r, dict)}
     mine = str(room.get("nr") or "").strip()
-    claimed: dict[tuple[str, int], int] = {}
-    for idx, o in enumerate(openings):
-        other = by_nr.get(str(o.get("i") or ""))
-        if other is None or str(o.get("i")) == mine:
+    pairs: list[tuple[int, float, int, tuple[str, int], int]] = []
+    for nr in dict.fromkeys(str(o.get("i") or "") for o in openings):
+        other = by_nr.get(nr)
+        if other is None or nr == mine:
             continue
+        toward = [idx for idx, o in enumerate(openings) if str(o.get("i") or "") == nr]
+        rec = other.get("_angos_sienose")
+        theirs = (rec.get("angos") or []) if isinstance(rec, dict) else []
         for j, el in enumerate(other.get("elementai") or []):
-            if not isinstance(el, dict) or (el.get("tipas") or "") not in _DOOR_TIPAI or el.get("_exterior"):
+            if not isinstance(el, dict) or (el.get("tipas") or "") not in _DOOR_TIPAI:
                 continue
             leads = str(el.get("_is_sienu_angos") or el.get("_anga_i") or "").strip()
             if leads and leads != mine:
                 continue                                       # that door leads somewhere else
-            # a door stood toward this room (the walls pass, or added from the opening) claims by its side
-            # alone — a width he typed on it (800 in a 1,40 opening) is his business, not a second door
-            w = _f(el.get("plotis_mm"))
-            if leads != mine and w and abs(w / 1000.0 - float(o["plotis_m"])) > 0.16:
-                continue
+            if el.get("_exterior") and leads != mine:
+                continue                                       # a door to the outside, not toward this room
             units = kiekis_units(_f(el.get("kiekis")))       # a door he removed (0) claims nothing
-            if claimed.get((str(o.get("i")), j), 0) >= units:
+            if units <= 0:
                 continue
-            claimed[(str(o.get("i")), j)] = claimed.get((str(o.get("i")), j), 0) + 1
-            out.add(idx)
-            break
+            # the width it shows: the opening the pass stood it in, seen from its own room — else its own
+            ks = [k for k in (el.get("_anga_ks") or []) if isinstance(k, int) and 0 <= k < len(theirs)]
+            stood_in = theirs[ks[0]] if ks and isinstance(theirs[ks[0]], dict) else {}
+            own = _f(el.get("plotis_mm"))
+            w = _f(stood_in.get("plotis_m")) or (own / 1000.0 if own else None)
+            for idx in toward:
+                d = abs(w - float(openings[idx]["plotis_m"])) if w else 0.0
+                if leads != mine and d > DOOR_WIDTH_TOL_M:
+                    continue                                   # a door with no side claims by its width only
+                pairs.append((0 if d <= WALL_WIDTH_TOL_M else 1, d, idx, (nr, j), units))
+    out: set[int] = set()
+    claimed: dict[tuple[str, int], int] = {}
+    for _tier, _d, idx, key, units in sorted(pairs):
+        if idx in out or claimed.get(key, 0) >= units:
+            continue
+        claimed[key] = claimed.get(key, 0) + 1
+        out.add(idx)
     return out
 
 

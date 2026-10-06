@@ -12,6 +12,7 @@ Quantities never change on their own — only when he adds the opening.
 from __future__ import annotations
 
 from extractor import universal_rules as ur
+from extractor.project_questions import build_questions
 from extractor.room_facts import build_room_facts
 
 OUTLINE = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.35], [0.2, 0.35]]
@@ -227,3 +228,63 @@ def test_a_listed_door_no_opening_backs_holds_back_the_door_openings_left():
     alone = _stood("01", [_el("duris", 800, 2100), _el("duris", 1200, 2100)], [("07", 0.8)], paskirtis="koridorius")
     f = _angos(alone)
     assert f["withheld"] == [] and "1 durys sąraše, kurioms angos sienose nematau — patikrinkite patalpoje." in f["sentence"]
+
+
+# ── 2026-10-06: a door the room beyond lists, standing in the opening toward this room, is that opening's ──
+# objektas_a (local fixture): the garage was offered the laundry's door (the pass calls it a door to the
+# outside — a garage is outside for the finisher — and the claim skipped every such door), and the bathroom
+# was offered the bedroom's 0,57 m door (it claimed the FIRST opening toward the bathroom, the 1,57 m one).
+
+
+def _beside(*rooms: tuple[str, list[dict], list[tuple], dict]) -> dict:
+    """Rooms of one project as production stores them, the walls pass run over all of them together."""
+    project = {"patalpos": [
+        {"nr": nr, "puslapio_nr": 2, "plotas_m2": 15.0, "perimetras_m": 16.0, "lubu_aukstis_m": 2.7,
+         "polygon_pct": OUTLINE, "polygon_source": "vektoriniai_konturai", "_konturas": {"page": 1},
+         "elementai": elementai,
+         "_angos_sienose": {"page": 1, "angos": [_opening(i, w, x=round(0.2 + 0.05 * k, 2)) for k, (i, w) in enumerate(angos)]},
+         **room}
+        for nr, elementai, angos, room in rooms]}
+    ur.prepare_rooms_for_calc(project["patalpos"])
+    return project
+
+
+def _angos_of(project: dict, nr: str) -> dict:
+    return next(f for f in build_room_facts(project, nr)["facts"] if f["key"] == "angos")
+
+
+def test_the_garage_is_not_offered_the_door_the_laundry_lists_toward_it():
+    project = _beside(
+        ("103", [_el("duris", 780, 2100)], [("106", 0.78)], {"paskirtis": "koridorius"}),
+        ("105", [_el("duris", 1910, 2100)], [("106", 0.86), ("laukas", 1.91)], {"paskirtis": "garazas"}),
+        ("106", [], [("103", 0.78), ("105", 0.86)], {"paskirtis": "skalbykla"}))
+    laundry = project["patalpos"][2]["elementai"]
+    # the laundry's door stands in its opening toward the garage, a door to the outside for the finisher
+    assert [(e.get(ur.OPENING_SIDE_KEY), e.get(ur.EXTERIOR_KEY)) for e in laundry] == [("105", True)]
+    f = _angos_of(project, "105")
+    assert f["suggestions"] == [] and f["status"] == "read"
+    assert f["sentence"].endswith("Durys į patalpą 106 (0,86 m) įrašytos prie tos patalpos.")
+    # a door to the outside the room beyond lists in ITS opening to the outside claims nothing here
+    lone = _beside(("105", [_el("duris", 1910, 2100)], [("106", 0.86), ("laukas", 1.91)], {"paskirtis": "garazas"}),
+                   ("106", [{**_el("duris", 860, 2100), "_exterior": True}], [("laukas", 0.86)], {"paskirtis": "skalbykla"}))
+    assert lone["patalpos"][1]["elementai"][0][ur.OPENING_SIDE_KEY] == "laukas"
+    assert [(s["tipas"], s["plotis_m"], s["i"]) for s in _angos_of(lone, "105")["suggestions"]] == [("duris", 0.86, "106")]
+
+
+def test_the_bedrooms_door_claims_the_bathrooms_opening_of_its_width_and_the_wide_one_is_offered_once():
+    project = _beside(
+        ("110", [_el("duris", 600, 2100), _el("langas", 960, 1500)], [("111", 1.57), ("111", 0.57), ("laukas", 0.96)],
+         {"paskirtis": "miegamoji"}),
+        ("111", [_el("langas", 1440, 1500)], [("110", 1.57), ("110", 0.57), ("laukas", 1.44)], {"paskirtis": "vonia"}))
+    door = project["patalpos"][0]["elementai"][0]
+    assert (door[ur.OPENING_SIDE_KEY], door["plotis_mm"]) == ("111", 570)
+    bath = _angos_of(project, "111")
+    # the 0,57 m opening is the bedroom's door — said, not offered; the 1,57 m one nothing stands in is offered
+    assert [(s["tipas"], s["plotis_m"], s["i"]) for s in bath["suggestions"]] == [("duris", 1.57, "110")]
+    assert bath["sentence"].endswith("Durys į patalpą 110 (0,57 m) įrašytos prie tos patalpos.")
+    bedroom = _angos_of(project, "110")
+    assert [(s["tipas"], s["plotis_m"], s["i"]) for s in bedroom["suggestions"]] == [("duris", 1.57, "111")]
+    # one hole, one tick: the question offers the opening between them once, from the room asked first
+    q = next(x for x in build_questions(project)["questions"] if x["kind"] == "angos")
+    assert [(it["room_nr"], it["tipas"], it["plotis_m"], it["i"]) for it in q["items"]] == [("110", "duris", 1.57, "111")]
+    assert q["manual"] == []

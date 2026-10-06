@@ -23,6 +23,7 @@ from typing import Any
 
 from .room_facts import _DOOR_TIPAI, _FLOOR_LT, _anga_word, _f, build_room_facts, element_label, lt_num
 from .scope import is_room_excluded, normalize_apimtis
+from .universal_rules import DOOR_WIDTH_TOL_M
 
 ORDER = ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila")
 
@@ -228,14 +229,35 @@ def _opening_check(fact: dict) -> tuple[str, str]:
     return said, ""
 
 
+def _offered_from_beyond(offered: list[dict], nr: str, s: dict) -> bool:
+    """The same opening already offered from the room on its other side (2026-10-06, objektas_a: the bedroom
+    and the bathroom each offered a door into the one 1,57 m opening between them — one hole, two ticks, and
+    „Tinka" would have listed that door in both rooms). Neither room lists a door for it, so each room's sheet
+    offers it; the question offers it once — from the room asked first — each offer pairing with one.
+    Remembers the doors offered so far in `offered`."""
+    if s.get("tipas") not in _DOOR_TIPAI:
+        return False
+    toward, width = str(s.get("i") or ""), _f(s.get("plotis_m"))
+    for o in offered:
+        if (not o["paired"] and o["nr"] == toward and o["i"] == nr and width is not None and o["w"] is not None
+                and abs(o["w"] - width) <= DOOR_WIDTH_TOL_M):
+            o["paired"] = True
+            return True
+    offered.append({"nr": nr, "i": toward, "w": width, "paired": False})
+    return False
+
+
 def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
     asked = [(r, f) for r, f in rows if f["key"] == "angos"]
     if not asked:
         return None
     items, manual = [], []
+    offered: list[dict] = []
     for r, f in asked:
         suggestions = [s for s in (f.get("suggestions") or []) if isinstance(s, dict)]
         for s in suggestions:
+            if _offered_from_beyond(offered, _nr(r), s):
+                continue
             items.append(_item(r, f, proposed=True, tipas=s.get("tipas"), plotis_mm=s.get("plotis_mm"),
                                aukstis_mm=s.get("aukstis_mm"), i=s.get("i"), plotis_m=s.get("plotis_m"),
                                label=s.get("label"), line_pct=s.get("line_pct"),
