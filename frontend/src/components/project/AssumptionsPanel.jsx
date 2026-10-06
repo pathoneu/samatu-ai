@@ -10,10 +10,15 @@ import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { rulesWithScope } from '@/lib/scope';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
 import { estimatedLedRooms, ledEstimateBilled, ledEstimateText } from '@/lib/ledEstimate';
+import { createDebouncedRun, createRequestOrder } from '@/lib/debouncedRun';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
 // keystroke fired its own request and the answers raced (2026-07-27 audit).
 const RECOMPUTE_DEBOUNCE_MS = 400;
+// Which recompute answer counts — the newest per project. Module-level, not a
+// per-mount ref: a run flushed when the drawer closed can still be answering
+// after it is opened again, and an edit made then must supersede it.
+const recomputeOrder = createRequestOrder();
 
 // Plausible LT ceiling-height window (soviet 2.50 … double-height voids ~5.7).
 const H_MIN_M = 2.0;
@@ -273,19 +278,22 @@ export default function AssumptionsPanel({
   const setField = (field, val) => onChange({ ...safeAssumptions, [field]: val });
 
   // Debounced + request-ordered recompute (2026-07-27 audit):
-  //  - timerRef collapses a burst of keystrokes into ONE backend call
-  //  - reqIdRef makes stale answers unusable, so a slow first response can no
-  //    longer overwrite the quantities produced by a newer edit
+  //  - `debounced` collapses a burst of keystrokes into ONE backend call
+  //  - recomputeOrder makes stale answers unusable, so a slow first response can
+  //    no longer overwrite the quantities produced by a newer edit
   //  - revertRef holds the assumptions as they were BEFORE the burst; on
   //    failure we roll back, because otherwise the panel kept showing the new
   //    assumption next to the OLD quantities (a silently wrong sąmata).
-  const recomputeTimerRef = useRef(null);
-  const reqIdRef = useRef(0);
+  const [debounced] = useState(() => createDebouncedRun(RECOMPUTE_DEBOUNCE_MS));
   const revertRef = useRef(null);
 
-  useEffect(() => () => {
-    if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
-  }, []);
+  // The drawer closing unmounts this panel. A recompute still waiting out its
+  // debounce runs NOW: it used to be dropped here, so a setting toggled just
+  // before ✕ / a click outside / Esc was saved and its rows never recomputed
+  // (2026-10-06). The run answers to the page's onRecomputed / onChange, which
+  // outlive the panel; its own setRecomputing is a no-op by then (React 18) and
+  // the toast is global.
+  useEffect(() => () => { debounced.flush(); }, [debounced]);
 
   const handleRecompute = useCallback((field, newValue, meta = null) => {
     if (!onRecomputed || isDemo) return;  // Skip if parent won't accept results, or on the view-only sample
@@ -308,11 +316,10 @@ export default function AssumptionsPanel({
         source: 'prielaidos',
       });
     }
-    if (recomputeTimerRef.current) clearTimeout(recomputeTimerRef.current);
     setRecomputing(true);
-    recomputeTimerRef.current = setTimeout(async () => {
-      recomputeTimerRef.current = null;
-      const reqId = ++reqIdRef.current;
+    const orderKey = rawData?.id ?? '';
+    debounced.schedule(async () => {
+      const reqId = recomputeOrder.next(orderKey);
       try {
         const result = await recompute({
           rooms: panelRooms(rawData),
@@ -331,21 +338,21 @@ export default function AssumptionsPanel({
           // recompute paths cannot drift (lib/recomputeContext.js).
           context: buildRecomputeContext(rawData),
         });
-        if (reqId !== reqIdRef.current) return;  // superseded by a newer edit
+        if (!recomputeOrder.isLatest(orderKey, reqId)) return;  // superseded by a newer edit
         revertRef.current = null;
         onRecomputed(result);
       } catch (err) {
-        if (reqId !== reqIdRef.current) return;
+        if (!recomputeOrder.isLatest(orderKey, reqId)) return;
         console.error('Recompute failed:', err);
         const revertTo = revertRef.current;
         revertRef.current = null;
         if (revertTo) onChange(revertTo);
         toast.error(t('project.assumptions.toastRecomputeErr', { msg: err.message }));
       } finally {
-        if (reqId === reqIdRef.current) setRecomputing(false);
+        if (recomputeOrder.isLatest(orderKey, reqId)) setRecomputing(false);
       }
-    }, RECOMPUTE_DEBOUNCE_MS);
-  }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, onCorrection, isDemo, t]);
+    });
+  }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, onCorrection, isDemo, t, debounced]);
 
   const setLubuAukstis = (roomNr, val) => {
     const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
