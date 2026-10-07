@@ -340,6 +340,15 @@ def test_preflight_endpoint_hard_blocks_an_oversized_bundle(monkeypatch):
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "test_pdfs"
 
+# Enough wall clock for the WHOLE sample on any runner. The verdict is a
+# function of the pages read, and under the production budget (2,5 s) how many
+# pages get read depends on the machine: GitHub's runner stopped 1_BD.pdf's
+# sample short of its one interior page (elapsed 2.50–2.55 s) and the verdict
+# came back "unknown" on every push from 2026-10-06, while a laptop reads all 56
+# pages in 0,9 s. Stopping early is by design — production says so via
+# `sample_truncated` — so the rules are pinned on the full sample instead.
+_FULL_SAMPLE_BUDGET_S = 120.0
+
 
 @pytest.mark.integration
 @pytest.mark.parametrize("name,expect_verdict,expect_block", [
@@ -352,11 +361,21 @@ def test_preflight_on_real_fixtures(name, expect_verdict, expect_block):
     pdf = _FIXTURES / name
     if not pdf.exists():
         pytest.skip(f"{name} not on disk")
-    out = preflight_pdf(pdf.read_bytes())
-    assert out["verdict"] == expect_verdict, out
+    data = pdf.read_bytes()
+
+    # As production runs it: the default budget.
+    out = preflight_pdf(data)
     assert out["hard_block"] is expect_block, out
     # The whole point is that this is cheap: the endpoint budget is 5 s.
     assert out["elapsed_s"] < 5.0, out["elapsed_s"]
+
+    # The verdict, on the whole sample. A run that already read every sampled
+    # page IS that run; only a truncated one is repeated without the clock.
+    full = out if not out["sample_truncated"] else preflight_pdf(
+        data, budget_s=_FULL_SAMPLE_BUDGET_S)
+    assert full["sample_truncated"] is False, full
+    assert full["verdict"] == expect_verdict, full
+    assert full["hard_block"] is expect_block, full
 
 
 def test_sanity_mirror_strips_legacy_dev_prose_and_dedupes():

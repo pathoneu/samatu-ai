@@ -78,8 +78,10 @@ def _reset_pdf_page_cache():
 
 def pytest_configure(config):
     """Register custom marks so pytest doesn't warn on first use.
-    `integration` gates real-PDF / real-API tests; CI runs them via
-    `pytest -m integration` separately from the fast unit suite."""
+    `integration` marks real-PDF / real-API tests. Nothing deselects it: CI
+    (.github/workflows/ci.yml) runs the whole suite in one pass, integration
+    tests included, against whichever fixture PDFs are tracked. Locally,
+    `-m "not integration"` leaves them out."""
     config.addinivalue_line(
         "markers",
         "integration: marks tests that hit real PDFs or external services",
