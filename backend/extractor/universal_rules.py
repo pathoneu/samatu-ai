@@ -1005,6 +1005,7 @@ KIND_BY_DRAWING_KEY = "_tipas_pagal_brezini"  # element: its kind follows the dr
 WALL_WIDTH_TOL_M = 0.25                 # a Vision-read size against the wall's gap
 PASSAGE_MIN_W_M = 1.3                   # wider than a door
 DOOR_LIKE_W_M = (0.7, 1.3)              # an opening to the outside this wide with no window left is a door
+WINDOW_MIN_W_M = 0.5                    # narrower, an opening to the outside is no window's (room_facts offers none)
 _PASSAGE_ROOMS = {"gyvenamoji", "virtuve", "valgomasis", "koridorius", "holas", "tamburas", "kabinetas", "laiptai"}
 DOOR_WIDTH_TOL_M = 0.16
 FRAMELESS_MAX_W_M = 1.3                 # wider than this an interior „door" is a passage or a double leaf, not a frame
@@ -1355,7 +1356,10 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
         extractor/drawn_openings): a window takes a glazed opening first, a door one with a swing arc; a
         listed window whose only opening is a drawn door becomes an exterior door; a FREE glazed opening to
         the outside becomes a window, a FREE opening with a swing becomes a door (a listed door no opening
-        backed takes it first) — the terrace door drawn where the wall is not cut included.
+        backed takes it first) — the terrace door drawn where the wall is not cut included;
+      · the units of a listed window that stood in part take, last, the openings to the outside still free —
+        the closest width first (2026-10-07, objektas_a 102: „langas 2110 ×3" kept one window while the 3,90
+        and 0,96 m openings stayed empty); a unit none is left for is cut.
 
     A matched unit takes the WALL's width (`_plotis_pagal = "sienos"`; a size he typed stays) and records
     its opening (`_anga_ks`, `_anga_i`), so pairing across rooms is exact. Elements of several units whose
@@ -1363,7 +1367,7 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
     rooms = [r for r in rooms if isinstance(r, dict)]
     by_nr = {str(r.get("nr") or "").strip(): r for r in rooms if str(r.get("nr") or "").strip()}
     out = {"rooms": 0, "matched": 0, "widths": 0, "exterior": 0, "passages": 0, "unbacked": 0, "added": 0,
-           "added_windows": 0, "converted": 0, "stood_unbacked": 0}
+           "added_windows": 0, "converted": 0, "stood_unbacked": 0, "stood_left": 0}
     for r in rooms:
         els = [e for e in (r.get("elementai") or []) if isinstance(e, dict)]
         prev_ks = {id(e): e.get(OPENING_INDEX_KEY) for e in els} if r.get(USER_OPENINGS_KEY) else {}
@@ -1549,9 +1553,10 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
         #     (`_angos_user_at`), or on a size he typed, the units left stay as a piece of their own: a door no
         #     opening backs (`_be_angos`), a window standing in no opening (no `_anga_ks`); the room sheet names
         #     both (room_facts._stood_in_walls). A door added from an opening whose units found none is that
-        #     door too, run after run. An element no unit of which stands is kept whole, as before. The
-        #     reader's own list is cut as before: keeping its units too was measured worse (objektas_h 05,
-        #     tests/test_his_opening_units_kept_2026_10_06.py).
+        #     door too, run after run. An element no unit of which stands is kept whole, as before. In the
+        #     reader's own list the units left of a window that stood in part take the openings to the outside
+        #     still free (4g) and what finds none is cut as before: keeping its units too was measured worse
+        #     (objektas_h 05, tests/test_his_opening_units_kept_2026_10_06.py).
         his_room = bool(r.get(USER_OPENINGS_KEY))
         for idx, e in enumerate(els):
             if not (his_room or e.get("_dydis_user")):
@@ -1560,6 +1565,29 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
             left = _el_units(e) - len(fates.get(idx, []))
             if left > 0 and (is_door or idx in fates):
                 fates.setdefault(idx, []).extend({"kind": "none" if is_door else "loose"} for _ in range(left))
+        # 4g. the units of a listed window that stood in part — the rest found no opening of their width (step 2)
+        #     — stand in the openings to the outside still FREE, after the doors, the drawn doors and the drawn
+        #     glazing took theirs (so, in practice, the openings that show nothing): the closest width first, by
+        #     3b's tiers, each taking the wall's width (2026-10-07, objektas_a 102: „langas 2110 ×3" stood one
+        #     unit in the 2,11 m opening and step 5 cut the other two while the 3,90 and 0,96 m openings stayed
+        #     empty — reveals 52,99 m, true 89,39). A unit no free opening is left for is still cut (objektas_h
+        #     05: its second window has no opening of its own). An element none of whose units stood is kept
+        #     whole, as before, and named beside the openings left (room_facts._held_back): moving it too was
+        #     measured worse (eval --replay-geometry, objektas_a reveals +0,79 → −2,21 %, billed lines 22,88 →
+        #     22,92 %). A room he corrected and a size he typed stay 4f's; an opening narrower than a window
+        #     (WINDOW_MIN_W_M) takes none.
+        if not his_room:
+            for idx, e in windows:
+                w = _el_width_m(e)
+                if idx not in fates or e.get("_is_sienu_angos") or e.get("_dydis_user") or w is None:
+                    continue
+                for _ in range(_el_units(e) - len(fates[idx])):
+                    o, tier = _pick(free, w, _tiers(lambda o: o["i"] == "laukas" and o["w"] >= WINDOW_MIN_W_M, "langas"),
+                                    tol=9.9)
+                    if o is None:
+                        break
+                    take(o, idx, "window_as_door" if tier == 2 else "window")
+                    out["stood_left"] += 1
         # 5. apply — split an element whose units met different fates
         for idx in sorted(fates, reverse=True):
             e = els[idx]
@@ -1902,7 +1930,7 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
     out = {"shared_doors": 0, "exterior_doors": 0, "frameless": {"value": False, "source": "nera_pozymiu", "sakinys": ""},
            "ziniarastis": {"units": 0, "matched": 0, "beyond": 0}, "karnizas": False,
            "angos": {"rooms": 0, "matched": 0, "widths": 0, "exterior": 0, "passages": 0, "unbacked": 0, "added": 0,
-                     "added_windows": 0, "converted": 0, "stood_unbacked": 0}}
+                     "added_windows": 0, "converted": 0, "stood_unbacked": 0, "stood_left": 0}}
     try:
         out["angos"] = reconcile_openings_with_walls(rooms)
         for r in rooms:
