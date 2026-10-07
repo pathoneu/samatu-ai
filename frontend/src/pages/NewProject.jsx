@@ -13,11 +13,13 @@ import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
 import { WORK_FAMILIES, filterRowsByFamilies } from '@/lib/workFamilies';
 import { LUBOS_CHOICES, SIENOS_ANGOS_CHOICES, scopeForBackend } from '@/lib/scope';
 import { rememberProjectScope, remembered } from '@/lib/scopeMemory';
-import { parseLtNumber } from '@/lib/parseLtNumber';
 import {
   createProject, updateProject, getPriceLists, pullPriceListsFromBackend,
-  markPriceFillPending,
+  markPriceFillPending, refreshProjectFromBackend, flushProjectSaves,
 } from '@/lib/projectStore';
+import {
+  projectMeta, interiorStreamForm, metaToRestore, META_TEXT_MAX,
+} from '@/lib/newProjectForm';
 import { autoFillFromDefaultPriceList, describeAmbiguous } from '@/lib/applyPriceList';
 import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
 import { savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
@@ -105,6 +107,12 @@ async function detectAndExtract(file, forcedType, signal, opts = {}) {
  * when there is something to say.
  */
 function appendRulesOverride(fd, scope) {
+  const overrides = rulesOverrideFor(scope);
+  if (overrides) fd.append('rules_override', JSON.stringify(overrides));
+}
+
+/** The `rules_override` object itself — null when there is nothing to say. */
+function rulesOverrideFor(scope) {
   const overrides = {};
   try {
     const prefs = loadPrefs();
@@ -136,17 +144,7 @@ function appendRulesOverride(fd, scope) {
   }
   const apimtis = scopeForBackend(scope);
   if (apimtis) overrides.apimtis = apimtis;
-  if (Object.keys(overrides).length) fd.append('rules_override', JSON.stringify(overrides));
-}
-
-// SM01: the interior upload goes over the stream (lib/extractionRun.js owns the
-// stream, its timers, the hand-off and the wait — shared with the re-read).
-function interiorStreamForm(file, opts) {
-  const fd = new FormData();
-  fd.append('files', file);
-  fd.append('interior_subtype', opts.interiorSubtype || 'naujas');
-  appendRulesOverride(fd, opts.scope);
-  return fd;
+  return Object.keys(overrides).length ? overrides : null;
 }
 
 /**
@@ -359,6 +357,10 @@ export default function NewProject() {
         Notification.requestPermission().catch(() => {});
       }
     } catch { /* no Notification API — fine */ }
+    // His name, company, object and ceiling height — one copy for both hands
+    // that may save this project: this page when the result arrives, the
+    // server when the stream goes first (lib/newProjectForm.js).
+    const meta = projectMeta({ name: projectName, companyName, objektas, ceilingHeight });
     setError(null);
     setNotice(null);
     setStatus(t('newProject.statusUploading'));
@@ -388,6 +390,18 @@ export default function NewProject() {
     // it, exactly as a healthy run would.
     const landRecoveredProject = async (p) => {
       stopElapsed();
+      // The server saved it with the form's fields (`project_meta`). One that
+      // did not — a backend older than this page, mid-deploy — named it after
+      // the PDF: put his back before he sees it. Normally there is nothing to do.
+      const restore = metaToRestore(p, meta);
+      if (Object.keys(restore).length) {
+        try {
+          if (await refreshProjectFromBackend(p.id)) {
+            updateProject(p.id, restore);
+            await flushProjectSaves();
+          }
+        } catch { /* the project itself is saved; the name stays editable */ }
+      }
       try { await savePdf(p.id, file); } catch { /* IndexedDB best-effort */ }
       uploadPdfToBackend(p.id, file).catch(() => {});
       // This project was built and saved SERVER-side, so it never passed
@@ -466,7 +480,9 @@ export default function NewProject() {
           // SM01: stream the extraction so user sees progress in real time.
           setStreamPhase('rendering');
           const run = await runExtraction(
-            interiorStreamForm(file, { interiorSubtype, scope: scopeChoice() }),
+            interiorStreamForm(file, {
+              interiorSubtype, rulesOverride: rulesOverrideFor(scopeChoice()), meta,
+            }),
             {
               controller,
               onEvent: (ev) => {
@@ -569,23 +585,21 @@ export default function NewProject() {
         // conservative by construction: a section belonging to no family is
         // never dropped (see lib/workFamilies.js).
         const keptRows = filterRowsByFamilies(json.darbu_sarasas, [...families]);
-        // „Lubų aukštis, jei žinote" — kept as the project's own default so the
-        // Nustatymai height field opens on HIS number instead of 2,80. It is
-        // not applied behind his back: the quantities still come from what the
-        // drawing said, and one click in Nustatymai pushes his value through
-        // the live recompute.
-        const ceilingDefault = parseLtNumber(ceilingHeight);
         project = createProject(await withAutoPrices({
           ...json,
           darbu_sarasas:   keptRows,
-          name:            projectName || json.projektas || t('newProject.defaultNameInterior'),
-          company_name:    companyName,
+          // company_name, objektas_tipas and „Lubų aukštis, jei žinote" — the
+          // last kept as the project's own default so the Nustatymai height
+          // field opens on HIS number instead of 2,80. It is not applied
+          // behind his back: the quantities still come from what the drawing
+          // said, and one click in Nustatymai pushes his value through the
+          // live recompute. The same `meta` the server saves when the stream
+          // goes first.
+          ...meta,
+          name:            meta.name || json.projektas || t('newProject.defaultNameInterior'),
           tipas:           'interjeras',
-          objektas_tipas:  objektas,
           skaiciuoti_families: [...families],
           _apimtis:        scopeForBackend(scopeChoice()),
-          ...(Number.isFinite(ceilingDefault) && ceilingDefault > 0
-            ? { lubu_aukstis_default_m: ceilingDefault } : {}),
           rows:            [],
           total_rows:      json.patalpos.length,
           total_value:     0,
@@ -912,6 +926,7 @@ export default function NewProject() {
               placeholder={t('newProject.namePlaceholder')}
               title={t('newProject.nameTitle')}
               value={projectName}
+              maxLength={META_TEXT_MAX}
               onChange={(e) => setProjectName(e.target.value)}
               className="mt-1.5 bg-card border-border"
             />
@@ -923,6 +938,7 @@ export default function NewProject() {
               placeholder={t('newProject.companyPlaceholder')}
               title={t('newProject.companyTitle')}
               value={companyName}
+              maxLength={META_TEXT_MAX}
               onChange={(e) => setCompanyName(e.target.value)}
               className="mt-1.5 bg-card border-border"
             />

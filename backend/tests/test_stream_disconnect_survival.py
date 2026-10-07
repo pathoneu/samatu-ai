@@ -209,3 +209,104 @@ import pytest
 ])
 def test_recovered_project_name_is_human(filename, expected):
     assert main._clean_pdf_stem(filename) == expected
+
+
+# ── The New Project form's fields on the recovery path (2026-10-07) ─────────
+# Seen live: a reading takes ~20 min, Railway cuts the stream at ~10, the server
+# saves the project — and dropped what he typed on the form: „Testo g. 1 butas"
+# arrived under the PDF's name, with no company, no object and no ceiling
+# height. The stream request now carries them (`project_meta`, built by
+# frontend/src/lib/newProjectForm.js) and the save applies them, with the same
+# limits the browser applies to its own save.
+
+_META = {"name": "Testo g. 1 butas", "company_name": "UAB Statyba",
+         "objektas_tipas": "namas", "lubu_aukstis_default_m": 2.75}
+
+
+def _saved_blob(monkeypatch, result, pdf_name="Visi techniniai 01.28.pdf", **kw):
+    saved = {}
+    monkeypatch.setattr(main.db, "upsert_project",
+                        lambda pid, blob, user_id=None, **k: saved.update(blob=blob))
+    main._save_orphaned_result(result, {"id": "u"}, pdf_name, **kw)
+    return saved["blob"]
+
+
+def test_orphan_save_applies_the_forms_fields(monkeypatch):
+    blob = _saved_blob(monkeypatch, _result(), meta=dict(_META))
+    assert blob["name"] == "Testo g. 1 butas"
+    assert blob["company_name"] == "UAB Statyba"
+    assert blob["objektas_tipas"] == "namas"
+    assert blob["lubu_aukstis_default_m"] == 2.75
+    # presentation only: the reading itself rides along untouched
+    assert blob["tipas"] == "interjeras" and blob["total_rows"] == 2
+    assert blob["darbu_sarasas"][0]["aprasymas"] == "Dažymas"
+    # the raw form string the endpoint received reads the same
+    raw = json.dumps(_META, ensure_ascii=False)
+    assert _saved_blob(monkeypatch, _result(), meta=raw)["name"] == "Testo g. 1 butas"
+
+
+def test_orphan_save_without_the_forms_fields_falls_back(monkeypatch):
+    # An older page sends none: the PDF's name, no company, nothing invented.
+    blob = _saved_blob(monkeypatch, _result())
+    assert blob["name"] == "Visi techniniai 01.28"
+    assert blob["company_name"] == ""
+    assert "objektas_tipas" not in blob and "lubu_aukstis_default_m" not in blob
+    # The browser's own order: his name → the reading's title → the PDF's name.
+    titled = {**_result(), "projektas": "Dviejų kambarių butas"}
+    assert _saved_blob(monkeypatch, titled, meta={"name": "   "})["name"] == "Dviejų kambarių butas"
+    assert _saved_blob(monkeypatch, titled, meta=dict(_META))["name"] == "Testo g. 1 butas"
+    assert _saved_blob(monkeypatch, {**_result(), "projektas": {"x": 1}})["name"] == "Visi techniniai 01.28"
+
+
+def test_orphan_save_rejects_or_caps_bad_values(monkeypatch):
+    blob = _saved_blob(monkeypatch, _result(), meta={
+        "name": "  " + "Testo g. 1 " * 40, "company_name": 7, "objektas_tipas": "pilis",
+        "lubu_aukstis_default_m": 280, "tipas": "kz", "id": "not-this", "rows": [1]})
+    assert len(blob["name"]) == 200 and blob["name"].startswith("Testo g. 1")
+    assert blob["company_name"] == ""
+    assert "objektas_tipas" not in blob and "lubu_aukstis_default_m" not in blob
+    # the form's fields never overwrite what the save itself owns
+    assert blob["tipas"] == "interjeras" and blob["id"] != "not-this" and blob["rows"] == []
+
+
+@pytest.mark.parametrize("meta,expected", [
+    # text: trimmed, cut to the form inputs' 200 characters
+    ({"name": "  Testo g. 1  "}, {"name": "Testo g. 1"}),
+    ({"name": "x" * 500}, {"name": "x" * 200}),
+    ({"company_name": "  UAB Statyba "}, {"company_name": "UAB Statyba"}),
+    ({"name": "   ", "company_name": ""}, {}),
+    ({"name": 123, "company_name": {"a": 1}}, {}),
+    # object: the form's three answers only
+    ({"objektas_tipas": "komercines"}, {"objektas_tipas": "komercines"}),
+    ({"objektas_tipas": "pilis"}, {}),
+    ({"objektas_tipas": ["butas"]}, {}),
+    # ceiling height: a number inside the 2–6 m window Nustatymai accepts
+    ({"lubu_aukstis_default_m": 2}, {"lubu_aukstis_default_m": 2.0}),
+    ({"lubu_aukstis_default_m": 6.0}, {"lubu_aukstis_default_m": 6.0}),
+    ({"lubu_aukstis_default_m": 280}, {}),
+    ({"lubu_aukstis_default_m": 1.5}, {}),
+    ({"lubu_aukstis_default_m": -2.8}, {}),
+    ({"lubu_aukstis_default_m": True}, {}),
+    ({"lubu_aukstis_default_m": "2.8"}, {}),
+    ({"lubu_aukstis_default_m": float("nan")}, {}),
+    ({"lubu_aukstis_default_m": float("inf")}, {}),
+    # nothing else rides along
+    ({"tipas": "kz", "rows": [1], "_saved_by": "x"}, {}),
+])
+def test_project_meta_keeps_only_what_is_right(meta, expected):
+    assert main._project_meta(meta) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    None, "", "   ", "{not json", "[1, 2]", '"Testo g. 1"', "null", "NaN",
+    "[" * 2000 + "]" * 2000,                   # nested past the parser's recursion limit
+    json.dumps({"name": "x" * 5000}),          # oversized: never parsed
+])
+def test_a_bad_form_field_is_no_meta_never_an_error(raw):
+    assert main._project_meta(raw) == {}
+
+
+def test_the_direct_call_default_is_no_meta():
+    # called directly (tests do), the Form default is a FieldInfo, not a string
+    from fastapi import Form
+    assert main._project_meta(Form(None)) == {}

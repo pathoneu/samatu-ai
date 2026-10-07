@@ -6287,9 +6287,58 @@ def _project_gone(project_id: str) -> bool:
         return False
 
 
+# The New Project form's presentation fields (2026-10-07, seen live): „Projekto
+# pavadinimas", „Įmonės pavadinimas", „Koks objektas?" and „Lubų aukštis, jei
+# žinote". A connected browser saves them with the project itself; when the
+# stream goes first (a reading takes ~20 min, Railway cuts at ~10) the SERVER
+# saves the project, and it used to drop all four — „Testo g. 1 butas" arrived
+# under the PDF's name, with no company and his ceiling height gone. The stream
+# request now carries them as `project_meta`, built by the page's own helper
+# (frontend/src/lib/newProjectForm.js) under the same limits as below.
+_PROJECT_META_TEXT_MAX = 200          # the form inputs' maxLength
+_PROJECT_META_RAW_MAX = 4096          # the whole field; ours is a few hundred bytes
+_OBJEKTO_TIPAI = frozenset({"butas", "namas", "komercines"})
+# Nustatymai's height window (AssumptionsPanel H_MIN_M / H_MAX_M): a default
+# outside it could never be applied from there.
+_CEILING_DEFAULT_MIN_M, _CEILING_DEFAULT_MAX_M = 2.0, 6.0
+
+
+def _project_meta(raw) -> dict:
+    """The form's fields from `project_meta` (the raw form string, or a dict),
+    keeping only what is right: text trimmed and cut to 200 characters, the
+    object one of the form's three, the ceiling height a number inside 2–6 m.
+    Anything else — absent, not JSON, not an object, oversized — is {}: these
+    fields name the project, they never refuse a reading."""
+    if isinstance(raw, str):
+        if not raw.strip() or len(raw) > _PROJECT_META_RAW_MAX:
+            return {}
+        try:
+            raw = json.loads(raw)
+        except (ValueError, RecursionError):
+            log.warning("project_meta ignored: not JSON")
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    meta: dict = {}
+    for key in ("name", "company_name"):
+        text = raw.get(key)
+        if isinstance(text, str) and text.strip():
+            meta[key] = text.strip()[:_PROJECT_META_TEXT_MAX]
+    tipas = raw.get("objektas_tipas")
+    if isinstance(tipas, str) and tipas in _OBJEKTO_TIPAI:
+        meta["objektas_tipas"] = tipas
+    height = raw.get("lubu_aukstis_default_m")
+    if (isinstance(height, (int, float)) and not isinstance(height, bool)
+            and math.isfinite(height)
+            and _CEILING_DEFAULT_MIN_M <= height <= _CEILING_DEFAULT_MAX_M):
+        meta["lubu_aukstis_default_m"] = float(height)
+    return meta
+
+
 def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
                           pdf_bytes: bytes | None = None,
-                          project_id: str | None = None) -> str | None:
+                          project_id: str | None = None,
+                          meta: dict | str | None = None) -> str | None:
     """Persist a finished extraction whose CLIENT vanished mid-stream.
 
     Mirrors what NewProject.jsx's createProject() builds from the done event
@@ -6299,6 +6348,10 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     dropped, matching the frontend's own guards. (2026-07-28 disconnect
     survival; born from the first production run, where Railway's edge cut a
     live stream ~10 min in and 20 minutes of paid Opus work evaporated.)
+
+    `meta` — the New Project form's fields the stream request carried
+    (`_project_meta`); without them the project is named the way the browser
+    would name it: the reading's own title, then the PDF's name.
 
     Returns the saved project's id, or None when nothing was saved."""
     if not user or not user.get("id"):
@@ -6314,16 +6367,25 @@ def _save_orphaned_result(result: dict, user: dict | None, pdf_name: str,
     zero_rooms = not result.get("patalpos")
     import uuid as _uuid
     from datetime import timezone as _tz
-    stem = _clean_pdf_stem(pdf_name)
+    meta = _project_meta(meta)
+    # The browser's order (NewProject.jsx createProject): the name he typed →
+    # the reading's own title → here, the PDF's name.
+    title = result.get("projektas")
+    name = (meta.get("name")
+            or (title.strip() if isinstance(title, str) else "")
+            or _clean_pdf_stem(pdf_name))
     # The id was announced to the client in the stream's first event, so a
     # browser that lost the connection knows exactly which project to wait for.
     project_id = project_id or str(_uuid.uuid4())
     now = datetime.now(_tz.utc).isoformat().replace("+00:00", "Z")
     blob = {
         **result,
+        # „Koks objektas?" and „Lubų aukštis, jei žinote" — only when he gave
+        # them; the keys below are the save's own and always win.
+        **{k: meta[k] for k in ("objektas_tipas", "lubu_aukstis_default_m") if k in meta},
         "id": project_id,
-        "name": stem,
-        "company_name": "",
+        "name": name,
+        "company_name": meta.get("company_name", ""),
         "tipas": "interjeras",
         "rows": [],
         "total_rows": len(result.get("patalpos") or []),
@@ -6367,6 +6429,7 @@ async def extract_interior_stream_endpoint(
     files: list[UploadFile] = File(...),
     rules_override: str | None = Form(None),
     reread_of: str | None = Form(None),
+    project_meta: str | None = Form(None),
 ):
     _user = _billable_user(request)
     # Billing parity with /extract-interior (pre-prod audit 2026-07-25): this
@@ -6404,6 +6467,10 @@ async def extract_interior_stream_endpoint(
             overrides_dict = json.loads(rules_override)
         except json.JSONDecodeError as e:
             raise HTTPException(status_code=400, detail=f"rules_override JSON klaida: {e}")
+    # The New Project form's name, company, object and ceiling height — used
+    # only if this server ends up saving the project (_save_orphaned_result).
+    # Never a 400: they name the project, they do not change the reading.
+    meta = _project_meta(project_meta)
 
     pdf_name = files[0].filename or ""
     log.info("extract-interior-stream: ip=%s file=%s size=%dKB pages=%d",
@@ -6562,7 +6629,7 @@ async def extract_interior_stream_endpoint(
                         log.error("stream orphan drain: re-read %s could not be held; "
                                   "saving it as a separate project", recovery_id)
                     saved = _save_orphaned_result(result, _user, pdf_name, pdf_bytes,
-                                                  project_id=recovery_id)
+                                                  project_id=recovery_id, meta=meta)
                     if saved:
                         _job_finish("done", project_id=saved)
                     else:

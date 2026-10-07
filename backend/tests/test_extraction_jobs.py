@@ -286,6 +286,53 @@ def test_client_gone_mid_run_new_project_saved_then_done(jobs_db, monkeypatch):
     assert job["result"] is None
 
 
+def test_client_gone_mid_run_saves_the_forms_name_and_choices(jobs_db, monkeypatch):
+    """2026-10-07, seen live: the project the server saved after the hand-off was named after the PDF — the
+    name he typed, his company, the object and his ceiling height were all dropped. The stream request
+    carries them as `project_meta` (frontend/src/lib/newProjectForm.js) and the server's save applies them."""
+    import json as _json
+    _stream_env(monkeypatch, stream=_slow_ok_stream)
+    rid = _disconnect_midstream(project_meta=_json.dumps({
+        "name": "Testo g. 1 butas", "company_name": "UAB Statyba",
+        "objektas_tipas": "komercines", "lubu_aukstis_default_m": 3.1}, ensure_ascii=False))
+    p = db.get_project(rid, user_id="owner")
+    assert p["name"] == "Testo g. 1 butas"
+    assert p["company_name"] == "UAB Statyba"
+    assert p["objektas_tipas"] == "komercines"
+    assert p["lubu_aukstis_default_m"] == 3.1
+    assert p["_saved_by"] == "stream_disconnect_recovery"
+    assert db.get_extraction_job(rid)["status"] == "done"
+
+
+def test_a_bad_project_meta_never_refuses_the_reading(jobs_db, monkeypatch):
+    # It only names the project: a malformed one is ignored, the reading runs and the PDF names it.
+    _stream_env(monkeypatch, stream=_slow_ok_stream)
+    rid = _disconnect_midstream(project_meta="{not json")
+    p = db.get_project(rid, user_id="owner")
+    assert p["name"] == "planas" and p["company_name"] == ""
+    assert "objektas_tipas" not in p
+    assert db.get_extraction_job(rid)["status"] == "done"
+
+
+def test_the_stream_takes_project_meta_as_a_form_field(jobs_db, monkeypatch):
+    """Over real multipart HTTP: the field the page sends reaches the endpoint under that name (the tests
+    above call the endpoint directly), and a connected run still leaves the saving to the browser."""
+    import json as _json
+    _stream_env(monkeypatch, stream=_ok_stream)
+    seen = []
+    real = main._project_meta
+    monkeypatch.setattr(main, "_project_meta", lambda raw: (seen.append(raw), real(raw))[1])
+    r = TestClient(main.app).post(
+        "/extract-interior-stream",
+        files={"files": ("planas.pdf", b"%PDF-1.4 fake", "application/pdf")},
+        data={"project_meta": _json.dumps({"name": "Testo g. 1 butas"}, ensure_ascii=False)})
+    assert r.status_code == 200, r.text
+    assert '"event": "done"' in r.text
+    assert [_json.loads(s) for s in seen] == [{"name": "Testo g. 1 butas"}]
+    rid = _json.loads(r.text.split("\n\n")[0][len("data: "):])["project_id"]
+    assert db.get_extraction_job(rid)["project_id"] is None and db.get_project(rid) is None
+
+
 def test_client_gone_mid_reread_holds_the_read_and_saves_no_project(jobs_db, monkeypatch):
     db.upsert_project("p-old", {"name": "Butas", "patalpos": []}, user_id="owner")
     _stream_env(monkeypatch, stream=_slow_ok_stream)
