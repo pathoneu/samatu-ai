@@ -30,6 +30,7 @@ import {
   buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers,
   ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 } from '@/lib/roomZones';
+import { ltCount } from '@/lib/ltPlural';
 
 function centroidOf(geometry) {
   if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
@@ -332,7 +333,7 @@ function MissingRoomsChip({ count }) {
       <rect x={0} y={0} width={250} height={24} rx={5}
         fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
       <text x={10} y={16} fontSize={11} fill="#b45309">
-        {count} patalpų be vietos plane — žr. „Peržiūra“
+        {ltCount(count, 'patalpa', 'patalpos', 'patalpų')} be vietos plane — žr. „Peržiūra“
       </text>
     </g>
   );

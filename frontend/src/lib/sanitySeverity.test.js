@@ -16,6 +16,7 @@ import {
   warningAction,
   expectedSuffix,
   mergeSanity,
+  roomNoteParts,
 } from './sanitySeverity.js';
 
 // ── tier resolution ─────────────────────────────────────────────────────────
@@ -257,4 +258,25 @@ test('assumptionFocus maps a warning to the control it is about', () => {
   assert.equal(assumptionFocus({ code: 'paint_consumption_rate' }), null);
   assert.equal(assumptionFocus(null), null);
   assert.equal(assumptionFocus({ code: 'lubu_aukstis_out_of_range', room: '  ' }).roomNr, null);
+});
+
+// ── a room's note ───────────────────────────────────────────────────────────
+
+test('roomNoteParts: „101 Tambūras: …", never „[101]Tambūras: …" (2026-10-07)', () => {
+  const line = (w) => { const { room, text } = roomNoteParts(w); return room ? `${room} ${text}` : text; };
+  // the live shape: number in `room`, name at the head of the message (lt_rules `_who`)
+  const w = { room: '101', message: 'Tambūras: Sienos dažomos pagal projekto apdailos duomenis.' };
+  assert.deepEqual(roomNoteParts(w), { room: '101', text: 'Tambūras: Sienos dažomos pagal projekto apdailos duomenis.' });
+  assert.equal(line(w), '101 Tambūras: Sienos dažomos pagal projekto apdailos duomenis.');
+  // a stored message that still carries the bracketed number loses it
+  assert.equal(line({ room: '101', message: '[101]Tambūras: Sienos dažomos.' }), '101 Tambūras: Sienos dažomos.');
+  assert.equal(line({ room: '101', message: '[101] Tambūras: Sienos dažomos.' }), '101 Tambūras: Sienos dažomos.');
+  // a message that already opens with the number is not numbered twice
+  assert.equal(line({ room: '101', message: '101 Tambūras: Sienos dažomos.' }), '101 Tambūras: Sienos dažomos.');
+  // a project-level check has no room — the message alone
+  assert.deepEqual(roomNoteParts({ room: '', message: 'GKP lapų skaičius nesutampa.' }), { room: '', text: 'GKP lapų skaičius nesutampa.' });
+  assert.deepEqual(roomNoteParts({ message: 'Be patalpos.' }), { room: '', text: 'Be patalpos.' });
+  // a number-typed room still reads as a number
+  assert.equal(line({ room: 7, message: 'WC: Plytelės iki lubų.' }), '7 WC: Plytelės iki lubų.');
+  assert.equal(line(null), '');
 });

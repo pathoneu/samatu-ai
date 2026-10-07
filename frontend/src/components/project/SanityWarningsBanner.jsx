@@ -37,6 +37,7 @@ import {
   expectedSuffix,
   groupBySeverity,
   mergeSanity,
+  roomNoteParts,
   summarizeSanity,
   warningAction,
   warningKey,
@@ -196,7 +197,7 @@ export default function SanityWarningsBanner({
         {summary.rooms_count != null && (
           <>
             <span>·</span>
-            <span>{t('project.sanity.summary', { rooms: summary.rooms_count, area: summary.total_area_m2 })}</span>
+            <span>{t('project.sanity.summary', { count: Number(summary.rooms_count) || 0, area: summary.total_area_m2 })}</span>
           </>
         )}
         {projectId && (
@@ -268,13 +269,15 @@ export default function SanityWarningsBanner({
                 {items.map((w, i) => {
                   const action = warningAction(w);
                   const expected = expectedSuffix(w);
+                  // „101 Tambūras: …" — never „[101]Tambūras: …"
+                  const note = roomNoteParts(w);
                   return (
                     <li key={warningKey(w) + i} className="text-xs flex items-start gap-2 group">
                       <span className="opacity-60 shrink-0 mt-0.5">·</span>
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="text-foreground">
-                          {w.room && <strong className="mr-1">[{w.room}]</strong>}
-                          {cleanUserText(w.message)}
+                          {note.room && <><strong>{note.room}</strong>{' '}</>}
+                          {cleanUserText(note.text)}
                           {expected && (
                             <span className="text-muted-foreground">
                               {' '}{t('project.sanity.expectedInline', { expected })}

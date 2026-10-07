@@ -199,6 +199,28 @@ export function expectedSuffix(w) {
   return expected.trim();
 }
 
+/**
+ * A room's note as it reads in the list: „101 Tambūras: Sienos dažomos…" —
+ * the room the way every other screen names it. The backend puts the room's
+ * NAME at the head of the message (lt_rules `_who`) and its NUMBER in `room`;
+ * the list printed them glued as „[101]Tambūras: …" (2026-10-07). Returns the
+ * number to print in front (empty when there is none, or when the message
+ * already starts with it) and the message — a stored message that carries the
+ * old „[101]" in front loses it.
+ */
+export function roomNoteParts(w) {
+  const message = typeof w?.message === 'string' ? w.message : String(w?.message ?? '');
+  const room = w?.room != null ? String(w.room).trim() : '';
+  if (!room) return { room: '', text: message };
+  let text = message.trimStart();
+  const bracketed = `[${room}]`;
+  if (text.startsWith(bracketed)) text = text.slice(bracketed.length).trimStart();
+  if (text === room || text.startsWith(`${room} `) || text.startsWith(`${room}:`)) {
+    return { room: '', text };
+  }
+  return { room, text };
+}
+
 // ── revalidate merge ────────────────────────────────────────────────────────
 
 /**
