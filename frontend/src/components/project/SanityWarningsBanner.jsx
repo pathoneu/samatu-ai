@@ -28,6 +28,7 @@ import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, Refre
 
 import { revalidateProject } from '../../lib/revalidateApi';
 import { noteServerVersion } from '../../lib/projectStore';
+import { ltNumber } from '../../lib/ledger';
 import {
   SEV_HIGH,
   SEV_MED,
@@ -198,7 +199,7 @@ export default function SanityWarningsBanner({
         {summary.rooms_count != null && (
           <>
             <span>·</span>
-            <span>{t('project.sanity.summary', { count: Number(summary.rooms_count) || 0, area: summary.total_area_m2 })}</span>
+            <span>{t('project.sanity.summary', { count: Number(summary.rooms_count) || 0, area: ltNumber(summary.total_area_m2, 1) })}</span>
           </>
         )}
         {projectId && (

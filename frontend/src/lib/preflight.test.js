@@ -23,7 +23,7 @@ const SA_02 = {            // 37 pp architectural set, no interior sheets
 };
 const BD_139 = {           // 139 pp bundle — past the pipeline's page limit
   page_count: 139, verdict: 'mixed_bundle', interior_pages_estimate: 2,
-  est_minutes: 'virš valandos', est_minutes_max: 90, warnings: [],
+  est_minutes: 'ilgiau nei valandą', est_minutes_max: 90, warnings: [],
   hard_block: true,
   hard_block_reason: 'PDF turi 139 psl., o vienu kartu analizuojame iki 100. …',
   sampled_pages: 56, sample_truncated: false,

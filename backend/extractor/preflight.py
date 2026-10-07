@@ -252,13 +252,16 @@ def estimate_minutes(page_count: int) -> tuple[str, int]:
     min — plus the fact that latency is output-token bound and therefore
     roughly linear in pages sent to Pass-1. They are deliberately coarse: a
     number like "37 min" would imply a precision we do not have.
+
+    The label stands on its own after „skaičiuosime …", „numatyta: …" and
+    „Numatoma trukmė: …" — no „apie" in front of „iki" (2026-10-07).
     """
     pages = min(max(page_count, 0), MAX_PAGES_HARD)
     if pages <= 20:
         return "iki 30 min", 30
     if pages <= 40:
         return "30–60 min", 60
-    return "virš valandos", 90
+    return "ilgiau nei valandą", 90
 
 
 def summarize(page_count: int, kinds: list[str], *,

@@ -254,7 +254,7 @@ export default function ReextractButton({ project, onComplete }) {
           <p className="text-sm font-medium">{t('project.reextract.inProgress')}</p>
           {progress && <p className="text-xs text-muted-foreground truncate">{progress}</p>}
           {/* Elapsed + the honest horizon, as on the new-project screen:
-              „praėjo 6 min · numatyta apie iki 30 min", never a countdown. */}
+              „praėjo 6 min · numatyta: iki 30 min", never a countdown. */}
           {elapsed != null && (
             <p className="text-xs text-muted-foreground tabular-nums">
               {t('upload.stream.elapsedMin', { min: Math.floor(elapsed / 60), sec: elapsed % 60 })}

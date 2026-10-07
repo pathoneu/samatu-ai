@@ -2162,7 +2162,7 @@
     "preflight": {
       "checking": "Checking the file…",
       "pages": "{{n}} pages",
-      "duration": "about {{value}}",
+      "duration": "will take {{value}}",
       "disclaimer": "A quick guess from the PDF’s text, not a result.",
       "continue": "Continue",
       "continueTitle": "Calculate quantities with this file",
@@ -2250,7 +2250,7 @@
       "foundRooms_other": "Found {{count}} rooms",
       "refiningProgress": "Refining measurements — {{done}} of {{total}} rooms",
       "elapsedMin": "{{min}} min {{sec}} s elapsed",
-      "estimate": "expected about {{value}}"
+      "estimate": "expected: {{value}}"
     }
   },
   "billing": {

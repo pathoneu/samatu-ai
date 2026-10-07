@@ -421,7 +421,10 @@ def test_rule_engine_rows_read_plain():
         ("many rooms", {"patalpos": [{"nr": f"N{i}", "pavadinimas": f"Kambarys {i}",
                                       "plotas_m2": 30.0} for i in range(31)]}),
         ("all heights from markers", {"patalpos": [{**r, "_height_source": "positioned_marker"}
-                                                   for r in rooms[:3]]}),
+                                                   for r in rooms[:3]
+                                                   if not r.get("_height_marker_conflict")]}),
+        ("markers + a split-level room", {"patalpos": [{**r, "_height_source": "positioned_marker"}
+                                                       for r in rooms[:3]]}),
     ):
         rows += _warning_texts(apply_lt_sanity(parsed)["_lt_warnings"], tag)
     _assert_plain(rows)

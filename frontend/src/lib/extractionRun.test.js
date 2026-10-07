@@ -398,7 +398,7 @@ test('the re-read card states no price and the fixed-range line is gone', () => 
   }
   assert.match(r.durationEstimate, /\{\{value\}\}/);
   // Without an estimate: no upper bound the preflight itself would break
-  // (backend/extractor/preflight.estimate_minutes has a „virš valandos" tier).
+  // (backend/extractor/preflight.estimate_minutes has an „ilgiau nei valandą" tier).
   assert.match(r.durationPlain, /iki valandos ar ilgiau/);
   assert.match(EN.project.reextract.durationPlain, /an hour or more/);
 });

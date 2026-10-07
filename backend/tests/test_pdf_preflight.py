@@ -142,11 +142,30 @@ def test_page_with_neither_text_nor_line_work_is_blank():
     (21, "30–60 min", 60),
     (37, "30–60 min", 60),
     (40, "30–60 min", 60),
-    (41, "virš valandos", 90),
-    (96, "virš valandos", 90),
+    (41, "ilgiau nei valandą", 90),
+    (96, "ilgiau nei valandą", 90),
 ])
 def test_estimate_minutes_tiers(pages, label, ceiling):
     assert estimate_minutes(pages) == (label, ceiling)
+
+
+def test_every_tier_reads_plain_in_every_line_that_shows_it():
+    """„skaičiuosime apie iki 30 min" on the preflight card and „numatyta apie
+    iki 30 min" under the progress (2026-10-07 walkthrough): the label is put
+    into three Lithuanian lines as it is, so none of them may hedge it again."""
+    import json
+    import re
+
+    lt = json.loads((Path(__file__).resolve().parents[2] / "frontend" / "src" / "i18n"
+                     / "lt.json").read_text(encoding="utf-8"))
+    lines = (lt["newProject"]["preflight"]["duration"], lt["upload"]["stream"]["estimate"],
+             lt["project"]["reextract"]["durationEstimate"])
+    shown = [line.replace("{{value}}", estimate_minutes(pages)[0])
+             for line in lines for pages in (1, 30, 60)]
+    assert "skaičiuosime iki 30 min" in shown and "numatyta: iki 30 min" in shown
+    assert "skaičiuosime ilgiau nei valandą" in shown
+    for text in shown:
+        assert not re.search(r"\bapie\s+(?:iki|ilgiau|virš)\b", text), text
 
 
 def test_estimate_minutes_caps_at_the_pipeline_page_limit():

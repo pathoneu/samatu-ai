@@ -300,13 +300,30 @@ def apply_lt_sanity(parsed: dict) -> dict:
     # ("+2800 visos kitos patalpos") that buried Objektas A room 101's real 3.4 m
     # through two production runs. Name both groups; the second is the list
     # worth a human glance.
+    # A room whose plan altitude conflicts with the height read for it is in
+    # neither group: an altitude WAS found there, and the warning below says
+    # which one and why the other was kept (2026-10-07 — the walkthrough read
+    # „Patalpose nr. 103 altitudės nerasta" next to „Lubų plane pažymėta
+    # altitudė 2,80 m, bet perskaitytas aukštis 3,40 m" about the same room).
+    conflict_rooms = [r for r in rooms if r.get("_height_marker_conflict")]
     marker_rooms = [r for r in rooms
-                    if r.get("_height_source") == "positioned_marker"]
+                    if r.get("_height_source") == "positioned_marker"
+                    and not r.get("_height_marker_conflict")]
     if marker_rooms:
         marker_nrs = ", ".join(str(r.get("nr") or "?") for r in marker_rooms)
         other = [r for r in rooms
-                 if r.get("_height_source") != "positioned_marker"]
-        if other:
+                 if r.get("_height_source") != "positioned_marker"
+                 and not r.get("_height_marker_conflict")]
+        if not other and conflict_rooms:
+            warnings.append({
+                "level": "INFO",
+                "patalpa_nr": None,
+                "message": (
+                    f"Lubų aukštis paimtas iš lubų plano altitudžių, pažymėtų "
+                    f"pačiose patalpose (nr. {marker_nrs})."
+                ),
+            })
+        elif other:
             other_nrs = ", ".join(str(r.get("nr") or "?") for r in other)
             warnings.append({
                 "level": "WARN",

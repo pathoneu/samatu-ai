@@ -291,14 +291,17 @@ def test_the_eval_reproduces_production_on_its_own_output(run):
 # ── (d) the model's own warnings, in his numbers (2026-10-06) ───────────────
 def test_the_models_warnings_reach_the_list_in_his_numbers(run):
     """Step 3.9 runs on production's path: the warnings the model wrote (the
-    stored ones, answered back by the stub) come out with decimal commas, and
-    the list the screen reads shows them so (extractor/model_warnings.py)."""
-    from extractor.model_warnings import plain_numbers, room_identifiers
+    stored ones, answered back by the stub) come out with decimal commas and
+    without the prompt's English words („naudotas fallback 2.82 m" → „naudotas
+    numatytasis 2,82 m", 2026-10-07), and the list the screen reads shows them
+    so (extractor/model_warnings.py)."""
+    from extractor.model_warnings import plain_numbers, plain_words, room_identifiers
 
     result = run["result"]
     rooms = result["patalpos"]
     said = [w["message"] for w in gr._vision_warnings(run["frozen"])]
-    want = [plain_numbers(m, room_identifiers(rooms), rooms) for m in said]
+    want = [plain_numbers(plain_words(m, rooms), room_identifiers(rooms), rooms) for m in said]
+    assert any("numatytasis 2,82 m" in m for m in want), want
     assert want != said, "no stored warning carries a number to rewrite — nothing is tested"
     stored = [w.get("message") for w in result.get("warnings") or [] if isinstance(w, dict)]
     shown = [w.get("message") for w in (result.get("lt_sanity") or {}).get("warnings") or []]

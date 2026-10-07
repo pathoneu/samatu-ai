@@ -341,3 +341,58 @@ def test_split_level_conflict_keeps_the_taller_reading_and_discloses():
             if "dvigubo aukščio" in w["message"]]
     assert len(msgs) == 1
     assert "2,80 m" in msgs[0] and "5,70 m" in msgs[0]     # LT decimal comma
+    # …and no sentence claims its height came from that altitude
+    assert not any("altitudži" in w["message"] for w in out["_lt_warnings"] or [])
+
+
+def _height_room(nr, **extra):
+    return {"nr": nr, "pavadinimas": f"Kambarys {nr}", "paskirtis": "miegamasis",
+            "plotas_m2": 15.0, "perimetras_m": 16.0, "lubu_aukstis_m": 2.8, **extra}
+
+
+_CONFLICT = {"marker_m": 2.8, "kept_m": 3.4, "reason": "split_level_suspected"}
+
+
+def test_a_split_level_room_is_not_listed_as_having_no_altitude():
+    """The 2026-10-07 walkthrough read about room 103 both „Patalpose nr. 103
+    altitudės nerasta — joms taikytas bendras projekto aukštis" and „Lubų plane
+    pažymėta altitudė 2,80 m, bet perskaitytas aukštis 3,40 m … Skaičiuojama su
+    didesniu aukščiu". An altitude WAS found there: only the second is true."""
+    from extractor.lt_rules import apply_lt_sanity
+
+    rooms = [_height_room("101", _height_source="positioned_marker"),
+             _height_room("102", _height_source="positioned_marker"),
+             _height_room("103", lubu_aukstis_m=3.4, _height_marker_conflict=_CONFLICT),
+             _height_room("104")]
+    msgs = [w["message"] for w in apply_lt_sanity({"patalpos": rooms})["_lt_warnings"]]
+    source = [m for m in msgs if m.startswith("Lubų aukštis paimtas iš lubų plano altitudžių")]
+    assert len(source) == 1
+    assert "(nr. 101, 102)" in source[0] and "Patalpose nr. 104 altitudės nerasta" in source[0]
+    assert "103" not in source[0]
+    conflict = [m for m in msgs if "Lubų plane pažymėta altitudė 2,80 m" in m]
+    assert len(conflict) == 1 and "perskaitytas aukštis 3,40 m" in conflict[0]
+    assert "Skaičiuojama su didesniu aukščiu" in conflict[0]      # the policy, as before
+
+
+def test_with_no_other_room_left_only_the_first_sentence_stays():
+    from extractor.lt_rules import apply_lt_sanity
+
+    rooms = [_height_room("101", _height_source="positioned_marker"),
+             _height_room("102", _height_source="positioned_marker"),
+             _height_room("103", lubu_aukstis_m=3.4, _height_marker_conflict=_CONFLICT)]
+    out = apply_lt_sanity({"patalpos": rooms})["_lt_warnings"]
+    source = [w for w in out if "altitudži" in w["message"]]
+    assert [w["message"] for w in source] == [
+        "Lubų aukštis paimtas iš lubų plano altitudžių, pažymėtų pačiose patalpose (nr. 101, 102)."]
+    assert source[0]["level"] == "INFO" and source[0]["patalpa_nr"] is None
+    assert not any("altitudės nerasta" in w["message"] or "Visų patalpų" in w["message"] for w in out)
+    assert sum("Lubų plane pažymėta altitudė" in w["message"] for w in out) == 1
+
+    # without a split-level room the two sentences are what they were
+    plain = [w["message"] for w in apply_lt_sanity({"patalpos": rooms[:2]})["_lt_warnings"]
+             if "altitudži" in w["message"]]
+    assert plain == ["Visų patalpų (nr. 101, 102) lubų aukštis nuskaitytas iš lubų plano "
+                     "altitudžių, pažymėtų pačiose patalpose."]
+    plain = [w["message"] for w in apply_lt_sanity(
+        {"patalpos": rooms[:2] + [_height_room("104")]})["_lt_warnings"] if "altitudži" in w["message"]]
+    assert len(plain) == 1 and "Patalpose nr. 104 altitudės nerasta" in plain[0]

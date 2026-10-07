@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileSearch, Brain, Search, CheckCircle2, AlertCircle, Home,
 } from 'lucide-react';
+import { ltNumber } from '@/lib/ledger';
 
 // User-facing phase labels — no "Pass 1/2", no "Vision".
 // `labelKey` resolves against i18n at render.
@@ -171,7 +172,7 @@ export default function ProcessingStateStream({
                   </div>
                   <div className="tabular-nums">
                     {r.plotas_m2 != null
-                      ? `${Number(r.plotas_m2).toFixed(1)} m²`
+                      ? `${ltNumber(r.plotas_m2, 1)} m²`
                       : '—'}
                     {r.refined && <span className="text-primary">{t('upload.stream.corrected')}</span>}
                   </div>
@@ -209,7 +210,7 @@ export default function ProcessingStateStream({
       )}
 
       {/* Elapsed + the honest horizon. „Liko 4 min" would be a number we do
-          not have; „praėjo 6 min · numatyta 15–25 min" is one we do. */}
+          not have; „praėjo 6 min · numatyta: 30–60 min" is one we do. */}
       {elapsed != null && !error && (
         <div className="mt-4 text-center text-muted-foreground tabular-nums" style={{ fontSize: 13 }}>
           {t('upload.stream.elapsedMin', { min: Math.floor(elapsed / 60), sec: elapsed % 60 })}

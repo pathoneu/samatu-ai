@@ -23,6 +23,12 @@ read these texts by machine — the LED room-list gate
 (niche_inference.enumerated_led_rooms) and the height salvage
 (height_markers.salvage_heights_from_warnings) — must read the same thing
 before and after, or the text is left as the model wrote it.
+
+The English words the reading prompt teaches the model come back inside its
+Lithuanian sentences too („… (dimension chain nepilnai įskaitomas)", „…,
+confidence žema" — the 2026-10-07 walkthrough). `plain_words` is a small
+glossary for the ones the stored readings actually carry; it runs first, under
+the same rules (see the block above it).
 """
 from __future__ import annotations
 
@@ -173,6 +179,156 @@ def plain_numbers(text: str, room_ids: Iterable[str] = (), rooms: list[dict] | N
     return text
 
 
+# ── The English words the reader leaks into a Lithuanian sentence ───────────
+# The reading prompt is half English (`dimension chain`, `confidence: "low"`,
+# `default 2.82`, `count'as`, `inline_label`) and the model writes those words
+# back into its Lithuanian warnings. Measured on the stored readings
+# (ground_truth/*/ai_extract.json and the local projects, 2026-10-07): the
+# dimension chain, the confidence level, a default / fallback height, a symbol
+# count and „inline žymų". A glossary for exactly those, nothing cleverer:
+#   · only in a Lithuanian sentence (it has a Lithuanian letter);
+#   · whole words — a code (snake_case, `…`), the drawing's quoted text and
+#     the project's own room names are never touched;
+#   · an ending the glossary does not know („chain'uką") stays as written;
+#   · case follows the English word („Confidence" → „Patikimumas").
+_LT_ONLY = re.compile(r"[ąčęėįšųūžĄČĘĖĮŠŲŪŽ]")
+_NOT_IN_WORD = r"(?<![\w'’`])"
+_WORD_END = r"(?![\w'’`])"
+_BACKTICKED = re.compile(r"`[^`\n]*`")
+
+_CHAIN_FORMS = {   # the ending the model hung on „chain" → the Lithuanian noun
+    "": "grandinė", "as": "grandinė", "s": "grandinės", "ai": "grandinės",
+    "o": "grandinės", "ų": "grandinių", "ą": "grandinę", "us": "grandines",
+    "e": "grandinėje", "uose": "grandinėse", "u": "grandine", "ais": "grandinėmis",
+    "ams": "grandinėms",
+}
+# The model declined the chain as a masculine noun („dimension chain …
+# nematomas"); „grandinė" is feminine, so a participle that agreed with it —
+# right after it, or after one adverb — follows it.
+_CHAIN = re.compile(
+    rf"{_NOT_IN_WORD}(dimension)\s+chain(s?)(?:['’]([^\W\d_]+))?{_WORD_END}"
+    r"(?:(\s+(?:(?:ne)?(?:pilnai|aiškiai|dalinai|visiškai|tiksliai|visai)\s+)?)"
+    rf"([^\W\d_]+?(?:om|am|ėm|yt|ėt|ot))(as|i){_WORD_END})?",
+    re.IGNORECASE)
+_CHAIN_HALF = re.compile(rf"{_NOT_IN_WORD}(dimension)(?=\s+grandin)", re.IGNORECASE)
+
+_LEVELS = {"low": "žemas", "žema": "žemas", "žemas": "žemas",
+           "medium": "vidutinis", "vidutinė": "vidutinis", "vidutinis": "vidutinis",
+           "high": "aukštas", "aukšta": "aukštas", "aukštas": "aukštas"}
+_LEVEL = "|".join(sorted(_LEVELS, key=len, reverse=True))
+_CONF_LEVEL_FIRST = re.compile(                       # „low confidence" → „žemas patikimumas"
+    rf"{_NOT_IN_WORD}({_LEVEL})[\s-]+confidence{_WORD_END}", re.IGNORECASE)
+_CONF_LEVEL_AFTER = re.compile(                       # „confidence žema" → „patikimumas žemas"
+    rf"{_NOT_IN_WORD}(confidence)(\s*[:=–—-]\s*|\s+(?:yra\s+)?)({_LEVEL}){_WORD_END}",
+    re.IGNORECASE)
+_CONF_FORMS = {"": "patikimumas", "as": "patikimumas", "o": "patikimumo",
+               "ą": "patikimumą", "u": "patikimumu", "e": "patikimume"}
+_CONF = re.compile(rf"{_NOT_IN_WORD}(confidence)(?:['’]([^\W\d_]+))?{_WORD_END}", re.IGNORECASE)
+
+# „priimtas default 2.82m", „naudotas fallback 2.82 m" — before a value only:
+# „numatytasis" agrees with the height it names, not with every noun.
+_DEFAULT = re.compile(rf"{_NOT_IN_WORD}(default|fallback)(?=\s*[~≈]?\s*\d)", re.IGNORECASE)
+
+_COUNT_FORMS = {"": "skaičius", "as": "skaičius", "o": "skaičiaus", "ą": "skaičių",
+                "ai": "skaičiai", "ų": "skaičių", "ui": "skaičiui"}
+_COUNT = re.compile(rf"{_NOT_IN_WORD}(count)(?:['’]([^\W\d_]+))?{_WORD_END}", re.IGNORECASE)
+
+# „iš lubų plano inline žymų" — the plan's own labels; „inline" says nothing more.
+_INLINE = re.compile(rf"{_NOT_IN_WORD}(inline)\s+((?:žym|užraš)[^\W\d_]*){_WORD_END}",
+                     re.IGNORECASE)
+
+
+def _cased(english: str, lithuanian: str) -> str:
+    """`lithuanian` in the case the model wrote `english` in."""
+    if len(english) > 1 and english.isupper():
+        return lithuanian.upper()
+    if english[:1].isupper():
+        return lithuanian[:1].upper() + lithuanian[1:]
+    return lithuanian
+
+
+def _chain(m: re.Match) -> str | None:
+    ending = (m.group(3) or "").lower()
+    key = ending or ("s" if m.group(2) else "")
+    noun = _CHAIN_FORMS.get(key)
+    if noun is None:
+        return None
+    out = _cased(m.group(1), "matmenų") + " " + noun
+    if m.group(5):
+        participle, tail = m.group(5), m.group(6)
+        if key in ("", "as") and tail.lower() == "as":
+            tail = _cased(tail, "a")
+        elif key in ("s", "ai") and tail.lower() == "i":
+            tail = _cased(tail, "os")
+        out += m.group(4) + participle + tail
+    return out
+
+
+def _conf(m: re.Match) -> str | None:
+    noun = _CONF_FORMS.get((m.group(2) or "").lower())
+    return None if noun is None else _cased(m.group(1), noun)
+
+
+def _count(m: re.Match) -> str | None:
+    noun = _COUNT_FORMS.get((m.group(2) or "").lower())
+    return None if noun is None else _cased(m.group(1), noun)
+
+
+_GLOSSARY = (
+    (_CHAIN, _chain),
+    (_CHAIN_HALF, lambda m: _cased(m.group(1), "matmenų")),
+    (_CONF_LEVEL_FIRST, lambda m: _cased(m.group(1), _LEVELS[m.group(1).lower()]) + " patikimumas"),
+    (_CONF_LEVEL_AFTER, lambda m: _cased(m.group(1), "patikimumas") + m.group(2)
+                                  + _LEVELS[m.group(3).lower()]),
+    (_CONF, _conf),
+    (_DEFAULT, lambda m: _cased(m.group(1), "numatytasis")),
+    (_COUNT, _count),
+    (_INLINE, lambda m: _cased(m.group(1), m.group(2))),
+)
+
+
+def _name_spans(text: str, names: Iterable[str]) -> list[tuple[int, int]]:
+    out = []
+    for name in names:
+        if name and not name.isdigit():
+            out += _spans(re.compile(re.escape(name), re.IGNORECASE), text)
+    return out
+
+
+def _is_lithuanian(text: str, names: Iterable[str]) -> bool:
+    """A Lithuanian letter in the sentence itself — not only in a quoted
+    drawing text or a room's name („Room „Svetainė“ count unknown" is English)."""
+    chars = list(text)
+    for start, end in _spans(_QUOTED, text) + _name_spans(text, names):
+        chars[start:end] = " " * (end - start)
+    return bool(_LT_ONLY.search("".join(chars)))
+
+
+def plain_words(text: str, rooms: list[dict] | None = None) -> str:
+    """One model-written text with the leaked English words in Lithuanian — or
+    the text as written, when a reader of it would read something else."""
+    if not isinstance(text, str) or not text:
+        return text
+    rooms = [r for r in (rooms or []) if isinstance(r, dict)]
+    names = [str(r.get("pavadinimas") or "").strip() for r in rooms]
+    if not _is_lithuanian(text, names):
+        return text
+    out = text
+    for pattern, english_to_lt in _GLOSSARY:
+        keep = _spans(_QUOTED, out) + _spans(_BACKTICKED, out) + _name_spans(out, names)
+
+        def _sub(m: re.Match) -> str:
+            if _inside(keep, m.start(), m.end()):
+                return m.group(0)
+            new = english_to_lt(m)
+            return m.group(0) if new is None else new
+
+        out = pattern.sub(_sub, out)
+    if out != text and not _same_for_the_readers(text, out, rooms):
+        return text
+    return out
+
+
 def normalise_model_warnings(parsed: dict, model_entries: list) -> int:
     """Rewrite, in place, the entries of `parsed["warnings"]` that are the
     model's own (`model_entries`: the Pass-1 list as it came back — the same
@@ -189,12 +345,12 @@ def normalise_model_warnings(parsed: dict, model_entries: list) -> int:
     for i, w in enumerate(ws):
         if isinstance(w, dict) and id(w) in dicts:
             msg = w.get("message")
-            new = plain_numbers(msg, ids, rooms)
+            new = plain_numbers(plain_words(msg, rooms), ids, rooms)
             if new != msg:
                 w["message"] = new
                 changed += 1
         elif isinstance(w, str) and id(w) in strings:
-            new = plain_numbers(w, ids, rooms)
+            new = plain_numbers(plain_words(w, rooms), ids, rooms)
             if new != w:
                 ws[i] = new
                 changed += 1

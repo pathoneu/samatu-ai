@@ -2232,7 +2232,7 @@
     "preflight": {
       "checking": "Tikriname failą…",
       "pages": "{{n}} psl.",
-      "duration": "skaičiuosime apie {{value}}",
+      "duration": "skaičiuosime {{value}}",
       "disclaimer": "Tai greitas spėjimas iš PDF teksto, ne skaičiavimo rezultatas.",
       "continue": "Tęsti",
       "continueTitle": "Skaičiuoti kiekius su šiuo failu",
@@ -2322,7 +2322,7 @@
       "foundRooms_other": "Radau {{count}} patalpų",
       "refiningProgress": "Tikslinu matmenis — {{done}} iš {{total}} kambarių",
       "elapsedMin": "praėjo {{min}} min {{sec}} s",
-      "estimate": "numatyta apie {{value}}"
+      "estimate": "numatyta: {{value}}"
     }
   },
   "billing": {
