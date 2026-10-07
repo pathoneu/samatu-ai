@@ -16,6 +16,8 @@ import {
   warningAction,
   expectedSuffix,
   mergeSanity,
+  REFRESH_RECOMPUTES,
+  SANITY_CHECK_CODES,
   roomNoteParts,
 } from './sanitySeverity.js';
 
@@ -178,9 +180,8 @@ test('mergeSanity: a stream the rebuild did not produce is preserved', () => {
   };
   const out = mergeSanity(PREV, fresh);
   const codes = out.warnings.map((w) => w.code || w.message);
-  assert.ok(codes.includes('paintable_floor_ratio'),
-    'the §6 high-severity check must survive a revalidate that did not re-run it');
-  assert.ok(codes.includes('perimeter_out_of_bounds'));
+  assert.ok(codes.includes('perimeter_out_of_bounds'),
+    'a check the refresh does not re-run must survive it');
 });
 
 test('mergeSanity: a stream the rebuild DID produce is authoritative', () => {
@@ -207,7 +208,10 @@ test('mergeSanity: a check that now passes disappears', () => {
 
 test('mergeSanity: the summary is recomputed from the merged rows', () => {
   const fresh = {
-    warnings: [{ source: 'cross_page_validator', level: 'WARN', message: 'nauja' }],
+    warnings: [
+      PREV.warnings[0],                    // the §6 check still fires
+      { source: 'cross_page_validator', level: 'WARN', message: 'nauja' },
+    ],
     summary: { rooms_count: 7, total_area_m2: 95.6, warnings_count: 1, high: 0 },
   };
   const out = mergeSanity(PREV, fresh);
@@ -228,6 +232,76 @@ test('mergeSanity: identical rows are not duplicated', () => {
 test('mergeSanity: a malformed rebuild leaves what is on screen alone', () => {
   assert.equal(mergeSanity(PREV, null), PREV);
   assert.equal(mergeSanity(PREV, {}), PREV);
+});
+
+// „Atnaujinti patikrinimus" kept a fixed false note (2026-10-07): the GKP check
+// stopped firing, the refresh came back with NO §6 row, and the per-stream rule
+// read „no rows for this stream" as „not re-run" and kept the stale one.
+const STALE_GK = {
+  source: 'sanity_checks', code: 'gk_sheets_off', severity: 'low', level: 'INFO',
+  message: 'GKP lapų skaičius nesutampa: eilutėje 57 vnt., apskaičiuota 35,2 vnt.',
+};
+const READING_ONLY = {
+  // Written into lt_sanity only, during the reading of the drawing — the
+  // refresh cannot recompute it.
+  source: 'large_pdf', level: 'WARNING', severity: 'med', room: '',
+  message: 'Didelis PDF (64 psl.) — analizė gali užtrukti.',
+};
+const STILL_VALID = {
+  source: 'sanity_checks', code: 'paintable_floor_ratio', severity: 'high',
+  level: 'WARNING', message: 'Dažomas sienų plotas 6,10× grindų ploto',
+};
+
+test('mergeSanity: a stale §6 row the refresh no longer produces is gone', () => {
+  const prev = { warnings: [STALE_GK, READING_ONLY], summary: {} };
+  const fresh = { warnings: [], summary: {} };       // every check passes now
+  const out = mergeSanity(prev, fresh);
+  assert.ok(!out.warnings.some((w) => w.code === 'gk_sheets_off'), JSON.stringify(out.warnings));
+  assert.equal(out.summary.low, 0);
+});
+
+test('mergeSanity: a reading-only note survives the refresh', () => {
+  const prev = { warnings: [STALE_GK, READING_ONLY], summary: {} };
+  const fresh = { warnings: [STILL_VALID], summary: {} };
+  const out = mergeSanity(prev, fresh);
+  assert.deepEqual(out.warnings.filter((w) => w.source === 'large_pdf'), [READING_ONLY]);
+});
+
+test('mergeSanity: a §6 check that still fires stays — once', () => {
+  const prev = { warnings: [STILL_VALID, STALE_GK], summary: {} };
+  const fresh = { warnings: [STILL_VALID], summary: {} };
+  const out = mergeSanity(prev, fresh);
+  assert.deepEqual(out.warnings.map((w) => w.code), ['paintable_floor_ratio']);
+  assert.equal(out.summary.high, 1);
+});
+
+test('mergeSanity: a §6 row saved without its source tag is replaced by its code', () => {
+  // Rows from before 2026-08-23 carry the code and no `source`.
+  const legacy = { code: 'gk_sheets_off', level: 'INFO', message: 'GKP lapų skaičius skiriasi' };
+  const out = mergeSanity({ warnings: [legacy, READING_ONLY], summary: {} },
+    { warnings: [{ source: 'cross_page_validator', level: 'WARN', message: 'x' }], summary: {} });
+  assert.ok(!out.warnings.some((w) => w.code === 'gk_sheets_off'));
+  assert.ok(out.warnings.some((w) => w.source === 'large_pdf'));
+});
+
+test('mergeSanity: every stream the refresh re-runs is replaced, empty included', () => {
+  const prev = {
+    warnings: [
+      { source: 'cross_page_validator', level: 'WARN', message: 'sena kryžminė' },
+      { source: 'lt_rules', level: 'WARN', room: '101', message: 'sena STR' },
+      { source: 'revalidate', level: 'WARN', message: 'Nepavyko atlikti patikrinimo' },
+      READING_ONLY,
+    ],
+    summary: {},
+  };
+  const out = mergeSanity(prev, { warnings: [], summary: {} });
+  assert.deepEqual(out.warnings, [READING_ONLY]);
+});
+
+test('mergeSanity: the refresh lists are the backend\'s', () => {
+  assert.deepEqual(REFRESH_RECOMPUTES,
+    ['sanity_checks', 'cross_page_validator', 'revalidate', 'lt_rules']);
+  assert.ok(SANITY_CHECK_CODES.includes('gk_sheets_off'));
 });
 
 test('mergeSanity: no prior state just adopts the rebuild', () => {

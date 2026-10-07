@@ -224,15 +224,55 @@ export function roomNoteParts(w) {
 // ── revalidate merge ────────────────────────────────────────────────────────
 
 /**
+ * The streams „Atnaujinti patikrinimus" RE-RUNS on every press (backend
+ * api/revalidate.py RECOMPUTED_SOURCES; a backend test pins the two lists).
+ * For these the refreshed list is the whole truth, EMPTY INCLUDED: a check
+ * that now passes leaves no row at all. Keeping the old row whenever the
+ * refresh had none for its stream is how a fixed false note („GKP lapų
+ * skaičius nesutampa", 2026-10-07) stayed on screen and was saved back.
+ */
+export const REFRESH_RECOMPUTES = ['sanity_checks', 'cross_page_validator', 'revalidate', 'lt_rules'];
+
+/**
+ * The CLAUDE.md §6 check codes (backend extractor/sanity_checks.py CODES,
+ * pinned by the same test). Projects saved before 2026-08-23 carry these rows
+ * with the code but WITHOUT a `source` — the code is what says the refresh
+ * re-ran them.
+ */
+export const SANITY_CHECK_CODES = [
+  'paintable_floor_ratio',
+  'ceiling_floor_mismatch',
+  'baseboard_perimeter_mismatch',
+  'perimeter_below_geometric_minimum',
+  'paint_consumption_rate',
+  'gk_sheets_off',
+  'window_reveals_zero',
+  'window_reveal_avg_off',
+  'sanity_check_error',
+];
+
+const REFRESH_SOURCES = new Set(REFRESH_RECOMPUTES);
+const SANITY_CODES = new Set(SANITY_CHECK_CODES);
+
+/** Did the refresh re-run the check behind this row? Then only its new list counts. */
+function recomputedByRefresh(w) {
+  if (!w || typeof w !== 'object') return false;
+  if (w.source) return REFRESH_SOURCES.has(w.source);
+  return SANITY_CODES.has(w.code);
+}
+
+/**
  * Merge a rebuilt `lt_sanity` onto the one already on screen.
  *
- * "Atnaujinti AI patikrinimus" must never be able to make a check disappear
- * just because the endpoint that rebuilt the payload does not run that
- * validator. Rule, per stream (`source`):
+ * Rule, per row on screen:
  *
- *   · the rebuild produced entries for this source → its list is authoritative
- *     (a check that now passes SHOULD vanish);
- *   · the rebuild produced nothing for this source → keep what we had.
+ *   · the refresh re-ran its check (REFRESH_RECOMPUTES / SANITY_CHECK_CODES)
+ *     → the rebuilt list replaces it, even when the rebuilt list has nothing
+ *     for that stream (the check now passes, the row goes);
+ *   · otherwise, per stream (`source`): the rebuild produced entries for this
+ *     source → its list is authoritative; it produced nothing → keep what we
+ *     had. "Atnaujinti patikrinimus" must never make a note disappear that it
+ *     cannot recompute (one written only during the reading of the drawing).
  *
  * Fresh entries win on identical keys so refreshed wording/severity lands.
  * The summary is recomputed from the merged list rather than trusted from
@@ -258,6 +298,7 @@ export function mergeSanity(prev, fresh) {
     seen.add(warningKey(w));
   }
   for (const w of prevList) {
+    if (recomputedByRefresh(w)) continue;  // re-run — the rebuilt list is the truth
     const source = w?.source || '';
     const wasRefreshed = source
       ? refreshedSources.has(source)

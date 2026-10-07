@@ -23,6 +23,34 @@ from .universal_rules import gkp_ceiling_areas_m2, gkp_sheet_count
 # so `extractor/sanity_mirror.py` can tell the banner which validator spoke.
 SOURCE = "sanity_checks"
 
+# Every code this module emits (a test pins it to the emit sites). Rows saved
+# before the tag above existed (2026-08-23) carry the code and NO `source`, so
+# a re-run that replaced by tag alone kept them forever — a stale
+# „GKP lapų skaičius nesutampa" came back on every „Atnaujinti patikrinimus".
+# The browser's merge (frontend/src/lib/sanitySeverity.js) keeps the same list.
+CODES = frozenset({
+    "paintable_floor_ratio",
+    "ceiling_floor_mismatch",
+    "baseboard_perimeter_mismatch",
+    "perimeter_below_geometric_minimum",
+    "paint_consumption_rate",
+    "gk_sheets_off",
+    "window_reveals_zero",
+    "window_reveal_avg_off",
+    "sanity_check_error",
+})
+
+
+def is_sanity_check_row(w) -> bool:
+    """A row this module produced: tagged with SOURCE, or — saved before the
+    tag existed — untagged and carrying one of its CODES. A re-run replaces
+    every such row."""
+    if not isinstance(w, dict):
+        return False
+    if w.get("source"):
+        return w.get("source") == SOURCE
+    return w.get("code") in CODES
+
 
 @dataclass
 class Warning:

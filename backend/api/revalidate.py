@@ -22,10 +22,19 @@ from fastapi import APIRouter, HTTPException, Request
 
 import auth as _auth
 import db
+from extractor.sanity_checks import is_sanity_check_row
 
 log = logging.getLogger("samatu_ai")
 
 router = APIRouter(prefix="/api/projects", tags=["revalidate"])
+
+# The streams (the `source` of their rows in `lt_sanity`) this endpoint RE-RUNS
+# on every press — `lt_rules` is the tag the mirror gives `_lt_warnings`. For
+# these the refreshed list is the whole truth, EMPTY INCLUDED: a check that now
+# passes leaves no row. The browser's merge drops what it had on screen for
+# them and keeps every other stream (frontend/src/lib/sanitySeverity.js
+# REFRESH_RECOMPUTES — a test pins the two lists together).
+RECOMPUTED_SOURCES = ("sanity_checks", "cross_page_validator", "revalidate", "lt_rules")
 
 
 def _build_lt_sanity_mirror(parsed: dict, rooms_count: int) -> dict:
@@ -108,7 +117,9 @@ def _revalidate_payload(payload: dict) -> dict:
     # baseboard≈perimeter−0.8m/door, dažų sąnaudos, GKP lapai, angokraščiai).
     # These are the app's only generalisation safety net on a project we have
     # never seen, so "Atnaujinti AI patikrinimus" must RE-RUN them, not just
-    # carry the stale ones. Source-tagged replace keeps the refresh idempotent.
+    # carry the stale ones. Replacing every row the module produced — by its
+    # tag, or by its code on rows saved before the tag existed — keeps the
+    # refresh idempotent and lets a check that now passes actually leave.
     try:
         from extractor.sanity_checks import run_all_checks as sanity_run
         fresh_sanity = sanity_run(parsed) or []
@@ -124,7 +135,7 @@ def _revalidate_payload(payload: dict) -> dict:
         }]
     parsed["warnings"] = [
         w for w in (parsed.get("warnings") or [])
-        if not (isinstance(w, dict) and w.get("source") == "sanity_checks")
+        if not is_sanity_check_row(w)
     ] + fresh_sanity
 
     # 4. Rebuild the UI mirror that SanityWarningsBanner consumes. The builder

@@ -170,9 +170,10 @@ export default function SanityWarningsBanner({
       // the merged result is written back, or the write-through 409s against
       // our own save and the user is told their changes were lost.
       noteServerVersion(projectId, fresh?.updated_at);
-      // MERGE, never replace: the rebuild only re-runs some validators, and
-      // dropping the rest is how "refresh the checks" quietly turned into
-      // "delete most of the checks".
+      // MERGE, never replace wholesale: the rows of the checks the refresh
+      // re-ran are replaced by its list (a check that passes now leaves); the
+      // rest stay — dropping those is how "refresh the checks" quietly turned
+      // into "delete most of the checks".
       onRevalidated?.({
         ...fresh,
         lt_sanity: mergeSanity(sanity, fresh?.lt_sanity),
