@@ -5501,6 +5501,55 @@ def _run_pass1_once(client, system, pages, *,
     return out
 
 
+def _cut_off_answers(meta) -> int:
+    """How many of the adjacency pass's answers were cut off at the cap (its
+    `_meta.truncated_attempts`): 1 = it fitted on the larger try, 2 = it never did."""
+    cut = meta.get("truncated_attempts") if isinstance(meta, dict) else None
+    return len(cut) if isinstance(cut, list) else 0
+
+
+# The adjacency pass is the only source of a room's partition walls — the
+# „pertvarų sandūros“ term (n_partition_walls × H) of „Dažymo kampų montavimas“.
+# Without it the corner metres are short by that whole term: objektas_a fell
+# from 465,58 to ~370 m (true 493,35) on 2026-10-07, when the answer was cut
+# off, and nothing on screen said so.
+PARTITION_WALLS_UNREAD_CODE = "adjacency_unread"
+PARTITION_WALLS_UNREAD_MESSAGE = (
+    "Kaimyninių patalpų sienų nustatyti nepavyko, todėl pertvarų kampai (sienų "
+    "sandūros su kitomis patalpomis) į „Dažymo kampų montavimas“ neįskaičiuoti — "
+    "tikras kampų kiekis gali būti didesnis. Patikrinkite kampus plane.")
+
+
+def _warn_partition_walls_unread(parsed: dict) -> bool:
+    """One user-visible warning when the adjacency pass left every room without
+    partition walls: failed (refused, cut off twice, unreadable, no answer),
+    skipped (no floor page, or Pass-1 ran without voting, which is where the
+    pass lives) or matched no room. Reads `_meta.adjacency`, which the pass
+    writes — a result without it (an older path, a stub) gets nothing. The
+    reader's own reason stays on the stored warning (`_reason`), off the
+    screen. Returns whether it warned."""
+    note = (parsed.get("_meta") or {}).get("adjacency")
+    if not isinstance(note, dict) or note.get("status") == "applied":
+        return False
+    for r in parsed.get("patalpos") or []:
+        try:
+            if isinstance(r, dict) and int(r.get("n_partition_walls") or 0) > 0:
+                return False   # the rooms carry partition walls all the same
+        except (TypeError, ValueError):
+            continue
+    warnings = parsed.get("warnings")
+    if not isinstance(warnings, list):
+        warnings = parsed["warnings"] = []
+    if any(isinstance(w, dict) and w.get("code") == PARTITION_WALLS_UNREAD_CODE for w in warnings):
+        return False
+    warnings.append({
+        "level": "WARN", "severity": "med", "code": PARTITION_WALLS_UNREAD_CODE,
+        "message": PARTITION_WALLS_UNREAD_MESSAGE,
+        "_reason": note.get("reason") or note.get("status"),
+    })
+    return True
+
+
 def _resolve_floor_b64(pages, runs):
     """Pick the floor-plan page image for the adjacency pass.
 
@@ -5709,9 +5758,14 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
 
     # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
     # hash), applied to every run's rooms. Best-effort — failure leaves
-    # n_partition_walls unset, exactly the pre-voting production behaviour.
+    # n_partition_walls unset, exactly the pre-voting production behaviour —
+    # but never silently: what became of the pass is recorded on the run's
+    # `_meta.adjacency`, and extract_interior warns when the rooms were left
+    # without partition walls (2026-10-07: a cut-off answer cost objektas_a
+    # ~18 % of its corner metres with no word on screen).
     floor_b64, floor_idx = _resolve_floor_b64(pages, runs)
     adj = None
+    adj_note: dict = {"status": "skipped", "reason": "no_floor_page"}
     if floor_b64:
         try:
             from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
@@ -5733,10 +5787,24 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
                 n_set += (summary or {}).get("n_rooms_matched", 0)
             print(f"[voting] adjacency on page {floor_idx}: matched rooms across runs={n_set}")
             _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
+            adj_note = {"status": "applied" if n_set else "no_room_matched",
+                        "page": floor_idx, "rooms_matched": n_set}
+            _n_cut = _cut_off_answers(getattr(adj, "_meta", None))
+            if _n_cut:   # it fitted only on the larger try
+                adj_note["cut_off_answers"] = _n_cut
         except Exception as exc:
             print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
-            # a refused / cut-off answer was still billed (ModelStopped._meta)
+            # a refused / cut-off / unreadable answer was still billed — both
+            # answers when the cut-off retry ran (`_meta` on the exception)
             _append_extra_call(runs[0], getattr(exc, "_meta", None), reader="adjacency")
+            _why = getattr(exc, "error", None)   # ModelStopped: "cut_off" / "refused:<category>"
+            adj_note = {"status": "failed", "page": floor_idx,
+                        "reason": (_why if isinstance(_why, str) and _why
+                                   else f"{type(exc).__name__}: {str(exc)[:200]}")}
+            _n_cut = _cut_off_answers(getattr(exc, "_meta", None))
+            if _n_cut:
+                adj_note["cut_off_answers"] = _n_cut
+    runs[0].setdefault("_meta", {})["adjacency"] = adj_note
 
     def _attach_vote_meta(meta: dict) -> None:
         """Record per-round provenance: model/tokens/cost split (each round
@@ -5992,6 +6060,19 @@ def extract_interior(
     # (source-only _meta, no model → free, not billed). The pre-pass ran before
     # Pass-1 above, so it couldn't attach to `parsed` at its own call site.
     _append_extra_call(parsed, (eks or {}).get("_meta"), reader="eksplikacija")
+
+    # Partition walls (2026-10-07). The adjacency pass lives in the voted Pass-1
+    # only — without voting it never ran. When the rooms were left without
+    # partition walls, the corner metres lack that whole term: say so, once,
+    # in the list the screen reads (after the model's own warnings above, so
+    # the Step 3.9 rewrite never touches it).
+    if not _voting_on:
+        parsed.setdefault("_meta", {}).setdefault(
+            "adjacency", {"status": "skipped", "reason": "voting_off"})
+    if _warn_partition_walls_unread(parsed):
+        _adj_note = parsed["_meta"]["adjacency"]
+        print(f"[extractor] partition walls unread "
+              f"({_adj_note.get('reason') or _adj_note.get('status')}) — kampai warning added")
 
     _pass1_rooms = parsed.get("patalpos") or []
     _emit({

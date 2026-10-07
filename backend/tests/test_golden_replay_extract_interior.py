@@ -199,7 +199,9 @@ def test_no_reader_fails_quietly(run):
     assert not [f"{r.name}: {r.getMessage()}" for r in run["logs"]]
     assert not [r["nr"] for r in result["patalpos"] if r.get("_calc_failed")]
     codes = {w.get("code") or w.get("source") for w in result.get("warnings") or [] if isinstance(w, dict)}
-    assert not codes & {"room_calc_failed", "pozicijos_build_failure", "doors_page_unread", "doors_unattributed"}
+    assert not codes & {"room_calc_failed", "pozicijos_build_failure", "doors_page_unread", "doors_unattributed",
+                        "adjacency_unread"}
+    assert result["_meta"]["adjacency"]["status"] == "applied"
     assert result["pozicijos"]
 
 

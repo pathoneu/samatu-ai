@@ -34,6 +34,22 @@ from models_config import model_for
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_PATH = REPO_ROOT / "prompts" / "room_adjacency.txt"
 
+# Output cap (2026-10-07). The model thinks by default and the thinking counts
+# against max_tokens; the answer itself is a room list of ~2-3k tokens (the
+# largest cached one is 15 rooms, ~9.6k characters). 8 192 fitted for months —
+# 4 685 tokens on objektas_h, 6 334 on objektas_a on 2026-10-06 — then both paid
+# runs of objektas_a on 2026-10-07 hit it: the answer was cut off, no room got
+# its partition walls and the corner metres fell ~18 % without a word to the
+# user. Only the tokens produced are billed, so headroom costs nothing until it
+# is used; the call is streamed, so the SDK's non-streaming ceiling (21 333,
+# see apdailos_reader) does not apply.
+MAX_TOKENS = 32_768
+# An answer cut off at the cap gets ONE more try with a larger one — the first
+# reading pass's cap (prompt.MAX_OUTPUT_TOKENS). Both answers are billed, so
+# both are in the usage the pass reports. A refusal is never asked again: the
+# same request gets the same answer.
+RETRY_MAX_TOKENS = 64_000
+
 
 @dataclass
 class Adjacency:
@@ -110,19 +126,54 @@ def _load_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
+def _billed_meta(billed: list[dict[str, Any]], model: str, key: str) -> dict[str, Any]:
+    """The pass's `_meta`: the usage of every answer it paid for, summed. One
+    answer → exactly the block a single call always reported; after a cut-off
+    retry every answer cut off at its cap is also listed (`truncated_attempts`,
+    as the first reading pass records its own)."""
+    meta: dict[str, Any] = {"cache": "miss", "key": key, "model": model}
+    if len(billed) == 1:
+        meta.update({k: billed[0].get(k) for k in ("input_tokens", "output_tokens")})
+        return meta
+    for k in ("input_tokens", "output_tokens"):
+        meta[k] = sum(int(b.get(k) or 0) for b in billed)
+    meta["truncated_attempts"] = [dict(b) for b in billed if b.get("stop_reason") == "max_tokens"]
+    return meta
+
+
+def _with_usage(exc: BaseException, meta: dict[str, Any]) -> BaseException:
+    """Put the billed usage on an exception the pass lets through, where the
+    caller looks for it (``getattr(exc, "_meta", None)``, as on ModelStopped)."""
+    try:
+        exc._meta = meta  # type: ignore[attr-defined]
+    except AttributeError:  # an exception class without a __dict__
+        pass
+    return exc
+
+
 def extract_adjacency(
     *,
     image_b64: str,
     model: str | None = None,
-    max_tokens: int = 8192,
+    max_tokens: int = MAX_TOKENS,
     cache: VisionCache | None = None,
     no_cache: bool = False,
     client: Any | None = None,
 ) -> AdjacencyPayload:
-    """Run the adjacency Vision pass on a single floor-plan page."""
+    """Run the adjacency Vision pass on a single floor-plan page.
+
+    An answer cut off at ``max_tokens`` is asked again once with
+    ``RETRY_MAX_TOKENS``; a refusal is not asked again. Every billed answer is
+    in the usage the pass reports: on the payload's ``_meta``, or on the
+    ``_meta`` of the exception it raises (ModelStopped for a refusal or a
+    second cut-off; the original error, usage attached, for an answer that
+    cannot be read or a retry that never came back)."""
     prompt = _load_prompt()
     img_bytes = base64.b64decode(image_b64)
     model = model or model_for("vision_pass1")
+    # The first cap is part of the key: a cap change is a cache miss (one paid
+    # call), never a stale answer. Whichever attempt answers, the answer is
+    # stored under this key, so the next run of the same page is a hit.
     key = cache_key(img_bytes, prompt, model, str(max_tokens))
 
     if cache is None:
@@ -140,37 +191,49 @@ def extract_adjacency(
         client = anthropic.Anthropic(max_retries=1)
 
     media_type = _detect_image_media_type(img_bytes)
-    with client.messages.stream(
-        model=model,
-        max_tokens=max_tokens,
-        system=prompt,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image",
-                 "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
-                {"type": "text", "text": "Return the room adjacency JSON."},
-            ],
-        }],
-    ) as stream:
-        resp = stream.get_final_message()
-
-    _, stopped = read_answer(resp, reader="adjacency_extractor")
-    if stopped:  # refused / cut off: named, usage kept, never cached (2026-09-30)
-        raise ModelStopped(stopped, {"cache": "miss", "key": key, **usage_meta(resp, model)})
+    caps = [max_tokens] + ([RETRY_MAX_TOKENS] if RETRY_MAX_TOKENS > max_tokens else [])
+    billed: list[dict[str, Any]] = []
+    for i, cap in enumerate(caps):
+        try:
+            with client.messages.stream(
+                model=model,
+                max_tokens=cap,
+                system=prompt,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image",
+                         "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
+                        {"type": "text", "text": "Return the room adjacency JSON."},
+                    ],
+                }],
+            ) as stream:
+                resp = stream.get_final_message()
+        except Exception as exc:
+            if billed:  # the cut-off answer before this try was billed all the same
+                raise _with_usage(exc, _billed_meta(billed, model, key))
+            raise
+        billed.append({**usage_meta(resp, model), "max_tokens": cap,
+                       "stop_reason": getattr(resp, "stop_reason", None)})
+        _, stopped = read_answer(resp, reader="adjacency_extractor")
+        if stopped == "cut_off" and i + 1 < len(caps):
+            print(f"[adjacency_extractor] answer cut off at max_tokens={cap} "
+                  f"(output_tokens={billed[-1].get('output_tokens')}) — "
+                  f"one more try at max_tokens={caps[i + 1]}")
+            continue
+        if stopped:  # refused / cut off: named, usage kept, never cached (2026-09-30)
+            raise ModelStopped(stopped, _billed_meta(billed, model, key))
+        break
 
     text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
-    payload = _decode_response_json(text)
-    cache.put(key, payload)
+    try:
+        payload = _decode_response_json(text)
+        out = parse_adjacency_payload(payload)
+    except (ValueError, TypeError) as exc:  # a whole answer, billed, that cannot be read
+        raise _with_usage(exc, _billed_meta(billed, model, key))
+    cache.put(key, payload)  # only an answer that reads — never one that fails every run
 
-    out = parse_adjacency_payload(payload)
-    out._meta = {
-        "cache": "miss",
-        "key": key,
-        "model": model,
-        "input_tokens": getattr(resp.usage, "input_tokens", None),
-        "output_tokens": getattr(resp.usage, "output_tokens", None),
-    }
+    out._meta = _billed_meta(billed, model, key)
     return out
 
 

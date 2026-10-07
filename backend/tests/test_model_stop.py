@@ -369,6 +369,9 @@ def _vision_readers():
 
 
 _VISION_IDS = [r[0] for r in _vision_readers()]
+# Readers that ask a cut-off answer once more with a larger cap (2026-10-07):
+# both answers are billed, so the stop carries both answers' usage.
+_RETRY_A_CUT_OFF = {"adjacency_extractor"}
 
 
 @pytest.mark.parametrize("idx", range(10), ids=_VISION_IDS)
@@ -381,11 +384,12 @@ def test_vision_reader_stop_raises_and_caches_nothing(tmp_path, capsys, idx, res
     client = _StreamClient(resp)
     with pytest.raises(ModelStopped) as ei:
         fn(image_b64=_png_b64(), model="claude-test", cache=cache, client=client, **extra)
-    assert client.calls == 1
+    asked = 2 if (resp_kind == "cut_off" and name in _RETRY_A_CUT_OFF) else 1
+    assert client.calls == asked                          # a refusal is never asked again
     want = "refused:reasoning_extraction" if resp_kind == "refusal" else "cut_off"
     assert ei.value.error == want
     assert ei.value._meta["model"] == "claude-test"
-    assert ei.value._meta["input_tokens"] == (5497 if resp_kind == "refusal" else 900)
+    assert ei.value._meta["input_tokens"] == (5497 if resp_kind == "refusal" else 900 * asked)
     assert list(cache.keys()) == []                       # a stopped answer is never cached
     assert name in capsys.readouterr().out
 
