@@ -200,6 +200,35 @@ def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
     return math.ceil(bare * (1.0 + waste_factor))
 
 
+# The „GKP lapai …" rows (vision_call.build_gkp_pozicijos) and the §6 #5 check
+# that re-derives them (sanity_checks.check_gk_sheets_math) share the two
+# functions below, so the check can never measure a row against another area or
+# another rounding than the row was built with. 2026-10-07: the check summed only
+# the standard-height ceilings, so every project with GKP ceilings above 3 m read
+# „GKP lapų skaičius nesutampa" against a correct row.
+GKP_SHEET_WASTE = 1.10
+
+
+def gkp_sheet_count(area_m2: float) -> int:
+    """Boards on a „GKP lapai …" row: area / one 1,2 × 2,5 m sheet × 1,10 for
+    waste, rounded up once."""
+    if area_m2 <= 0:
+        return 0
+    return math.ceil(area_m2 / UNIVERSAL_RULES["drywall_sheet_area_m2"] * GKP_SHEET_WASTE)
+
+
+def gkp_ceiling_areas_m2(rooms) -> tuple[float, float]:
+    """(standard-height, above-3 m) GKP ceiling m² of the rooms in scope — each
+    summed and rounded to 0,01 m² exactly as the two „GKP lubų montavimas" rows
+    are. A room marked `_neskaiciuoti` (extractor/scope.py) is out of both."""
+    counted = [r for r in (rooms or []) if isinstance(r, dict) and not r.get("_neskaiciuoti")]
+
+    def _sum(field: str) -> float:
+        return round(sum(float(r.get(field) or 0) for r in counted), 2)
+
+    return _sum("gkp_lubu_standart_m2"), _sum("gkp_lubu_virs_3m_m2")
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # PER PATALPOS TIPĄ — universal taisyklės
 # ═════════════════════════════════════════════════════════════════════════

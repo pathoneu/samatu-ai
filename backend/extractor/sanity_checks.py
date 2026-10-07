@@ -15,6 +15,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, asdict
 
+from .universal_rules import gkp_ceiling_areas_m2, gkp_sheet_count
+
 
 # Every warning this module emits carries this tag, so a re-run (revalidate /
 # recompute) can drop the previous batch instead of stacking duplicates — and
@@ -216,24 +218,30 @@ def check_paint_quantity(rooms):
 
 
 def check_gk_sheets_math(rooms, vision_result=None):
-    """§6 #5: GK sheets = ceil(area_m2 / 3.0) × 1.10.
+    """§6 #5: GKP sheets = GKP ceiling m² / 3,0 m² × 1,10, rounded up.
 
-    Sums per-room `gkp_lubu_standart_m2` (ceiling GKP), divides by sheet area
-    (3.0 m² for 1.2×2.5m sheet) and applies 10% waste. Compares against the
-    "GKP lapai luboms" pozicija. Tolerates ±5% slack since rounding propagates.
+    Re-derives the „GKP lapai luboms" pozicija with the row's own area and
+    formula (`universal_rules.gkp_ceiling_areas_m2` + `gkp_sheet_count`): the
+    standard-height AND the above-3 m GKP ceilings of the rooms in scope. Until
+    2026-10-07 it summed only `gkp_lubu_standart_m2` and rounded differently, so
+    every project with ceilings above 3 m read „nesutampa" against a correct row
+    (93,39 + 61,55 m² → 57 sheets on the row, „apskaičiuota 35,2"). What it still
+    catches is a row whose count no longer follows the ceilings. ±5 % slack.
     """
-    total_gkp_m2 = sum(float(r.get("gkp_lubu_standart_m2") or 0) for r in rooms)
+    standart_m2, virs_3m_m2 = gkp_ceiling_areas_m2(rooms)
+    total_gkp_m2 = standart_m2 + virs_3m_m2
     if total_gkp_m2 <= 0:
         return None
 
-    import math
-    expected_sheets = math.ceil(total_gkp_m2 / 3.0) * 1.10
+    expected_sheets = gkp_sheet_count(total_gkp_m2)
     pozicijos = (vision_result or {}).get("pozicijos") or []
     actual_sheets = None
     for p in pozicijos:
         apr = (p.get("aprasymas") or "").lower()
         vnt = (p.get("vnt") or "").lower()
-        if "gkp lapai" in apr and vnt == "vnt":
+        # The ceiling row only: „GKP lapai sienoms" counts wall boards — another
+        # area, never to be measured against the ceilings.
+        if "gkp lapai" in apr and "sienoms" not in apr and vnt == "vnt":
             actual_sheets = float(p.get("kiekis") or 0)
             break
     if actual_sheets is None:
@@ -245,12 +253,13 @@ def check_gk_sheets_math(rooms, vision_result=None):
     return Warning(
         code="gk_sheets_off",
         message=(f"GKP lapų skaičius nesutampa: eilutėje {actual_sheets:.0f} vnt., "
-                 f"apskaičiuota {_lt(expected_sheets, 1)} vnt. (leistina ±5 %)"),
-        hint="Lapų skaičius = GKP lubų plotas / 3,0 m² (1,2 × 2,5 m lapas), "
-             "suapvalinus į viršų, × 1,10 atliekoms. Patikrinkite lubų GKP "
-             "plotus pagal patalpas.",
+                 f"apskaičiuota {expected_sheets} vnt. (leistina ±5 %)"),
+        hint="Lapų skaičius = visų GKP lubų plotas (standartinio aukščio ir virš "
+             "3 m) / 3,0 m² (1,2 × 2,5 m lapas) × 1,10 atliekoms, suapvalinus į "
+             "viršų. Patikrinkite, ar eilutės kiekis nepakeistas ranka, ir lubų "
+             "GKP plotus pagal patalpas.",
         severity="low",
-        expected=f"≈{expected_sheets:.0f} vnt.",
+        expected=f"≈{expected_sheets} vnt.",
         actual=f"{actual_sheets:.0f} vnt.",
     )
 

@@ -124,7 +124,7 @@ def test_run_all_checks_swallows_exceptions():
 
 def test_gk_sheets_math_passes_when_pozicija_matches_formula():
     rooms = [{"gkp_lubu_standart_m2": 148.88}]
-    # ceil(148.88/3.0) * 1.10 = ceil(49.6) * 1.10 = 50 * 1.10 = 55.0
+    # ceil(148.88 / 3.0 × 1.10) = ceil(54.59) = 55 — the row's own formula
     pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 55}]
     assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
 
@@ -147,6 +147,59 @@ def test_gk_sheets_math_skipped_when_no_gkp_area():
 def test_gk_sheets_math_skipped_when_no_pozicija():
     rooms = [{"gkp_lubu_standart_m2": 100}]
     assert check_gk_sheets_math(rooms, {"pozicijos": []}) is None
+
+
+def test_gk_sheets_math_counts_the_ceilings_above_3m_like_the_row():
+    """2026-10-07, live: „eilutėje 57 vnt., apskaičiuota 35,2 vnt." — the row
+    covers every GKP ceiling (93,39 standard + 61,55 above 3 m = 154,94 m² → 57
+    sheets), the check summed the standard ones only. Same area, same formula
+    now: a correct row is quiet."""
+    rooms = [{"nr": "101", "gkp_lubu_standart_m2": 93.39},
+             {"nr": "102", "gkp_lubu_virs_3m_m2": 61.55}]
+    pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 57}]
+    assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
+
+
+def test_gk_sheets_math_still_fires_when_the_row_is_really_off():
+    rooms = [{"nr": "101", "gkp_lubu_standart_m2": 93.39},
+             {"nr": "102", "gkp_lubu_virs_3m_m2": 61.55}]
+    pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 70}]
+    w = check_gk_sheets_math(rooms, {"pozicijos": pozicijos})
+    assert w is not None and w.code == "gk_sheets_off"
+    assert "eilutėje 70 vnt., apskaičiuota 57 vnt." in w.message
+    assert w.expected == "≈57 vnt."
+
+
+def test_gk_sheets_math_never_measures_the_wall_row_against_the_ceilings():
+    rooms = [{"nr": "101", "gkp_lubu_standart_m2": 93.39}]
+    pozicijos = [
+        {"aprasymas": "GKP lapai sienoms (12.5 mm)", "vnt": "vnt", "kiekis": 4},
+        {"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 35},
+    ]
+    assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
+
+
+def test_gk_sheets_math_leaves_out_a_room_he_does_not_do():
+    # `_neskaiciuoti` rooms are out of every row (extractor/scope.py) — and of
+    # the check: 93,39 m² → 35 sheets, the excluded 61,55 m² changes nothing.
+    rooms = [{"nr": "101", "gkp_lubu_standart_m2": 93.39},
+             {"nr": "102", "gkp_lubu_virs_3m_m2": 61.55, "_neskaiciuoti": True}]
+    pozicijos = [{"aprasymas": "GKP lapai luboms (9.5 mm)", "vnt": "vnt", "kiekis": 35}]
+    assert check_gk_sheets_math(rooms, {"pozicijos": pozicijos}) is None
+
+
+def test_gk_sheets_check_agrees_with_the_real_builder_on_two_heights():
+    """End to end: the pozicijos builder's own „GKP lapai luboms" row, checked by
+    run_all_checks, raises nothing — the row and the check share one area and one
+    formula (universal_rules.gkp_ceiling_areas_m2 / gkp_sheet_count)."""
+    from extractor.vision_call import _build_pozicijos_from_rooms
+    parsed = _build_pozicijos_from_rooms({"patalpos": [
+        {"nr": "101", "pavadinimas": "Svetainė", "plotas_m2": 93.39, "gkp_lubu_standart_m2": 93.39},
+        {"nr": "102", "pavadinimas": "Antresolė", "plotas_m2": 61.55, "gkp_lubu_virs_3m_m2": 61.55},
+    ]})
+    sheets = [p for p in parsed["pozicijos"] if p["aprasymas"].startswith("GKP lapai luboms")]
+    assert [p["kiekis"] for p in sheets] == [57]
+    assert "gk_sheets_off" not in [w["code"] for w in run_all_checks(parsed)]
 
 
 

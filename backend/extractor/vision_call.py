@@ -29,7 +29,7 @@ from .prompt import (
 from models_config import model_for
 from . import ledger as _ledger
 from . import run_usage as _run_usage
-from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, kiekis_units, lt_num
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, gkp_ceiling_areas_m2, kiekis_units, lt_num
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -1956,10 +1956,8 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
     GKP (ceiling + wall combined). Now emits separate lines using the correct
     thickness constants from UNIVERSAL_RULES.
     """
-    from .universal_rules import UNIVERSAL_RULES
+    from .universal_rules import UNIVERSAL_RULES, gkp_sheet_count
 
-    SHEET = UNIVERSAL_RULES["drywall_sheet_area_m2"]          # 3.0 m²
-    WASTE = 1.10
     wall_thickness = UNIVERSAL_RULES["drywall_thickness_walls_mm"]      # 12.5
     ceil_thickness = UNIVERSAL_RULES["drywall_thickness_ceilings_mm"]   # 9.5
 
@@ -1976,9 +1974,11 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
     # it, never clone it". The thickness stays in the label because walls take
     # 12.5 mm and ceilings 9.5 mm: two different products, two price keys.
     # (2026-09-02)
+    # Sheets = area / 3,0 m² × 1,10, rounded up once — `gkp_sheet_count`, the same
+    # function `sanity_checks.check_gk_sheets_math` re-derives these rows with.
     pozicijos = []
     if walls_total > 0:
-        wall_sheets = math.ceil(walls_total / SHEET * WASTE)
+        wall_sheets = gkp_sheet_count(walls_total)
         pozicijos.append({
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai sienoms ({wall_thickness} mm)",
@@ -1986,7 +1986,7 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
             _IS_MATERIAL_LINE: True,
         })
     if ceilings_total > 0:
-        ceil_sheets = math.ceil(ceilings_total / SHEET * WASTE)
+        ceil_sheets = gkp_sheet_count(ceilings_total)
         pozicijos.append({
             "skyrius": _SK_GKP,
             "aprasymas": f"GKP lapai luboms ({ceil_thickness} mm)",
@@ -4080,8 +4080,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # GKP MONTAVIMAS (~5-9 lines)
     # ════════════════════════════════════════════════════════════════════════
 
-    gkp_standart = _sum("gkp_lubu_standart_m2")
-    gkp_high = _sum("gkp_lubu_virs_3m_m2")
+    # Both heights feed the sheets row below; `check_gk_sheets_math` sums them
+    # through this same function, so the check and the row cannot drift apart.
+    gkp_standart, gkp_high = gkp_ceiling_areas_m2(rooms)
     gkp_total = gkp_standart + gkp_high
     gkp_parent: str | None = None
     if gkp_total > 0:
