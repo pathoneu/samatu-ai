@@ -24,6 +24,9 @@ ln -s /Users/ignasgaldikas/samatu-ai/frontend/node_modules frontend/node_modules
 mkdir -p backend/data && cp /Users/ignasgaldikas/samatu-ai/backend/data/samatu.db backend/data/ \
   && cp -R /Users/ignasgaldikas/samatu-ai/backend/data/pdf_store backend/data/pdf_store
 cp /Users/ignasgaldikas/samatu-ai/backend/.env backend/.env
+# eval gate fixtures (untracked PDFs the €0 lanes read; without them every --recompute drifts, e.g. 22,60 → 22,72 %)
+mkdir -p docs/superpowers/fixtures && cp -R /Users/ignasgaldikas/samatu-ai/docs/superpowers/fixtures/. docs/superpowers/fixtures/
+cp /Users/ignasgaldikas/samatu-ai/backend/.confidential-terms backend/.confidential-terms   # the denylist is untracked too
 # backend (your port from the table; --reload is fine in dev)
 cd backend && SAMATU_AUTH_DISABLED=1 /Users/ignasgaldikas/samatu-ai/venv/bin/uvicorn main:app --port <BACKEND_PORT> --reload
 # frontend, pointed at your backend
