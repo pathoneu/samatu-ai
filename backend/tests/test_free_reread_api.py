@@ -195,3 +195,13 @@ def test_a_stranger_cannot_read_someone_elses_project(tmp_path, monkeypatch):
 def test_a_strange_project_id_is_rejected(tmp_path, monkeypatch, bad):
     _isolate(tmp_path, monkeypatch)
     assert TestClient(app).get(f"/api/projects/{bad}/free-reread").status_code in (400, 404)
+
+
+def test_status_a_project_read_at_lane_version_11_is_offered_the_evidence_refresh(tmp_path, monkeypatch):
+    """LANE_VERSION 12 (2026-10-16): the walls' strings carry `ilgis_pt` for the viewer's scale check — a
+    project read at 11 is offered the free re-read."""
+    _isolate(tmp_path, monkeypatch)
+    _store(blob=_blob(geometrija={"versija": 11}))
+    body = TestClient(app).get("/api/projects/p1/free-reread").json()
+    assert gl.LANE_VERSION == 12
+    assert body["needed"] is True and body["projekto_versija"] == 11

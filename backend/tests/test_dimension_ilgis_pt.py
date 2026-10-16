@@ -56,3 +56,43 @@ def test_the_length_reaches_the_walls_strings_on_the_room():
 def test_a_string_without_a_line_has_no_length():
     dims = pdim.read_dimension_strings(build_plan([two_rooms()]), pages=[1])
     assert all("ilgis_pt" not in d for d in dims if d.get("span_source") != "line")
+
+
+def _strip_lengths(rooms):
+    for r in rooms:
+        for s in r["_sienos"]:
+            for e in s["eilutes"]:
+                e.pop("ilgis_pt", None)
+
+
+def _without_lengths(room):
+    import copy
+    import json
+    r = copy.deepcopy(room)
+    _strip_lengths([r])
+    return json.dumps(r, sort_keys=True, ensure_ascii=False)
+
+
+def test_a_kept_perimeter_gets_its_evidence_refreshed_and_nothing_else_moves():
+    """LANE_VERSION 12: a room summed from strings before `ilgis_pt` existed keeps its perimeter (KEEP — a
+    re-read never moves a billed number), but its walls' strings learn the drawn length."""
+    pdf = build_plan([two_rooms()])
+    dims = pdim.read_dimension_strings(pdf, pages=[1])
+    alignment = sa.align_sheets(pdf, [1])
+    rooms = [_room("01", 0.2, 0.2, 4.2, 3.2), _room("02", 4.4, 0.2, 7.4, 3.2)]
+    ds.sum_perimeters(rooms, dims, alignment, {1: 1 / PT_PER_M})
+    assert all(r["perimetras_saltinis"] == "matmenu_eilutes" for r in rooms)
+    _strip_lengths(rooms)                                  # a project stored at lane version 11
+    # one string the drawing no longer carries as written: its entry must stay as it is
+    rooms[0]["_sienos"][0]["eilutes"][0]["text"] = "9999"
+    before = [_without_lengths(r) for r in rooms]
+    out = ds.sum_perimeters(rooms, dims, alignment, {1: 1 / PT_PER_M})
+    assert out["stated"] == [] and sorted(out["skipped"]) == ["01", "02"]   # the skip stays a skip
+    assert [_without_lengths(r) for r in rooms] == before                    # byte-identical but for ilgis_pt
+    eilutes = [e for r in rooms for s in r["_sienos"] for e in s["eilutes"]]
+    stale = rooms[0]["_sienos"][0]["eilutes"][0]
+    assert "ilgis_pt" not in stale
+    refreshed = [e for e in eilutes if e is not stale]
+    assert len(refreshed) == 7 and all(e.get("ilgis_pt") for e in refreshed)
+    for e in refreshed:
+        assert abs(e["ilgis_pt"] / PT_PER_M / e["value_m"] - 1) < 0.005, e

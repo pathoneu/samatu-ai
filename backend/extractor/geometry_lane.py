@@ -153,7 +153,9 @@ def _forget_open_space(room: dict) -> None:
 # 11 (2026-10-06, objektas_a on production): an outline kept although its area is off the table's gives its length
 # as the estimate matched to the table's area — × √(table / outline), a similar shape — never shorter than any room
 # of that area could be (104: 13,98 → 14,96 m around 13,51 m²); the outline's own length stays beside it.
-LANE_VERSION = 11
+# 12 (2026-10-16): the drawn length each dimension string's scale ratio used (`ilgis_pt`) rides with the string into the
+# walls' evidence, also on a room whose walls were summed before — the viewer's scale check needs it; no quantity changes.
+LANE_VERSION = 12
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

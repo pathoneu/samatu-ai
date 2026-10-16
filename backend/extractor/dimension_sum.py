@@ -333,6 +333,36 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
     return None
 
 
+EVIDENCE_MATCH = 0.002   # page fraction: an eilutė's line ends and the fresh string's agree within this
+
+
+def _refresh_evidence(room: dict, by_base: dict[int, list[dict]], slanted_by_base: dict[int, list[dict]]) -> None:
+    """A room whose perimeter is kept (KEEP) keeps it — a re-read never moves a billed number — but the
+    record of the strings its walls were added up from may learn what the fresh strings carry: each
+    `_sienos[].eilutes[]` entry takes `ilgis_pt` from the fresh string on the same page with the same
+    text whose line ends agree within EVIDENCE_MATCH. No match → the entry stays as it is. Nothing
+    else on the room is touched (LANE_VERSION 12)."""
+    walls = room.get("_sienos")
+    if not isinstance(walls, list):
+        return
+    fresh = [s for group in (by_base, slanted_by_base) for strings in group.values() for s in strings
+             if s.get("ilgis_pt") is not None and s.get("line_pct")]
+
+    def same(a, b) -> bool:
+        return all(abs(float(a[i][j]) - float(b[i][j])) <= EVIDENCE_MATCH for i in (0, 1) for j in (0, 1))
+
+    for wall in walls:
+        for e in (wall.get("eilutes") or []) if isinstance(wall, dict) else []:
+            line = e.get("line_pct") if isinstance(e, dict) else None
+            if not line or len(line) != 2:
+                continue
+            for s in fresh:
+                if s["page"] == e.get("page") and str(s["text"]) == str(e.get("text")) and (
+                        same(line, s["line_pct"]) or same(line, s["line_pct"][::-1])):
+                    e["ilgis_pt"] = s["ilgis_pt"]
+                    break
+
+
 def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict, scale_by_page: dict[int, float],
                    page_sizes: dict[int, tuple[float, float]] | None = None) -> dict:
     summary: dict[str, list[str]] = {"stated": [], "blank": [], "skipped": []}
@@ -341,6 +371,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
     for room in rooms:
         nr = str(room.get("nr") or "")
         if room.get("perimetras_saltinis") in KEEP and room.get("perimetras_m"):
+            _refresh_evidence(room, by_base, slanted_by_base)
             summary["skipped"].append(nr)
             continue
         poly_pct = room.get("polygon_pct")
