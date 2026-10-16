@@ -185,7 +185,7 @@ def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
             line_pct = [[round(x / W, 5), round(y / H, 5)] for x, y in ends]
         by_base.setdefault(b, []).append({"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "horiz": horiz,
                                           "s0": min(s0, s1), "s1": max(s0, s1), "pos": t["k"] * lp + across,
-                                          "line_pct": line_pct})
+                                          "line_pct": line_pct, "ilgis_pt": d.get("ilgis_pt")})
     return by_base
 
 
@@ -203,7 +203,8 @@ def _slanted_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
         W, H = float(d.get("page_width") or 0), float(d.get("page_height") or 0)
         line_pct = [[round(float(x) / W, 5), round(float(y) / H, 5)] for x, y in line] if W > 0 and H > 0 else None
         by_base.setdefault(base_page(alignment, p), []).append(
-            {"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "a": ends[0], "b": ends[1], "line_pct": line_pct})
+            {"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "a": ends[0], "b": ends[1], "line_pct": line_pct,
+             "ilgis_pt": d.get("ilgis_pt")})
     return by_base
 
 
@@ -405,7 +406,8 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                                  [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
                     "ilgis_m": round(length, 3) if length is not None else None,
                     "saltinis": "eilute" if row else None,
-                    "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"]}
+                    "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"],
+                                 "ilgis_pt": s.get("ilgis_pt")}
                                 for s in (row or [])],
                     "kontrole_m": control, "istriza": horiz is None, "_frame": (horiz, e0, e1)}
             if parts:

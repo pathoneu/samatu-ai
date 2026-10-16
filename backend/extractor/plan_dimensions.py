@@ -332,7 +332,7 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
             # length cannot choose between them.
             key = (round(abs(p - across), 1), dev)
             if best is None or key < best[0]:
-                best = (key, (a0, a1, p), ratio)
+                best = (key, (a0, a1, p, length), ratio)
         if best:
             accepted.append((d, best[1], best[2]))
     if len(accepted) < MIN_SCALED or len(accepted) < MIN_SCALED_SHARE * len(dims):
@@ -351,10 +351,13 @@ def _attach_lines_on_page(dims: list[dict], lines: dict, stated: set[int] | None
         d["mastelis"] = mastelis
         if other:
             d["mastelis_kitas"] = other
-    for d, (a0, a1, p), _ in accepted:
+    for d, (a0, a1, p, length), _ in accepted:
         d["span"] = [round(a0, 2), round(a1, 2)]
         d["line_pos"] = round(p, 2)
         d["span_source"] = "line"
+        # the drawn length the ratio used (span less the stroke width: PDFium bounds include the caps) —
+        # read by the viewer's scale check only
+        d["ilgis_pt"] = round(length, 2)
     return len(accepted)
 
 
@@ -510,7 +513,7 @@ def _slanted_dimensions(pdf_bytes: bytes, scale_by_page: dict[int, float]) -> li
                 if across > LINE_NEAR_PT or not (-2.0 <= along <= length + 2.0):
                     continue
                 if best is None or across < best[0]:
-                    best = (across, a, b)
+                    best = (across, a, b, length)
             if best is None:
                 continue
             xs = [pt[0] for pt in run["pts"]]
@@ -519,7 +522,8 @@ def _slanted_dimensions(pdf_bytes: bytes, scale_by_page: dict[int, float]) -> li
                         "bbox": [round(min(xs) - 2, 2), round(min(ys) - 2, 2), round(max(xs) + 2, 2), round(max(ys) + 2, 2)],
                         "page_width": info["W"], "page_height": info["H"], "orientation": "s",
                         "line": [[round(best[1][0], 2), round(best[1][1], 2)], [round(best[2][0], 2), round(best[2][1], 2)]],
-                        "span_source": "line", "scale_m_per_pt": round(scale, 6), "mastelis": _mastelis(scale)})
+                        "span_source": "line", "ilgis_pt": round(best[3], 2),
+                        "scale_m_per_pt": round(scale, 6), "mastelis": _mastelis(scale)})
     return out
 
 
