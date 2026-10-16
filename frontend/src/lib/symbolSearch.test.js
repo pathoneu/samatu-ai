@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   boxFromDrag, normalizeCandidates, visibleCandidates, formatScore, countLabel, groupByPage,
   unusualPages, countsByPage, planAllPages, pageRanges, candidatesToMeasurements, klassFor,
-  decisionsToRecord, aiMarkCount, AI_CONFIDENCE, SYMBOL_SOURCE, DEFAULT_THRESHOLD, MIN_THRESHOLD,
+  decisionsToRecord, aiMarkCount, rejectionsToRecord, isAiMark, aiTallies, AI_CONFIDENCE, SYMBOL_SOURCE, DEFAULT_THRESHOLD, MIN_THRESHOLD,
 } from './symbolSearch.js';
 import { normalizeConfidence, CONF_GELTONA } from './confidence.js';
 
@@ -117,4 +117,25 @@ test('aiMarkCount counts only AI-found marks of the type', () => {
     { kind: 'count', typeId: 'b', source: SYMBOL_SOURCE },
   ];
   assert.equal(aiMarkCount(ms, 'a'), 1);
+});
+
+test('cancel keeps only the hand-removed ones, as rejects', () => {
+  const c = normalizeCandidates(1, raw);
+  assert.deepEqual(rejectionsToRecord(c, new Set(['1:2', '1:3'])).map((x) => [x.c.id, x.decision]),
+    [['1:2', 'reject'], ['1:3', 'reject']]);
+  assert.deepEqual(rejectionsToRecord(c, new Set()), []);
+});
+
+test('isAiMark / aiTallies tell AI-found marks from hand-placed ones', () => {
+  const ms = [
+    { kind: 'count', typeId: 'a', source: SYMBOL_SOURCE },
+    { kind: 'count', typeId: 'a', source: SYMBOL_SOURCE },
+    { kind: 'count', typeId: 'a', source: 'user' },
+    { kind: 'count', typeId: 'b' },
+    { kind: 'area', typeId: 'a', source: SYMBOL_SOURCE },
+  ];
+  assert.equal(isAiMark(ms[0]), true);
+  assert.equal(isAiMark(ms[2]), false);
+  assert.equal(isAiMark(ms[4]), false);
+  assert.deepEqual(aiTallies(ms), { a: 2 });
 });

@@ -36,6 +36,7 @@ import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
+import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -1237,6 +1238,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                   activeCountTypeId={activeCountTypeId}
                   onSelectType={setActiveCountTypeId}
                   tallies={countTallies}
+                  aiTallies={aiTalliesOf(measurements)}
                   collapsed={countLegendCollapsed}
                   onToggleCollapse={() => setCountLegendCollapsed((v) => !v)}
                   onAddType={addCountType}

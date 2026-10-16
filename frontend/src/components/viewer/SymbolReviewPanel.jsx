@@ -6,7 +6,7 @@ import { findSymbol, recordDecision } from '@/lib/cvToolsApi';
 import { makeCountType } from '@/lib/measurements';
 import {
   normalizeCandidates, visibleCandidates, countLabel, groupByPage, countsByPage, unusualPages,
-  planAllPages, pageRanges, candidatesToMeasurements, klassFor, decisionsToRecord, formatScore,
+  planAllPages, pageRanges, candidatesToMeasurements, klassFor, decisionsToRecord, rejectionsToRecord, formatScore,
   DEFAULT_THRESHOLD, MIN_THRESHOLD, MAX_RUN_MS, MAX_PAGES_PER_RUN, UNUSUAL_WARNING, SYMBOL_SOURCE,
 } from '@/lib/symbolSearch';
 
@@ -41,7 +41,7 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     setHoveredId(null); setProgress(null); setSkipped(null); setError(null);
   };
   const open = () => { reset(); setThreshold(DEFAULT_THRESHOLD); setActive(true); };
-  const close = () => { reset(); setActive(false); };
+  const finish = () => { reset(); setActive(false); };
 
   const all = useMemo(() => Object.values(byPage).flatMap((r) => r.candidates), [byPage]);
   const found = useMemo(() => all.filter((c) => !removed.has(c.id)).length, [all, removed]);
@@ -143,9 +143,8 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     setHoveredId((h) => (h === id ? null : h));
   };
 
-  const recordAll = useCallback((type) => {
-    const list = decisionsToRecord(all, threshold, removed);
-    const klass = klassFor(type);
+  const sendDecisions = useCallback((list, klass) => {
+    if (!list.length) return 0;
     let failures = 0;
     // Sequential, fire-and-forget: the corpus must not slow the person down.
     (async () => {
@@ -158,11 +157,21 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
         } catch { failures += 1; }
       }
       if (failures) {
-        toast.warning(`Mokymo duomenų įrašyti nepavyko (${failures} iš ${list.length}) — kiekis pridėtas`);
+        toast.warning(`Mokymo duomenų įrašyti nepavyko (${failures} iš ${list.length})`);
       }
     })();
     return list.length;
-  }, [all, threshold, removed, projectId]);
+  }, [projectId]);
+
+  const recordAll = (type) => sendDecisions(decisionsToRecord(all, threshold, removed), klassFor(type));
+
+  // Cancel (Esc, ✕, another tool): nothing is counted, but what the person removed
+  // by hand was a judgement — keep it as rejects, under the class of the type the
+  // review panel had chosen (its close button passes it) or the neutral 'simbolis' (Esc, another tool).
+  const close = (klassType = null) => {
+    sendDecisions(rejectionsToRecord(all, removed), klassFor(klassType));
+    finish();
+  };
 
   // typeId of an existing type, or newLabel for a new one.
   const add = ({ typeId, newLabel }) => {
@@ -178,10 +187,10 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     const marks = candidatesToMeasurements(visible, type);
     onAdd?.(marks, created);
     recordAll(type);
+    finish();
     toast.success(`Pridėta ${marks.length} vnt. „${type.label}"`, {
-      description: 'Rasta automatiškai — patikrinkite kiekvieną žymę brėžinyje. Sąraše „Matavimai" jos pažymėtos geltonai.',
+      description: 'Rasta automatiškai — tuščiavidurės žymės brėžinyje; patikrinkite kiekvieną. Sąraše „Matavimai" jos pažymėtos geltonai.',
     });
-    close();
     return true;
   };
 
@@ -217,7 +226,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
           title="Apveskite vieną simbolį — programa suras panašius pagal formą. Tai pagalba skaičiuoti, ne tikras atpažinimas: patikrinkite kiekvieną.">
           Rasti panašius
         </h3>
-        <button type="button" onClick={s.close} title="Uždaryti paiešką (Esc) — niekas nepridedama"
+        <button type="button" onClick={() => s.close(countTypes.find((t) => t.id === typeChoice) || null)} title="Uždaryti paiešką (Esc) — niekas nepridedama"
           className="p-0.5 rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Uždaryti">
           <X className="w-3.5 h-3.5" />
         </button>

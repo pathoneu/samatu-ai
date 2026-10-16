@@ -170,6 +170,24 @@ export function decisionsToRecord(all, threshold, removed) {
   return out;
 }
 
+/** On cancel nothing is counted, but the hand-removed candidates are still a
+ *  judgement („not this symbol") — the corpus keeps them as rejects. */
+export function rejectionsToRecord(all, removed) {
+  return all.filter((c) => removed.has(c.id)).map((c) => ({ c, decision: 'reject' }));
+}
+
+/** Whether a measurement is a „Rasti panašius" mark (drawn hollow, listed apart). */
+export function isAiMark(m) {
+  return m?.kind === 'count' && m.source === SYMBOL_SOURCE;
+}
+
+/** {typeId: n} of AI-found marks — the count legend shows them per type. */
+export function aiTallies(measurements) {
+  const out = {};
+  for (const m of measurements || []) if (isAiMark(m) && m.typeId) out[m.typeId] = (out[m.typeId] || 0) + 1;
+  return out;
+}
+
 /** AI-found marks of a count type that nobody has checked yet. */
 export function aiMarkCount(measurements, typeId) {
   return (measurements || []).filter((m) => m.kind === 'count' && m.typeId === typeId && m.source === SYMBOL_SOURCE).length;
