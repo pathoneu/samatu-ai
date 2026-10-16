@@ -95,3 +95,43 @@ export async function saveOutlineTool(op, { api, getFresh }) {
   }
   throw new Error(`Nežinomas kontūro veiksmas: ${op?.kind}`);
 }
+
+// `grindu_danga` → [nominative, genitive, accusative] (mirror of backend api/room_outline.py _FLOOR_WORDS)
+const FLOOR_WORDS = {
+  plyteles: ['plytelės', 'plytelių', 'plyteles'],
+  minksta: ['parketas arba laminatas', 'parketo arba laminato', 'parketą arba laminatą'],
+  be_dangos: ['betonas be dangos', 'betono be dangos', 'betoną be dangos'],
+};
+const lt2 = (v) => Number(v).toFixed(2).replace('.', ',');
+const pos = (v) => typeof v === 'number' && v > 0;
+
+function floorKind(r) {
+  if (r && FLOOR_WORDS[r.grindu_danga]) return r.grindu_danga;
+  if (pos(r?.plyteles_grindys_m2)) return 'plyteles';
+  return pos(r?.pvc_grindys_m2) ? 'minksta' : null;
+}
+
+/**
+ * „Sujungti" applies the kept room's finishes to the whole area. When the two rooms' floor coverings or
+ * wall tiles differ that moves billed quantities between lines — the dialog says so BEFORE the merge
+ * (mirror of backend `merge_finish_warning`, same words). Null when nothing moves.
+ */
+export function mergeFinishWarning(kept, gone, keptNr, goneNr) {
+  const a = pos(kept?.plotas_m2) ? kept.plotas_m2 : 0;
+  const b = pos(gone?.plotas_m2) ? gone.plotas_m2 : 0;
+  const both = Math.round((a + b) * 100) / 100;
+  const fk = floorKind(kept);
+  const fg = floorKind(gone);
+  const floorDiffers = Boolean(fk && fg && fk !== fg);
+  const wallTiles = pos(gone?.plyteles_sienos_m2) ? gone.plyteles_sienos_m2 : 0;
+  const lostTiles = wallTiles > 0 && !pos(kept?.plyteles_sienos_m2);
+  if (!floorDiffers && !lostTiles) return null;
+  let text = 'Patalpų apdaila skiriasi: ' + (floorDiffers
+    ? `${goneNr} grindys ${FLOOR_WORDS[fg][0]}, ${keptNr} ${FLOOR_WORDS[fk][0]}`
+    : `${goneNr} sienose plytelės, ${keptNr} — ne`);
+  text += ` — sujungus visam plotui (${lt2(both)} m²) bus taikoma ${keptNr} apdaila`;
+  const tail = [];
+  if (floorDiffers && b > 0) tail.push(`${lt2(b)} m² pereis iš ${FLOOR_WORDS[fg][1]} į ${FLOOR_WORDS[fk][2]}`);
+  if (lostTiles) tail.push(`${goneNr} sienų plytelių (${lt2(wallTiles)} m²) sąmatoje nebeliks`);
+  return text + (tail.length ? '; ' + tail.join('; ') : '') + '.';
+}

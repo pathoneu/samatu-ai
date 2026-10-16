@@ -99,3 +99,18 @@ test('unknown operations and refused answers throw with the server sentence', as
   const api = { outlineSet: async () => ({ status: 'nope', detail: 'Kontūras per mažas arba išsigimęs' }) };
   await assert.rejects(saveOutlineTool({ kind: 'set', nr: '01', page: 1, polygon: ring }, { api, getFresh: project }), /per mažas/);
 });
+
+test('mergeFinishWarning: says what moves between lines when the finishes differ, nothing when they agree', async () => {
+  const { mergeFinishWarning } = await import('./outlineToolSave.js');
+  const kitchen = { nr: '04', plotas_m2: 26.31, grindu_danga: 'plyteles', plyteles_sienos_m2: 1.4 };
+  const living = { nr: '05', plotas_m2: 35.5, grindu_danga: 'minksta', plyteles_sienos_m2: 0 };
+  assert.equal(mergeFinishWarning(kitchen, living, '04', '05'),
+    'Patalpų apdaila skiriasi: 05 grindys parketas arba laminatas, 04 plytelės — sujungus visam plotui (61,81 m²) '
+    + 'bus taikoma 04 apdaila; 35,50 m² pereis iš parketo arba laminato į plyteles.');
+  assert.equal(mergeFinishWarning(living, { ...living, nr: '06' }, '05', '06'), null);
+  const bath = { nr: '03', plotas_m2: 6, plyteles_grindys_m2: 6, plyteles_sienos_m2: 18 };
+  const hall = { nr: '02', plotas_m2: 4, plyteles_grindys_m2: 4 };
+  assert.equal(mergeFinishWarning(hall, bath, '02', '03'),
+    'Patalpų apdaila skiriasi: 03 sienose plytelės, 02 — ne — sujungus visam plotui (10,00 m²) bus taikoma 02 apdaila; '
+    + '03 sienų plytelių (18,00 m²) sąmatoje nebeliks.');
+});

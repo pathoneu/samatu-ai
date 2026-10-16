@@ -598,7 +598,7 @@ export default function WorkspacePanel({
                     style={{ fontSize: 9, lineHeight: '14px', border: '1px solid hsl(var(--border))' }}
                     title={r._sujungta_i
                       ? `Patalpa sujungta su ${r._sujungta_i}: jos plotas ir angos skaičiuojami patalpoje ${r._sujungta_i}`
-                      : r._sujungimas?.sakinys}
+                      : [r._sujungimas?.sakinys, r._sujungimas?.apdaila_skiriasi].filter(Boolean).join('. ')}
                     data-testid="room-merge-badge"
                   >
                     {r._sujungta_i ? `sujungta į ${r._sujungta_i}` : `+ ${(r._sujungimas?.su || []).join(', ')}`}

@@ -199,3 +199,47 @@ def test_objektas_h_merge_05_into_04_keeps_the_ceiling_at_the_table_total_and_th
     # doors and reveals: the absorbed room's openings are billed through the kept room
     for k in ("Durų angų paruošimas beapvadinėms durims", "Angokraščių glaistymas-dažymas"):
         assert q1[k] == pytest.approx(q0[k], abs=0.01), k
+
+
+# ── the project's area (header, „Apsauginės dangos", „Šiukšlių išvežimas") ──
+
+def _with_garage():
+    a, b = _rooms()
+    g = {"nr": "03", "pavadinimas": "Garažas", "paskirtis": "garažas", "plotas_m2": 20.0, "perimetras_m": 18.0,
+         "lubu_aukstis_m": H, "elementai": []}
+    t = {"nr": "04", "pavadinimas": "Tambūras", "paskirtis": "tambūras", "plotas_m2": 3.0, "perimetras_m": 7.0,
+         "lubu_aukstis_m": H, "elementai": []}
+    return [a, b, g, t]
+
+
+def _header(client, rooms, apimtis=None):
+    body = {"patalpos": copy.deepcopy(rooms), "rules_override": {"apimtis": apimtis} if apimtis else {}}
+    r = client.post("/recompute-interior", json=body)
+    assert r.status_code == 200, r.text
+    return r.json()["bendras_plotas_m2"]
+
+
+def test_excluding_a_room_by_choice_takes_exactly_its_area_off_the_header_and_the_garage_stays_out(client):
+    rooms = _with_garage()
+    assert _header(client, rooms) == pytest.approx(21.0)                    # 12 + 9, no garage, no tambour
+    assert _header(client, rooms, {"patalpos_ne": ["02"]}) == pytest.approx(12.0)
+
+
+def test_a_merge_leaves_the_header_where_it_was(client):
+    rooms = _with_garage()
+    a, b = _merged()
+    assert _header(client, [a, b] + rooms[2:]) == pytest.approx(_header(client, rooms))
+
+
+def test_objektas_h_merge_05_into_04_leaves_the_header_at_138_79(client):
+    blob = _objektas_h()
+    assert _header(client, blob["patalpos"]) == pytest.approx(138.79, abs=0.01)
+    assert _header(client, _merge_h(copy.deepcopy(blob))["patalpos"]) == pytest.approx(138.79, abs=0.01)
+
+
+def test_the_ledgers_name_the_absorbed_room_as_merged_never_as_his_choice(client):
+    out, _ = _run(client, _merged())
+    seen = [e for row in out["darbu_sarasas"] for e in (row.get("excluded") or []) if e.get("room_nr") == "02"]
+    assert seen, "the absorbed room is listed on the ledgers"
+    assert all(e["excluded_because"] == "Sujungta į 01 — plotas ir angos skaičiuojami ten" for e in seen)
+    assert scope.excluded_because({"_neskaiciuoti": True, "_neskaiciuoti_kodel": "pasirinkimas"}) == scope.EXCLUDED_BECAUSE

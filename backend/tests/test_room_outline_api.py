@@ -412,3 +412,24 @@ def test_a_merge_of_typed_perimeters_keeps_both_rooms_walls_less_the_shared_run(
     assert kept["perimetras_m"] == pytest.approx(expected, abs=0.05)
     k = out["sujungimas"]["01"]
     assert k["_perimetras_pries_sujungima"] == 15.0 and k["_sujungimas"]["perimetras"].startswith("Perimetras: 15,00 + 13,00")
+
+
+def test_a_merge_of_rooms_with_different_floors_says_what_moves_before_and_after(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob(grindu_danga="plyteles", plyteles_grindys_m2=12.0)
+    blob["patalpos"][1].update(grindu_danga="minksta", pvc_grindys_m2=9.0)
+    _store(blob=blob)
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    want = ("Patalpų apdaila skiriasi: 02 grindys parketas arba laminatas, 01 plytelės — sujungus visam plotui "
+            "(21,00 m²) bus taikoma 01 apdaila; 9,00 m² pereis iš parketo arba laminato į plyteles.")
+    assert out["ispejimas"] == want
+    assert out["sujungimas"]["01"]["_sujungimas"]["apdaila_skiriasi"] == want
+
+
+def test_a_merge_of_rooms_with_the_same_finish_warns_nothing(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    assert out["ispejimas"] is None and "apdaila_skiriasi" not in out["sujungimas"]["01"]["_sujungimas"]

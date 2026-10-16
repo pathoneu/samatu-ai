@@ -345,6 +345,50 @@ def _lt(v: float) -> str:
     return f"{v:.2f}".replace(".", ",")
 
 
+# `grindu_danga` → (nominative, genitive, accusative): what the merge warning says the floor is, moves from, moves to
+_FLOOR_WORDS = {
+    "plyteles": ("plytelės", "plytelių", "plyteles"),
+    "minksta": ("parketas arba laminatas", "parketo arba laminato", "parketą arba laminatą"),
+    "be_dangos": ("betonas be dangos", "betono be dangos", "betoną be dangos"),
+}
+
+
+def _floor_kind(r: dict) -> str | None:
+    """The room's floor covering: what the floor plan says (`grindu_danga`), else what the engine laid."""
+    k = r.get("grindu_danga")
+    if k in _FLOOR_WORDS:
+        return k
+
+    def pos(f):
+        v = r.get(f)
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+    return "plyteles" if pos("plyteles_grindys_m2") else ("minksta" if pos("pvc_grindys_m2") else None)
+
+
+def merge_finish_warning(kept: dict, gone: dict, kept_nr: str, gone_nr: str, both: float, b: float) -> str | None:
+    """„Sujungti" applies the kept room's finishes to the whole area. When the two rooms' floor coverings or wall
+    tiles differ that moves billed quantities between lines — say so before the merge and keep it after."""
+    parts = []
+    fk, fg = _floor_kind(kept), _floor_kind(gone)
+    if fk and fg and fk != fg:
+        parts.append(f"{gone_nr} grindys {_FLOOR_WORDS[fg][0]}, {kept_nr} {_FLOOR_WORDS[fk][0]}")
+    wall_tiles = gone.get("plyteles_sienos_m2")
+    wall_tiles = float(wall_tiles) if isinstance(wall_tiles, (int, float)) and not isinstance(wall_tiles, bool) else 0.0
+    kept_tiles = kept.get("plyteles_sienos_m2")
+    kept_tiles = float(kept_tiles) if isinstance(kept_tiles, (int, float)) and not isinstance(kept_tiles, bool) else 0.0
+    lost_tiles = wall_tiles > 0 and kept_tiles <= 0
+    if not parts and not lost_tiles:
+        return None
+    text = "Patalpų apdaila skiriasi: " + (parts[0] if parts else f"{gone_nr} sienose plytelės, {kept_nr} — ne")
+    text += f" — sujungus visam plotui ({_lt(both)} m²) bus taikoma {kept_nr} apdaila"
+    tail = []
+    if parts and b > 0:
+        tail.append(f"{_lt(b)} m² pereis iš {_FLOOR_WORDS[fg][1]} į {_FLOOR_WORDS[fk][2]}")
+    if lost_tiles:
+        tail.append(f"{gone_nr} sienų plytelių ({_lt(wall_tiles)} m²) sąmatoje nebeliks")
+    return text + ("; " + "; ".join(tail) if tail else "") + "."
+
+
 @router.post("/{project_id}/rooms/{room_nr}/outline-merge")
 def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body: OutlineMerge):
     """„Sujungti" (2026-10-16): room `room_nr` is merged INTO `kept_nr`. The kept room takes the union the
@@ -374,6 +418,7 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
 
     a, b = printed(kept) or 0.0, printed(gone) or 0.0
     both = round(a + b, 2)
+    finish_warning = merge_finish_warning(kept, gone, kept_nr, gone_nr, both, b)
 
     def outline_perimeter(r):
         """The walls its outline counts (the lane's / the person's figure, imaginary edges left out), or None."""
@@ -402,6 +447,8 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
         "sakinys": "Plotas: " + " + ".join(_lt(p["plotas_m2"]) for p in parts) + " m² iš eksplikacijos — patalpos sujungtos",
         "apdaila": "Visam plotui taikoma patalpos " + kept_nr + " apdaila",
     }
+    if finish_warning:
+        kept["_sujungimas"]["apdaila_skiriasi"] = finish_warning
     carried = [{**e, "_is_patalpos": gone_nr} for e in (gone.get("elementai") or []) if isinstance(e, dict)]
     kept["elementai"] = [e for e in (kept.get("elementai") or []) if isinstance(e, dict)] + carried
 
@@ -438,6 +485,7 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
         "status": "ok",
         "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "sujungimas": {nr: {k: r.get(k) for k in MERGE_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
+        "ispejimas": finish_warning,
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
     }

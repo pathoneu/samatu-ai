@@ -12,6 +12,7 @@ import { roomPageOf } from '@/lib/roomZones';
 import { displaySizePt, pctRingToPts } from '@/lib/outlineTools';
 import { openingCounts } from '@/lib/mergeReextract';
 import { MERGE_REFUSED } from './OutlineToolLayer';
+import { mergeFinishWarning } from '@/lib/outlineToolSave';
 
 // A perimeter the person typed is never replaced by a re-read (api/room_outline.py keeps `user_override`):
 // say so, instead of promising that the walls follow the new outline.
@@ -117,6 +118,7 @@ export default function OutlineToolPanel({
       const sum = (table(tool.nr) || 0) + (table(tool.targetNr) || 0);
       const target = byNr.get(String(tool.targetNr));
       const carried = openingCounts(target?.elementai);
+      const finishWarning = mergeFinishWarning(room, target, tool.nr, tool.targetNr);
       body = (
         <div className="space-y-1.5">
           <p>
@@ -133,6 +135,9 @@ export default function OutlineToolPanel({
               ? `Sienos: jūsų įrašyti perimetrai sudedami (${formatNumberLT(Number(room?.perimetras_m) || 0, 2)} + ${formatNumberLT(Number(target?.perimetras_m) || 0, 2)} m), bendros sienos atkarpa — jei ji buvo siena — atimama iš abiejų pusių.`
               : `Sienos ${tool.nr} perskaitomos iš brėžinio pagal sujungtą kontūrą.`}
           </p>
+          {finishWarning && (
+            <p className="text-foreground border-l-2 border-primary pl-2" data-testid="merge-finish-warning">{finishWarning}</p>
+          )}
         </div>
       );
     } else {

@@ -7134,11 +7134,14 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         parsed["_floor_anchors"] = payload.floor_anchors
 
     # The project's area follows the rooms he counts: a room switched off
-    # („Neskaičiuoju") leaves the header figure as well as the rows (2026-09-10).
-    if any(isinstance(r, dict) and r.get("_neskaiciuoti") for r in out_rooms):
+    # („Neskaičiuoju") leaves the header figure as well as the rows (2026-09-10),
+    # and the garage / tambour stay out of it as they do above (2026-10-16). A
+    # room merged into another („Sujungti") moves nothing: the kept room bills it.
+    if any(_scope.is_excluded_by_choice(r) for r in out_rooms):
         parsed["bendras_plotas_m2"] = round(sum(
             float(r.get("plotas_m2") or 0) for r in out_rooms
             if isinstance(r, dict) and not r.get("_neskaiciuoti")
+            and normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas")
             and isinstance(r.get("plotas_m2"), (int, float))), 2)
 
     # Reuse extractor's post-processing helpers
