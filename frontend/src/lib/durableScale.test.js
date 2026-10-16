@@ -188,7 +188,7 @@ test('objektas_a on production: the main floor plan (sheet 2) gets the geometry 
   const scales = laneScalesOf(project);
   assert.equal(scales[2].calibrated, true);
   assert.equal(scales[2].label, '1:82');
-  assert.equal(scaleStatusText(scales[2]), 'Mastelis 1:82 (išmatuotas pagal matmenis)');
+  assert.equal(scaleStatusText(scales[2]), 'Spėjamas mastelis 1:82 (išmatuotas pagal matmenis)');
   // the label says where sheet 2's scale came from: the geometry lane's own record (1:82,49 measured, not written)
   assert.deepEqual(laneScaleOriginOf(project)[2], { kilme: 'ismatuotas', uzrasyta: [] });
   // a sheet both lanes read keeps the pair lane's ratio — and what it said before: every sheet of that reading
@@ -231,3 +231,52 @@ test('both lanes on the same sheet: the pair lane\'s ratio wins, and only a reco
   const gap = { _meta: { plan_dimension_lane: { mastelis: { 2: 0 } }, geometrija: { masteliai: { 2: { m_per_pt: 0.029101, mastelis: 82 } } } } };
   assert.deepEqual(laneMastelisOf(gap), { 2: 82 });
 });
+
+// ── confirming a lane scale (Togal-v2 W6) ────────────────────────────────────
+import { confirmedLaneScale, confirmLaneScales, confirmPageScalesDurable, staleConfirmation, laneScalesOf, LANE_CONFIRMED } from './durableScale.js';
+
+const H_LIKE = { _meta: { geometrija: { masteliai: {
+  1: { m_per_pt: 0.04065, mastelis: 115 }, 2: { m_per_pt: 0.040598, mastelis: 115 },
+} } } };
+
+test('confirming a lane scale writes it into pageScalesDurable as confirmed, with its origin', () => {
+  const p = confirmPageScalesDurable(H_LIKE, [1], undefined, 0);
+  const s = getPageScaleDurable(p, 1);
+  assert.equal(s.calibrated, true);
+  assert.equal(s.confirmed, true);
+  assert.equal(s.source, LANE_CONFIRMED);
+  assert.equal(s.label, '1:115');
+  assert.equal(s.kilme, 'ismatuotas');
+  assert.equal(s.laneRatio, 115);
+  assert.equal(s.confirmedAt, '1970-01-01T00:00:00.000Z');
+  assert.ok(Math.abs(s.metersPerPointX - 115 * METERS_PER_POINT_AT_1_TO_1) < 1e-12);
+  // the other page is untouched and getPageScaleDurable semantics hold
+  assert.equal(getPageScaleDurable(p, 2).calibrated, false);
+  assert.equal(p._meta, H_LIKE._meta, 'nothing else on the project changes');
+});
+
+test('confirm-all writes every listed page; pages with no lane scale and his own calibrations stay', () => {
+  const mine = { metersPerPointX: 0.02, metersPerPointY: 0.02, calibrated: true, source: 'user' };
+  const map = confirmLaneScales({ 3: mine }, [1, 2, 9], laneScalesOf(H_LIKE), 0);
+  assert.equal(map[1].source, LANE_CONFIRMED);
+  assert.equal(map[2].source, LANE_CONFIRMED);
+  assert.equal(map[9], undefined, 'no lane scale on page 9 — nothing invented');
+  assert.equal(map[3], mine);
+});
+
+test('only a lane scale can be confirmed — never the approximate one from the room areas', () => {
+  assert.equal(confirmedLaneScale({ calibrated: true, source: 'auto', metersPerPointX: 0.03 }), null);
+  assert.equal(confirmedLaneScale({ calibrated: true, source: 'user', metersPerPointX: 0.03 }), null);
+  assert.equal(confirmedLaneScale({ calibrated: false, source: 'plan' }), null);
+  assert.equal(confirmedLaneScale(null), null);
+});
+
+test('a confirmation the re-read drawing no longer supports is flagged', () => {
+  const lane = laneScalesOf(H_LIKE);
+  const rec = confirmedLaneScale(lane[1], 0);
+  assert.equal(staleConfirmation(rec, lane[1]), null);
+  const reread = laneScalesOf({ _meta: { geometrija: { masteliai: { 1: { m_per_pt: exactMpp100(), mastelis: 100 } } } } });
+  assert.deepEqual(staleConfirmation(rec, reread[1]), { confirmed: 115, now: 100 });
+  assert.equal(staleConfirmation({ calibrated: true, source: 'user', metersPerPointX: 0.03 }, lane[1]), null);
+});
+function exactMpp100() { return Math.round(100 * METERS_PER_POINT_AT_1_TO_1 * 1e6) / 1e6; }
