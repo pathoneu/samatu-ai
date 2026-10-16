@@ -10,15 +10,18 @@ const stages = (statuses) => STAGE_IDS.map((id, i) => ({
 }));
 
 test('the stage ids are the server\'s, in the lane\'s order (openings before walls)', () => {
-  assert.deepEqual(STAGE_IDS, ['mastelis', 'tekstas', 'patalpos', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
+  assert.deepEqual(STAGE_IDS, ['mastelis', 'tekstas', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
 });
 
 test('ticking walls ticks the outlines they are added along; unticking outlines unticks what needs them', () => {
   const none = { plotai: true, konturai: false, sienos: false, angos: false, grindys: false };
-  assert.deepEqual(toggleFeature(none, 'sienos', true), { ...none, konturai: true, sienos: true });
+  assert.deepEqual(toggleFeature(none, 'sienos', true), { ...none, konturai: true, sienos: true, angos: true });
   const all = allFeatures();
   assert.deepEqual(toggleFeature(all, 'konturai', false), { ...all, konturai: false, sienos: false, angos: false });
   assert.deepEqual(toggleFeature(all, 'grindys', false), { ...all, grindys: false });
+  // an outline brings its openings, and openings need their outline
+  assert.deepEqual(toggleFeature(none, 'konturai', true), { ...none, konturai: true, angos: true });
+  assert.deepEqual(toggleFeature(all, 'angos', false), { ...all, konturai: false, sienos: false, angos: false });
 });
 
 test('„plotai" cannot be unticked and alone is not a run', () => {
@@ -41,13 +44,17 @@ test('a running snapshot: the current stage, its education text, the progress', 
   assert.equal(v.current.about, 'apie konturai');
   assert.equal(v.progress, 3 / 8);
   assert.equal(v.terminal, false);
-  assert.equal(headline(v, [1]), 'Konturai… 4/8 (lapas 1)');
+  assert.equal(headline(v, [1]), 'Konturai… 4/8 (pritaikoma lapui 1)');
   assert.equal(needsPolling({ job: 'j', result_ready: false, failed: false }), true);
 });
 
 test('the server leaves „kiekiai" running; the browser\'s landing finishes it', () => {
-  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'skipped', 'running']) };
+  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'skipped', 'perduota']) };
   assert.equal(needsPolling(snap), false);
+  const handed = viewOf(snap);
+  assert.equal(handed.current.id, 'kiekiai');
+  assert.equal(handed.current.status, 'running');
+  assert.equal(handed.terminal, false);
   const landing = viewOf(snap, { status: 'running', note: null });
   assert.equal(landing.current.id, 'kiekiai');
   assert.equal(landing.done, false);
@@ -63,7 +70,7 @@ test('a failure is named by its stage, never a generic error', () => {
   const v = viewOf({ job: 'j', failed: true, stages: stages(['done', 'done', 'done', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']) });
   assert.equal(v.failed, true);
   assert.equal(v.failedStage.id, 'konturai');
-  assert.equal(headline(v, [1]), 'Nepavyko: Konturai (lapas 1)');
+  assert.equal(headline(v, [1]), 'Nepavyko: Konturai (pritaikoma lapui 1)');
   // the browser's own step can fail too — after the server finished
   const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'running']) };
   const v2 = viewOf(snap, { status: 'failed', note: 'Kiekių perskaičiuoti nepavyko' });

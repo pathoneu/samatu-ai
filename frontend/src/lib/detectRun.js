@@ -13,12 +13,15 @@
 
 import { ltCount } from './ltPlural.js';
 
-export const STAGE_IDS = Object.freeze(['mastelis', 'tekstas', 'patalpos', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
+export const STAGE_IDS = Object.freeze(['mastelis', 'tekstas', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
 export const FEATURES = Object.freeze(['plotai', 'konturai', 'sienos', 'angos', 'grindys']);
 
-/** What each feature needs read first (mirrors api/detect_run.REQUIRES). */
+/**
+ * What each feature needs read first (mirrors api/detect_run.REQUIRES). An outline and its openings come together:
+ * the lane writes the openings in the frame of the room's own outline.
+ */
 export const REQUIRES = Object.freeze({
-  plotai: [], konturai: ['plotai'], sienos: ['konturai'], angos: ['konturai'], grindys: ['plotai'],
+  plotai: [], konturai: ['plotai', 'angos'], sienos: ['konturai'], angos: ['konturai'], grindys: ['plotai'],
 });
 
 export const FEATURE_LABELS = Object.freeze({
@@ -31,15 +34,15 @@ export const FEATURE_LABELS = Object.freeze({
 
 export const FEATURE_HINTS = Object.freeze({
   plotai: 'Visada skaitoma — be jų nežinoma, kur stovi patalpos.',
-  konturai: 'Patalpų kontūrai iš brėžinio sienų. Jūsų pataisyti kontūrai nekeičiami.',
+  konturai: 'Patalpų kontūrai iš brėžinio sienų, kartu su jų angomis. Jūsų pataisyti kontūrai nekeičiami.',
   sienos: 'Sienų ilgiai sudedami iš plano matmenų. Reikia kontūrų.',
-  angos: 'Durys ir langai sienose. Reikia kontūrų.',
+  angos: 'Durys ir langai kontūro sienose — skaitomi kartu su kontūrais.',
   grindys: 'Danga, nubraižyta grindų plane.',
 });
 
 // Shown before the server's first answer, and when a snapshot lacks its stage list.
 const FALLBACK_LABELS = Object.freeze({
-  mastelis: 'Mastelis', tekstas: 'Tekstas', patalpos: 'Patalpos', konturai: 'Kontūrai',
+  mastelis: 'Mastelis', tekstas: 'Tekstas', planas: 'Planas', konturai: 'Kontūrai',
   angos: 'Angos', sienos: 'Sienos', grindys: 'Grindys', kiekiai: 'Kiekiai',
 });
 
@@ -89,6 +92,8 @@ export function viewOf(snapshot, client = null) {
     : STAGE_IDS.map((id) => ({ id, label_lt: FALLBACK_LABELS[id], about_lt: '', status: 'pending', note: null }));
   const stages = src.map((s) => {
     const out = { id: s.id, label: s.label_lt || FALLBACK_LABELS[s.id] || s.id, about: s.about_lt || '', status: s.status || 'pending', note: s.note || null };
+    // the server hands „kiekiai" over (`perduota`): until the browser lands the read it is still running
+    if (out.status === 'perduota') out.status = 'running';
     if (s.id === 'kiekiai' && client && snapshot?.result_ready) {
       out.status = client.status;
       out.note = client.note ?? out.note;
@@ -116,7 +121,7 @@ export function statusMark(status) {
 
 /** The pill's headline. */
 export function headline(view, pages) {
-  const where = pages === 'all' ? 'visi lapai' : `lapas ${Array.isArray(pages) ? pages.join(', ') : pages}`;
+  const where = pages === 'all' ? 'visi lapai' : `pritaikoma lapui ${Array.isArray(pages) ? pages.join(', ') : pages}`;
   if (!view) return '';
   if (view.failed) return `Nepavyko: ${view.failedStage.label} (${where})`;
   if (view.done) return `Perskaityta (${where})`;

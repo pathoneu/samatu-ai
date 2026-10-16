@@ -65,6 +65,9 @@ export default function DetectRunProgress({ run, view, onDismiss, className = ''
       <div className="mx-3 mt-1.5 h-[3px] bg-muted" aria-hidden="true">
         <div className={`h-full transition-[width] duration-300 ${failed ? 'bg-destructive' : 'bg-[hsl(var(--accent-2))]'}`} style={{ width: `${Math.round(progress * 100)}%` }} />
       </div>
+      {run.snapshot?.skaitoma_lt && (
+        <p className="px-3 pt-1.5 text-[11px] leading-snug text-muted-foreground" data-testid="detect-run-scope">{run.snapshot.skaitoma_lt}</p>
+      )}
       {!terminal && current?.about && (
         <p className="px-3 pt-1.5 leading-snug text-[hsl(var(--ink-2))]" data-testid="detect-run-about">{current.about}</p>
       )}
