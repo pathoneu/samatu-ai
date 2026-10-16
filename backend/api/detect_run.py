@@ -10,10 +10,8 @@ GET  /detect-run/{job} → {stage, stages: [{id, label_lt, status, started,
 
 What is read is EXACTLY the free re-read (api/free_reread.read_drawing: the
 geometry lane, the door schedule, the vector symbols) — no Vision call, no lane
-logic of its own. The stages are observed, not re-implemented: the lane's own
-steps are wrapped by pass-through hooks (`_install_stage_hooks`) that tell the
-job which step the lane has reached in this thread. The stages are in the
-order the lane runs them — openings BEFORE walls, because a wall's chain of
+logic of its own. The stages are the lane's own: `apply_geometry(on_stage=)`
+says which step it has reached. The stages are in the order the lane runs them — openings BEFORE walls, because a wall's chain of
 strings has a hole where its door is (geometry_lane: „The openings come BEFORE
 the walls are added").
 
@@ -21,18 +19,21 @@ The server SAVES NOTHING, as with the free re-read: the finished result has
 the free re-read's shape, and the browser lands it through the same merge
 (lib/freeReread.mergeFreeReread → /recompute-interior), which is where his
 verified rooms, typed numbers and corrected outlines are kept. „kiekiai" is
-that last step; the server leaves it running and the browser finishes it.
+that last step; the server hands it over („perduota") and the browser
+finishes it.
 
 A sheet and a feature choice narrow what LANDS, never what is read: the lane
 reads the whole plan (it needs every sheet of a plan to align and add up
 strings) and then the rooms outside the chosen sheets' plan, and the keys of
-features he did not choose, are put back as they were. A narrowed result keeps
-the project's stored lane version, so the full free re-read is still offered.
+features he did not choose, are put back as they were — and so are their
+entries in `_meta.geometrija` (a per-room entry names a room only when that
+room's key landed; `_geometry_meta`). A narrowed result keeps the project's
+stored lane version, so the full free re-read is still offered. Every snapshot
+says so in `skaitoma_lt`.
 """
 from __future__ import annotations
 
 import copy
-import functools
 import json
 import logging
 import threading
@@ -40,6 +41,7 @@ import time
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from api import free_reread as _fr
 from extractor import geometry_lane as _gl
@@ -54,7 +56,7 @@ STAGES: tuple[tuple[str, str, str], ...] = (
      "Skaitomi ant brėžinio linijų užrašyti matmenys. Iš linijos ilgio lape ir parašyto skaičiaus nustatomas kiekvieno lapo mastelis."),
     ("tekstas", "Tekstas",
      "Lape ieškoma patalpų numerių ir plotų užrašų — taip sužinoma, kur stovi kiekviena eksplikacijos patalpa."),
-    ("patalpos", "Patalpos",
+    ("planas", "Planas",
      "Lapai, kuriuose nubraižytas tas pats planas, sutapdinami pagal tas pačias sienas, kad kiekvienai patalpai būtų surinkti visų lapų užrašai."),
     ("konturai", "Kontūrai",
      "Iš vektorinių sienų randamas kiekvienos patalpos kontūras. Jūsų pataisyti ar nubraižyti kontūrai nekeičiami."),
@@ -70,24 +72,13 @@ STAGES: tuple[tuple[str, str, str], ...] = (
 STAGE_IDS = tuple(s[0] for s in STAGES)
 LANE_STAGES = STAGE_IDS[:-1]
 
-# The lane's own steps (module globals of extractor/geometry_lane.py, looked up by name at call time) → the stage
-# it has reached when one is called. A step called again later (sheets aligned again for the floor plan) never
-# moves the job backwards.
-_HOOKED = {
-    "geometry_dimension_strings": "mastelis",
-    "locate_rooms": "tekstas",
-    "align_sheets": "patalpos",
-    "trace_vector_rooms": "konturai",
-    "_read_wall_openings": "angos",
-    "sum_perimeters": "sienos",
-    "_read_floor_coverings": "grindys",
-}
-
 FEATURES = ("plotai", "konturai", "sienos", "angos", "grindys")
-# What a feature needs read first: walls are added up along an outline, openings are read in an outline's walls.
-REQUIRES = {"konturai": ("plotai",), "sienos": ("konturai",), "angos": ("konturai",), "grindys": ("plotai",)}
+# What a feature needs read first: walls are added up along an outline, openings are read in an outline's walls —
+# and an outline brings its openings, which the lane writes in the frame of that outline (a stored openings record
+# under today's outline would not match it on the check sheet).
+REQUIRES = {"konturai": ("plotai", "angos"), "sienos": ("konturai",), "angos": ("konturai",), "grindys": ("plotai",)}
 # The stages a feature's result comes from (mastelis and kiekiai always run)
-FEATURE_STAGES = {"plotai": ("tekstas", "patalpos"), "konturai": ("konturai",), "angos": ("angos",),
+FEATURE_STAGES = {"plotai": ("tekstas", "planas"), "konturai": ("konturai",), "angos": ("angos",),
                   "sienos": ("sienos",), "grindys": ("grindys",)}
 # The room keys each feature writes — put back as they were when the feature is not chosen
 FEATURE_KEYS = {
@@ -107,34 +98,10 @@ MAX_PAGES = 500
 FAILED_BEFORE = "Neatlikta — ankstesnis etapas nepavyko."
 NOT_CHOSEN = "Nepasirinkta — šio etapo rezultatas nepritaikomas."
 LANE_FAILED = "Šio etapo skaitymas nepavyko — projekte niekas nepakeista."
-
-_tls = threading.local()
-
-
-def _install_stage_hooks() -> None:
-    """Wrap the lane's steps so a job running in THIS thread hears which one the lane has reached. A pass-through
-    when no job listens (the paid reading, the plain free re-read); a listener that raises is ignored."""
-    for name, stage in _HOOKED.items():
-        fn = getattr(_gl, name, None)
-        if fn is None or getattr(fn, "_detect_run_stage", None):
-            continue
-
-        @functools.wraps(fn)
-        def hooked(*args, _fn=fn, _stage=stage, **kwargs):
-            listener = getattr(_tls, "on_stage", None)
-            if listener is not None:
-                try:
-                    listener(_stage)
-                except Exception:  # noqa: BLE001 — progress must never sink the lane
-                    log.exception("detect-run stage listener failed")
-            return _fn(*args, **kwargs)
-
-        hooked._detect_run_stage = stage
-        setattr(_gl, name, hooked)
-
-
-_install_stage_hooks()
-
+HANDED_OVER = "Perskaičiuojama naršyklėje."
+# What „per sheet" means, on every snapshot: the pill and the toast never present a whole-drawing read as one sheet's
+SKAITOMA_LT = ("Skaitomas visas brėžinys — lapai sutapdinami ir sienų matmenys sudedami per visus lapus; "
+               "pritaikoma tik pasirinktam lapui ir pasirinktoms funkcijoms.")
 
 def _now() -> float:
     return round(time.time(), 3)
@@ -195,7 +162,7 @@ class _Job:
 
     def snapshot(self, *, with_result: bool) -> dict:
         with self.lock:
-            running = next((s["id"] for s in self.stages if s["status"] == "running"), None)
+            running = next((s["id"] for s in self.stages if s["status"] in ("running", "perduota")), None)
             current = running or (self.stages[self.cursor]["id"] if 0 <= self.cursor < len(self.stages) else None)
             out = {
                 "job": self.id,
@@ -205,6 +172,7 @@ class _Job:
                 "pages": self.pages,
                 "features": sorted(self.features, key=FEATURES.index),
                 "features_added": list(self.added),
+                "skaitoma_lt": SKAITOMA_LT,
                 "result_ready": self.result is not None,
                 "failed": self.error is not None,
                 "created": self.created,
@@ -278,6 +246,72 @@ def _restore(room: dict, before: dict, keys) -> None:
             room.pop(k, None)
 
 
+# Per-room entries of `_meta.geometrija`, by the feature whose keys they describe
+META_ROOM_LISTS = {"konturai": "konturai", "konturu_siulymai": "konturai",
+                   "perimetrai_sudeti": "sienos", "perimetrai_tusti": "sienos", "perimetrai_atmesti": "sienos",
+                   "poros_patvirtintos": "sienos", "poros_atmestos": "sienos", "angos_sienose": "angos"}
+META_ROOM_DICTS = {"konturu_priezastys": "konturai"}
+META_GROUP_LISTS = {"atviros_erdves": "konturai", "skirtingu_lapu_erdves": "konturai", "ribos_nepasiulytos": "konturai"}
+FLOOR_ROOM_LISTS = ("dvi_dangos",)
+
+
+def _geometry_meta(new: dict, stored: dict, landed, rooms: list) -> dict:
+    """The new read's `_meta.geometrija` with every per-room entry taken from the read only for a room whose key
+    LANDED in this result, and from the stored record for every other room; a group entry (an open space, a
+    proposed boundary) comes from the read when all its rooms landed, from the stored record when none did, and is
+    dropped when they are mixed. Sheet-level facts (scales, alignment, sheets) come from the read. Counts derived
+    from rooms (`vietos`, `nupiesta`) are counted again on the rooms as they land."""
+    out = copy.deepcopy(new)
+    stored = stored if isinstance(stored, dict) else {}
+
+    def nrs(v):
+        return [str(x) for x in v] if isinstance(v, list) else []
+
+    for key, feat in META_ROOM_LISTS.items():
+        merged = [n for n in nrs(new.get(key)) if landed(n, feat)] + [n for n in nrs(stored.get(key)) if not landed(n, feat)]
+        out[key] = list(dict.fromkeys(merged))
+    for key, feat in META_ROOM_DICTS.items():
+        a = new.get(key) if isinstance(new.get(key), dict) else {}
+        b = stored.get(key) if isinstance(stored.get(key), dict) else {}
+        out[key] = {**{n: v for n, v in b.items() if not landed(n, feat)}, **{n: v for n, v in a.items() if landed(n, feat)}}
+
+    for key, feat in META_GROUP_LISTS.items():
+        keep = [g for g in (new.get(key) or []) if g and all(landed(str(n), feat) for n in g)]
+        keep += [g for g in (stored.get(key) or []) if g and not any(landed(str(n), feat) for n in g)]
+        out[key] = keep
+    out["ribos"] = ([g for g in (new.get("ribos") or []) if all(landed(str(n), "konturai") for n in g.get("nariai") or [])]
+                    + [g for g in (stored.get("ribos") or []) if not any(landed(str(n), "konturai") for n in g.get("nariai") or [])])
+    nf = new.get("grindu_dangos") if isinstance(new.get("grindu_dangos"), dict) else {}
+    sf = stored.get("grindu_dangos") if isinstance(stored.get("grindu_dangos"), dict) else {}
+    floors = copy.deepcopy(nf)
+    a, b = nf.get("perskaityta") or {}, sf.get("perskaityta") or {}
+    floors["perskaityta"] = {**{n: v for n, v in b.items() if not landed(n, "grindys")}, **{n: v for n, v in a.items() if landed(n, "grindys")}}
+    for key in FLOOR_ROOM_LISTS:
+        merged = [n for n in nrs(nf.get(key)) if landed(n, "grindys")] + [n for n in nrs(sf.get(key)) if not landed(n, "grindys")]
+        floors[key] = sorted(set(merged))
+    out["grindu_dangos"] = floors
+    # counted again on the rooms as they land (geometry_lane: `vietos` per source, `nupiesta` per drawn kind)
+    vietos: dict = {}
+    drawn = {"langai": 0, "durys": 0, "be_tarpo": 0}
+    for r in rooms:
+        if not isinstance(r, dict):
+            continue
+        v = r.get("_vieta") if isinstance(r.get("_vieta"), dict) else None
+        if v and v.get("saltinis"):
+            vietos[v["saltinis"]] = vietos.get(v["saltinis"], 0) + 1
+        rec = r.get("_angos_sienose") if isinstance(r.get("_angos_sienose"), dict) else {}
+        for o in rec.get("angos") or []:
+            if o.get("nupiesta") == "langas":
+                drawn["langai"] += 1
+            elif o.get("nupiesta") == "durys":
+                drawn["durys"] += 1
+            if o.get("be_tarpo"):
+                drawn["be_tarpo"] += 1
+    out["vietos"] = vietos
+    out["nupiesta"] = drawn
+    return out
+
+
 def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict, list[str]]:
     """The read narrowed to the chosen sheets' plan and the chosen features. Returns (result, in-scope room nrs).
     Rooms outside go back exactly as stored; inside, a feature not chosen keeps its stored keys."""
@@ -311,9 +345,15 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
     # a sheet whose plan holds every room is the whole read: only a room left out, or a feature not chosen, narrows it
     narrowed = left_out > 0 or set(features) != set(FEATURES)
     if narrowed and isinstance(out.get("_meta"), dict) and isinstance(out["_meta"].get("geometrija"), dict):
-        stored = ((project.get("_meta") or {}).get("geometrija") or {}).get("versija") if isinstance(project.get("_meta"), dict) else None
+        stored_geo = ((project.get("_meta") or {}).get("geometrija") or {}) if isinstance(project.get("_meta"), dict) else {}
+        stored_geo = stored_geo if isinstance(stored_geo, dict) else {}
+        scope = set(in_scope)
+
+        def landed(nr: str, feature: str) -> bool:
+            return nr in scope and feature in features
+
         meta = dict(out["_meta"])
-        meta["geometrija"] = {**meta["geometrija"], "versija": stored}
+        meta["geometrija"] = {**_geometry_meta(meta["geometrija"], stored_geo, landed, rooms), "versija": stored_geo.get("versija")}
         out["_meta"] = meta
     out["taikymas"] = {"puslapiai": pages, "funkcijos": sorted(features, key=FEATURES.index), "patalpos": in_scope}
     return out, in_scope
@@ -379,13 +419,13 @@ def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     if pages != "all":
         mine = [g for g in groups if set(g) & set(pages)]
         if mine and len(mine[0]) > 1:
-            notes["patalpos"] = f"Lapai {_lt_list(mine[0])} sutapdinti kaip vienas planas."
+            notes["planas"] = f"Lapai {_lt_list(mine[0])} sutapdinti kaip vienas planas."
         elif mine:
-            notes["patalpos"] = f"Lapas {mine[0][0]} — atskiras planas."
+            notes["planas"] = f"Lapas {mine[0][0]} — atskiras planas."
         else:
-            notes["patalpos"] = "Šis lapas nėra patalpų planas — patalpos jame neskaitomos."
+            notes["planas"] = "Šis lapas nėra patalpų planas — patalpos jame neskaitomos."
     else:
-        notes["patalpos"] = f"Planų: {len(groups)}." if groups else "Patalpų plano nerasta."
+        notes["planas"] = f"Planų: {len(groups)}." if groups else "Patalpų plano nerasta."
     traced = [r for r in rooms if str(r.get("polygon_source") or "") == "vektoriniai_konturai"]
     his = [r for r in rooms if str(r.get("polygon_source") or "") in HIS_OUTLINES]
     without = [r for r in rooms if str(r.get("polygon_source") or "") not in WALL_OUTLINES]
@@ -431,11 +471,10 @@ def per_page(result: dict, in_scope: list[str], pages) -> dict:
 # ── the job ─────────────────────────────────────────────────────────────────
 
 def _run(job: _Job, project: dict, pdf_bytes: bytes) -> None:
-    _tls.on_stage = job.enter
     try:
         job.enter("mastelis")
         try:
-            out = _fr.read_drawing(project, pdf_bytes, on_step=lambda _step: job.enter("kiekiai"))
+            out = _fr.read_drawing(project, pdf_bytes, on_stage=job.enter)
         except Exception as exc:  # noqa: BLE001 — read_drawing never raises; if it does, the stage says so
             log.error("detect-run read failed for %s: %r", job.project_id, exc)
             job.fail_current(LANE_FAILED)
@@ -450,8 +489,8 @@ def _run(job: _Job, project: dict, pdf_bytes: bytes) -> None:
             for s in job.stages:
                 if s["id"] == "kiekiai":
                     # the browser lands the read and rebuilds the rows (the same path every room edit takes)
-                    s["status"], s["started"] = "running", s["started"] or t
-                    s["note"] = "Perskaičiuojama naršyklėje."
+                    s["status"], s["started"] = "perduota", s["started"] or t
+                    s["note"] = HANDED_OVER
                     continue
                 if s["status"] in ("pending", "running"):
                     s["status"] = "done" if job._chosen(s["id"]) else "skipped"
@@ -469,9 +508,24 @@ def _run(job: _Job, project: dict, pdf_bytes: bytes) -> None:
         log.exception("detect-run job %s crashed", job.id)
         job.fail_current(f"{LANE_FAILED} ({type(exc).__name__})")
     finally:
-        _tls.on_stage = None
         with _fr._running_lock:
             _fr._running.discard(job.project_id)
+
+
+def _page_count(pdf_bytes: bytes) -> int | None:
+    """The drawing's number of sheets (PDFium, under the process-wide lock); None when it cannot be told."""
+    try:
+        import pypdfium2 as pdfium
+        from extractor.pdfium_guard import PDFIUM_LOCK
+        with PDFIUM_LOCK:
+            doc = pdfium.PdfDocument(pdf_bytes)
+            try:
+                return len(doc)
+            finally:
+                doc.close()
+    except Exception as exc:  # noqa: BLE001 — an unreadable count is checked by the lane itself, not here
+        log.warning("detect-run page count failed: %r", exc)
+        return None
 
 
 def _parse_body(body) -> tuple[object, set[str], list[str]]:
@@ -527,12 +581,17 @@ async def api_detect_run_start(request: Request, project_id: str):
     try:
         from storage import get_storage, pdf_key
         try:
-            pdf_bytes = get_storage().get(pdf_key(project_id))
+            pdf_bytes = await run_in_threadpool(get_storage().get, pdf_key(project_id))
         except Exception as exc:  # noqa: BLE001 — an R2 hiccup is a 502, not a 500
             log.warning("detect-run pdf fetch failed for %s: %r", project_id, exc)
             raise HTTPException(status_code=502, detail="Nepavyko pasiekti brėžinio saugyklos")
         if not pdf_bytes:
             raise HTTPException(status_code=404, detail=_fr.NO_PDF)
+        if pages != "all":
+            count = await run_in_threadpool(_page_count, pdf_bytes)
+            beyond = [p for p in pages if count is not None and p > count]
+            if beyond:
+                raise HTTPException(status_code=400, detail=f"Lapo {beyond[0]} brėžinyje nėra (lapų: {count})")
         job = _Job(project_id, pages, features, added)
         with _jobs_lock:
             _jobs[job.id] = job
