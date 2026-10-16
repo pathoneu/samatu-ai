@@ -13,8 +13,11 @@ searchable:
     (`display_fraction`, the backend twin of pageRotation.rotatePctPoint). The viewer stores a point as
     toPdf(): an unrotated-frame fraction × EmbedPDF's `page.size`, and that size is PDFium's
     FPDF_GetPageSizeByIndexF — measured 2026-10-16 with EmbedPDF's own wasm build: on a /Rotate 90 page it is
-    the DISPLAYED size, not the mediabox. So the divisor here is pypdfium2's `page.get_size()` (the same
-    PDFium answer), never the cropbox;
+    the DISPLAYED size, not the mediabox. Since 2026-10-16 the viewer gives its adapter the UNROTATED size
+    (pageRotation.mediaboxSizeFrom: that same size swapped back on /Rotate 90/270) and a project whose points
+    were converted carries `measurementsFrame: 'mediabox'`; its divisor here is pypdfium2's `page.get_size()`
+    mapped back through the display rotation — the exact twin of mediaboxSizeFrom (equal to the mediabox when
+    no cropbox trims it). A project not migrated yet keeps the old divisor, `page.get_size()` as reported;
   * count marks (kind count) in their type's colour and shape, tallied in the legend;
   * optionally the wall solid the program read (api/page_geometry.wall_solid_rings).
 
@@ -42,6 +45,7 @@ log = logging.getLogger("samatu.export_overlay_pdf")
 router = APIRouter(prefix="/api/projects", tags=["export-overlay-pdf"])
 
 METERS_PER_POINT_AT_1_TO_1 = 0.0254 / 72
+MEASUREMENTS_FRAME = "mediabox"   # lib/measurementFrame.MEASUREMENTS_FRAME
 MAX_PAGES = 60
 MAX_SIDE_PX = 4200              # an A0 sheet at 110 dpi is ~5100 px — cap the raster, not the vectors
 PREVIEW_SIDE_PX = 1400
@@ -122,6 +126,14 @@ def display_fraction(pt: dict, size_w: float, size_h: float, rot: int) -> tuple[
     if mediabox_w <= 0 or mediabox_h <= 0:
         return None
     return rotate_pct_point(x / mediabox_w, y / mediabox_h, rot)
+
+
+def measurement_divisor(sheet: dict, project: dict) -> tuple[float, float]:
+    """The size the viewer divided this project's stored points by: the unrotated size once the project is
+    in the mediabox frame (`measurementsFrame == 'mediabox'`), else PDFium's reported size (old points)."""
+    if project.get("measurementsFrame") == MEASUREMENTS_FRAME:
+        return sheet.get("Wu", sheet["Ws"]), sheet.get("Hu", sheet["Hs"])
+    return sheet["Ws"], sheet["Hs"]
 
 
 def _pct_pair(p: Any) -> tuple[float, float] | None:
@@ -231,9 +243,10 @@ def _hex_rgb(value: Any, fallback=(0.16, 0.44, 0.71)) -> tuple[float, float, flo
 
 
 def render_sheets(pdf_bytes: bytes, pages: list[int], dpi: int, side_cap: int) -> list[dict]:
-    """[{page, image (PIL), Wd, Hd, Wm, Hm, Ws, Hs, rotation}] — the displayed page size in points, the
-    unrotated (cropbox) size, PDFium's page size (the viewer's `page.size`, the measurements' divisor) and
-    the raster. Under the process-wide PDFium lock."""
+    """[{page, image (PIL), Wd, Hd, Wm, Hm, Ws, Hs, Wu, Hu, rotation}] — the displayed page size in points,
+    the unrotated (cropbox) size, PDFium's page size (the viewer's `page.size`, the divisor of points stored
+    before the mediabox frame), that size unrotated (mediaboxSizeFrom's twin, the divisor of points in the
+    mediabox frame) and the raster. Under the process-wide PDFium lock."""
     import pypdfium2 as pdfium
 
     from extractor.pdfium_guard import PDFIUM_LOCK
@@ -252,10 +265,11 @@ def render_sheets(pdf_bytes: bytes, pages: list[int], dpi: int, side_cap: int) -
                     Wm, Hm = abs(x1 - x0), abs(y1 - y0)
                     Wd, Hd = (Hm, Wm) if rot in (90, 270) else (Wm, Hm)
                     Ws, Hs = (float(v) for v in page.get_size())
+                    Wu, Hu = (Hs, Ws) if rot in (90, 270) else (Ws, Hs)
                     scale = min(dpi / 72.0, side_cap / max(Wd, Hd))
                     image = page.render(scale=scale, may_draw_forms=True).to_pil().convert("RGB")
                     out.append({"page": nr, "image": image, "Wd": Wd, "Hd": Hd, "Wm": Wm, "Hm": Hm, "Ws": Ws, "Hs": Hs,
-                                "rotation": rot})
+                                "Wu": Wu, "Hu": Hu, "rotation": rot})
                 finally:
                     page.close()
         finally:
@@ -410,7 +424,7 @@ def draw_sheet(c, sheet: dict, project: dict, layers: Layers, scale: dict | None
             legend.append(("line", PROPOSED, f"Patalpos kontūras — pasiūlytas programos, patikrinkite ({n_ai})", "dash"))
 
     measurements = _measurements_on(project, page)
-    Ws, Hs = sheet["Ws"], sheet["Hs"]
+    Ws, Hs = measurement_divisor(sheet, project)
 
     def disp(points):
         return [q for q in (display_fraction(p, Ws, Hs, rot) for p in points or []) if q]
