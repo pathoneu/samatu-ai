@@ -14,7 +14,8 @@ Source of truth for *what Togal does*: `docs/superpowers/research/2026-10-16-tog
 6. **No new dependencies** without writing it in the report first. No Vision/Anthropic calls from tests. Do not run `/extract-interior` (paid, ~$2.37, 12 min) — use the saved extracts in the demo projects and the €0 lanes.
 7. **Scope discipline.** Touch only the files your brief names (plus tests and docs for them). If you must touch a shared file (`TakeoffViewer.jsx`, `InteriorWorkspace.jsx`, `main.py`), keep the diff minimal and say so in the report; the manager merges.
 8. **Commits:** small, one concern each, message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push, never deploy, never touch `main` or `viewer-rebuild`.
-9. **Report format** (your final message): what was built · how the founder verifies it on localhost (URL, clicks) · tests run with counts · what is not done or not verified · risks and open questions.
+9. **Shared machine.** Every worktree runs on one Mac. Never stop an eval or test by process name (`pkill -f eval_harness`, `pkill -f pytest`, `killall python` and the like): it kills the managers' gate runs on other branches. Stop only your own PID.
+10. **Report format** (your final message): what was built · how the founder verifies it on localhost (URL, clicks) · tests run with counts · what is not done or not verified · risks and open questions.
 
 ## Worktree setup (do this first, every worker)
 
