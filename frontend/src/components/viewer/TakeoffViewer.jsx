@@ -39,8 +39,10 @@ import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
 import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu from './MeasureContextMenu';
+import SheetRail from './SheetRail';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor } from '@/lib/sheetRail';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -716,8 +718,39 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
+function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0 }) {
   const { activeDocumentId } = useActiveDocument();
+  // ---- Sheets (Togal-v2 W7) ------------------------------------------------
+  // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
+  // A rename or „Atkurti automatinį" is undone from its toast („Atšaukti"): the Istorija stack holds
+  // measurements only (lib/measureHistory snapshots a measurement list), so sheet names stay out of it.
+  const sheetOverridesRef = useRef(sheetOverrides);
+  useEffect(() => { sheetOverridesRef.current = sheetOverrides; });
+  const putSheetOverride = (page, entry) => {
+    const cur = sheetOverridesRef.current || {};
+    const next = entry ? { ...clearSheetOverride(cur, page), [String(page)]: entry } : clearSheetOverride(cur, page);
+    sheetOverridesRef.current = next;
+    onSheetOverridesChange?.(next);
+  };
+  const changeSheet = (sheet, next, message) => {
+    const before = overrideFor(sheetOverridesRef.current, sheet.page);
+    const after = overrideFor(next, sheet.page);
+    if (JSON.stringify(before || null) === JSON.stringify(after || null)) return;
+    putSheetOverride(sheet.page, after);
+    toast.success(message, {
+      action: { label: 'Atšaukti', onClick: () => putSheetOverride(sheet.page, before) },
+    });
+  };
+  const renameSheet = (sheet, patch) => changeSheet(
+    sheet,
+    setSheetOverride(sheetOverridesRef.current, sheet.page, patch,
+      { name: sheet.autoName, tipas: sheet.autoTipas, discipline: sheet.autoDiscipline }),
+    `Lapas ${sheet.page} pakeistas`,
+  );
+  const resetSheet = (sheet) => changeSheet(
+    sheet, clearSheetOverride(sheetOverridesRef.current, sheet.page),
+    `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
+  );
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
   const [fillFor, setFillFor] = useState(null);
@@ -1135,6 +1168,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
         // No explicit user choice yet → open by default on multi-page documents.
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
         const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
+        const sheetRail = sheetPages && !check ? buildSheetRail({ puslapiai: sheetPages, overrides: sheetOverrides, pageCount: totalPages }) : null;
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1189,7 +1223,9 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
           />
           <div className="relative flex flex-1 min-h-0">
-            {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
+            {railOpen && (sheetRail
+              ? <SheetRail documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} />
+              : <ThumbnailRail documentId={activeDocumentId} />)}
             {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
                 reads ViewportElementContext, whose Provider is rendered BY the
                 Viewport component. As a parent it got null → setupZoomGestures
@@ -1258,6 +1294,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       measureCalibA={calibSlot.pageNr === layout.pageNumber ? calibSlot.point : null}
                       onMeasureCalibAChange={(point) => setCalibSlot(
                         point ? { pageNr: layout.pageNumber, point } : { pageNr: null, point: null })}
+                      sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
                     />
                   )}
                 />
@@ -1294,7 +1331,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             {measureTool === 'count' && (
               <div
                 className="absolute top-2 z-30 w-60 shadow-lg"
-                style={{ left: railOpen ? 156 : 8 }}
+                style={{ left: railOpen ? (sheetRail ? 240 : 156) : 8 }}
               >
                 <CountLegendPanel
                   countTypes={countTypes}
@@ -1405,6 +1442,13 @@ export default function TakeoffViewer({
   // jumps to a place and fits it. Absent → the viewer is exactly what it was.
   check = null,
   focus = null,
+  // Sheets (Togal-v2 W7): the classification (`project.puslapiai`), the user's
+  // `project.sheet_overrides` and their setter; `sheetLinksVersion` changes once a rename has been
+  // saved, so the sheet links are read again. Absent → the plain thumbnail strip.
+  sheetPages = null,
+  sheetOverrides = null,
+  onSheetOverridesChange = null,
+  sheetLinksVersion = 0,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1438,6 +1482,10 @@ export default function TakeoffViewer({
           initialCountTypes={initialCountTypes}
           onMeasureDataChange={onMeasureDataChange}
           laneScales={laneScales}
+          sheetPages={sheetPages}
+          sheetOverrides={sheetOverrides}
+          onSheetOverridesChange={onSheetOverridesChange}
+          sheetLinksVersion={sheetLinksVersion}
         />
       </EmbedPDF>
     </div>
