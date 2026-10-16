@@ -7,8 +7,8 @@ reads the text layer with pypdfium2 (the same reader as the plan-area lane, ever
 its own frame, boxes mapped into the display frame) and the sheet names the rail shows (the
 classification's `puslapiai` with the user's `sheet_overrides` on top).
 
-Read-only, owner-scoped (ownership is checked before anything else), rate-limited like the other PDF
-handlers, saves nothing, calls no model. The text of a PDF is read once per process and kept in a
+Read-only, owner-scoped (ownership is checked before anything else), saves nothing, calls no model.
+Reading a PDF's text is rate-limited like the other PDF handlers; answering from the cache is not. The text of a PDF is read once per process and kept in a
 small cache keyed by the PDF's hash, so scrolling through a set costs one parse. A scan has no text
 layer and answers an empty list — never an error.
 """
@@ -56,13 +56,18 @@ def read_text_pages(pdf_bytes: bytes) -> dict:
     return {"page_count": page_count, "pages": pages}
 
 
-def _text_for(project_id: str, pdf_bytes: bytes) -> dict:
+def _text_for(project_id: str, pdf_bytes: bytes, on_miss=None) -> dict:
+    """The parsed text of a PDF, from the cache when this process has read it before. `on_miss`
+    runs before a fresh parse — the rate limit guards the parse, not the cached answer: a sheet
+    set scrolled end to end asks once per page, dozens of times a minute."""
     key = f"{project_id}:{hashlib.sha1(pdf_bytes).hexdigest()}"
     with _cache_lock:
         hit = _cache.get(key)
         if hit is not None:
             _cache.move_to_end(key)
             return hit
+    if on_miss is not None:
+        on_miss()
     parsed = read_text_pages(pdf_bytes)
     with _cache_lock:
         _cache[key] = parsed
@@ -132,7 +137,6 @@ def api_page_callouts(request: Request, project_id: str, page: int):
     if page < 1:
         raise HTTPException(status_code=400, detail="Lapo numeris prasideda nuo 1")
     from main import _check_rate_limit, _client_key
-    _check_rate_limit(_client_key(request), "sheet_links")
 
     from storage import get_storage, pdf_key
     try:
@@ -144,7 +148,10 @@ def api_page_callouts(request: Request, project_id: str, page: int):
         raise HTTPException(status_code=404, detail=NO_PDF)
 
     try:
-        parsed = _text_for(project_id, pdf_bytes)
+        parsed = _text_for(project_id, pdf_bytes,
+                           on_miss=lambda: _check_rate_limit(_client_key(request), "sheet_links"))
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001 — a PDF PDFium cannot open has no links, not a 500
         log.warning("sheet-links text read failed for %s: %r", project_id, exc)
         raise HTTPException(status_code=422, detail="Nepavyko perskaityti brėžinio teksto")

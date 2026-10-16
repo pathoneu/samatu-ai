@@ -155,3 +155,18 @@ def test_another_users_project_is_a_404_before_anything_is_read(tmp_path, monkey
     r = TestClient(app).get("/api/projects/p1/pages/1/callouts")
     assert r.status_code == 401
     assert read == []
+
+
+def test_the_rate_limit_guards_the_parse_not_the_cached_answer(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    import main
+    monkeypatch.setattr(main, "_RATE_LIMIT_PER_MIN", 2)
+    client = TestClient(app)
+    codes = [client.get(f"/api/projects/p1/pages/{1 + i % 4}/callouts").status_code for i in range(12)]
+    assert codes == [200] * 12
+    sheet_links._cache.clear()
+    _store("p2")
+    _store("p3")
+    assert client.get("/api/projects/p2/pages/1/callouts").status_code == 200   # 2nd parse this minute
+    assert client.get("/api/projects/p3/pages/1/callouts").status_code == 429   # 3rd
