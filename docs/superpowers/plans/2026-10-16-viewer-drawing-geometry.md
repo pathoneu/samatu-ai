@@ -1232,3 +1232,20 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - **Coverage.** Research §10 gap 1 → Tasks 1–5; gap 2 → Task 6; gap 3 → Tasks 7–8; docs → Task 9.
 - **Consistency.** `snapPolygonsFromGeometry(geometry, {pageWidthPt, pageHeightPt, pageRotation})` and `pickSnap(raw, {drawing, measurements}, tol)` are used with those exact names in Tasks 2 and 4. `fetchOutlineSet(projectId, roomNr, {page, polygon_pct})` matches Tasks 1, 7 and 8. `usePageGeometry(projectId, page, enabled)` returns `{geometry, status}` in Tasks 3, 4, 6, 8. Backend answer keys `walls_pct`, `status`, `width_pt`, `height_pt`, `vertex_count`, `truncated` match Tasks 1–3 and 6.
 - **Risk notes.** Task 7 changes a room's `perimetras_m` only when no lane produced one — the stated-perimeter priority (plan dimensions > table > user > traced outline > Vision) is preserved. Nothing in `backend/extractor/` changes.
+
+---
+
+### Task 10: Comfort layer (added after the founder's „include some UI comfortable and understandable usability", 2026-10-16)
+
+What Togal's editor does well (research note §11) that the four features above lacked, built and browser-verified on Objektas H:
+
+- [x] **Outline editing says its exits.** `OUTLINE_HINT` in the top pill and the status bar: drag · midpoint adds · double-click removes · Z undo · Enter save · Esc cancel.
+- [x] **Live consequence while editing.** `OutlineEditLayer` shows „10,21 m² · 20,25 m · lentelėje 10,12 m²" at the ring's centroid (page scale; „Mastelis nenustatytas" when none), so a moved corner is judged before saving.
+- [x] **Undo.** Every drag / insert / delete snapshots the ring (`onGestureStart` → `snapshotOutline`, 50 steps); Z or the ↶ toolbar button steps back.
+- [x] **Guard.** A self-crossing ring turns red, the save button is disabled with the reason, Enter is refused with a toast (`polygonGeometry.selfIntersects`).
+- [x] **Snapping is announced.** With a measure tool armed the status bar appends „· prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)", or „· šiame lape vektorinių sienų nėra — prilimpa tik prie matavimų" on a raster sheet (`SNAP_NOTE`, from the shared page-geometry cache).
+- [x] **Walls layer has a legend** (bottom-right while on): wall solid · dashed = outline found automatically · solid = confirmed by you · violet = openings (D door, L window).
+- [x] **Calibration confirms itself.** A toast with the status bar's own wording („Mastelis 1:50 (jūsų nustatytas)") and the page(s) it applied to, with the advice to check one known dimension with Atstumas.
+- [x] A page click while editing no longer clears the focused room (which abandoned the edit); vertex handles have a 12 px hit area.
+
+Verification: `npx eslint . --quiet` clean; `npm run test:units` 1047 pass; browser pass on http://localhost:5173/project/demo-objektas_h (hint pill, readout, undo, Esc, legend text, status-bar note all observed).
