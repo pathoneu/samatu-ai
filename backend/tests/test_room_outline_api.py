@@ -301,11 +301,31 @@ def test_a_hole_comes_off_the_area_and_its_perimeter_is_kept_apart(tmp_path, mon
     k = room["_konturas"]
     assert abs(k["plotas_m2"] - (12.0 - 0.25)) < 0.2                    # outer − hole
     assert abs(k["perimetras_m"] - 14.0) < 0.2                          # the OUTER ring only
-    assert k["skyles"] == 1 and abs(k["skyliu_plotas_m2"] - 0.25) < 0.02 and abs(k["skyliu_perimetras_m"] - 2.0) < 0.05
+    assert abs(k["skyliu_plotas_m2"] - 0.25) < 0.02 and abs(k["skyliu_perimetras_m"] - 2.0) < 0.05
+    # one record per hole; with no answer to „Kas atimama?" a hole is a column — its faces are walls
+    assert len(k["skyles"]) == 1 and k["skyles"][0]["sienos"] is True and k["skyles"][0]["kampai"] == 4
+    assert abs(k["skyles"][0]["perimetras_m"] - 2.0) < 0.05 and abs(k["skyles"][0]["plotas_m2"] - 0.25) < 0.02
     assert len(room["polygon_holes_pct"]) == 1 and len(room["polygon_holes_pct"][0]) == 4
     # a ring without holes clears the ones it had
     plain = _set(TestClient(app), outer).json()["room"]
     assert plain["polygon_holes_pct"] is None and "skyles" not in plain["_konturas"]
+
+
+def test_each_hole_keeps_his_answer_whether_it_has_walls(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    outer = [(t, t), (4 + t, t), (4 + t, 3 + t), (t, 3 + t)]
+    column = [(1.0, 1.0), (1.5, 1.0), (1.5, 1.5), (1.0, 1.5)]
+    floor_hole = [(2.5, 1.0), (3.5, 1.0), (3.5, 2.0), (2.5, 2.0)]
+    ring = [list(_pct(x, y)) for x, y in outer]
+    holes = [[list(_pct(x, y)) for x, y in h] for h in (column, floor_hole)]
+    r = TestClient(app).post("/api/projects/p1/rooms/01/outline-set",
+                             json={"page": 1, "polygon_pct": ring, "holes": holes, "holes_walls": [True, False]})
+    assert r.status_code == 200, r.text
+    k = r.json()["room"]["_konturas"]
+    assert [h["sienos"] for h in k["skyles"]] == [True, False]
+    assert abs(k["skyliu_perimetras_m"] - 6.0) < 0.1                     # both holes' edges, as before
 
 
 def test_a_hole_outside_the_outline_or_overlapping_another_is_refused(tmp_path, monkeypatch):

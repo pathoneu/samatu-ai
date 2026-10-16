@@ -81,6 +81,9 @@ class OutlineSet(BaseModel):
     page: int = Field(ge=1)
     polygon_pct: list[list[float]] = Field(min_length=3, max_length=500)
     holes: list[list[list[float]]] | None = Field(default=None, max_length=50)
+    # „Kas atimama?" per hole: True — a column / shaft, its faces are painted walls (the default); False — a floor
+    # opening or anything else with no walls. Missing or shorter than `holes` → True for the rest.
+    holes_walls: list[bool] | None = Field(default=None, max_length=50)
 
 
 class OutlineMerge(OutlineSet):
@@ -259,7 +262,10 @@ def _measured(ring, holes, size: tuple[float, float], scale: float) -> dict:
             raise HTTPException(status_code=400, detail="Išpjovos persidengia")
         cut.append(hole)
     perim_pt = outer.exterior.length
+    holes_m = [{"perimetras_m": round(h.exterior.length * scale, 2), "plotas_m2": round(h.area * scale * scale, 2),
+                "kampai": _convex_corners(h)} for h in cut]
     return {
+        "skyles": holes_m,
         "plotas_m2": round((outer.area - sum(h.area for h in cut)) * scale * scale, 2),
         "perimetras_m": round(perim_pt * scale, 2),
         "skyliu_plotas_m2": round(sum(h.area for h in cut) * scale * scale, 2) if cut else None,
@@ -267,8 +273,23 @@ def _measured(ring, holes, size: tuple[float, float], scale: float) -> dict:
     }
 
 
+def _convex_corners(hole) -> int:
+    """The hole's corners that stick INTO the room (a column's outer corners: corner bead), straight runs skipped."""
+    from shapely.geometry.polygon import orient
+    pts = list(orient(hole, sign=1.0).exterior.coords)[:-1]
+    n, out = len(pts), 0
+    for i in range(n):
+        (ax, ay), (bx, by), (cx, cy) = pts[i - 1], pts[i], pts[(i + 1) % n]
+        ux, uy, vx, vy = bx - ax, by - ay, cx - bx, cy - by
+        lu, lv = (ux * ux + uy * uy) ** 0.5, (vx * vx + vy * vy) ** 0.5
+        if lu and lv and (ux * vy - uy * vx) / (lu * lv) > 0.17:      # a left turn of more than ~10°
+            out += 1
+    return out
+
+
 def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], scale: float,
-                 *, table_m2: float | None = None, extra: dict | None = None) -> float:
+                 *, table_m2: float | None = None, extra: dict | None = None,
+                 holes_walls: list[bool] | None = None) -> float:
     """Write the person's ring (and holes) onto `room` as its corrected outline → the drawn perimeter.
     `table_m2`: the printed area the drawn one is compared with (default: the room's own)."""
     m = _measured(ring, holes, size, scale)
@@ -288,7 +309,9 @@ def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], 
                          "plotas_uzrasas_m2": own if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0 else None,
                          "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": DRAWN}
     if holes:
-        room["_konturas"].update(skyles=len(holes), skyliu_plotas_m2=m["skyliu_plotas_m2"],
+        walls = list(holes_walls or [])
+        skyles = [{**h, "sienos": bool(walls[i]) if i < len(walls) else True} for i, h in enumerate(m["skyles"])]
+        room["_konturas"].update(skyles=skyles, skyliu_plotas_m2=m["skyliu_plotas_m2"],
                                  skyliu_perimetras_m=m["skyliu_perimetras_m"])
     if extra:
         room["_konturas"].update(extra)
@@ -316,14 +339,16 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     openings read again — exactly what a click (`outline-at`) does, with the person's geometry instead of
     the wall solid's face. The printed area stays the room's area; the drawn one is shown beside it
     (`_konturas.plotas_m2`, `paklaida`). Holes („Atimti") come off the drawn area; their perimeter is kept
-    apart (`_konturas.skyliu_perimetras_m`), never added to the room's. Saves nothing — the sheet patches
+    apart (`_konturas.skyliu_perimetras_m`), never added to the room's `perimetras_m`. Each hole is recorded in
+    `_konturas.skyles[i]` with its perimeter, its convex corners and his answer to „Kas atimama?" (`sienos`):
+    a column or shaft whose faces are painted walls (the engine adds its perimeter and corners) or not. Saves nothing — the sheet patches
     the room and recomputes."""
     # Ownership FIRST (tests/test_route_ownership_policy.py): a stranger's malformed ring must get the
     # same 404 as a stranger's well-formed one — never a 400 that says the project exists.
     _project_for(request, project_id)
     ring, holes = _drawn_rings(body)
     pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
-    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale)
+    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale, holes_walls=body.holes_walls)
     apply_geometry(parsed, pdf_bytes, dims)
     _drawn_perimeter_if_unread(room, perimetras)
     return {
@@ -432,7 +457,8 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     k_a, k_b = outline_perimeter(kept), outline_perimeter(gone)
     p_a, p_b = number(kept.get("perimetras_m")), number(gone.get("perimetras_m"))
     perimetras = _set_outline(kept, ring, holes, body.page, (W, H), scale, table_m2=both or None,
-                              extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": both or None})
+                              extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": both or None},
+                              holes_walls=body.holes_walls)
 
     # ── what the kept room bills: both table rows, both rooms' openings ──
     before = kept.get("_sujungimas") if isinstance(kept.get("_sujungimas"), dict) else None

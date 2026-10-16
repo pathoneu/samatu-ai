@@ -6,13 +6,14 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { Scissors, Combine, SquareDashed, Undo2, X, Check } from 'lucide-react';
-import { formatNumberLT, shoelaceAreaM2 } from '@/lib/measureGeometry';
+import { formatNumberLT, realPathLengthM, shoelaceAreaM2 } from '@/lib/measureGeometry';
 import { displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
 import { roomPageOf } from '@/lib/roomZones';
-import { displaySizePt, pctRingToPts } from '@/lib/outlineTools';
+import { displaySizePt, holeHasWalls, pctRingToPts, sameHole } from '@/lib/outlineTools';
 import { openingCounts } from '@/lib/mergeReextract';
 import { MERGE_REFUSED } from './OutlineToolLayer';
 import { mergeFinishWarning } from '@/lib/outlineToolSave';
+
 
 // A perimeter the person typed is never replaced by a re-read (api/room_outline.py keeps `user_override`):
 // say so, instead of promising that the walls follow the new outline.
@@ -152,6 +153,15 @@ export default function OutlineToolPanel({
     const holes = tool.holes || [];
     const gross = m2(tool.ring);
     const cut = holes.reduce((s, h) => s + (m2(h) || 0), 0);
+    const walled = holes.filter((h) => holeHasWalls(h, tool.holeWalls));
+    const edgeM = (h) => (scale?.calibrated && size ? realPathLengthM(pctRingToPts(h, size), scale, true) : null);
+    const walledM = walled.reduce((s, h) => (s == null || edgeM(h) == null ? null : s + edgeM(h)), 0);
+    // „Kas atimama?" — one answer per hole, remembered by where the hole is (a split or a merge carries it)
+    const answer = (h, sienos) => onChange((cur) => ({
+      ...cur,
+      holeWalls: [...(cur.holeWalls || []).filter((a) => !sameHole(a.ring, h)), { ring: h, sienos }],
+      dirty: true,
+    }));
     body = (
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -172,6 +182,19 @@ export default function OutlineToolPanel({
             {holes.map((h, i) => (
               <li key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[2px] border border-border bg-muted/50">
                 <span className="mono tabular">{i + 1}. {fmt(m2(h))}</span>
+                <label className="inline-flex items-center gap-1">
+                  <span className="text-muted-foreground">Kas atimama?</span>
+                  <select
+                    className="h-6 rounded-[2px] border border-border bg-card px-1 text-[12px]"
+                    value={holeHasWalls(h, tool.holeWalls) ? 'sienos' : 'be'}
+                    onChange={(e) => answer(h, e.target.value === 'sienos')}
+                    aria-label={`Kas atimama: ${i + 1} išpjova`}
+                    data-testid="subtract-hole-kind"
+                  >
+                    <option value="sienos">kolona / šachta — sienos dažomos</option>
+                    <option value="be">anga grindyse / kita — sienų nėra</option>
+                  </select>
+                </label>
                 <button type="button" title="Pašalinti išpjovą" aria-label={`Pašalinti ${i + 1} išpjovą`}
                   className="hover:text-destructive"
                   onClick={() => onChange((cur) => ({ ...cur, holes: cur.holes.filter((_, k) => k !== i), dirty: true }))}
@@ -184,7 +207,10 @@ export default function OutlineToolPanel({
           {tool.shape === 'poly'
             ? 'Spustelėkite kampus; uždarykite spustelėję pirmą tašką arba dukart. '
             : 'Tempkite stačiakampį patalpos viduje (kolona, įmontuota spinta, šachta). '}
-          Kontūro perimetras nekinta — išpjovų kraštai saugomi atskirai. Sąmatoje grindų ir lubų plotas lieka iš lentelės: išpjova keičia nubrėžtą plotą, rodomą šalia.
+          Sąmatoje grindų ir lubų plotas lieka iš lentelės: išpjova keičia nubrėžtą plotą, rodomą šalia.
+          {' '}{walled.length > 0
+            ? `Kolonos / šachtos (${walled.length}) sienos pridedamos prie dažomų sienų ir grindjuosčių${walledM != null ? ` (+${formatNumberLT(walledM, 2)} m sienų ilgio)` : ''}, jų išoriniai kampai — prie kampų.`
+            : (holes.length > 0 ? 'Išpjovos be sienų sienų ir kampų nekeičia.' : '')}
         </p>
       </div>
     );

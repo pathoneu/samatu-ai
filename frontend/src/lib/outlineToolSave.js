@@ -18,6 +18,11 @@
  */
 import { roomsWithOutline, roomsWithSplit } from './roomOutline.js';
 
+/** „Kas atimama?" per hole (`holes_walls`), sent only when the operation says — the server's default is walls. */
+function wallsOf(op) {
+  return Array.isArray(op?.holesWalls) && op.holesWalls.length ? { holes_walls: op.holesWalls } : {};
+}
+
 /** The room keys a merge writes besides the geometry (mirror of backend MERGE_ROOM_KEYS). */
 export const MERGE_ROOM_KEYS = [
   'plotas_m2', 'plotas_saltinis', '_plotas_pries_sujungima', '_sujungimas', 'elementai',
@@ -60,16 +65,16 @@ function withV8(project, rooms) {
  */
 export async function saveOutlineTool(op, { api, getFresh }) {
   if (op?.kind === 'set') {
-    const answer = await api.outlineSet(op.nr, { page: op.page, polygon_pct: op.polygon, holes: op.holes });
+    const answer = await api.outlineSet(op.nr, { page: op.page, polygon_pct: op.polygon, holes: op.holes, ...wallsOf(op) });
     const fresh = getFresh();
     const rooms = roomsWithOutline(fresh, op.nr, answer);
     if (!rooms) throw failure(answer);
     return withV8(fresh, rooms);
   }
   if (op?.kind === 'split') {
-    const mine = await api.outlineSet(op.nr, { page: op.page, polygon_pct: op.polygon, holes: op.holes });
+    const mine = await api.outlineSet(op.nr, { page: op.page, polygon_pct: op.polygon, holes: op.holes, ...wallsOf(op) });
     if (mine?.status !== 'ok') throw failure(mine);
-    const theirs = await api.outlineSet(op.other.nr, { page: op.page, polygon_pct: op.other.polygon, holes: op.other.holes });
+    const theirs = await api.outlineSet(op.other.nr, { page: op.page, polygon_pct: op.other.polygon, holes: op.other.holes, ...wallsOf(op.other) });
     if (theirs?.status !== 'ok') throw failure(theirs);
     // Each answer read the walls against the STORED outlines: a neighbour's openings from either answer are
     // fine, but neither may speak for the two rooms that just changed.
@@ -86,7 +91,7 @@ export async function saveOutlineTool(op, { api, getFresh }) {
   }
   if (op?.kind === 'merge') {
     const answer = await api.outlineMerge(op.goneNr, {
-      page: op.page, kept_nr: String(op.keptNr), polygon_pct: op.polygon, holes: op.holes,
+      page: op.page, kept_nr: String(op.keptNr), polygon_pct: op.polygon, holes: op.holes, ...wallsOf(op),
     });
     const fresh = getFresh();
     const rooms = roomsWithSplit(fresh, answer);

@@ -114,3 +114,13 @@ test('mergeFinishWarning: says what moves between lines when the finishes differ
     'Patalpų apdaila skiriasi: 03 sienose plytelės, 02 — ne — sujungus visam plotui (10,00 m²) bus taikoma 02 apdaila; '
     + '03 sienų plytelių (18,00 m²) sąmatoje nebeliks.');
 });
+
+test('set: his answers to „Kas atimama?" travel as holes_walls; none given, none sent', async () => {
+  const calls = [];
+  const api = { outlineSet: async (nr, body) => { calls.push(body); return { status: 'ok', room: { polygon_pct: body.polygon_pct } }; } };
+  const holes = [[[0.12, 0.12], [0.13, 0.12], [0.13, 0.13]]];
+  await saveOutlineTool({ kind: 'set', nr: '01', page: 1, polygon: ring, holes, holesWalls: [false] }, { api, getFresh: project });
+  await saveOutlineTool({ kind: 'set', nr: '01', page: 1, polygon: ring, holes }, { api, getFresh: project });
+  assert.deepEqual(calls[0].holes_walls, [false]);
+  assert.equal('holes_walls' in calls[1], false);
+});

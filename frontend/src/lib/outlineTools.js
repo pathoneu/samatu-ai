@@ -353,3 +353,32 @@ export function lassoSelect(measurements, page, lasso) {
       && m.points.every((p) => insideRing(p, lasso)))
     .map((m) => m.id);
 }
+
+
+// ── „Atimti": his answer to „Kas atimama?" per hole (2026-10-16) ────────────────────────────────────
+
+function ringCentre(ring) {
+  const n = ring.length || 1;
+  return ring.reduce(([x, y], [a, b]) => [x + Number(a) / n, y + Number(b) / n], [0, 0]);
+}
+
+/** Two hole rings (page fractions) at the same place — how an answer follows its hole through a split or a merge. */
+export function sameHole(a, b) {
+  const [ax, ay] = ringCentre(a || []);
+  const [bx, by] = ringCentre(b || []);
+  return Math.abs(ax - bx) < 0.002 && Math.abs(ay - by) < 0.002;
+}
+
+/** The answers already on a room: [{ring, sienos}] (`_konturas.skyles[i]` ↔ `polygon_holes_pct[i]`). */
+export function roomHoleWalls(r) {
+  const holes = Array.isArray(r?.polygon_holes_pct) ? r.polygon_holes_pct.filter((h) => Array.isArray(h) && h.length >= 3) : [];
+  const skyles = Array.isArray(r?._konturas?.skyles) ? r._konturas.skyles : [];
+  return holes.map((ring, i) => ({ ring: ring.map(([x, y]) => [Number(x), Number(y)]), sienos: skyles[i]?.sienos !== false }));
+}
+
+/** Whether `hole` has walls: the answer given for a hole at the same place, else the default — a column or a
+ *  shaft, its faces painted. */
+export function holeHasWalls(hole, answers = []) {
+  const hit = (answers || []).find((a) => sameHole(a?.ring, hole));
+  return hit ? hit.sienos !== false : true;
+}

@@ -21,7 +21,7 @@ import { roomPageOf } from '@/lib/roomZones';
 import {
   displaySizePt, holeFit, holesInside, pctRingToPts, ptsRingToPct, rectRing, ringAt, splitRingByLine, unionTouchingRings,
 } from '@/lib/outlineTools';
-import { roomHoles } from './useOutlineTool';
+import { roomHoles, roomHoleWalls } from './useOutlineTool';
 
 const SNAP_PX = 8;
 const EDIT = '#b45309';       // amber — the outline being worked on (same as the vertex editor)
@@ -127,7 +127,9 @@ export default function OutlineToolLayer({
     const res = unionTouchingRings(pts(tool.ring), pts(room.polygon_pct.map(([x, y]) => [Number(x), Number(y)])), tol);
     if (res.status !== 'ok') return { refused: res.status };
     const holes = [...res.holes, ...(tool.holes || []).map(pts), ...roomHoles(room).map(pts)];
-    return { union: { ring: ptsRingToPct(res.ring, size), holes: holes.map((h) => ptsRingToPct(h, size)) } };
+    // the absorbed room's answers to „Kas atimama?" travel with its holes
+    return { union: { ring: ptsRingToPct(res.ring, size), holes: holes.map((h) => ptsRingToPct(h, size)) },
+      holeWalls: [...(tool.holeWalls || []), ...roomHoleWalls(room)] };
   };
   const hovered = tool.mode === 'merge' && hoverNr && hoverNr !== tool.targetNr
     ? neighbours.find((r) => String(r.nr) === hoverNr) : null;
@@ -175,7 +177,7 @@ export default function OutlineToolLayer({
         toast.error(`${room.nr}: ${MERGE_REFUSED[res.refused]}`);
         return;
       }
-      onChange((cur) => ({ ...cur, targetNr: String(room.nr), union: res.union, refused: null }));
+      onChange((cur) => ({ ...cur, targetNr: String(room.nr), union: res.union, holeWalls: res.holeWalls, refused: null }));
       return;
     }
     if (tool.mode === 'subtract') {

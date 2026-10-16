@@ -145,3 +145,21 @@ test('lasso: takes the marks wholly inside, on its page only', () => {
   assert.deepEqual(lassoSelect(ms, 2, square), ['c3']);
   assert.deepEqual(lassoSelect(ms, 1, R([0, 0], [1, 1])), []);
 });
+
+test('„Kas atimama?": a hole has walls unless he said otherwise, and the answer follows the hole by place', async () => {
+  const { holeHasWalls, roomHoleWalls, sameHole } = await import('./outlineTools.js');
+  const column = [[0.1, 0.1], [0.12, 0.1], [0.12, 0.12], [0.1, 0.12]];
+  const floorHole = [[0.3, 0.3], [0.34, 0.3], [0.34, 0.34], [0.3, 0.34]];
+  const room = { polygon_holes_pct: [column, floorHole],
+    _konturas: { skyles: [{ perimetras_m: 2, sienos: true }, { perimetras_m: 3, sienos: false }] } };
+  const answers = roomHoleWalls(room);
+  assert.deepEqual(answers.map((a) => a.sienos), [true, false]);
+  assert.equal(holeHasWalls(column, answers), true);
+  assert.equal(holeHasWalls(floorHole, answers), false);
+  // the same hole re-drawn in another order of points (a split's ring) keeps its answer
+  assert.equal(holeHasWalls([...floorHole].reverse(), answers), false);
+  assert.equal(sameHole(column, floorHole), false);
+  // a new hole, and a room saved before the question existed: walls
+  assert.equal(holeHasWalls([[0.5, 0.5], [0.6, 0.5], [0.6, 0.6]], answers), true);
+  assert.deepEqual(roomHoleWalls({ polygon_holes_pct: [column], _konturas: { skyles: 1 } }).map((a) => a.sienos), [true]);
+});

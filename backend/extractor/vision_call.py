@@ -3849,6 +3849,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "angų atbrailos": r.get("kampai_opening_reveals_m"),
                     "pusiniai kampai": r.get("kampai_pusiniai_m"),
                     "perimetras": r.get("kampai_perimetras_m"),
+                    "kolonų / šachtų kampai": r.get("kampai_skyliu_m") or None,   # only a room with a column
                 }))
         pozicijos.append(_ledger.attach(
             _kampai_row, _k_contribs, _k_excluded,
