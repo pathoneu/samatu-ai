@@ -37,13 +37,15 @@ def read_text_pages(pdf_bytes: bytes) -> dict:
     """{page_count, pages: {page: {width, height, lines: [(text, boxes)]}}} — boxes in the display
     frame (/Rotate applied, points from the top-left), one entry per text line per direction."""
     from extractor.plan_area_annotations import _iter_pages_pdfium, _lines
+    from extractor.pdfium_guard import PDFIUM_LOCK
     import pypdfium2 as pdfium
 
-    doc = pdfium.PdfDocument(pdf_bytes)
-    try:
-        page_count = len(doc)
-    finally:
-        doc.close()
+    with PDFIUM_LOCK:   # two threads inside PDFium segfault the process (pdfium_guard)
+        doc = pdfium.PdfDocument(pdf_bytes)
+        try:
+            page_count = len(doc)
+        finally:
+            doc.close()
     pages: dict[int, dict] = {}
     for pn, W, H, chars, to_display in _iter_pages_pdfium(pdf_bytes, None):
         entry = pages.setdefault(pn, {"width": float(W), "height": float(H), "lines": []})
