@@ -92,14 +92,14 @@ def api_free_reread_status(request: Request, project_id: str):
     }
 
 
-def read_drawing(project: dict, pdf_bytes: bytes, *, on_step=None) -> dict:
+def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, then the
     drawing's door schedule and its vector symbols — answered in the shape POST /free-reread returns. Saves
-    nothing. `on_step("projekto_skaitymai")` is called when the lane is done and the project-level scans
-    start (api/detect_run.py shows them as a stage)."""
+    nothing. `on_stage` hears the lane's steps (geometry_lane.apply_geometry) and then "kiekiai" when the
+    project-level scans start (api/detect_run.py shows them as stages)."""
     parsed = copy.deepcopy(project)
     try:
-        out = apply_geometry(parsed, pdf_bytes)
+        out = apply_geometry(parsed, pdf_bytes, on_stage=on_stage)
     except Exception as exc:  # noqa: BLE001 — the lane never raises; if it ever does, nothing changes
         log.error("free-reread lane raised for %s: %r", project.get("id"), exc)
         return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
@@ -108,8 +108,8 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_step=None) -> dict:
         return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
                 "_meta": project.get("_meta") or {}, "santrauka": None}
     floors = out.get("grindu_dangos") or {}
-    if on_step:
-        on_step("projekto_skaitymai")
+    if on_stage:
+        on_stage("kiekiai")
     # the drawing's door schedule (deterministic, $0) rides along: a project read before it existed
     # gets its frameless-door evidence with the same click (the browser's merge spreads project keys)
     schedule = None

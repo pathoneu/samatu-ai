@@ -42,8 +42,9 @@ quantity on their own.
 from __future__ import annotations
 
 import copy
+import logging
 import time
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .dimension_sum import ESTIMATE_SOURCE, KEEP as STATED_PERIMETERS, SOURCE as SUMMED, WALL_OUTLINES, sum_perimeters
 from .floor_coverings import find_floor_sheets, read_floor_coverings
@@ -368,6 +369,20 @@ def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, 
         meta["ribos"].append({"nariai": members, "pagal": cut["pagal"]})
 
 
+_log = logging.getLogger("samatu.geometry_lane")
+
+
+def _stage(on_stage: Callable[[str], None] | None, name: str) -> None:
+    """Tell a listener which step the lane has reached (api/detect_run.py shows them as stages). Progress never
+    sinks the lane: whatever the listener raises is logged and swallowed."""
+    if on_stage is None:
+        return
+    try:
+        on_stage(name)
+    except Exception:  # noqa: BLE001
+        _log.exception("geometry lane stage listener failed at %s", name)
+
+
 def geometry_dimension_strings(pdf_bytes: bytes) -> list[dict]:
     """The ONE source of the dimension strings the geometry reading receives —
     the paid reading, the free re-read, the room-outline click and the eval all
@@ -379,7 +394,8 @@ def geometry_dimension_strings(pdf_bytes: bytes) -> list[dict]:
     return read_dimension_strings(pdf_bytes, pages=None)
 
 
-def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None) -> dict:
+def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None, *,
+                   on_stage: Callable[[str], None] | None = None) -> dict:
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
@@ -389,6 +405,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                   "perimetrai_atmesti": [], "seconds": 0.0}
     status = "insufficient"
     try:
+        _stage(on_stage, "mastelis")
         rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict) and _nr(r)]
         plan_pages = plan_pages_from_classification(parsed.get("puslapiai"))
         if not plan_pages:
@@ -412,6 +429,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
             if d.get("scale_m_per_pt"):
                 scale.setdefault(int(d["page"]), float(d["scale_m_per_pt"]))
 
+        _stage(on_stage, "tekstas")
         where = locate_rooms(pdf_bytes, rooms, plan_pages)
         for r in rooms:
             v = where.get(_nr(r))
@@ -444,6 +462,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # only when there is an outline whose walls their strings could state.
         anchors = {int(v["page"]) for v in where.values()} | traced_on
         everything = any(p not in scale for p in anchors)      # an anchor sheet with no strings needs its plan's scale
+        _stage(on_stage, "planas")
         alignment = lay_over(sheets if everything else anchors)
 
         areas = {_nr(r): float(r.get("plotas_m2") or 0) for r in rooms}
@@ -456,6 +475,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 W, H, _ = page_geometry(pdf_bytes, p)
                 if W > 0 and H > 0:
                     sizes[p] = (W, H)
+        _stage(on_stage, "konturai")
         for group in alignment["groups"]:
             located = [r for r in rooms if r.get("_vieta") and int(r["_vieta"]["page"]) in group]
             # the lane's OWN outlines are traced again every run (2026-09-23: a stored project gains what the lane
@@ -612,6 +632,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # The openings come BEFORE the walls are added: a designer writes the wall pieces either side of a door
         # and never the door itself, so a wall's chain of strings has a hole exactly where the room's own
         # opening is (objektas_h bedroom 09: „660" | door 1,40 m | „1538") — dimension_sum fills it and says so.
+        _stage(on_stage, "angos")
         _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta)
         # Two dimension strings closing a rectangle (plan_dimensions, `plano_matmenys`) assume the room IS one.
         # A wall outline checks it: a bounding-box pair it is as long as becomes the perimeter, and an exact
@@ -623,6 +644,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     and str(r.get("polygon_source") or "") in WALL_OUTLINES
                     and confirm_pair_by_outline(r, k.get("perimetras_m"))):
                 meta["poros_patvirtintos"].append(_nr(r))
+        _stage(on_stage, "sienos")
         held = {}
         for r in rooms:
             if (r.get("perimetras_saltinis") == PAIR_SOURCE and r.get("perimetras_m") and not _his(r)
@@ -665,6 +687,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 old = before.get(nr)
                 if old is not None and str(r.get("perimetras_saltinis") or "") not in [s for s in STATED_PERIMETERS if s != "matmenu_eilutes"]:
                     r.setdefault("_perimetras_pries_geometrija", old)
+        _stage(on_stage, "grindys")
         _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
         if meta["konturai"] or done["stated"] or meta["grindu_dangos"]["perskaityta"]:
             status = "applied"

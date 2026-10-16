@@ -57,7 +57,8 @@ def test_paid_and_free_paths_call_the_geometry_reading_the_same_way():
         calls = _apply_geometry_calls(rel)
         assert calls, rel
         for c in calls:
-            assert len(c.args) == 2 and not c.keywords, (
+            # a progress listener (`on_stage`, api/detect_run.py) is no dimension strings of its own
+            assert len(c.args) == 2 and not [k for k in c.keywords if k.arg != "on_stage"], (
                 f"{rel}:{c.lineno} passes its own dimension strings to the geometry reading")
     # the room-outline click reads its strings once and reuses them — from the same source
     src = (BACKEND / "api/room_outline.py").read_text(encoding="utf-8")
