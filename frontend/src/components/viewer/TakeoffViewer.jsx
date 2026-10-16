@@ -169,7 +169,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null, addon = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -194,6 +194,8 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
+      {/* The reading button („Perskaityti lapą", renderToolbarAddon) — first, so a narrow toolbar never hides it. */}
+      {addon && <>{addon(cur, total)}<span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" /></>}
       {/* Deterministic: jump to visible page ± 1. The plugin's relative
           scrollToNext/PreviousPage steps from its own (stale) currentPage —
           under wheel scrolling that no-ops or bounces (founder: "page changer
@@ -731,7 +733,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -1203,6 +1205,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onOpenGuide={() => setGuideOpen(true)}
             symbolSearchActive={symbol.active}
             onToggleSymbolSearch={check ? null : toggleSymbolSearch}
+            addon={check ? null : renderToolbarAddon}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
@@ -1449,6 +1452,9 @@ export default function TakeoffViewer({
   // jumps to a place and fits it. Absent → the viewer is exactly what it was.
   check = null,
   focus = null,
+  // (currentPage, totalPages) => node — a control at the head of the toolbar, after the page-rail toggle
+  // („Perskaityti lapą", components/viewer/DetectRunButton). Not drawn in the check sheet.
+  renderToolbarAddon = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1461,6 +1467,7 @@ export default function TakeoffViewer({
     <div className="h-full" data-takeoff-viewer>
       <EmbedPDF engine={engine} plugins={plugins}>
         <ViewerInner
+          renderToolbarAddon={renderToolbarAddon}
           onRoomOutlineEdit={onRoomOutlineEdit}
           check={check}
           focus={focus}

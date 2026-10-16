@@ -26,6 +26,9 @@ import { useTranslation } from 'react-i18next';
 import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
+import DetectRunButton from '@/components/viewer/DetectRunButton';
+import DetectRunProgress from '@/components/viewer/DetectRunProgress';
+import { useDetectRun } from '@/lib/useDetectRun';
 import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { toast } from 'sonner';
@@ -153,6 +156,8 @@ export default function InteriorWorkspace({
   lastRipple = null,
 }) {
   const { t } = useTranslation();
+  // „Perskaityti lapą" (2026-10-16): the €0 reading per sheet with named stages (api/detect_run.py)
+  const detectRun = useDetectRun(project, onProjectChange);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfBlob, setPdfBlob] = useState(null);  // Diena 6: V9 click-to-count'ui
   // Sprint H7 (2026-04-29): default 70/30 — PDF gets more central space.
@@ -457,9 +462,14 @@ export default function InteriorWorkspace({
       <MobileViewOnlyBanner />
       {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (auto-count-style) */}
       <div
-        className="flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
+        className="relative flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
         style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
       >
+        {detectRun.run && (
+          <div className="pointer-events-none absolute right-3 top-11 z-30">
+            <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} />
+          </div>
+        )}
         {detecting && (
           <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 text-xs text-blue-300">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -477,6 +487,9 @@ export default function InteriorWorkspace({
               hoveredRoomNrExternal={hoveredRoomNr}
               projectId={project.id}
               pdfBlob={pdfBlob}
+              renderToolbarAddon={(page, total) => (
+                <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+              )}
               onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
               onRoomPolygonFill={handleRoomPolygonFill}
               onRoomOutlineEdit={handleRoomOutlineEdit}

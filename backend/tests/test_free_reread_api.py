@@ -137,7 +137,7 @@ def test_a_lane_that_breaks_changes_nothing_and_says_so(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     _store()
 
-    def boom(parsed, pdf_bytes, dims=None):
+    def boom(parsed, pdf_bytes, dims=None, **kw):
         raise RuntimeError("no")
     monkeypatch.setattr(fr, "apply_geometry", boom)
     r = TestClient(app).post("/api/projects/p1/free-reread")
@@ -153,7 +153,7 @@ def test_one_read_per_project_at_a_time(tmp_path, monkeypatch):
     started, release = threading.Event(), threading.Event()
     real = fr.apply_geometry
 
-    def slow(parsed, pdf_bytes, dims=None):
+    def slow(parsed, pdf_bytes, dims=None, **kw):
         started.set()
         release.wait(timeout=10)
         return real(parsed, pdf_bytes, dims)

@@ -92,6 +92,57 @@ def api_free_reread_status(request: Request, project_id: str):
     }
 
 
+def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
+    """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, then the
+    drawing's door schedule and its vector symbols — answered in the shape POST /free-reread returns. Saves
+    nothing. `on_stage` hears the lane's steps (geometry_lane.apply_geometry) and then "kiekiai" when the
+    project-level scans start (api/detect_run.py shows them as stages)."""
+    parsed = copy.deepcopy(project)
+    try:
+        out = apply_geometry(parsed, pdf_bytes, on_stage=on_stage)
+    except Exception as exc:  # noqa: BLE001 — the lane never raises; if it ever does, nothing changes
+        log.error("free-reread lane raised for %s: %r", project.get("id"), exc)
+        return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
+                "_meta": project.get("_meta") or {}, "santrauka": None}
+    if out.get("status") == "failed":
+        return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
+                "_meta": project.get("_meta") or {}, "santrauka": None}
+    floors = out.get("grindu_dangos") or {}
+    if on_stage:
+        on_stage("kiekiai")
+    # the drawing's door schedule (deterministic, $0) rides along: a project read before it existed
+    # gets its frameless-door evidence with the same click (the browser's merge spreads project keys)
+    schedule = None
+    try:
+        from extractor.door_schedule import scan_door_schedule
+        schedule = scan_door_schedule(pdf_bytes)
+    except Exception as exc:  # noqa: BLE001 — never the lane's failure
+        log.warning("free-reread door schedule scan failed for %s: %r", project.get("id"), exc)
+    # the symbols counted from the drawing's paths (extractor/vector_symbols): the diffuser rows take
+    # this count on the next recompute
+    vector_symbols = None
+    try:
+        from extractor.vector_symbols import scan_vector_symbols
+        vector_symbols = scan_vector_symbols(pdf_bytes)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
+    return {
+        "status": "ok",
+        "lane": out.get("status"),
+        "patalpos": parsed.get("patalpos") or [],
+        "_meta": parsed.get("_meta") or {},
+        **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
+        **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
+        "santrauka": {
+            "konturai": len(out.get("konturai") or []),
+            "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),
+            "perimetrai_tusti": len(out.get("perimetrai_tusti") or []),
+            "grindu_dangos": len(floors.get("perskaityta") or {}),
+            "sekundes": out.get("seconds"),
+        },
+    }
+
+
 # Plain `def`: PDF parsing and geometry, 100 % blocking — the threadpool's job.
 @router.post("/{project_id}/free-reread")
 def api_free_reread(request: Request, project_id: str):
@@ -113,48 +164,7 @@ def api_free_reread(request: Request, project_id: str):
         if not pdf_bytes:
             raise HTTPException(status_code=404, detail=NO_PDF)
 
-        parsed = copy.deepcopy(project)
-        try:
-            out = apply_geometry(parsed, pdf_bytes)
-        except Exception as exc:  # noqa: BLE001 — the lane never raises; if it ever does, nothing changes
-            log.error("free-reread lane raised for %s: %r", project_id, exc)
-            return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
-                    "_meta": project.get("_meta") or {}, "santrauka": None}
-        if out.get("status") == "failed":
-            return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
-                    "_meta": project.get("_meta") or {}, "santrauka": None}
-        floors = out.get("grindu_dangos") or {}
-        # the drawing's door schedule (deterministic, $0) rides along: a project read before it existed
-        # gets its frameless-door evidence with the same click (the browser's merge spreads project keys)
-        schedule = None
-        try:
-            from extractor.door_schedule import scan_door_schedule
-            schedule = scan_door_schedule(pdf_bytes)
-        except Exception as exc:  # noqa: BLE001 — never the lane's failure
-            log.warning("free-reread door schedule scan failed for %s: %r", project_id, exc)
-        # the symbols counted from the drawing's paths (extractor/vector_symbols): the diffuser rows take
-        # this count on the next recompute
-        vector_symbols = None
-        try:
-            from extractor.vector_symbols import scan_vector_symbols
-            vector_symbols = scan_vector_symbols(pdf_bytes)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("free-reread vector symbol scan failed for %s: %r", project_id, exc)
-        return {
-            "status": "ok",
-            "lane": out.get("status"),
-            "patalpos": parsed.get("patalpos") or [],
-            "_meta": parsed.get("_meta") or {},
-            **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
-            **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
-            "santrauka": {
-                "konturai": len(out.get("konturai") or []),
-                "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),
-                "perimetrai_tusti": len(out.get("perimetrai_tusti") or []),
-                "grindu_dangos": len(floors.get("perskaityta") or {}),
-                "sekundes": out.get("seconds"),
-            },
-        }
+        return read_drawing(project, pdf_bytes)
     finally:
         with _running_lock:
             _running.discard(project_id)
