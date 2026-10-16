@@ -83,3 +83,13 @@ Demo project with vector PDF, 11 rooms, 8 sheets: `http://localhost:<VITE_PORT>/
 Merge key: the viewer manager merges into togal-v2; the backend manager reviews and gates W3/W9/W10/W11 and signals „merge-ready". W3 review (backend manager): stage progress through an explicit `on_stage` callback on `geometry_lane.apply_geometry` (authorised, pass-through only), per-room landing for narrowed runs, a fixed honesty sentence in every job snapshot (the lane reads the whole drawing; the sheet only narrows what lands). Detection stages follow the lane's real order, not Togal's: mastelis „Mastelis" → tekstas „Patalpos lape" (locate_rooms places the table's rooms on the sheets from the text layer) → planas „Planas" (align_sheets lays one plan's sheets over each other) → konturai „Kontūrai" → angos „Angos" (openings are read before the walls are summed) → sienos „Sienos" → grindys „Grindų dangos" → kiekiai „Kiekiai" (closed by the browser after /recompute-interior). No separate „Patalpos" stage.
 
 **Confidentiality:** `backend/.confidential-terms` is the founder's denylist; before every commit on togal-v2 run `git diff --cached | grep -i -n -F -f backend/.confidential-terms` and commit only when it prints nothing. Worker reports and session titles are not exempt.
+
+## Merge log (togal-v2)
+
+| When | Branch | What | Checks at merge |
+|---|---|---|---|
+| 2026-10-16 | research/togal-pipeline-analysis (ff) | snap to walls, standard scale, walls layer, outline editing, comfort layer | backend 4698 pass, units 1047, lint, build |
+| 2026-10-16 | togal/quantities-panel (W1) | „Kiekiai" tab: lines × rooms tree, two-way highlight, eye, right-click, sort/filter | units 1059, lint |
+| 2026-10-16 | togal/comfort-shortcuts (W4) | shortcut table + „?" guide + PDF, Istorija undo/redo, coach marks, right-click on marks, keys S/U for layers | units 1089, lint, build |
+
+Known follow-ups from the reports: focusing a room scrolls to its page, not to the room (TakeoffViewer focus scrolling); the Matavimai list says „nekalibruota" where the viewer shows metres (it ignores the lane scale); AI-found count marks look like hand-placed ones on the sheet; two things are now called „Kiekiai" (the new tab and the priced-lines section).
