@@ -22,6 +22,7 @@ import { polygonCentroid } from '@/lib/polygonGeometry';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 import MeasureLayer from './MeasureLayer';
 import CheckLayer from './CheckLayer';
+import DrawingGeometryLayer from './DrawingGeometryLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -179,6 +180,13 @@ export default function PageOverlayHost({
       {checkMode && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <CheckLayer data={checkData} renderedSize={{ width, height }} />
+        </div>
+      )}
+      {/* Walls layer (2026-10-16): the wall solid, every outline and opening the program read on this
+          sheet — below the room zones so markers and rings stay on top; pointer-transparent. */}
+      {!checkMode && wallsLayerVisible && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <DrawingGeometryLayer geometry={pageGeometry} rooms={displayRooms} page={layout.pageNumber} renderedSize={{ width, height }} />
         </div>
       )}
       {!checkMode && (

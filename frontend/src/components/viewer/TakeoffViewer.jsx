@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -152,7 +152,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, onDownload }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, onDownload }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -208,6 +208,21 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             aria-pressed={!!zoneFillsVisible}
             onClick={onToggleZoneFills}
           ><Layers className="w-4 h-4" /></button>
+          {/* Walls layer (2026-10-16, Togal analysis §10): the wall solid, every room outline and
+              every opening the program read from the vector PDF — the QA view of the geometry lane. */}
+          {onToggleWallsLayer && (
+            <button
+              type="button"
+              className={wallsLayerVisible ? pressed : btn}
+              title={wallsLayerVisible
+                ? 'Paslėpti sienų sluoksnį'
+                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš vektorinio PDF'}
+              aria-pressed={!!wallsLayerVisible}
+              aria-label="Sienų sluoksnis"
+              data-testid="viewer-walls-layer"
+              onClick={onToggleWallsLayer}
+            ><BrickWall className="w-4 h-4" /></button>
+          )}
         </>
       )}
       {onMeasureTool && (
@@ -622,6 +637,15 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // Room layer presentation. Founder decision 2026-07-11: numbered markers by
   // default; the toolbar Layers toggle re-enables the filled polygon zones.
   const [zoneFillsVisible, setZoneFillsVisible] = useState(ROOM_POLYGON_FILLS_DEFAULT_VISIBLE);
+  // Walls layer (2026-10-16): the wall solid, every outline and every opening the program read on the
+  // sheet. Off by default — the drawing stays clean — remembered per browser.
+  const [wallsLayerVisible, setWallsLayerVisibleState] = useState(() => {
+    try { return localStorage.getItem('samatu_viewer_walls') === '1'; } catch { return false; }
+  });
+  const setWallsLayerVisible = (next) => {
+    try { localStorage.setItem('samatu_viewer_walls', next ? '1' : '0'); } catch { /* private mode */ }
+    setWallsLayerVisibleState(next);
+  };
 
   // ---- Measurement subsystem (Phase 3) ------------------------------------
   // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
@@ -918,6 +942,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onCloseSearch={() => setSearchOpen(false)}
             zoneFillsVisible={zoneFillsVisible}
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
+            wallsLayerVisible={wallsLayerVisible}
+            onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
             onDownload={handleDownload}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
@@ -960,6 +986,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
                       zoneFillsVisible={zoneFillsVisible}
+                      wallsLayerVisible={wallsLayerVisible}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}
