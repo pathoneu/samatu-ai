@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch, ListChecks } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -27,13 +27,19 @@ import { clickToFill } from '@/lib/clickToFillApi';
 import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale } from '@/lib/measureGeometry';
-import { autoPageScalesFromRooms } from '@/lib/durableScale';
+import { autoPageScalesFromRooms, confirmLaneScales } from '@/lib/durableScale';
+import { mergePageScales } from '@/lib/pageScales';
+import { dimensionStringsOf } from '@/lib/scaleOverview';
+import { scaleCheckReadout } from '@/lib/scaleCheck';
+import { visiblePageOf } from '@/lib/visiblePage';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
 import { selfIntersects } from '@/lib/polygonGeometry';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
+import { ScaleOverviewDock, ScaleGateChip } from './ScaleOverviewPanel';
+import ScaleCheckCard from './ScaleCheckCard';
 import CountLegendPanel from './CountLegendPanel';
 import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
@@ -72,6 +78,8 @@ const MEASURE_HINTS = {
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
   count: 'Kiekis: 1) pasirinkite tipą dešinėje 2) spustelėkite elementus · ant žymės — pašalinti',
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
+  // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
+  scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
 };
 // Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
 // Key names come from lib/viewerShortcuts, the table the „?" guide prints.
@@ -82,20 +90,7 @@ const SNAP_NOTE = {
   no_walls: ' · šiame lape vektorinių sienų nėra — prilimpa tik prie matavimų',
 };
 
-// The page the user is actually LOOKING at. The scroll plugin's `currentPage`
-// goes stale under wheel-scrolling (audit P1: "psl. 2" while page 3 fills the
-// screen; fit then yanks the viewport back) while pageVisibilityMetrics stay
-// live — virtualization depends on them — so derive from the metrics and fall
-// back to the plugin's field.
-function visiblePageOf(scroll) {
-  const m = scroll?.pageVisibilityMetrics;
-  if (Array.isArray(m) && m.length) {
-    let best = m[0];
-    for (const x of m) if (x.visiblePercentage > best.visiblePercentage) best = x;
-    return best.pageNumber;
-  }
-  return scroll?.currentPage ?? 1;
-}
+// visiblePageOf moved to lib/visiblePage (2026-10-16): the scale panel reads the same page.
 
 /**
  * SearchBox — inline toolbar search (Task 4.1). Debounced live query through
@@ -169,7 +164,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null, addon = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null, addon = null, scalesOpen = false, onToggleScales = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -272,6 +267,19 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             >
               <ScanSearch className="w-4 h-4" />
               <span className="text-[11px] leading-none hidden lg:inline">Rasti panašius</span>
+            </button>
+          )}
+          {onToggleScales && (
+            <button
+              type="button"
+              className={(scalesOpen ? pressed : btn) + ' inline-flex items-center gap-1'}
+              title="Visų lapų masteliai: koks nustatytas, iš kur jis, ar patvirtintas"
+              aria-pressed={scalesOpen}
+              onClick={onToggleScales}
+              data-testid="scales-toggle"
+            >
+              <ListChecks className="w-4 h-4" />
+              <span className="text-[11px] leading-none hidden lg:inline">Masteliai</span>
             </button>
           )}
         </>
@@ -733,7 +741,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -830,8 +838,18 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // step. A user calibration (measureScales) always wins the merge.
   const autoScales = useMemo(() => autoPageScalesFromRooms(rooms), [rooms]);
   const effectiveScales = useMemo(
-    () => ({ ...autoScales, ...(laneScales || {}), ...measureScales }),
+    () => mergePageScales(autoScales, laneScales || {}, measureScales),
     [autoScales, laneScales, measureScales]);
+  // „Masteliai" (Togal-v2 W6): every sheet's scale, confirm a guessed one, check it against a known length.
+  const [scalesOpen, setScalesOpen] = useState(false);
+  // The last „Patikrinti mastelį" readout: {page, readout} | null. Nothing is saved.
+  const [scaleCheck, setScaleCheck] = useState(null);
+  const confirmScales = (pages) => {
+    setMeasureScales((prev) => confirmLaneScales(prev, pages, laneScales || {}));
+    toast.success(pages.length > 1 ? `Patvirtinta ${pages.length} lapų mastelis` : `Patvirtintas ${pages[0]} lapo mastelis`, {
+      description: 'Mastelis dabar jūsų. Jei perskaičius brėžinį iš naujo matmenys rodys kitą, „Masteliai" tai parodys.',
+    });
+  };
   // Toolbar toggles removed 2026-07-14 (founder: confusing). Snap stays ON —
   // it only pulls to existing measurement endpoints; ortho off.
   const snapEnabled = true;
@@ -988,6 +1006,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (symbol.active) { symbol.close(); return true; }
     if (outlineEdit) { setOutlineEdit(null); return true; }
     if (calibRequest) { setCalibRequest(null); return true; }
+    if (scaleCheck && measureTool !== 'scalecheck') { setScaleCheck(null); return true; }
+    if (measureTool === 'scalecheck') { setScaleCheck(null); }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
     return false;
   };
@@ -1206,6 +1226,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             symbolSearchActive={symbol.active}
             onToggleSymbolSearch={check ? null : toggleSymbolSearch}
             addon={check ? null : renderToolbarAddon}
+            scalesOpen={scalesOpen}
+            onToggleScales={check || !project ? null : () => setScalesOpen((v) => !v)}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
@@ -1259,7 +1281,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onOutlineGestureStart={snapshotOutline}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
-                      measureTool={measureTool}
+                      measureTool={measureTool === 'scalecheck' ? 'calibrate' : measureTool}
                       measurements={measurements}
                       measureScale={effectiveScales[layout.pageNumber] || null}
                       snapEnabled={snapEnabled}
@@ -1283,13 +1305,22 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                           });
                         }
                       }}
-                      onMeasureCalibrate={(pageNr, a, b) => setCalibRequest({
+                      onMeasureCalibrate={(pageNr, a, b) => (measureTool === 'scalecheck' ? setScaleCheck({
+                        page: pageNr,
+                        readout: scaleCheckReadout({
+                          a, b,
+                          scale: effectiveScales[pageNr],
+                          pageSize: documentState?.document?.pages?.[layout.pageIndex]?.size,
+                          rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
+                          strings: dimensionStringsOf(project)[pageNr] || [],
+                        }),
+                      }) : setCalibRequest({
                         pageNr, a, b,
                         // The page's /Rotate travels with the pick: the dialog's
                         // axis labels describe what the user SEES, while a/b are
                         // unrotated mediabox points (audit P1).
                         rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
-                      })}
+                      }))}
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
@@ -1317,6 +1348,31 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>
+              </div>
+            )}
+            {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
+            {(scalesOpen || scaleCheck) && !check && project && (
+              <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-2">
+                {scaleCheck && (
+                  <ScaleCheckCard
+                    readout={scaleCheck.readout}
+                    page={scaleCheck.page}
+                    scale={effectiveScales[scaleCheck.page]}
+                    onClose={() => { setScaleCheck(null); if (measureTool === 'scalecheck') setMeasureTool(null); }}
+                  />
+                )}
+                {scalesOpen && (
+                  <ScaleOverviewDock
+                    documentId={activeDocumentId}
+                    project={project}
+                    totalPages={totalPages}
+                    durable={measureScales}
+                    onConfirm={confirmScales}
+                    onFix={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
+                    onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
+                    onClose={() => setScalesOpen(false)}
+                  />
+                )}
               </div>
             )}
             {historyOpen && !check && (
@@ -1435,6 +1491,8 @@ export default function TakeoffViewer({
   // pageScalesFromLane) — exact, so a sheet the engine already read as 1:50
   // never says „nekalibruotas". A user calibration still wins.
   laneScales = null,
+  // The project (Togal-v2 W6): the „Masteliai" panel and the scale check read its lane record and rooms.
+  project = null,
   onRoomPolygonFill = null,
   // External "arm click-to-fill for room nr" request: { nr, t } (t = nonce).
   fillRequest = null,
@@ -1489,6 +1547,7 @@ export default function TakeoffViewer({
           initialCountTypes={initialCountTypes}
           onMeasureDataChange={onMeasureDataChange}
           laneScales={laneScales}
+          project={project}
         />
       </EmbedPDF>
     </div>

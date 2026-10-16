@@ -237,3 +237,61 @@ export function pageScalesFromLane(mastelisByPage, origins = null) {
 export function laneScalesOf(project) {
   return pageScalesFromLane(laneMastelisOf(project), laneScaleOriginOf(project));
 }
+
+// ── Confirming a lane scale (Togal-v2 W6, 2026-10-16) ────────────────────────
+// Togal asks a person to confirm the scale it predicted (`isHintConfirmed`, research §2.2). A lane scale stays
+// „spėjamas" until he does; confirming copies it into pageScalesDurable as his, with where it came from, so the
+// status bar can say „Patvirtintas" and a later re-read that measures another ratio can be flagged
+// (`laneRatio`). getPageScaleDurable is unchanged: a confirmed entry is an ordinary calibrated PageScale.
+export const LANE_CONFIRMED = 'lane-confirmed';
+
+const ratioOfMpp = (mpp) => (mpp > 0 ? Math.round(mpp / METERS_PER_POINT_AT_1_TO_1) : 0);
+
+/** The durable record of confirming `laneScale` (a laneScalesOf entry), or null when it is not one. */
+export function confirmedLaneScale(laneScale, at = Date.now()) {
+  if (!laneScale?.calibrated || laneScale.source !== 'plan') return null;
+  const mpp = Number(laneScale.metersPerPointX) || 0;
+  if (!(mpp > 0)) return null;
+  const ratio = ratioOfMpp(mpp);
+  return {
+    metersPerPointX: mpp,
+    metersPerPointY: Number(laneScale.metersPerPointY) || mpp,
+    calibrated: true,
+    anisotropic: false,
+    source: LANE_CONFIRMED,
+    confirmed: true,
+    label: laneScale.label || `1:${ratio}`,
+    ...(laneScale.kilme ? { kilme: laneScale.kilme, uzrasyta: laneScale.uzrasyta || [] } : {}),
+    laneRatio: ratio,
+    confirmedAt: new Date(at).toISOString(),
+  };
+}
+
+/**
+ * A pageScalesDurable map with each of `pages` set to its confirmed lane scale. Pages with no lane scale are
+ * left as they were. Pure — the viewer applies it to its live map, confirmPageScalesDurable to a project.
+ */
+export function confirmLaneScales(durableMap, pages, laneScales, at = Date.now()) {
+  const out = { ...(durableMap || {}) };
+  for (const p of pages || []) {
+    const rec = confirmedLaneScale(laneScales?.[p] ?? laneScales?.[String(p)], at);
+    if (rec) out[p] = rec;
+  }
+  return out;
+}
+
+/** The project with `pages`' lane scales confirmed (laneScalesOf(project) unless given). */
+export function confirmPageScalesDurable(project, pages, laneScales = laneScalesOf(project), at = Date.now()) {
+  return { ...project, pageScalesDurable: confirmLaneScales(project?.pageScalesDurable, pages, laneScales, at) };
+}
+
+/**
+ * A confirmation the drawing no longer supports: the lane now measures another ratio on that sheet than the one
+ * he confirmed. `{confirmed, now}` ratios, or null.
+ */
+export function staleConfirmation(durableScale, laneScale) {
+  if (durableScale?.source !== LANE_CONFIRMED || !laneScale?.calibrated) return null;
+  const now = ratioOfMpp(Number(laneScale.metersPerPointX) || 0);
+  const confirmed = Number(durableScale.laneRatio) || ratioOfMpp(Number(durableScale.metersPerPointX) || 0);
+  return now > 0 && confirmed > 0 && now !== confirmed ? { confirmed, now } : null;
+}

@@ -57,3 +57,14 @@ test('buildMeasureExportDoc: empty project is safe', () => {
   assert.deepEqual(doc.measureScales, {});
   assert.deepEqual(doc.countTypes, []);
 });
+
+test('buildMeasureExportDoc: a sheet scaled by the lane exports metres (2026-10-16, objektas_h)', () => {
+  const laneProject = {
+    _meta: { geometrija: { masteliai: { 1: { m_per_pt: 0.04065, mastelis: 115 } } } },
+    measurements: [{ id: 'm1', kind: 'distance', page: 1, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] }],
+    countTypes: [],
+  };
+  const doc = buildMeasureExportDoc(laneProject);
+  assert.equal(doc.measureScales[1].source, 'plan');
+  assert.match(toMeasurementsCSV(doc), /;4,06;m;/);   // 100 pt × 1:115
+});

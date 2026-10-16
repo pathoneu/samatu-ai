@@ -1,4 +1,4 @@
-import { autoPageScalesFromRooms } from './durableScale.js';
+import { effectivePageScales } from './pageScales.js';
 
 /**
  * buildMeasureExportDoc — the exact document the Matavimai CSV/JSON export ships.
@@ -11,13 +11,11 @@ import { autoPageScalesFromRooms } from './durableScale.js';
  * order as the viewer and the panel: auto first, user calibration wins.
  */
 export function buildMeasureExportDoc(project) {
-  const rooms = project?.v8_rooms || project?.patalpos || [];
   return {
     measurements: project?.measurements || [],
-    measureScales: {
-      ...autoPageScalesFromRooms(rooms),
-      ...(project?.pageScalesDurable || {}),
-    },
+    // 2026-10-16: the lane's scales too (lib/pageScales) — the viewer measured in metres on objektas_h's
+    // lane-scaled sheets while the export said „nekalibruota".
+    measureScales: effectivePageScales(project),
     countTypes: project?.countTypes || [],
   };
 }
