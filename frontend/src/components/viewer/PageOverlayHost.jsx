@@ -22,6 +22,8 @@ import { polygonCentroid } from '@/lib/polygonGeometry';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 import MeasureLayer from './MeasureLayer';
 import CheckLayer from './CheckLayer';
+import { usePageGeometry } from '@/hooks/usePageGeometry';
+import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
 function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
@@ -51,6 +53,8 @@ function deleteAnchorFor(m, adapter) {
 
 export default function PageOverlayHost({
   documentId,
+  // The project the drawing belongs to — needed to ask the backend for the sheet's wall geometry.
+  projectId = null,
   layout,
   rooms,
   pageRotation = 0,
@@ -61,6 +65,8 @@ export default function PageOverlayHost({
   // Founder decision 2026-07-11: rooms render as numbered markers by default;
   // polygon fills only when the toolbar zone-fill toggle turns this on.
   zoneFillsVisible = false,
+  // Walls layer (2026-10-16): the wall solid, every outline and opening the program read on the sheet.
+  wallsLayerVisible = false,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -114,9 +120,17 @@ export default function PageOverlayHost({
       reportedRotation: pageRotation,
     });
   }, [width, height, pageWidthPt, pageHeightPt, pageRotation]);
+  // The drawing's wall solid (api/page_geometry) — fetched when a measure tool is armed on this page
+  // (and when the walls layer is on). Cached per (project, page) in lib/pageGeometryApi, so the
+  // scroll virtualization mounting and unmounting this host costs nothing after the first ask.
+  const measureActive = measureTool != null;
+  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible);
+  const drawingSnapPolygons = useMemo(
+    () => snapPolygonsFromGeometry(pageGeometry, { pageWidthPt, pageHeightPt, pageRotation }),
+    [pageGeometry, pageWidthPt, pageHeightPt, pageRotation],
+  );
   if (!vp) return null;
 
-  const measureActive = measureTool != null;
   const selectedMeasurement = (selectedMeasureId != null && adapter)
     ? (measurements || []).find((m) => m.id === selectedMeasureId && m.page === layout.pageNumber)
     : null;
@@ -196,6 +210,7 @@ export default function PageOverlayHost({
             activeCountTypeId={activeCountTypeId}
             snapEnabled={snapEnabled}
             orthoEnabled={orthoEnabled}
+            drawingSnapPolygons={drawingSnapPolygons}
             onCommit={onMeasureCommit}
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}

@@ -6,12 +6,12 @@ import {
   realPathLengthM, shoelaceAreaM2, formatNumberLT, uncalibratedScale, draftCommitPoints,
 } from '@/lib/measureGeometry.js';
 import {
-  nearestVertex,
   nearestEdge,
   orthoSnap,
   pointInPolygon,
   polygonCentroid,
 } from '@/lib/polygonGeometry.js';
+import { pickSnap } from '@/lib/drawingSnap.js';
 
 // Tools that build a multi-vertex draft (polyline for line tools, polygon for area).
 const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
@@ -46,6 +46,9 @@ export default function MeasureLayer({
   activeCountTypeId = null,
   snapEnabled = false,
   orthoEnabled = false,
+  // The drawing's wall solid as snap polygons in PDF points (lib/drawingSnap) — [] when the sheet has
+  // no vector walls or the geometry has not arrived yet. Snapped BEFORE the user's own measurements.
+  drawingSnapPolygons = [],
   onCommit,
   onCalibrate,
   onSelect,
@@ -70,6 +73,7 @@ export default function MeasureLayer({
   const setCalibA = onCalibAChange || setLocalCalibA;
   const [cursor, setCursor] = useState(null);   // snapped PDF point under the pointer
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
+  const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
 
   // Reset the draft whenever the active tool changes. In controlled mode the
   // OWNER resets (this component re-mounts on every scroll-back, and resetting
@@ -80,7 +84,7 @@ export default function MeasureLayer({
       setLocalCalibA(null);
     }
     setCursor(null);
-    setSnapPt(null);
+    setSnapPt(null); setSnapKind(null);
   }, [tool]);
 
   // ---- coordinate + snapping helpers -------------------------------------
@@ -102,19 +106,21 @@ export default function MeasureLayer({
     return adapter.toPdf({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   }, [adapter]);
 
-  // Apply vertex/edge snapping then ortho snapping. Returns { point, snapped }.
+  // Apply vertex/edge snapping then ortho snapping. Returns { point, snapped, snapKind }.
+  // Order (lib/drawingSnap.pickSnap): a wall corner of the drawing, a measurement vertex, a wall face,
+  // a measurement edge — the drawing wins because it is what the person is measuring.
   const applySnap = useCallback((raw, e) => {
     const tol = SNAP_TOL_PX / (adapter?.scale || 1);
     let point = raw;
     let snapped = false;
+    let snapKind = null;
 
-    if (snapEnabled && snapPolygons.length) {
-      const v = nearestVertex(raw, snapPolygons, tol);
-      const edge = v ? null : nearestEdge(raw, snapPolygons, tol);
-      const hit = v || edge;
+    if (snapEnabled && (drawingSnapPolygons.length || snapPolygons.length)) {
+      const hit = pickSnap(raw, { drawing: drawingSnapPolygons, measurements: snapPolygons }, tol);
       if (hit) {
         point = hit.point;
         snapped = true;
+        snapKind = hit.kind;
       }
     }
 
@@ -127,8 +133,8 @@ export default function MeasureLayer({
       // sub-point rounding is well below drawing precision.
       point = orthoSnap(prev, point, { orthoEnabled: orthoEnabled || shiftHeld, shiftHeld, altHeld });
     }
-    return { point, snapped };
-  }, [adapter?.scale, snapEnabled, snapPolygons, orthoEnabled, tool, draft.points]);
+    return { point, snapped, snapKind };
+  }, [adapter?.scale, snapEnabled, snapPolygons, drawingSnapPolygons, orthoEnabled, tool, draft.points]);
 
   // ---- pointer handlers ---------------------------------------------------
 
@@ -140,7 +146,7 @@ export default function MeasureLayer({
     if (pts) onCommit(makeMeasurement(tool, pageNr, pts));
     dispatch({ type: 'reset' });
     setCursor(null);
-    setSnapPt(null);
+    setSnapPt(null); setSnapKind(null);
   }, [onCommit, tool, pageNr, dispatch]);
 
   const handlePointerMove = useCallback((e) => {
@@ -148,9 +154,10 @@ export default function MeasureLayer({
       setCursor(null);
       return;
     }
-    const { point, snapped } = applySnap(eventToPdf(e), e);
+    const { point, snapped, snapKind: kind } = applySnap(eventToPdf(e), e);
     setCursor(point);
     setSnapPt(snapped ? point : null);
+    setSnapKind(snapped ? kind : null);
   }, [tool, applySnap, eventToPdf]);
 
   const handlePointerDown = useCallback((e) => {
@@ -177,7 +184,7 @@ export default function MeasureLayer({
         onCalibrate?.(pageNr, calibA, point);
         setCalibA(null);
         setCursor(null);
-        setSnapPt(null);
+        setSnapPt(null); setSnapKind(null);
       }
       return;
     }
@@ -234,7 +241,7 @@ export default function MeasureLayer({
   const cancelDraft = useCallback(() => {
     dispatch({ type: 'reset' });
     setCursor(null);
-    setSnapPt(null);
+    setSnapPt(null); setSnapKind(null);
   }, [dispatch]);
   const draftMinPoints = tool === 'area' ? 3 : 2;
   const draftFinishable = POLY_TOOLS.has(tool) && draft.points.length >= draftMinPoints;
@@ -254,7 +261,7 @@ export default function MeasureLayer({
       } else if (e.key === 'Escape') {
         dispatch({ type: 'reset' });
         setCursor(null);
-        setSnapPt(null);
+        setSnapPt(null); setSnapKind(null);
       } else if (e.key === 'z' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         dispatch({ type: 'undo' });
       } else if (e.key === 'Backspace') {
@@ -275,7 +282,7 @@ export default function MeasureLayer({
       if (e.key === 'Escape') {
         setCalibA(null);
         setCursor(null);
-        setSnapPt(null);
+        setSnapPt(null); setSnapKind(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -328,6 +335,7 @@ export default function MeasureLayer({
         adapter={adapter}
         scale={scale}
         snapPt={snapPt}
+        snapKind={snapKind}
         decimals={decimals}
       />
 
@@ -348,6 +356,7 @@ export default function MeasureLayer({
           cursor={cursor}
           adapter={adapter}
           snapPt={snapPt}
+          snapKind={snapKind}
         />
       )}
     </svg>
@@ -497,10 +506,10 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   return <g pointerEvents="none">{mark}</g>;
 }
 
-function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, decimals }) {
+function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = null, decimals }) {
   if (!POLY_TOOLS.has(tool)) {
-    // Still show the snap indicator for non-poly tools that snap (none today), no-op.
-    return snapPt ? <SnapDot p={adapter.toViewport(snapPt)} /> : null;
+    // Still show the snap indicator for non-poly tools that snap (the count tool on a wall corner).
+    return snapPt ? <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} /> : null;
   }
   const sp = draft.points.map((p) => adapter.toViewport(p));
   const liveScreen = sp.length ? [...sp, ...(cursor ? [adapter.toViewport(cursor)] : [])] : [];
@@ -563,7 +572,7 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, decimals }) {
       {sp.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={3} fill="#2a6fb5" />
       ))}
-      {snapPt && <SnapDot p={adapter.toViewport(snapPt)} />}
+      {snapPt && <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} />}
       {chip && cur && <ReadoutChip x={cur.x + 12} y={cur.y - 12} text={chip} anchor="start" />}
     </g>
   );
@@ -572,7 +581,7 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, decimals }) {
 // Calibration draft: a distinct RED 2-point line (visually separate from the
 // blue measurement drafts). First point A is fixed; a rubber-band follows the
 // cursor until the second click, which is handled upstream via onCalibrate.
-function CalibrationLayer({ calibA, cursor, adapter, snapPt }) {
+function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) {
   const a = calibA ? adapter.toViewport(calibA) : null;
   const c = cursor ? adapter.toViewport(cursor) : null;
   return (
@@ -590,12 +599,24 @@ function CalibrationLayer({ calibA, cursor, adapter, snapPt }) {
       )}
       {a && <circle cx={a.x} cy={a.y} r={4} fill="#dc2626" />}
       {c && <circle cx={c.x} cy={c.y} r={3} fill="#dc2626" fillOpacity={0.7} />}
-      {snapPt && <SnapDot p={adapter.toViewport(snapPt)} />}
+      {snapPt && <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} />}
     </g>
   );
 }
 
-function SnapDot({ p }) {
+function SnapDot({ p, kind = null }) {
+  // A wall corner of the DRAWING is an orange square, a wall face an orange diamond; the user's own
+  // measurement stays the green circle — so the person sees WHAT the click will land on.
+  if (kind === 'drawing-vertex' || kind === 'drawing-edge') {
+    const r = kind === 'drawing-vertex' ? 6 : 5;
+    return (
+      <rect
+        x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
+        fill="none" stroke="#ea580c" strokeWidth={2} pointerEvents="none"
+        transform={kind === 'drawing-edge' ? `rotate(45 ${p.x} ${p.y})` : undefined}
+      />
+    );
+  }
   return (
     <circle cx={p.x} cy={p.y} r={5} fill="none" stroke="#16a34a" strokeWidth={2} pointerEvents="none" />
   );

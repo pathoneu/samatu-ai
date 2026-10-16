@@ -949,6 +949,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                   renderPage={(layout) => (
                     <PageOverlayHost
                       documentId={activeDocumentId}
+                      projectId={projectId}
                       layout={layout}
                       rooms={rooms}
                       pageRotation={documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0}
