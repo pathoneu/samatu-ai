@@ -254,7 +254,8 @@ export default function WorkspacePanel({
           const { value } = measurementValue(m, scale);
           display = m.kind === 'area' ? `${fmt(value, 2)} m²` : `${fmt(value, 2)} m`;
         }
-        return { id: m.id, label: KIND_LT[m.kind], page: m.page, display };
+        // A name given in the viewer (right-click „Pervadinti", 2026-10-16) leads; the kind follows.
+        return { id: m.id, label: m.name ? `${m.name} · ${KIND_LT[m.kind]}` : KIND_LT[m.kind], page: m.page, display };
       });
   }, [projMeasurements, project.pageScalesDurable, project.v8_rooms, project.patalpos]);
 
@@ -295,6 +296,34 @@ export default function WorkspacePanel({
     );
   }, [allRooms, filter]);
 
+  // „Rodyti sąraše" from the viewer's right-click menu: open Matavimai, scroll to the row, flash it.
+  // Count marks are listed per type, so a mark reveals its type's row.
+  const [revealKey, setRevealKey] = useState(null);
+  useEffect(() => {
+    const onReveal = (e) => {
+      const d = e.detail || {};
+      const key = d.kind === 'count' ? `count:${d.typeId}` : `meas:${d.id}`;
+      setCollapsed((c) => ({ ...c, meas: false }));
+      setRevealKey(key);
+      // Scroll only the panel's own scroller — scrollIntoView would also move the page and the drawing.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const row = document.querySelector(`[data-measure-row="${CSS.escape(key)}"]`);
+        let sc = row?.parentElement;
+        while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+        if (!row || !sc) return;
+        const rr = row.getBoundingClientRect();
+        const sr = sc.getBoundingClientRect();
+        sc.scrollBy({ top: rr.top - sr.top - sr.height / 2 + rr.height / 2, behavior: 'smooth' });
+      }));
+    };
+    window.addEventListener('samatu:measure-reveal', onReveal);
+    return () => window.removeEventListener('samatu:measure-reveal', onReveal);
+  }, []);
+  useEffect(() => {
+    if (!revealKey) return undefined;
+    const t = setTimeout(() => setRevealKey(null), 2200);
+    return () => clearTimeout(t);
+  }, [revealKey]);
   const toggleSection = (id) => {
     setCollapsed(c => ({ ...c, [id]: !c[id] }));
   };
@@ -658,7 +687,8 @@ export default function WorkspacePanel({
             {!collapsed.meas && measCountRows.map((r) => (
               <div
                 key={r.typeId}
-                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                data-measure-row={`count:${r.typeId}`}
+                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `count:${r.typeId}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && r.firstPage ? () => onJumpToPage(r.firstPage) : undefined}
                 title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage})` : undefined}
               >
@@ -678,7 +708,8 @@ export default function WorkspacePanel({
             {!collapsed.meas && measGeomRows.map((m) => (
               <div
                 key={m.id}
-                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                data-measure-row={`meas:${m.id}`}
+                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `meas:${m.id}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && m.page ? () => onJumpToPage(m.page) : undefined}
                 title={m.page ? `Rodyti brėžinyje (psl. ${m.page})` : undefined}
               >

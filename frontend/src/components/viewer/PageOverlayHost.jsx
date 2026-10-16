@@ -20,7 +20,7 @@ import { makeEmbedAdapter } from '@/lib/viewerEngine/embedPdfAdapter';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { polygonCentroid } from '@/lib/polygonGeometry';
 import RoomZoneLayer from '@/components/project/RoomZoneLayer';
-import MeasureLayer from './MeasureLayer';
+import MeasureLayer, { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from './MeasureLayer';
 import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
 import OutlineEditLayer from './OutlineEditLayer';
@@ -88,6 +88,8 @@ export default function PageOverlayHost({
   onMeasureCalibrate = null,
   onMeasureSelect = null,
   onMeasureDelete = null,
+  // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
+  onMeasureContextMenu = null,
   // Draft + first calibration point are owned by TakeoffViewer (this page host
   // unmounts when the page scrolls out of the virtualization buffer).
   measureDraft = null,
@@ -142,9 +144,20 @@ export default function PageOverlayHost({
     ? (measurements || []).find((m) => m.id === selectedMeasureId && m.page === layout.pageNumber)
     : null;
   const deleteAt = selectedMeasurement ? deleteAnchorFor(selectedMeasurement, adapter) : null;
+  // Right-click: hit-test the committed marks under the pointer (works with or without a tool armed —
+  // the measure SVG is click-through while idle, so the page root listens). A miss leaves the
+  // browser's own menu alone.
+  const handleContextMenu = (onMeasureContextMenu && adapter && !checkMode) ? (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
+    const id = hitTestMeasurement(raw, measurements || [], layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
+    if (!id) return;
+    e.preventDefault();
+    onMeasureContextMenu({ id, clientX: e.clientX, clientY: e.clientY });
+  } : undefined;
 
   return (
-    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }}>
+    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }} onContextMenu={handleContextMenu}>
       {/* ── Rotated page content ─────────────────────────────────────────────
           EmbedPDF draws ALL page content in UNROTATED mediabox space:
           <RenderLayer>'s raster ignores /Rotate (PDFium matrix render path),
