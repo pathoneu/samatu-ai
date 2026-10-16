@@ -252,3 +252,24 @@ def test_routes_answer_404_for_missing_project_and_version(env):
     assert client.get("/api/projects/p1/versions/999").status_code == 404
     assert client.get("/api/projects/p1/versions/abc/diff/dabartine").status_code == 404
     assert client.post("/api/projects/p1/versions/999/restore").status_code == 404
+
+
+def test_restored_project_is_the_version_data_with_the_row_columns_on_top(env):
+    """restore_project_version's UPDATE mirrors upsert's column mapping: what get_project serves after a
+    restore is exactly the version's blob with the row's columns over it."""
+    v1 = {**_blob(10), "name": "Senas", "company_name": "UAB A", "archetipas": "butas",
+          "status": "ready", "bendras_plotas_m2": 55.5, "vat_rate": 9}
+    db.upsert_project("p1", v1, now=T0)
+    db.upsert_project("p1", {**_blob(20), "name": "Naujas", "company_name": None, "vat_rate": 21,
+                             "bendras_plotas_m2": 70.0}, now=T0 + 600)
+    first = _rows()[0]["id"]
+    restored = db.restore_project_version("p1", first, now=T0 + 1200)
+    data = db.get_project_version("p1", first)["data"]
+    with db._conn() as c:
+        row = dict(c.execute("SELECT * FROM projects WHERE id = 'p1'").fetchone())
+    row.pop("data")
+    assert restored == {**data, **{k: v for k, v in row.items() if v is not None}}
+    assert (row["name"], row["company_name"], row["archetipas"], row["bendras_plotas_m2"], row["vat_rate"]) == \
+        ("Senas", "UAB A", "butas", 55.5, 9)
+    assert row["updated_at"] == db._iso_at(T0 + 1200)
+    assert row["created_at"] == db._iso_at(T0)          # creation date is not rewritten
