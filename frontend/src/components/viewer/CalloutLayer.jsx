@@ -15,7 +15,7 @@ import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { fetchPageCallouts } from '@/lib/sheetLinksApi';
 import { calloutHoverText } from '@/lib/sheetRail';
 
-const MIN_HIT_PX = 14;   // a 2-character tag at fit-to-width is ~6 px tall — keep it clickable
+const MIN_HIT_PX = 14;   // a 2-character tag at fit-to-width is ~5 × 6 px — keep it clickable both ways
 
 export function usePageCallouts(projectId, page, version, enabled) {
   const [callouts, setCallouts] = useState([]);
@@ -42,8 +42,9 @@ export default function CalloutLayer({ documentId, projectId, page, version = ''
       {callouts.map((c, i) => {
         const [x0, y0, x1, y1] = c.bbox_pct || [];
         if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
-        const left = x0 * width;
-        const w = Math.max((x1 - x0) * width, 4);
+        const textW = Math.max((x1 - x0) * width, 2);
+        const w = Math.max(textW, MIN_HIT_PX);
+        const left = x0 * width - (w - textW) / 2;
         const textH = Math.max((y1 - y0) * height, 2);
         const hitH = Math.max(textH, MIN_HIT_PX);
         const top = y0 * height - (hitH - textH) / 2;
@@ -70,9 +71,11 @@ export default function CalloutLayer({ documentId, projectId, page, version = ''
             }}
             className="group/callout focus:outline-none"
           >
+            {/* the words themselves: a faint evergreen tint and a 2 px underline (dashed when several
+                sheets could be meant) — visible on a busy plan, quiet on a clean one */}
             <span
-              style={{ position: 'absolute', left: 0, right: 0, top: (hitH + textH) / 2, height: 0 }}
-              className={`block border-b ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} border-[hsl(var(--viewer-chrome-active)/0.75)] group-hover/callout:border-b-2 group-focus-visible/callout:border-b-2`}
+              style={{ position: 'absolute', left: (w - textW) / 2, width: textW, top: (hitH - textH) / 2, height: textH + 1 }}
+              className={`block rounded-[1px] border-b-2 ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-active)/0.10)] group-hover/callout:bg-[hsl(var(--viewer-chrome-active)/0.22)] group-focus-visible/callout:bg-[hsl(var(--viewer-chrome-active)/0.22)]`}
             />
             {hover === i && (
               <span
