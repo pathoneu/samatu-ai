@@ -267,22 +267,21 @@ export default function PatikraQuestions() {
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
     const touched = joined ? Object.keys(found.rooms || {}) : [nr];
-    const saved = await saveRoomEdit(project, rooms);
-    remember(current, null, accepted ? 'accepted' : 'own', touched);
-    await land(saved, {
+    // the server's „konturas" row (outline-at, with this question's id) is this answer's journal record
+    await land(await saveRoomEdit(project, rooms), {
       fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched, accepted, joined }, t),
     });
-  }, [project, current, questions, land, pilot, t, remember]);
+  }, [project, current, questions, land, pilot, t]);
 
   const pickOutline = useCallback((point) => run(async () => {
     if (!point || !current || !outlineItem) return;
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point), { point });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { klausimas: current.id }), { point });
   }), [run, current, outlineItem, id, landOutline]);
 
   // „Tinka" on the boundary proposed after a click in the neighbour's room: the same click, labelled
   const acceptJoin = useCallback(() => run(async () => {
     if (!current || !outlineItem || !join?.point) return;
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, join.point, { pritarta: true }), { accepted: true });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, join.point, { pritarta: true, klausimas: current.id }), { accepted: true });
   }), [run, current, outlineItem, id, join, landOutline]);
 
   // „Nubrėšiu pats" after such a click: two clicks cut the JOINED space along his line
@@ -291,7 +290,7 @@ export default function PatikraQuestions() {
     setSplitFirst(first);
     if (!request || !current || !outlineItem || !join?.su) return;
     run(async () => {
-      const found = await fetchSplitSpace(id, outlineItem.room_nr, { ...request, su: join.su });
+      const found = await fetchSplitSpace(id, outlineItem.room_nr, { ...request, su: join.su }, { klausimas: current.id });
       const rooms = roomsWithSplit(project, found);
       if (!rooms) {
         const { key, params } = splitFailureKey(found);
@@ -304,20 +303,19 @@ export default function PatikraQuestions() {
       pilot('question_answer', { kind: 'question', id: current.kind });
       standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
       setAnswered((n) => n + 1);
-      const saved = await saveRoomEdit(project, rooms);
-      remember(current, null, 'own', Object.keys(found.rooms || {}));
-      await land(saved, {
+      // recorded by the server's „konturas" rows (split-space, with this question's id)
+      await land(await saveRoomEdit(project, rooms), {
         fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: Object.keys(found.rooms || {}), joined: true }, t),
       });
     });
-  }, [splitFirst, current, outlineItem, join, run, id, project, questions, land, pilot, t, remember]);
+  }, [splitFirst, current, outlineItem, join, run, id, project, questions, land, pilot, t]);
 
   // „Tinka" on the outline the program proposed (2026-09-23): the same click, at a point inside that outline
   const acceptOutline = useCallback(() => run(async () => {
     const cand = outlineItem?.proposed_outline;
     if (!current || !outlineItem || !Array.isArray(cand?.taskas_pct)) return;
     const point = { page: cand.page, x_pct: cand.taskas_pct[0], y_pct: cand.taskas_pct[1] };
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { pritarta: true }), { accepted: true });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { pritarta: true, klausimas: current.id }), { accepted: true });
   }), [run, current, outlineItem, id, landOutline]);
 
   const landSplit = useCallback(async (found, how = 'own') => {
@@ -332,7 +330,9 @@ export default function PatikraQuestions() {
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
     const saved = await saveRoomEdit(project, rooms);
-    remember(current, null, how, Object.keys(found.rooms || {}));
+    // a line he drew went through split-space, whose „konturas" rows are the record; the program's proposal
+    // (split-proposal) wrote nothing on the server, so its „Tinka" is recorded here — one act, one row
+    if (how === 'accepted') remember(current, null, how, Object.keys(found.rooms || {}));
     await land(saved, {
       fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: Object.keys(found.rooms || {}) }, t),
     });
@@ -342,7 +342,7 @@ export default function PatikraQuestions() {
     const { first, request } = nextSplitClick(splitFirst, point);
     setSplitFirst(first);
     if (!request || !current) return;
-    run(async () => { await landSplit(await fetchSplitSpace(id, current.items[0].room_nr, request)); });
+    run(async () => { await landSplit(await fetchSplitSpace(id, current.items[0].room_nr, request, { klausimas: current.id })); });
   }, [splitFirst, current, run, landSplit, id]);
 
   const skip = useCallback(() => {

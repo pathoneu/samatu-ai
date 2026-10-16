@@ -16,7 +16,7 @@ from main import app  # noqa: E402  (main before auth — house idiom)
 
 import db  # noqa: E402
 from tests.test_cv_find_symbol import DOORS, _door_box, _login, env  # noqa: E402,F401  (fixture)
-from tests.test_room_outline_api import _isolate, _set, _store  # noqa: E402
+from tests.test_room_outline_api import _blob, _click, _isolate, _pct, _set, _store, _store_pocket  # noqa: E402
 
 
 def _rows(project_id="p1"):
@@ -128,3 +128,54 @@ def test_a_symbol_decision_is_one_journal_row_too(env):  # noqa: F811
     assert row["source"] == "simbolis" and row["field_path"] == "simbolis.1.durys-ai"
     assert row["new_value"]["sprendimas"] == "reject" and row["note"] == "symbol_search"
     assert row["old_value"] == {"pasitikejimas": 0.81}
+
+
+# ── one act, one row: a Patikra answer that lands through an outline endpoint ───────────
+
+def test_an_accepted_outline_proposal_is_exactly_one_konturas_row_carrying_the_question(tmp_path, monkeypatch):
+    """The server's „konturas" row IS the record of the outline question's answer; the browser writes no
+    klausimas_* row for it (pages/PatikraQuestions.jsx), so „Įsiminta" rises by one."""
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob(_konturo_siulymas={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]], "plotas_m2": 12.0,
+                                   "perimetras_m": 14.0, "paklaida": 0.3, "taskas_pct": [0.15, 0.13]})
+    _store(blob=blob)
+    r = _click(TestClient(app), 2.0, 2.5, pritarta=True, klausimas="konturas")
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+    rows = _rows()
+    assert len(rows) == 1
+    assert rows[0]["source"] == "konturas" and rows[0]["note"] == "konturas"
+    assert rows[0]["new_value"]["saltinis"] == "pasiulyta"
+
+
+def test_a_line_drawn_through_a_shared_space_carries_the_question_on_each_room(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store_pocket()
+    ax, ay = _pct(2.0, -0.5)
+    bx, by = _pct(2.0, 4.0)
+    out = TestClient(app).post("/api/projects/p1/rooms/01/split-space", json={
+        "page": 1, "a": {"x_pct": ax, "y_pct": ay}, "b": {"x_pct": bx, "y_pct": by}, "su": "02", "klausimas": "erdve:01-02"}).json()
+    assert out["status"] == "ok"
+    rows = _rows()
+    assert sorted(r["room_nr"] for r in rows) == ["01", "02"]
+    assert {r["source"] for r in rows} == {"konturas"} and {r["note"] for r in rows} == {"erdve:01-02"}
+
+
+def test_an_accepted_door_answer_is_exactly_one_klausimas_tinka_row(tmp_path, monkeypatch):
+    """An answer that changes no outline (heights, doors, counts) is recorded by the browser, once."""
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    body = {"field_path": "klausimas.durys", "old_value": None,
+            "new_value": {"atsakymas": "tinka", "patalpos": []}, "source": "klausimas_tinka", "room_nr": None,
+            "note": "durys"}
+    with TestClient(app) as tc:
+        assert tc.post("/api/projects/p1/corrections", json=body).json() == {"status": "logged"}
+        assert tc.post("/api/projects/p1/corrections", json=body).json()["duplicate"] is True   # a double click
+    rows = _rows()
+    assert len(rows) == 1 and rows[0]["source"] == "klausimas_tinka" and rows[0]["note"] == "durys"
+
+
+def test_a_question_id_that_is_too_long_is_refused(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    r = _click(TestClient(app), 2.0, 2.5, klausimas="x" * 65)
+    assert r.status_code == 422 and _rows() == []
