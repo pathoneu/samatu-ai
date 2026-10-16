@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeRotation, rotatePctPoint, rotateBboxPct, rotateRoomGeometry,
-  inverseRotatePctPoint, displayRotationFor,
+  inverseRotatePctPoint, displayRotationFor, mediaboxSizeFrom,
 } from './pageRotation.js';
+import { makeEmbedAdapter } from './embedPdfAdapter.js';
 
 test('normalizeRotation: quarter-turns and degrees', () => {
   assert.equal(normalizeRotation(3), 270);
@@ -98,4 +99,34 @@ test('display->mediabox via displayRotationFor + inverseRotatePctPoint matches o
     assert.ok(Math.abs(back[0] - mediabox[0]) < 1e-9 && Math.abs(back[1] - mediabox[1]) < 1e-9,
       `reported=${reported}: ${back} != ${mediabox}`);
   }
+});
+
+test('mediaboxSizeFrom: EmbedPDF reports the displayed size — a 842×1191 mediabox at /Rotate 270 reads 1191×842', () => {
+  assert.deepEqual(mediaboxSizeFrom({ width: 1191, height: 842 }, 270), { width: 842, height: 1191 });
+  assert.deepEqual(mediaboxSizeFrom({ width: 1191, height: 842 }, 3), { width: 842, height: 1191 });
+  assert.deepEqual(mediaboxSizeFrom({ width: 200, height: 400 }, 90), { width: 400, height: 200 });
+  assert.deepEqual(mediaboxSizeFrom({ width: 842, height: 1191 }, 180), { width: 842, height: 1191 });
+  assert.deepEqual(mediaboxSizeFrom({ width: 842, height: 1191 }, 0), { width: 842, height: 1191 });
+  assert.equal(mediaboxSizeFrom(null, 90), null);
+  assert.equal(mediaboxSizeFrom({ width: 0, height: 5 }, 0), null);
+});
+
+test('a 4 m wall on a /Rotate 270 sheet measures 4 m once the adapter gets the mediabox size', () => {
+  // 842×1191 mediabox shown at 270 → display 1191×842; render it 1191×842 px (1 px per pt)
+  const reported = { width: 1191, height: 842 };
+  const mpp = 50 * 0.0254 / 72;                          // 1:50
+  const wallPt = 4 / mpp;                                // 4 m of wall in points
+  const measure = (size) => {
+    const a = makeEmbedAdapter({ renderedWidth: 1191, renderedHeight: 842, pageWidthPt: size.width,
+      pageHeightPt: size.height, reportedRotation: 270 });
+    // a horizontal wall on screen and a vertical one, each 4 m long
+    const h = [a.toPdf({ x: 100, y: 300 }), a.toPdf({ x: 100 + wallPt, y: 300 })];
+    const v = [a.toPdf({ x: 500, y: 100 }), a.toPdf({ x: 500, y: 100 + wallPt })];
+    const len = ([p, q]) => Math.hypot(q.x - p.x, q.y - p.y) * mpp;
+    return [len(h), len(v)];
+  };
+  const [hOld, vOld] = measure(reported);                // the old wiring: reported size as if mediabox
+  assert.ok(Math.abs(hOld - 4 * 842 / 1191) < 1e-6 && Math.abs(vOld - 4 * 1191 / 842) < 1e-6, `${hOld} ${vOld}`);
+  const [hNew, vNew] = measure(mediaboxSizeFrom(reported, 270));
+  assert.ok(Math.abs(hNew - 4) < 1e-9 && Math.abs(vNew - 4) < 1e-9, `${hNew} ${vNew}`);
 });
