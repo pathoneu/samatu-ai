@@ -9,6 +9,11 @@ import { formatNumberLT } from '@/lib/measureGeometry';
 import { scaleStatusText } from '@/lib/scaleLabel';
 
 const m = (v) => `${formatNumberLT(v, 2)} m`;
+// one decimal, signed; a difference that rounds to nothing reads „0,0 %", never „−0,0 %"
+const pct = (v) => {
+  const r = Math.round(v * 10) / 10;
+  return r === 0 ? '0,0 %' : `${r > 0 ? '+' : ''}${formatNumberLT(r, 1)} %`;
+};
 
 export default function ScaleCheckCard({ readout, page, scale, onClose }) {
   if (!readout) return null;
@@ -44,13 +49,18 @@ export default function ScaleCheckCard({ readout, page, scale, onClose }) {
                 {readout.nearest.map((n, i) => (
                   <tr key={i} data-scale-check-string={n.text}>
                     <td className="mono tabular">{n.text} <span className="text-muted-foreground">({m(n.value_m)})</span></td>
-                    <td className="mono tabular text-right">{n.drawnM != null ? m(n.drawnM) : '—'}</td>
-                    <td className="mono tabular text-right">{n.diffPct != null ? `${n.diffPct > 0 ? '+' : ''}${formatNumberLT(n.diffPct, 1)} %` : '—'}</td>
+                    <td className="mono tabular text-right" title={n.available ? undefined : 'Šiam nuskaitymui patikra negalima'}>{n.drawnM != null ? m(n.drawnM) : '—'}</td>
+                    <td className="mono tabular text-right">{n.diffPct != null ? pct(n.diffPct) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="mt-1 text-muted-foreground text-[11px] leading-snug">„Pagal mastelį" — kiek ilga to matmens nubrėžta linija pagal dabartinį mastelį.</div>
+            <div className="mt-1 text-muted-foreground text-[11px] leading-snug">„Pagal mastelį" — nupieštos linijos ilgis be brūkšnio storio × mastelis; „Skirtumas" — prieš užrašą.</div>
+            {readout.nearest.some((n) => !n.available) && (
+              <div className="mt-1 text-[11px] leading-snug text-foreground" data-testid="scale-check-unavailable">
+                Šiam brėžinio nuskaitymui patikra negalima: jame neišsaugotas linijų ilgis. Perskaitykite brėžinį iš naujo (nemokamai) ir patikra veiks.
+              </div>
+            )}
           </>
         ) : (
           <div className="text-muted-foreground text-[11.5px] leading-snug">Šiame lape programa nerado užrašytų matmenų, su kuriais būtų galima palyginti — palyginkite su matmeniu, kurį matote brėžinyje.</div>

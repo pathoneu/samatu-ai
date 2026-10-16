@@ -185,7 +185,7 @@ def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
             line_pct = [[round(x / W, 5), round(y / H, 5)] for x, y in ends]
         by_base.setdefault(b, []).append({"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "horiz": horiz,
                                           "s0": min(s0, s1), "s1": max(s0, s1), "pos": t["k"] * lp + across,
-                                          "line_pct": line_pct})
+                                          "line_pct": line_pct, "ilgis_pt": d.get("ilgis_pt")})
     return by_base
 
 
@@ -203,7 +203,8 @@ def _slanted_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
         W, H = float(d.get("page_width") or 0), float(d.get("page_height") or 0)
         line_pct = [[round(float(x) / W, 5), round(float(y) / H, 5)] for x, y in line] if W > 0 and H > 0 else None
         by_base.setdefault(base_page(alignment, p), []).append(
-            {"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "a": ends[0], "b": ends[1], "line_pct": line_pct})
+            {"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "a": ends[0], "b": ends[1], "line_pct": line_pct,
+             "ilgis_pt": d.get("ilgis_pt")})
     return by_base
 
 
@@ -332,6 +333,36 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
     return None
 
 
+EVIDENCE_MATCH = 0.002   # page fraction: an eilutė's line ends and the fresh string's agree within this
+
+
+def _refresh_evidence(room: dict, by_base: dict[int, list[dict]], slanted_by_base: dict[int, list[dict]]) -> None:
+    """A room whose perimeter is kept (KEEP) keeps it — a re-read never moves a billed number — but the
+    record of the strings its walls were added up from may learn what the fresh strings carry: each
+    `_sienos[].eilutes[]` entry takes `ilgis_pt` from the fresh string on the same page with the same
+    text whose line ends agree within EVIDENCE_MATCH. No match → the entry stays as it is. Nothing
+    else on the room is touched (LANE_VERSION 12)."""
+    walls = room.get("_sienos")
+    if not isinstance(walls, list):
+        return
+    fresh = [s for group in (by_base, slanted_by_base) for strings in group.values() for s in strings
+             if s.get("ilgis_pt") is not None and s.get("line_pct")]
+
+    def same(a, b) -> bool:
+        return all(abs(float(a[i][j]) - float(b[i][j])) <= EVIDENCE_MATCH for i in (0, 1) for j in (0, 1))
+
+    for wall in walls:
+        for e in (wall.get("eilutes") or []) if isinstance(wall, dict) else []:
+            line = e.get("line_pct") if isinstance(e, dict) else None
+            if not line or len(line) != 2:
+                continue
+            for s in fresh:
+                if s["page"] == e.get("page") and str(s["text"]) == str(e.get("text")) and (
+                        same(line, s["line_pct"]) or same(line, s["line_pct"][::-1])):
+                    e["ilgis_pt"] = s["ilgis_pt"]
+                    break
+
+
 def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict, scale_by_page: dict[int, float],
                    page_sizes: dict[int, tuple[float, float]] | None = None) -> dict:
     summary: dict[str, list[str]] = {"stated": [], "blank": [], "skipped": []}
@@ -340,6 +371,7 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
     for room in rooms:
         nr = str(room.get("nr") or "")
         if room.get("perimetras_saltinis") in KEEP and room.get("perimetras_m"):
+            _refresh_evidence(room, by_base, slanted_by_base)
             summary["skipped"].append(nr)
             continue
         poly_pct = room.get("polygon_pct")
@@ -405,7 +437,8 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                                  [round(edge[1][0] / W, 5), round(edge[1][1] / H, 5)]],
                     "ilgis_m": round(length, 3) if length is not None else None,
                     "saltinis": "eilute" if row else None,
-                    "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"]}
+                    "eilutes": [{"text": s["text"], "value_m": s["value_m"], "page": s["page"], "line_pct": s["line_pct"],
+                                 "ilgis_pt": s.get("ilgis_pt")}
                                 for s in (row or [])],
                     "kontrole_m": control, "istriza": horiz is None, "_frame": (horiz, e0, e1)}
             if parts:

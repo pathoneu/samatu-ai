@@ -74,3 +74,12 @@ test('plural: matmuo / matmenys / matmenų', () => {
   assert.deepEqual([1, 2, 9, 10, 11, 12, 20, 21, 22, 46, 111].map(f),
     ['matmuo', 'matmenys', 'matmenys', 'matmenų', 'matmenų', 'matmenų', 'matmenų', 'matmuo', 'matmenys', 'matmenys', 'matmenų']);
 });
+
+test('dimensionStringsOf carries ilgis_pt when the read stored it, and leaves it out otherwise', () => {
+  const s = dimensionStringsOf({ v8_rooms: [{ _sienos: [{ eilutes: [
+    { ...eil('3000', 1), ilgis_pt: 73.8 },
+    { ...eil('1200', 1, 0.5) },
+  ] }] }] });
+  assert.equal(s[1][0].ilgis_pt, 73.8);
+  assert.equal('ilgis_pt' in s[1][1], false);
+});

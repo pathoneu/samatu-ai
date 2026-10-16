@@ -16,9 +16,9 @@ import { scaleState, scaleSourceText } from './scaleLabel.js';
 const roomsOf = (project) => project?.v8_rooms || project?.patalpos || [];
 
 /**
- * `{page: [{text, value_m, line_pct}]}` — the dimension strings the geometry lane added into the rooms' walls
+ * `{page: [{text, value_m, line_pct, ilgis_pt?}]}` — the dimension strings the geometry lane added into the rooms' walls
  * (`room._sienos[].eilutes[]`, each with its own sheet and its drawn dimension line in display-space page
- * fractions). Deduplicated: two rooms sharing a wall carry the same string. The pair lane's
+ * fractions; `ilgis_pt` = the drawn line's length less its stroke, stored since 2026-10-16). Deduplicated: two rooms sharing a wall carry the same string. The pair lane's
  * `_perimetras_matmenys` keeps only text boxes, not lines, so it is not used here.
  */
 export function dimensionStringsOf(project) {
@@ -34,7 +34,8 @@ export function dimensionStringsOf(project) {
         const key = `${page}|${e.text}|${line.flat().map((n) => Number(n).toFixed(4)).join(',')}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        (out[page] ||= []).push({ text: String(e.text ?? ''), value_m: value, line_pct: line });
+        const ilgis = Number(e?.ilgis_pt);
+        (out[page] ||= []).push({ text: String(e.text ?? ''), value_m: value, line_pct: line, ...(ilgis > 0 ? { ilgis_pt: ilgis } : {}) });
       }
     }
   }
