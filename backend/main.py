@@ -1713,12 +1713,13 @@ async def api_log_correction(request: Request, project_id: str, payload: Correct
     user_filter = None if user.get("is_admin") else user["id"]
     if not db.get_project(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail="Project not found")
-    db.log_correction(
+    # One writer for every surface (togal-v2 W11): the same fix twice within 60 s is logged once.
+    written = db.log_correction_once(
         project_id=project_id, field_path=payload.field_path,
         old_value=payload.old_value, new_value=payload.new_value,
         source=payload.source, room_nr=payload.room_nr, note=payload.note,
     )
-    return {"status": "logged"}
+    return {"status": "logged"} if written else {"status": "logged", "duplicate": True}
 
 
 @app.get("/api/projects/{project_id}/corrections")

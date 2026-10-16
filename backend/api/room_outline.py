@@ -56,6 +56,29 @@ GEOMETRY_ROOM_KEYS = (
 )
 
 
+def _remembered(project_id: str, answer: dict, nr: str | None = None) -> dict:
+    """The learning journal (togal-v2 W11): every outline a person confirmed, drew, divided or merged is one
+    `corrections` row per room (source „konturas"), written HERE so every client path counts. The endpoints save
+    nothing to the project; the journal row says what the person did, the sheet lands the geometry. A failed
+    write never fails the answer."""
+    if not isinstance(answer, dict) or answer.get("status") != "ok":
+        return answer
+    rooms = answer.get("rooms") if isinstance(answer.get("rooms"), dict) else ({nr: answer["room"]} if nr and isinstance(answer.get("room"), dict) else {})
+    try:
+        import db as _db
+        for room_nr, r in rooms.items():
+            k = (r or {}).get("_konturas") or {}
+            _db.log_correction_once(
+                project_id=project_id, field_path=f"patalpa.{room_nr}.kontūras",
+                old_value={"plotas_m2": k.get("plotas_uzrasas_m2")},
+                new_value={"saltinis": k.get("saltinis"), "plotas_m2": k.get("plotas_m2"),
+                           "perimetras_m": k.get("perimetras_m"), "page": k.get("page")},
+                source="konturas", room_nr=str(room_nr))
+    except Exception as exc:  # noqa: BLE001 — the journal is never the outline
+        log.warning("outline journal write failed project=%s: %r", project_id, exc)
+    return answer
+
+
 class OutlineAt(BaseModel):
     page: int = Field(ge=1)
     x_pct: float = Field(ge=0.0, le=1.0)
@@ -185,7 +208,7 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             cut = propose_split(pdf_bytes, body.page, seats2, areas2, float(scale), (W, H), face_pct=union)
             if cut.get("status") == "ok":
                 if body.pritarta:
-                    return _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut)
+                    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut))
                 return {"status": "shared", "su": other, "page": body.page, "line_pct": cut["line_pct"], "pagal": cut["pagal"],
                         "rooms": {nr: {**part, "plotas_uzrasas_m2": areas2.get(nr)} for nr, part in cut["rooms"].items()}}
         return hit
@@ -209,12 +232,12 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             room.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
 
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }
+    }, _nr(room))
 
 
 def _ring_of(raw: list[list[float]], what: str) -> list[tuple[float, float]]:
@@ -326,12 +349,12 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale)
     apply_geometry(parsed, pdf_bytes, dims)
     _drawn_perimeter_if_unread(room, perimetras)
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }
+    }, _nr(room))
 
 
 @router.post("/{project_id}/rooms/{room_nr}/outline-merge")
@@ -371,13 +394,13 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     apply_geometry(parsed, pdf_bytes, dims)
     absorb(gone)            # whatever the lane made of a room with no outline today is not its geometry: it is merged
     _drawn_perimeter_if_unread(kept, perimetras)
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
         "neskaiciuoti": [gone_nr],
-    }
+    })
 
 
 def _joined_with(pdf_bytes: bytes, *, page: int, rooms: list[dict], room: dict, other_nr: str, lay, scale: float,
@@ -481,7 +504,7 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
                       areas, scale, (W, H), face_pct=face)
     if hit["status"] != "ok":
         return hit
-    return _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit)
+    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit))
 
 
 @router.post("/{project_id}/rooms/{room_nr}/split-proposal")
