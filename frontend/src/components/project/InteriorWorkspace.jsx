@@ -485,6 +485,7 @@ export default function InteriorWorkspace({
               initialMeasurements={project?.measurements || []}
               initialMeasureScales={project?.pageScalesDurable || {}}
               laneScales={laneScales}
+              project={project}
               initialCountTypes={project?.countTypes || null}
               onMeasureDataChange={handleMeasureDataChange}
               onRoomZoneClick={(room) => {
