@@ -215,6 +215,9 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     openings read again — exactly what a click (`outline-at`) does, with the person's geometry instead of
     the wall solid's face. The printed area stays the room's area; the drawn one is shown beside it
     (`_konturas.plotas_m2`, `paklaida`). Saves nothing — the sheet patches the room and recomputes."""
+    # Ownership FIRST (tests/test_route_ownership_policy.py): a stranger's malformed ring must get the
+    # same 404 as a stranger's well-formed one — never a 400 that says the project exists.
+    _project_for(request, project_id)
     ring: list[tuple[float, float]] = []
     for pt in body.polygon_pct:
         if len(pt) != 2 or not all(0.0 <= float(v) <= 1.0 for v in pt):
