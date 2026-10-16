@@ -106,3 +106,96 @@ def test_a_scope_choice_on_the_absorbed_room_changes_nothing_and_on_the_kept_roo
     assert b["_neskaiciuoti_kodel"] == "sujungta" and scope.excluded_quantity(b, "walls_paintable_m2") == 0.0
     # a kept room he excluded himself is excluded the normal way: its share (a + b) is remembered
     assert a["_neskaiciuoti_kodel"] == "pasirinkimas" and scope.excluded_quantity(a, "walls_paintable_m2") == 40.0
+
+
+# ── anchors subtract a room he chose not to count, never a room merged into another (follow-up A) ──
+
+def test_the_ceiling_anchor_keeps_the_whole_table_total_when_a_room_is_absorbed():
+    from extractor import vision_call
+    a, b = _merged()
+    a["ceiling_paintable_m2"] = 21.0
+    scope.mark_rooms([a, b], None)
+    parsed = {"patalpos": [a, b], "_ceiling_anchor": {"total_area_m2": 21.0, "label": "Iš viso", "page": 1}}
+    meta = vision_call._ceiling_base_meta(parsed, [a], set(), 21.0)
+    assert meta["source"] == "anchor" and meta["base"] == 21.0 and meta["excluded_m2"] == 0.0
+    assert "neįtrauktos" not in meta["provenance"]
+
+
+def test_the_ceiling_anchor_still_loses_a_room_he_chose_not_to_count():
+    from extractor import vision_call
+    a, b = _rooms()
+    a["ceiling_paintable_m2"] = 12.0
+    scope.mark_rooms([a, b], {"patalpos_ne": ["02"]})
+    parsed = {"patalpos": [a, b], "_ceiling_anchor": {"total_area_m2": 21.0, "label": "Iš viso", "page": 1}}
+    meta = vision_call._ceiling_base_meta(parsed, [a], set(), 12.0)
+    assert meta["source"] == "anchor" and meta["base"] == 12.0 and meta["excluded_m2"] == 9.0
+
+
+def test_the_predicates():
+    a, b = _merged()
+    c = {"nr": "03", "plotas_m2": 5.0}
+    scope.mark_rooms([a, b, c], {"patalpos_ne": ["03"]})
+    assert scope.is_absorbed(b) and not scope.is_excluded_by_choice(b)
+    assert scope.is_excluded_by_choice(c) and not scope.is_absorbed(c)
+    assert not scope.is_absorbed(a) and not scope.is_excluded_by_choice(a)
+
+
+def test_an_anchored_ceiling_bills_the_table_total_through_a_merge(client):
+    anchor = {"total_area_m2": 21.0, "label": "Iš viso", "page": 1}
+    before = client.post("/recompute-interior", json={"patalpos": _rooms(), "_ceiling_anchor": anchor}).json()
+    after = client.post("/recompute-interior", json={"patalpos": list(_merged()), "_ceiling_anchor": anchor}).json()
+    q = lambda out: {r["aprasymas"]: r.get("kiekis") for r in out["darbu_sarasas"]}  # noqa: E731
+    assert _row(q(before), "Lubų glaistymas/dažymas") == pytest.approx(21.0, abs=0.01)
+    assert _row(q(after), "Lubų glaistymas/dažymas") == pytest.approx(21.0, abs=0.01)
+
+
+def _objektas_h():
+    import json
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[2] / "ground_truth" / "objektas_h" / "ai_extract.json"
+    if not p.is_file():
+        pytest.skip("objektas_h extract not on this machine")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def _merge_h(blob, kept_nr="04", gone_nr="05"):
+    """What outline-merge leaves on objektas_h's open-space pair 05 → 04. The two halves of one open space
+    meet along an imaginary line that neither outline counted, so the kept room's walls are both rooms'
+    walls (the route's `outline A + outline B − union` is 0 there)."""
+    rooms = {str(r["nr"]): r for r in blob["patalpos"]}
+    kept, gone = rooms[kept_nr], rooms[gone_nr]
+    kept["_plotas_pries_sujungima"] = kept["plotas_m2"]
+    kept["plotas_m2"] = round(kept["plotas_m2"] + gone["plotas_m2"], 2)
+    kept["plotas_saltinis"] = "eksplikacija_sujungta"
+    kept["perimetras_m"] = round(float(kept["perimetras_m"]) + float(gone["perimetras_m"]), 2)
+    kept["elementai"] = list(kept.get("elementai") or []) + [{**e, "_is_patalpos": gone_nr} for e in gone.get("elementai") or []]
+    gone["_elementai_pries_sujungima"], gone["elementai"] = gone.get("elementai") or [], []
+    gone["_sujungta_i"] = kept_nr
+    return blob
+
+
+def _q(out):
+    return {r["aprasymas"]: float(r.get("kiekis") or 0) for r in out["darbu_sarasas"]}
+
+
+def test_objektas_h_merge_05_into_04_keeps_the_ceiling_at_the_table_total_and_the_other_totals(client):
+    blob = _objektas_h()
+    body = lambda b: {"patalpos": b["patalpos"], "_ceiling_anchor": b.get("_ceiling_anchor"),  # noqa: E731
+                      "rules_override": {}}
+    q0 = _q(client.post("/recompute-interior", json=body(copy.deepcopy(blob))).json())
+    q1 = _q(client.post("/recompute-interior", json=body(_merge_h(copy.deepcopy(blob)))).json())
+    # the ceiling stays anchored on the table total (it was 107,77 before the anchor learnt „sujungta")
+    assert q0["Lubų glaistymas/dažymas"] == pytest.approx(143.27, abs=0.01)
+    assert q1["Lubų glaistymas/dažymas"] == pytest.approx(143.27, abs=0.01)
+    # floor: the same area is levelled and covered — the kept room's finish now covers the absorbed half
+    # („Visam plotui taikoma patalpos 04 apdaila"), so 35,5 m² move from laminate to kitchen floor tiles
+    assert q1["Grindų išlyginamasis sluoksnis"] == q0["Grindų išlyginamasis sluoksnis"] == pytest.approx(143.27, abs=0.01)
+    cover = ("Parketo / laminato klojimas", "Virtuvės grindų plytelių klijavimas", "Vonios grindų plytelių klijavimas",
+             "Kitų grindų plytelių klijavimas")
+    assert sum(q1.get(k, 0) for k in cover) == pytest.approx(sum(q0.get(k, 0) for k in cover), abs=0.02)
+    assert q1["Parketo / laminato klojimas"] - q0["Parketo / laminato klojimas"] == pytest.approx(-35.5, abs=0.02)
+    # walls: the halves of one open space share no wall, so the painted walls do not move
+    assert q1["Sienų glaistymas/dažymas"] == pytest.approx(q0["Sienų glaistymas/dažymas"], abs=0.02)
+    # doors and reveals: the absorbed room's openings are billed through the kept room
+    for k in ("Durų angų paruošimas beapvadinėms durims", "Angokraščių glaistymas-dažymas"):
+        assert q1[k] == pytest.approx(q0[k], abs=0.01), k

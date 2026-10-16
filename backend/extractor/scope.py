@@ -51,6 +51,7 @@ __all__ = [
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
     "excluded_quantity", "EXCLUDED_QUANTITIES_KEY", "MERGED_INTO_KEY", "MERGED_BECAUSE",
+    "is_absorbed", "is_excluded_by_choice",
     "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
@@ -293,6 +294,23 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
         if "grindys" in off:
             r["_grindjuosciu_praleista"] = "pasirinkimas"
     return marked
+
+
+def is_absorbed(room: dict) -> bool:
+    """A room merged into another („Sujungti"): `mark_rooms` takes it out with MERGED_BECAUSE.
+
+    Its area and openings are billed through the room it was merged into, so an anchor that subtracts
+    excluded rooms from a drawing total (ceiling base, walls / skirting / floor anchors) must skip it —
+    the kept room still bills its share. It still emits no rows of its own (`_neskaiciuoti` stays True)."""
+    return isinstance(room, dict) and room.get("_neskaiciuoti_kodel") == MERGED_BECAUSE
+
+
+def is_excluded_by_choice(room: dict) -> bool:
+    """A room he chose not to count: out of every row AND subtracted from a drawing total, as before.
+
+    An absorbed room (`is_absorbed`) is out of every row too, but is NOT subtracted: its area and openings
+    are billed through the room it was merged into."""
+    return isinstance(room, dict) and bool(room.get("_neskaiciuoti")) and not is_absorbed(room)
 
 
 def rooms_in_scope(rooms: Iterable[dict] | None) -> list[dict]:

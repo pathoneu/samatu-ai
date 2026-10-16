@@ -2391,7 +2391,7 @@ def _walls_base_meta(parsed: dict, rooms: list[dict], per_room_sum: float) -> di
     excluded_m2 = round(sum(_scope.excluded_quantity(r, "walls_paintable_m2")
                             for r in (parsed.get("patalpos") or [])
                             if isinstance(r, dict)
-                            and (r.get("_neskaiciuoti") or "apdaila" in (r.get("_neskaiciuoti_sritys") or []))), 2)
+                            and (_scope.is_excluded_by_choice(r) or "apdaila" in (r.get("_neskaiciuoti_sritys") or []))), 2)
     ours = round(total - excluded_m2, 2)
     if rooms_sum <= 0 or not (_WALLS_ANCHOR_MIN * rooms_sum <= ours <= _WALLS_ANCHOR_MAX * rooms_sum + 0.5):
         _warns = parsed.setdefault("warnings", [])
@@ -2588,10 +2588,11 @@ def _ceiling_base_meta(parsed: dict, rooms: list[dict], stretch_nrs: set[str],
         return _per_room(per_room_sum)
 
     # Rooms the contractor does not do (apimtis) are not in `rooms`; the table
-    # total still counts them, so take them off the anchor first.
+    # total still counts them, so take them off the anchor first. A room merged
+    # into another („Sujungti") is NOT taken off: the kept room bills its area.
     excluded_m2 = round(sum(float(r.get("plotas_m2") or 0)
                             for r in (parsed.get("patalpos") or [])
-                            if isinstance(r, dict) and r.get("_neskaiciuoti")), 2)
+                            if _scope.is_excluded_by_choice(r)), 2)
     total_all = total
     total = round(total - excluded_m2, 2)
     if total <= 0:
@@ -3969,7 +3970,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         parsed, "grindjuostes", reference=grindjuostes_raw,
         excluded=sum(_scope.excluded_quantity(r, "grindjuosciu_m") for r in _all_rooms
                      if isinstance(r, dict)
-                     and (r.get("_neskaiciuoti") or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
+                     and (_scope.is_excluded_by_choice(r) or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
     grindjuostes_total = round(_gj_meta["base"], 2)
     if grindjuostes_total > 0:
         # The ledger: every room's own metres, then one sum step.
@@ -4463,7 +4464,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             reference=round(sum(_tile_wall_base_m(r) for r in _tile_floor_rooms), 2),
             excluded=sum(_tile_wall_base_m(r) for r in _all_rooms
                          if isinstance(r, dict)
-                         and (r.get("_neskaiciuoti") or "plyteles" in (r.get("_neskaiciuoti_sritys") or []))
+                         and (_scope.is_excluded_by_choice(r) or "plyteles" in (r.get("_neskaiciuoti_sritys") or []))
                          and _scope.excluded_quantity(r, "plyteles_grindys_m2") > 0))
         if _pg_meta["source"] == "anchor":
             pozicijos.append(_ledger.attach(
@@ -4603,7 +4604,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         parsed, "laminatas", reference=pvc_grindys,
         excluded=sum(_scope.excluded_quantity(r, "pvc_grindys_m2") for r in _all_rooms
                      if isinstance(r, dict)
-                     and (r.get("_neskaiciuoti") or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
+                     and (_scope.is_excluded_by_choice(r) or "grindys" in (r.get("_neskaiciuoti_sritys") or []))))
     pvc_billed = round(_lam_meta["base"], 2)
     if pvc_billed > 0:
         _lam_contribs = [_ledger.contribution(r, round(float(r.get("pvc_grindys_m2") or 0), 2), "m2",
