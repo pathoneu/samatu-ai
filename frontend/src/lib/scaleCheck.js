@@ -32,8 +32,10 @@ function pointSegmentDist(p, a, b) {
 /**
  * `{lengthM, lengthPt, nearest}` for two clicks `a`, `b` (mediabox points) on a sheet of `pageSize` points at
  * `rotation`, with `scale` (a PageScale; uncalibrated → lengthM null) and `strings` (dimensionStringsOf for this
- * sheet). nearest[i] = {text, value_m, drawnM, diffPct, distPt}: the string as written, its value, what the
- * current scale makes of its drawn line (null without a scale) and the difference in % of the written value.
+ * sheet). nearest[i] = {text, value_m, available, drawnM, diffPct, distPt}: the string as written, its value,
+ * what the current scale makes of its drawn line — `ilgis_pt` (line less stroke width) × scale; null without a
+ * scale, and null with available = false when the stored read predates `ilgis_pt` — and the difference
+ * ilgis_pt × m_per_pt / value_m − 1 in %.
  */
 export function scaleCheckReadout({ a, b, scale, pageSize, rotation = 0, strings = [], count = 3 }) {
   if (!a || !b || !(pageSize?.width > 0) || !(pageSize?.height > 0)) return null;
@@ -48,11 +50,16 @@ export function scaleCheckReadout({ a, b, scale, pageSize, rotation = 0, strings
       const p1 = { x: x1 * D.W, y: y1 * D.H };
       const p2 = { x: x2 * D.W, y: y2 * D.H };
       const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-      const drawnPt = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const drawnM = mpp > 0 ? drawnPt * mpp : null;
+      // The string's drawn length as the lane measured it: the line less its stroke width (`ilgis_pt`).
+      // The raw span between the line's ends runs one stroke long (PDFium bounds include the caps:
+      // +1,00 pt per string on objektas_h, 4–6 % on short walls) — so a read without `ilgis_pt` is not
+      // checked at all rather than checked wrongly.
+      const ilgisPt = Number(s.ilgis_pt) > 0 ? Number(s.ilgis_pt) : null;
+      const drawnM = mpp > 0 && ilgisPt != null ? ilgisPt * mpp : null;
       return {
         text: s.text,
         value_m: s.value_m,
+        available: ilgisPt != null,
         drawnM,
         diffPct: drawnM != null ? ((drawnM - s.value_m) / s.value_m) * 100 : null,
         distPt: pointSegmentDist(mid, A, B),
