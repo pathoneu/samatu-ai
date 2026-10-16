@@ -65,7 +65,7 @@ Demo project with vector PDF, 11 rooms, 8 sheets: `http://localhost:<VITE_PORT>/
 ## Manager duties
 
 - **Viewer / UI / integration manager** (this session, "Togal.AI PDF to quantities pipeline"): owns `togal-v2`, briefs and reviews W1, W2, W4, W5, W6, W7, W8; merges after reading the diff, running lint/units/build and the backend files the worker touched; keeps this document current.
-- **Backend / calculation-input manager** ("Ciurliu dimension re-extraction"): owns everything under `backend/extractor/`, the geometry lanes, scale lanes and `api/free_reread.py`; briefs and reviews W3, W9, W10, W11; runs the eval gate on every merge that touches a lane.
+- **Backend / calculation-input manager** (session ref d39d76): owns everything under `backend/extractor/`, the geometry lanes, scale lanes and `api/free_reread.py`; briefs and reviews W3, W9, W10, W11; runs the eval gate on every merge that touches a lane.
 - Reviews ask: does it work on objektas_h in a browser; what did the tests prove; did any billed quantity move; is anything AI-seeded presented as read; does the UI say what it is unsure about.
 
 ## Review and merge protocol
@@ -80,4 +80,6 @@ Demo project with vector PDF, 11 rooms, 8 sheets: `http://localhost:<VITE_PORT>/
 - Totals: his billed lines **22,60 %** (a 6,21 · b 18,07 · c 36,29 · d 16,22 · g 56,83 · h 17,12); legacy totals MAE 15,44 %; gate OK. Run: `eval_runs/2026-10-16_11-49-56_multi_totals_only`.
 - Rows: within ±10 % corpus mean **26,1 %**, € share 34,7 % (a 37,7/32,4 · b 9,9/21,0 · c 22,2/12,1 · d 36,0/60,3 · g 30,0/55,6 · h 20,8/26,7); gate OK.
 
-Merge key: the viewer manager merges into togal-v2; the backend manager reviews and gates W3/W9/W10/W11 and signals „merge-ready". W3 review (backend manager): stage progress through an explicit `on_stage` callback on `geometry_lane.apply_geometry` (authorised, pass-through only), per-room landing for narrowed runs, a fixed honesty sentence in every job snapshot (the lane reads the whole drawing; the sheet only narrows what lands). Stage label for sheet alignment: „Planas".
+Merge key: the viewer manager merges into togal-v2; the backend manager reviews and gates W3/W9/W10/W11 and signals „merge-ready". W3 review (backend manager): stage progress through an explicit `on_stage` callback on `geometry_lane.apply_geometry` (authorised, pass-through only), per-room landing for narrowed runs, a fixed honesty sentence in every job snapshot (the lane reads the whole drawing; the sheet only narrows what lands). Detection stages follow the lane's real order, not Togal's: mastelis „Mastelis" → tekstas „Patalpos lape" (locate_rooms places the table's rooms on the sheets from the text layer) → planas „Planas" (align_sheets lays one plan's sheets over each other) → konturai „Kontūrai" → angos „Angos" (openings are read before the walls are summed) → sienos „Sienos" → grindys „Grindų dangos" → kiekiai „Kiekiai" (closed by the browser after /recompute-interior). No separate „Patalpos" stage.
+
+**Confidentiality:** `backend/.confidential-terms` is the founder's denylist; before every commit on togal-v2 run `git diff --cached | grep -i -n -F -f backend/.confidential-terms` and commit only when it prints nothing. Worker reports and session titles are not exempt.
