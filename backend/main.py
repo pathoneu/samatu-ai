@@ -414,6 +414,7 @@ from api.page_geometry import router as page_geometry_router
 from api.sheet_links import router as sheet_links_router
 from api.export_overlay_pdf import router as export_overlay_pdf_router
 from api.project_questions import router as project_questions_router
+from api.project_versions import router as project_versions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
 
 load_dotenv()
@@ -765,6 +766,7 @@ app.include_router(sheet_links_router)
 app.include_router(export_overlay_pdf_router)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
+app.include_router(project_versions_router)
 app.include_router(account_router)
 
 
@@ -1414,9 +1416,15 @@ def api_upsert_project(request: Request, project_id: str, payload: dict = Body(.
     base_updated_at = payload.pop("base_updated_at", None)
     if base_updated_at is not None and not isinstance(base_updated_at, str):
         base_updated_at = None
+    # Project versions (togal-v2 W10): what kind of save this is and an optional
+    # label — protocol fields too, popped so they never land in the blob.
+    version_source = payload.pop("_versija_saltinis", None)
+    version_name = payload.pop("_versija_pavadinimas", None)
     try:
         return db.upsert_project(project_id, payload, user_id=user["id"],
-                                 base_updated_at=base_updated_at)
+                                 base_updated_at=base_updated_at,
+                                 version_source=version_source if isinstance(version_source, str) else "issaugota",
+                                 version_name=version_name[:120] if isinstance(version_name, str) else None)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except db.ProjectConflictError as e:
