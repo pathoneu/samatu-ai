@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
-import { autoPageScalesFromRooms } from '@/lib/durableScale';
+import { effectivePageScales, pageScaleIn } from '@/lib/pageScales';
 import { exportCSVFile, exportJSONFile } from '@/lib/measureExport';
 import { buildMeasureExportDoc } from '@/lib/measureExportDoc';
 import { manualPricePatch } from '@/lib/applyPriceList';
@@ -34,6 +34,9 @@ import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
 import { cleanUserText } from '@/lib/userText';
+
+// A measurement on a sheet with no scale in force has no metres (the viewer's chip says why).
+const NO_SCALE = 'be mastelio';
 
 function fmt(v, d = 2) {
   if (v == null) return '—';
@@ -240,24 +243,22 @@ export default function WorkspacePanel({
   }, [projMeasurements, project.countTypes]);
   const measGeomRows = useMemo(() => {
     const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
-    // Same merge as the viewer: pages auto-calibrated from their traced rooms
-    // read real meters here too; a user calibration overrides.
-    const autoScales = autoPageScalesFromRooms(project.v8_rooms || project.patalpos || []);
+    // The viewer's own merge (lib/pageScales, 2026-10-16): the room areas, the drawing's dimension strings,
+    // then his calibration — a sheet whose scale the lane read shows metres here as it does in the viewer.
+    const scales = effectivePageScales(project);
     return projMeasurements
       .filter((m) => KIND_LT[m.kind])
       .map((m) => {
-        const scale = project.pageScalesDurable?.[m.page]
-          ?? project.pageScalesDurable?.[String(m.page)]
-          ?? autoScales[m.page] ?? null;
-        let display = 'nekalibruota';
-        if (scale) {
+        const scale = pageScaleIn(scales, m.page);
+        let display = NO_SCALE;
+        if (scale?.calibrated) {
           const { value } = measurementValue(m, scale);
           display = m.kind === 'area' ? `${fmt(value, 2)} m²` : `${fmt(value, 2)} m`;
         }
         // A name given in the viewer (right-click „Pervadinti", 2026-10-16) leads; the kind follows.
         return { id: m.id, label: m.name ? `${m.name} · ${KIND_LT[m.kind]}` : KIND_LT[m.kind], page: m.page, display };
       });
-  }, [projMeasurements, project.pageScalesDurable, project.v8_rooms, project.patalpos]);
+  }, [projMeasurements, project]);
 
   // Push a counted type into the estimate as a position row (kiekis = count,
   // price left for the user). Re-running updates the existing measurement row
@@ -714,7 +715,7 @@ export default function WorkspacePanel({
                 title={m.page ? `Rodyti brėžinyje (psl. ${m.page})` : undefined}
               >
                 <span className="flex-1 min-w-0 truncate text-muted-foreground">{m.label} · psl. {m.page}</span>
-                <span className={`font-mono tabular-nums ${m.display === 'nekalibruota' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                <span className={`font-mono tabular-nums ${m.display === NO_SCALE ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {m.display}
                 </span>
               </div>
