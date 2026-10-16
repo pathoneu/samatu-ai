@@ -22,7 +22,8 @@ import { useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check, CircleHelp, Loader2, MinusCircle, PenLine } from 'lucide-react';
 
-import { getProject, refreshProjectFromBackend } from '@/lib/projectStore';
+import { getProject, logCorrection, refreshProjectFromBackend } from '@/lib/projectStore';
+import { questionCorrection, questionVerdict } from '@/lib/learningEvents';
 import { useProjectFixes } from '@/lib/useProjectFixes';
 import {
   answerSummary, doorsAnswer, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
@@ -195,22 +196,30 @@ export default function PatikraQuestions() {
   }, [id, current?.id, current?.answer]);
 
   // ── answers ────────────────────────────────────────────────────────────────────────────────────────
+  // the learning journal (togal-v2 W11): „Tinka" = the program's proposal taken, otherwise his own answer
+  const remember = useCallback((question, payload, how, touched) => {
+    const ev = questionCorrection(question, questionVerdict(question, payload, how), touched);
+    if (ev && id) logCorrection(id, ev);
+  }, [id]);
+
   const answer = useCallback((question, built, send, landOptions = {}) => run(async () => {
     if (!built) return;
+    const { learn = null, ...opts } = landOptions;
     pilot('question_answer', { kind: 'question', id: question.kind });
     standAfter.current = { id: question.id, index: Math.max(0, questions.findIndex((q) => q.id === question.id)) };
     const result = await send(built);
+    remember(question, learn?.payload, learn?.how, built.touched);
     setAnswered((n) => n + 1);
     const summary = answerSummary(question, built, t);
-    await land(result, { ...landOptions, factKey: question.id, sameValue: Boolean(built.sameValue), summary });
-  }), [run, pilot, questions, land, t]);
+    await land(result, { ...opts, factKey: question.id, sameValue: Boolean(built.sameValue), summary });
+  }), [run, pilot, questions, land, t, remember]);
 
   // the way without a click: the wall length typed by hand goes down the perimeter's own write path
   const typeOutlineLength = useCallback((value) => {
     if (!current || !outlineItem) return;
     const nr = outlineItem.room_nr;
     const built = numbersAnswer(project, [{ room_nr: nr, field: 'perimetras_m', proposed: null }], { [nr]: value });
-    answer(current, built && { ...built, typed: true, value: Number(value) }, (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+    answer(current, built && { ...built, typed: true, value: Number(value) }, (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { how: 'own' } });
   }, [current, outlineItem, project, answer]);
 
   const onBodyAnswer = (payload) => {
@@ -218,19 +227,19 @@ export default function PatikraQuestions() {
     if (!q) return;
     if (q.answer === 'number_all') {
       answer(q, heightAnswer(project, q.items, payload.value, payload.perRoom),
-        (a) => saveAssumptionEdit(project, 'lubu_auksciai', a.table));
+        (a) => saveAssumptionEdit(project, 'lubu_auksciai', a.table), { learn: { payload } });
     } else if (q.answer === 'numbers') {
-      answer(q, numbersAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+      answer(q, numbersAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
     } else if (q.answer === 'choices' && q.kind === 'apdaila') {
-      answer(q, wallsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'walls_paint_override', a.table));
+      answer(q, wallsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'walls_paint_override', a.table), { learn: { payload } });
     } else if (q.answer === 'choices' && q.kind === 'durys') {
       // one choice for the whole project — the frameless-door assumption, down the Prielaidos write path
       // „su apvadais" takes the frameless-door row away on purpose — not an orphan to carry back
-      answer(q, doorsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'vidaus_durys_beapvadines', a.value), { scopeChange: true });
+      answer(q, doorsAnswer(project, q.items, payload.values), (a) => saveAssumptionEdit(project, 'vidaus_durys_beapvadines', a.value), { scopeChange: true, learn: { payload } });
     } else if (q.answer === 'choices') {
-      answer(q, floorAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+      answer(q, floorAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
     } else if (q.answer === 'openings') {
-      answer(q, openingsAnswer(project, q.items, payload.picked, payload.edits), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true });
+      answer(q, openingsAnswer(project, q.items, payload.picked, payload.edits), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
     }
   };
 
@@ -258,6 +267,7 @@ export default function PatikraQuestions() {
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
     const touched = joined ? Object.keys(found.rooms || {}) : [nr];
+    // the server's „konturas" row (outline-at, with this question's id) is this answer's journal record
     await land(await saveRoomEdit(project, rooms), {
       fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched, accepted, joined }, t),
     });
@@ -265,13 +275,13 @@ export default function PatikraQuestions() {
 
   const pickOutline = useCallback((point) => run(async () => {
     if (!point || !current || !outlineItem) return;
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point), { point });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { klausimas: current.id }), { point });
   }), [run, current, outlineItem, id, landOutline]);
 
   // „Tinka" on the boundary proposed after a click in the neighbour's room: the same click, labelled
   const acceptJoin = useCallback(() => run(async () => {
     if (!current || !outlineItem || !join?.point) return;
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, join.point, { pritarta: true }), { accepted: true });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, join.point, { pritarta: true, klausimas: current.id }), { accepted: true });
   }), [run, current, outlineItem, id, join, landOutline]);
 
   // „Nubrėšiu pats" after such a click: two clicks cut the JOINED space along his line
@@ -280,7 +290,7 @@ export default function PatikraQuestions() {
     setSplitFirst(first);
     if (!request || !current || !outlineItem || !join?.su) return;
     run(async () => {
-      const found = await fetchSplitSpace(id, outlineItem.room_nr, { ...request, su: join.su });
+      const found = await fetchSplitSpace(id, outlineItem.room_nr, { ...request, su: join.su }, { klausimas: current.id });
       const rooms = roomsWithSplit(project, found);
       if (!rooms) {
         const { key, params } = splitFailureKey(found);
@@ -293,6 +303,7 @@ export default function PatikraQuestions() {
       pilot('question_answer', { kind: 'question', id: current.kind });
       standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
       setAnswered((n) => n + 1);
+      // recorded by the server's „konturas" rows (split-space, with this question's id)
       await land(await saveRoomEdit(project, rooms), {
         fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: Object.keys(found.rooms || {}), joined: true }, t),
       });
@@ -304,10 +315,10 @@ export default function PatikraQuestions() {
     const cand = outlineItem?.proposed_outline;
     if (!current || !outlineItem || !Array.isArray(cand?.taskas_pct)) return;
     const point = { page: cand.page, x_pct: cand.taskas_pct[0], y_pct: cand.taskas_pct[1] };
-    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { pritarta: true }), { accepted: true });
+    await landOutline(outlineItem.room_nr, await fetchOutlineAt(id, outlineItem.room_nr, point, { pritarta: true, klausimas: current.id }), { accepted: true });
   }), [run, current, outlineItem, id, landOutline]);
 
-  const landSplit = useCallback(async (found) => {
+  const landSplit = useCallback(async (found, how = 'own') => {
     const rooms = roomsWithSplit(project, found);
     if (!rooms) {
       const { key, params } = splitFailureKey(found);
@@ -318,16 +329,20 @@ export default function PatikraQuestions() {
     pilot('question_answer', { kind: 'question', id: 'erdve' });
     standAfter.current = { id: current.id, index: Math.max(0, questions.findIndex((q) => q.id === current.id)) };
     setAnswered((n) => n + 1);
-    await land(await saveRoomEdit(project, rooms), {
+    const saved = await saveRoomEdit(project, rooms);
+    // a line he drew went through split-space, whose „konturas" rows are the record; the program's proposal
+    // (split-proposal) wrote nothing on the server, so its „Tinka" is recorded here — one act, one row
+    if (how === 'accepted') remember(current, null, how, Object.keys(found.rooms || {}));
+    await land(saved, {
       fromInterior: true, factKey: current.id, summary: answerSummary(current, { touched: Object.keys(found.rooms || {}) }, t),
     });
-  }, [project, current, questions, land, pilot, t]);
+  }, [project, current, questions, land, pilot, t, remember]);
 
   const pickSplit = useCallback((point) => {
     const { first, request } = nextSplitClick(splitFirst, point);
     setSplitFirst(first);
     if (!request || !current) return;
-    run(async () => { await landSplit(await fetchSplitSpace(id, current.items[0].room_nr, request)); });
+    run(async () => { await landSplit(await fetchSplitSpace(id, current.items[0].room_nr, request, { klausimas: current.id })); });
   }, [splitFirst, current, run, landSplit, id]);
 
   const skip = useCallback(() => {
@@ -378,6 +393,7 @@ export default function PatikraQuestions() {
       <StepBar
         step="patikra"
         hasPdf
+        projectId={id}
         setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
       />
 
@@ -566,7 +582,7 @@ export default function PatikraQuestions() {
                             {t(proposed.pagal === 'kampas' ? 'project.questions.splitByCorner' : 'project.questions.splitByAreas')}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={() => run(() => landSplit(proposed))}>
+                            <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={() => run(() => landSplit(proposed, 'accepted'))}>
                               <Check className="h-4 w-4" aria-hidden="true" />
                               {t('project.questions.accept')}
                             </button>

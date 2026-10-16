@@ -27,6 +27,7 @@ import auth as _auth
 import db as _db
 import page_raster_cache as _pdf_cache
 
+import logging
 import time
 
 import pypdfium2 as pdfium
@@ -399,4 +400,14 @@ def record_decision(
             "source": body.source,
         },
     )
+    # The learning journal (togal-v2 W11): the same decision is one `corrections` row too, so „Įsiminta" and the
+    # per-project journal count it. The crop above is the training sample; this row is what the person did.
+    try:
+        _db.log_correction_once(
+            project_id=body.project_id, field_path=f"simbolis.{body.page_idx + 1}.{body.klass}",
+            old_value={"pasitikejimas": body.confidence} if body.confidence is not None else None,
+            new_value={"sprendimas": body.decision, "langas": [x, y, w, h], "dpi": body.dpi},
+            source="simbolis", note=body.source)
+    except Exception as exc:  # noqa: BLE001 — the journal never fails the recorded crop
+        logging.getLogger("samatu.cv_tools").warning("symbol journal write failed project=%s: %r", body.project_id, exc)
     return {"status": "ok"}

@@ -41,6 +41,7 @@ import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
+import AiChat from '@/components/project/AiChat';
 
 // Outlines that must never be re-detected over. The last two are traced by the
 // BACKEND during extraction (wall_outline.py, vector_rooms.py): before
@@ -182,6 +183,9 @@ export default function InteriorWorkspace({
   // Right panel tab (Togal-v2 capability B): 'patalpos' = WorkspacePanel as before, 'kiekiai' = the
   // Quantities Panel. Both stay mounted while hidden so their filters / folds survive a switch.
   const [rightTab, setRightTab] = useState('patalpos');
+  // „Pokalbis" (togal-v2 W11): the line selected in Kiekiai is offered to the chat; „Pridėti į pokalbį" adds one.
+  const [kiekiaiActiveRow, setKiekiaiActiveRow] = useState(null);
+  const [chatAddRequest, setChatAddRequest] = useState(null);
   // Open on the first PLAN page. Page 1 of a real interior set is a marketing
   // render whose scale reads „nekalibruotas"; the plan on page 2 auto-seeds its
   // own scale. Landing on the cover asks the contractor to work out that the
@@ -707,7 +711,7 @@ export default function InteriorWorkspace({
         className="overflow-hidden flex flex-col"
       >
         <div role="tablist" aria-label="Dešinysis skydelis" className="shrink-0 flex border-b border-border bg-card">
-          {[['patalpos', 'Patalpos ir eilutės'], ['kiekiai', 'Kiekiai']].map(([key, label]) => (
+          {[['patalpos', 'Patalpos ir eilutės'], ['kiekiai', 'Kiekiai'], ['pokalbis', 'Pokalbis']].map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -738,7 +742,20 @@ export default function InteriorWorkspace({
               onIsolateRooms={handleIsolateRooms}
               onRoomRowHover={setHoveredRoomNr}
               onOpenAssumptions={onOpenAssumptions ? () => onOpenAssumptions() : null}
+              onActiveRowChange={setKiekiaiActiveRow}
+              onAddToChat={(what) => {
+                setChatAddRequest({ ...what, nonce: Date.now() });
+                setRightTab('pokalbis');
+              }}
             />
+        </div>
+        <div className={rightTab === 'pokalbis' ? 'flex-1 min-h-0' : 'hidden'}>
+          <AiChat
+            project={project}
+            focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+            activeRow={kiekiaiActiveRow}
+            addRequest={chatAddRequest}
+          />
         </div>
         <div className={rightTab === 'patalpos' ? 'flex-1 min-h-0' : 'hidden'}>
         <WorkspacePanel

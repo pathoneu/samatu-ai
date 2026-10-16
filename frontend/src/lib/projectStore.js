@@ -19,6 +19,7 @@
 // (the unit tests below import it directly, without the vite resolver).
 import { API_BASE as API } from './apiBase.js';
 import { toast } from 'sonner';
+import { learningEventsFromChange } from './learningEvents.js';
 
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
@@ -735,9 +736,13 @@ export function updateProject(id, updates, opts) {
       { id: 'projectstore-missing' });
     return null;
   }
+  const before = projects[idx];
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
   // THE hot path — debounced. Everything else in this module saves immediately.
   _scheduleSave(projects, id, opts?.versionSource ? { versionSource: opts.versionSource } : undefined);
+  // The learning journal (togal-v2 W11): every surface saves through here, so a row „Teisinga", a typed
+  // quantity or a room „patvirtinta" is recorded whichever table or rail it was made in.
+  for (const payload of learningEventsFromChange(before, projects[idx])) logCorrection(id, payload);
   return projects[idx];
 }
 
@@ -984,6 +989,9 @@ export function markRoomVerified(projectId, roomNr) {
 
 // ── Correction audit log (Phase 12.3 learning loop foundation) ────────────────
 
+/** Fired on `window` after a correction row is stored: `{projectId, source}`. */
+export const LEARNING_EVENT = 'samatu:learning-logged';
+
 export function logCorrection(projectId, payload) {
   if (!projectId || !payload?.field_path) return Promise.resolve(false);
   return fetch(`${API}/api/projects/${projectId}/corrections`, {
@@ -992,11 +1000,22 @@ export function logCorrection(projectId, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-    .then(res => res.ok)
+    .then((res) => {
+      // „Įsiminta" and the journal re-read the log when a row lands
+      if (res.ok && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(LEARNING_EVENT, { detail: { projectId, source: payload.source } }));
+      }
+      return res.ok;
+    })
     .catch((e) => {
       console.warn('[projectStore] correction log failed:', e);
       return false;
     });
+}
+
+/** The project's correction corpus as a CSV download (togal-v2 W11): laikas, patalpa, laukas, buvo, tapo, saltinis, pastaba. */
+export function correctionsCsvUrl(projectId) {
+  return projectId ? `${API}/api/projects/${encodeURIComponent(projectId)}/corrections.csv` : null;
 }
 
 /**

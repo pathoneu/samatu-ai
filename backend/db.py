@@ -15,6 +15,7 @@ No auth yet — single-tenant. When auth lands, add user_id to projects.
 """
 from __future__ import annotations
 
+import calendar
 import json
 import logging
 import os
@@ -870,6 +871,49 @@ def log_correction(project_id: str, field_path: str,
             json.dumps(new_value, ensure_ascii=False) if new_value is not None else None,
             source, note, _now_iso(),
         ))
+
+
+# The same fix arriving twice within this window is one fix: a double click, a
+# client that logs and a server hook that logs the same outline, a retried POST.
+CORRECTION_DEDUP_SECONDS = 60
+
+
+def log_correction_once(project_id: str, field_path: str,
+                        old_value: Any, new_value: Any,
+                        source: str = "inline_edit",
+                        room_nr: str | None = None,
+                        note: str | None = None) -> bool:
+    """THE writer of the learning journal (togal-v2 W11): every accept, reject
+    or edit of an AI result comes through here — the POST route and the server
+    hooks in api/room_outline.py and api/cv_tools.py.
+
+    Idempotent: when a row with the same project, `field_path` and exactly the
+    same `new_value` JSON was written in the last CORRECTION_DEDUP_SECONDS, nothing
+    is written and False is returned. True when a row was written."""
+    new_json = json.dumps(new_value, ensure_ascii=False) if new_value is not None else None
+    now = _now_iso()
+    cutoff = time.strftime(
+        "%Y-%m-%dT%H:%M:%SZ",
+        time.gmtime(calendar.timegm(time.strptime(now, "%Y-%m-%dT%H:%M:%SZ")) - CORRECTION_DEDUP_SECONDS))
+    with _conn() as c:
+        dup = c.execute("""
+            SELECT 1 FROM corrections
+             WHERE project_id = ? AND field_path = ? AND new_value IS ? AND occurred_at >= ?
+             LIMIT 1
+        """, (project_id, field_path, new_json, cutoff)).fetchone()
+        if dup:
+            return False
+        c.execute("""
+            INSERT INTO corrections
+                (project_id, room_nr, field_path, old_value, new_value,
+                 source, note, occurred_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            project_id, room_nr, field_path,
+            json.dumps(old_value, ensure_ascii=False) if old_value is not None else None,
+            new_json, source, note, now,
+        ))
+    return True
 
 
 def list_corrections(project_id: str | None = None, limit: int = 500) -> list[dict]:

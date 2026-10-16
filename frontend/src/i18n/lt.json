@@ -1417,6 +1417,8 @@
       "why": "kodėl toks skaičius?",
       "learned": "Įsiminta mokymui — pataisymas Nr. {{count}} šiame projekte",
       "log": "Mokymosi žurnalas ({{count}})",
+      "remembered": "Įsiminta: {{count}} · Mokymosi žurnalas",
+      "logCsv": "Atsisiųsti visą žurnalą (CSV)",
       "logTitle": "Šio projekto pataisymai, naujausi viršuje. Įrašyta pas jus.",
       "rippleTitle": "Pataisyta: {{label}}",
       "rippleRows_one": "Perskaičiuota: {{count}} eilutė",

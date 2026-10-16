@@ -1721,21 +1721,43 @@ async def api_log_correction(request: Request, project_id: str, payload: Correct
     user_filter = None if user.get("is_admin") else user["id"]
     if not db.get_project(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail="Project not found")
-    db.log_correction(
+    # One writer for every surface (togal-v2 W11): the same fix twice within 60 s is logged once.
+    written = db.log_correction_once(
         project_id=project_id, field_path=payload.field_path,
         old_value=payload.old_value, new_value=payload.new_value,
         source=payload.source, room_nr=payload.room_nr, note=payload.note,
     )
-    return {"status": "logged"}
+    return {"status": "logged"} if written else {"status": "logged", "duplicate": True}
 
 
 @app.get("/api/projects/{project_id}/corrections")
 async def api_list_corrections(request: Request, project_id: str, limit: int = 500):
     user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
+    project = db.get_project(project_id, user_id=user_filter)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    # Each row with its journal sentence (togal-v2 W11): the „Mokymosi žurnalas" says what he did, in his words.
+    from api.learning_journal import journal
+    return {"corrections": journal(project, db.list_corrections(project_id, limit=limit))}
+
+
+@app.get("/api/projects/{project_id}/corrections.csv")
+async def api_corrections_csv(request: Request, project_id: str):
+    """The project's correction corpus as CSV (togal-v2 W11): laikas, patalpa, laukas, buvo, tapo, saltinis,
+    pastaba — UTF-8 with a BOM. Same owner gate as the list."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
     if not db.get_project(project_id, user_id=user_filter):
         raise HTTPException(status_code=404, detail="Project not found")
-    return {"corrections": db.list_corrections(project_id, limit=limit)}
+    from api.learning_journal import corrections_csv
+    body = corrections_csv(db.list_corrections(project_id, limit=100_000))
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", project_id)[:64] or "projektas"
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="mokymosi-zurnalas-{safe_id}.csv"'},
+    )
 
 
 @app.get("/api/projects/{project_id}/extractions")
@@ -7856,6 +7878,25 @@ lubų aukščio, kiekio ar kainos, nieko eksportuoti ar išsaugoti. Jei vartotoj
 liepia ką nors padaryti — vienu sakiniu pasakyk, kad pakeitimus atlieka pats
 vartotojas programoje, ir iš karto duok numeruotus žingsnius su tikrais mygtukų
 pavadinimais. Neatsiprašinėk ilgai ir nekartok to paties.
+Jei manai, kad kuris nors kiekis turėtų būti kitas, pasakyk kodėl ir kiek, bet
+pridurk, kad pakeisti jį reikia pačiam žingsnyje „Sąmata" — pokalbis kiekių
+nekeičia.
+
+═══ PASIRINKTOS PATALPOS IR EILUTĖS ═══
+Kartais paskutinis vartotojo pranešimas prasideda bloku „PASIRINKTA" — tai
+patalpos ir sąmatos eilutės, kurias vartotojas pažymėjo, su tuo, ką programa apie
+jas perskaitė (plotas, perimetras, aukštis, apdaila, angos, grindys su sakiniu,
+iš kur paimta) ir kaip suskaičiuota kiekviena eilutė (iš kurių patalpų, kas
+neįtraukta, eiga). Tada:
+- Atsakyk PIRMIAUSIA apie pažymėtas patalpas ir eilutes, o po bloko einantį
+  klausimą („KLAUSIMAS:") suprask kaip klausimą apie jas („šiose patalpose" =
+  pažymėtose).
+- Cituok bloke pateiktus skaičius su vienetais ir pasakyk, iš kur jie
+  (pvz. „pagal eksplikaciją", „vartotojo įrašytas", „prielaida"). Kai sudedi
+  kelias reikšmes, parodyk trumpą sudėtį (iki 6 dėmenų).
+- Jei reikiamo skaičiaus bloke nėra, imk jį iš projekto duomenų ir pasakyk, kad
+  jis ne iš pažymėtų; jei nėra ir ten — pasakyk, kad tokio duomens nėra.
+- Jei blokas sako, kad dalis pažymėtų neįtraukta ar nerasta, pasakyk tai.
 """
 
 
@@ -7902,6 +7943,10 @@ async def chat_project(request: Request, payload: dict = Body(...)):
 
     grounded_ctx = _build_chat_context(full_project)
     ctx_json = json.dumps(grounded_ctx, ensure_ascii=False, indent=2)
+    # The rooms and rows he selected (togal-v2 W11): built from the read facts and the row ledgers, placed in
+    # the LAST user turn — after both cache breakpoints, so a new selection never re-sends the project.
+    from api.chat_selection import build_chat_selection
+    selection_text, given = build_chat_selection(full_project, payload.get("selection"))
 
     # Build messages: project context as first user turn, then prior history,
     # then current question. The context block carries cache_control: without
@@ -7925,6 +7970,8 @@ async def chat_project(request: Request, payload: dict = Body(...)):
             messages.append({"role": m["role"], "content": str(m["content"])})
     if question:
         messages.append({"role": "user", "content": question})
+    if selection_text and len(messages) > 2 and messages[-1]["role"] == "user":
+        messages[-1] = {"role": "user", "content": f"{selection_text}\n\nKLAUSIMAS: {messages[-1]['content']}"}
 
     log.info("chat: user=%s project=%s history_len=%d ctx_size=%dKB",
              user["id"], project_id or "(passed)", len(history), len(ctx_json) // 1024)
@@ -7971,7 +8018,7 @@ async def chat_project(request: Request, payload: dict = Body(...)):
             db.record_usage(user.get("id"), resp_like, kind="chat")
         except Exception as _exc:
             log.warning("record_usage failed (chat): %r", _exc)
-        return {"status": "ok", "answer": text}
+        return {"status": "ok", "answer": text, "given": given}
     except Exception:
         # Log the detail server-side, but never return the raw exception to the
         # client — it leaks the provider/model/error internals into the chat

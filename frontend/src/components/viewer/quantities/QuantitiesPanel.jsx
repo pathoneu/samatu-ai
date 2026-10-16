@@ -46,6 +46,8 @@ export default function QuantitiesPanel({
   onIsolateRooms = null,
   onRoomRowHover = null,
   onOpenAssumptions = null,
+  onActiveRowChange = null,   // (row | null) — the line under the cursor, offered to „Pokalbis"
+  onAddToChat = null,         // ({kind: 'row', row} | {kind: 'room', nr}) — „Pridėti į pokalbį"
 }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('');
@@ -61,6 +63,8 @@ export default function QuantitiesPanel({
     [project?.darbu_sarasas, rooms, filter, sort, hiddenRoomNrs],
   );
   const familyByKey = useMemo(() => new Map(tree.families.map((f) => [f.key, f])), [tree]);
+  const activeRow = familyByKey.get(String(activeKey || '').split('/')[0])?.row || null;
+  useEffect(() => { onActiveRowChange?.(activeRow); }, [activeRow, onActiveRowChange]);
   const focusedNr = focusedRoomNr != null ? String(focusedRoomNr) : null;
   const focusedFamilies = useMemo(() => new Set(familiesWithRoom(tree, focusedNr)), [tree, focusedNr]);
   // „N eil." under the selected room counts every line it is in, not only the ones the filter shows.
@@ -326,6 +330,15 @@ export default function QuantitiesPanel({
                 {menuTarget.room ? 'Atidaryti patikros lapą' : 'Atidaryti patikrą'}
               </ContextMenuItem>
               <ContextMenuItem onSelect={recompute}>Perskaičiuoti</ContextMenuItem>
+              {onAddToChat && (
+                <ContextMenuItem
+                  onSelect={() => onAddToChat(menuTarget.room
+                    ? { kind: 'room', nr: menuTarget.room.nr }
+                    : { kind: 'row', row: menuTarget.family.row })}
+                >
+                  {menuTarget.room ? 'Klausti pokalbyje apie šią patalpą' : 'Klausti pokalbyje apie šią eilutę'}
+                </ContextMenuItem>
+              )}
               <ContextMenuSeparator />
               <ContextMenuItem onSelect={() => onOpenAssumptions?.()} disabled={!onOpenAssumptions}>
                 Keisti nustatymus…

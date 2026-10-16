@@ -17,6 +17,7 @@ import RoomsGrid from '@/components/project/RoomsGrid';
 import ScaleInfoBanner from '@/components/project/ScaleInfoBanner';
 import PageStructureCard from '@/components/project/PageStructureCard';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
+import LearningJournal from '@/components/project/LearningJournal';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
@@ -297,7 +298,7 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
 
 export const STEPS = ['brezinys', 'patikra', 'samata', 'siusti'];
 
-export function StepBar({ step, setStep, hasPdf }) {
+export function StepBar({ step, setStep, hasPdf, projectId = null }) {
   const { t } = useTranslation();
   const icons = {
     brezinys: MapIcon, patikra: ClipboardCheck, samata: ListChecks, siusti: Send,
@@ -351,6 +352,8 @@ export function StepBar({ step, setStep, hasPdf }) {
           </React.Fragment>
         );
       })}
+      {/* „Įsiminta: N" — the learning journal, on every step (togal-v2 W11) */}
+      {projectId && <LearningJournal projectId={projectId} />}
     </nav>
   );
 }
@@ -1115,6 +1118,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       <StepBar
         step={step} setStep={goStep}
         hasPdf={!!pdfUrl}
+        projectId={project.id}
       />
 
       <div className="flex-1 px-4 py-4 space-y-5">

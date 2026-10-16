@@ -56,11 +56,36 @@ GEOMETRY_ROOM_KEYS = (
 )
 
 
+def _remembered(project_id: str, answer: dict, nr: str | None = None, klausimas: str | None = None) -> dict:
+    """The learning journal (togal-v2 W11): every outline a person confirmed, drew, divided or merged is one
+    `corrections` row per room (source „konturas"), written HERE so every client path counts. The endpoints save
+    nothing to the project; the journal row says what the person did, the sheet lands the geometry. A failed
+    write never fails the answer. `klausimas`: the Patikra question this outline answers — it rides in `note`,
+    and this row IS that answer's record (the browser writes no `klausimas_*` row for it: one act, one row)."""
+    if not isinstance(answer, dict) or answer.get("status") != "ok":
+        return answer
+    rooms = answer.get("rooms") if isinstance(answer.get("rooms"), dict) else ({nr: answer["room"]} if nr and isinstance(answer.get("room"), dict) else {})
+    try:
+        import db as _db
+        for room_nr, r in rooms.items():
+            k = (r or {}).get("_konturas") or {}
+            _db.log_correction_once(
+                project_id=project_id, field_path=f"patalpa.{room_nr}.kontūras",
+                old_value={"plotas_m2": k.get("plotas_uzrasas_m2")},
+                new_value={"saltinis": k.get("saltinis"), "plotas_m2": k.get("plotas_m2"),
+                           "perimetras_m": k.get("perimetras_m"), "page": k.get("page")},
+                source="konturas", room_nr=str(room_nr), note=klausimas or None)
+    except Exception as exc:  # noqa: BLE001 — the journal is never the outline
+        log.warning("outline journal write failed project=%s: %r", project_id, exc)
+    return answer
+
+
 class OutlineAt(BaseModel):
     page: int = Field(ge=1)
     x_pct: float = Field(ge=0.0, le=1.0)
     y_pct: float = Field(ge=0.0, le=1.0)
     pritarta: bool = False            # the point is inside the outline the lane proposed and he said „Tinka"
+    klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question answered (journal note)
 
 
 class PagePoint(BaseModel):
@@ -73,6 +98,7 @@ class SplitSpace(BaseModel):
     a: PagePoint
     b: PagePoint
     su: str | None = Field(default=None, max_length=8)   # the neighbour whose face this room's pocket joins (2026-09-23)
+    klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question answered (journal note)
 
 
 class OutlineSet(BaseModel):
@@ -81,6 +107,7 @@ class OutlineSet(BaseModel):
     page: int = Field(ge=1)
     polygon_pct: list[list[float]] = Field(min_length=3, max_length=500)
     holes: list[list[list[float]]] | None = Field(default=None, max_length=50)
+    klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question answered (journal note)
 
 
 class OutlineMerge(OutlineSet):
@@ -185,7 +212,8 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             cut = propose_split(pdf_bytes, body.page, seats2, areas2, float(scale), (W, H), face_pct=union)
             if cut.get("status") == "ok":
                 if body.pritarta:
-                    return _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut)
+                    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut),
+                                       klausimas=body.klausimas)
                 return {"status": "shared", "su": other, "page": body.page, "line_pct": cut["line_pct"], "pagal": cut["pagal"],
                         "rooms": {nr: {**part, "plotas_uzrasas_m2": areas2.get(nr)} for nr, part in cut["rooms"].items()}}
         return hit
@@ -209,12 +237,12 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             room.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
 
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }
+    }, _nr(room), klausimas=body.klausimas)
 
 
 def _ring_of(raw: list[list[float]], what: str) -> list[tuple[float, float]]:
@@ -326,12 +354,12 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale)
     apply_geometry(parsed, pdf_bytes, dims)
     _drawn_perimeter_if_unread(room, perimetras)
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }
+    }, _nr(room), klausimas=body.klausimas)
 
 
 @router.post("/{project_id}/rooms/{room_nr}/outline-merge")
@@ -371,13 +399,13 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     apply_geometry(parsed, pdf_bytes, dims)
     absorb(gone)            # whatever the lane made of a room with no outline today is not its geometry: it is merged
     _drawn_perimeter_if_unread(kept, perimetras)
-    return {
+    return _remembered(project_id, {
         "status": "ok",
         "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
         "neskaiciuoti": [gone_nr],
-    }
+    }, klausimas=body.klausimas)
 
 
 def _joined_with(pdf_bytes: bytes, *, page: int, rooms: list[dict], room: dict, other_nr: str, lay, scale: float,
@@ -481,7 +509,7 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
                       areas, scale, (W, H), face_pct=face)
     if hit["status"] != "ok":
         return hit
-    return _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit)
+    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit), klausimas=body.klausimas)
 
 
 @router.post("/{project_id}/rooms/{room_nr}/split-proposal")
