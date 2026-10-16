@@ -1293,6 +1293,9 @@ WATERPROOFING_KG_PER_M2 = 3.0         # membrane, 2 coats × 1,5 kg/m²
 SELF_LEVELLING_KG_PER_M2 = 6.0        # ~3 mm × 2 kg/m²/mm
 FLOOR_COVERING_WASTE = 1.10           # grindų danga + 10 % atliekų
 DUCT_WASTE = 1.05                     # ortakiai + 5 % atliekų
+# Waste inside two billed WORK quantities (not material norms):
+TILE_PLINTH_WASTE = 1.10              # plytelių grindjuostės: (perimetras − durys) + 10 %
+CORNICE_LENGTH_WASTE = 1.05           # lubų karnizo ilgis: perimetras + 5 %
 
 
 def putty_q_level(overrides: dict | None, default: str | None = "Q2") -> str | None:
@@ -1461,7 +1464,7 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "", evidence: bool | No
         return 0.0
     if normalize_paskirtis(paskirtis) not in _KARNIZAS_PASKIRTYS:
         return 0.0
-    return round(perim * 1.05, 2)
+    return round(perim * CORNICE_LENGTH_WASTE, 2)
 
 
 def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> float:
@@ -3535,7 +3538,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 return 0.0
             n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
-            return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10
+            return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * TILE_PLINTH_WASTE
 
         def _pjovimas_45(r: dict) -> float:
             # mirrors the line: max(Σ perim × 0,4 ; 2 × n × vidutinis plytelių aukštis)
@@ -4474,7 +4477,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             0,85 m per door, +10 % waste — the same primitives as the MDF line."""
             n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
-            return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
+            return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * TILE_PLINTH_WASTE, 2)
 
         # The floor plan's own tile-skirting length (grindų plano legenda,
         # „Grindjuostės (iš plytelių)"), when the drawing states one. It covers
