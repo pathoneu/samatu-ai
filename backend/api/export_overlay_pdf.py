@@ -11,10 +11,12 @@ searchable:
   * measurements (`project.measurements`, kind distance / perimeter / area) with their length or area at the
     sheet's scale in force, mapped to the display exactly like lib/viewerEngine/embedPdfAdapter.js
     (`display_fraction`, the backend twin of pageRotation.rotatePctPoint). The viewer stores a point as
-    toPdf(): an unrotated-frame fraction × EmbedPDF's `page.size`, and that size is PDFium's
-    FPDF_GetPageSizeByIndexF — measured 2026-10-16 with EmbedPDF's own wasm build: on a /Rotate 90 page it is
-    the DISPLAYED size, not the mediabox. So the divisor here is pypdfium2's `page.get_size()` (the same
-    PDFium answer), never the cropbox;
+    toPdf(): an unrotated-frame fraction × EmbedPDF's `page.size`, and that size is the UNROTATED page —
+    measured 2026-10-16 in the browser on this build: 842 × 1191 at rotation 3 on a /Rotate 270 A3 sheet,
+    400 × 200 at rotation 1 on a 400 × 200 /Rotate 90 sheet, equal to `page.boxes.media`. pypdfium2's
+    `page.get_size()` is the DISPLAYED size (swapped on /Rotate 90/270), so the divisor here is that size
+    swapped back (`Wu`, `Hu`); dividing by `get_size()` as reported placed every mark on a rotated sheet
+    stretched along one axis (lengths were right — they come from the points and the scale);
   * count marks (kind count) in their type's colour and shape, tallied in the legend;
   * optionally the wall solid the program read (api/page_geometry.wall_solid_rings).
 
@@ -231,9 +233,9 @@ def _hex_rgb(value: Any, fallback=(0.16, 0.44, 0.71)) -> tuple[float, float, flo
 
 
 def render_sheets(pdf_bytes: bytes, pages: list[int], dpi: int, side_cap: int) -> list[dict]:
-    """[{page, image (PIL), Wd, Hd, Wm, Hm, Ws, Hs, rotation}] — the displayed page size in points, the
-    unrotated (cropbox) size, PDFium's page size (the viewer's `page.size`, the measurements' divisor) and
-    the raster. Under the process-wide PDFium lock."""
+    """[{page, image (PIL), Wd, Hd, Wm, Hm, Ws, Hs, Wu, Hu, rotation}] — the displayed page size in points,
+    the unrotated (cropbox) size, pypdfium2's page size (displayed), that size unrotated (the viewer's
+    `page.size`, the measurements' divisor) and the raster. Under the process-wide PDFium lock."""
     import pypdfium2 as pdfium
 
     from extractor.pdfium_guard import PDFIUM_LOCK
@@ -252,10 +254,11 @@ def render_sheets(pdf_bytes: bytes, pages: list[int], dpi: int, side_cap: int) -
                     Wm, Hm = abs(x1 - x0), abs(y1 - y0)
                     Wd, Hd = (Hm, Wm) if rot in (90, 270) else (Wm, Hm)
                     Ws, Hs = (float(v) for v in page.get_size())
+                    Wu, Hu = (Hs, Ws) if rot in (90, 270) else (Ws, Hs)
                     scale = min(dpi / 72.0, side_cap / max(Wd, Hd))
                     image = page.render(scale=scale, may_draw_forms=True).to_pil().convert("RGB")
                     out.append({"page": nr, "image": image, "Wd": Wd, "Hd": Hd, "Wm": Wm, "Hm": Hm, "Ws": Ws, "Hs": Hs,
-                                "rotation": rot})
+                                "Wu": Wu, "Hu": Hu, "rotation": rot})
                 finally:
                     page.close()
         finally:
@@ -410,7 +413,7 @@ def draw_sheet(c, sheet: dict, project: dict, layers: Layers, scale: dict | None
             legend.append(("line", PROPOSED, f"Patalpos kontūras — pasiūlytas programos, patikrinkite ({n_ai})", "dash"))
 
     measurements = _measurements_on(project, page)
-    Ws, Hs = sheet["Ws"], sheet["Hs"]
+    Ws, Hs = sheet["Wu"], sheet["Hu"]
 
     def disp(points):
         return [q for q in (display_fraction(p, Ws, Hs, rot) for p in points or []) if q]

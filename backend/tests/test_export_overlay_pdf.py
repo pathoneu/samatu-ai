@@ -68,18 +68,19 @@ def test_measurement_points_land_where_pdfium_draws_them(rotation):
     """A click on the blue square, stored the way the viewer stores it, maps back onto the displayed sheet
     exactly where PDFium renders the square — on every /Rotate.
 
-    The viewer (embedPdfAdapter.toPdf) stores an unrotated-frame fraction × EmbedPDF's `page.size`, and
-    that size is PDFium's FPDF_GetPageSizeByIndexF — checked against EmbedPDF's own wasm build on this very
-    fixture at /Rotate 90: 200 × 400, the displayed size (the mediabox is 400 × 200)."""
+    The viewer (embedPdfAdapter.toPdf) stores an unrotated-frame fraction × EmbedPDF's `page.size`, and in
+    the browser that size is the UNROTATED page: this very fixture at /Rotate 90 reports 400 × 200,
+    rotation 1 (Playwright, 2026-10-16). pypdfium2's get_size() is the displayed 200 × 400 — not the divisor."""
     sheet = render_sheets(_sheet_pdf(rotation), [1], dpi=72, side_cap=2000)[0]
     swapped = rotation in (90, 270)
     assert sheet["rotation"] == rotation
     assert (sheet["Wm"], sheet["Hm"]) == (W, H)
     assert (sheet["Wd"], sheet["Hd"]) == ((H, W) if swapped else (W, H))
-    assert (sheet["Ws"], sheet["Hs"]) == ((H, W) if swapped else (W, H))          # EmbedPDF's page.size
+    assert (sheet["Ws"], sheet["Hs"]) == ((H, W) if swapped else (W, H))          # pypdfium2: displayed
     assert sheet["image"].width / sheet["image"].height == pytest.approx(sheet["Wd"] / sheet["Hd"], rel=0.02)
-    stored = {"x": MARK[0] / W * sheet["Ws"], "y": MARK[1] / H * sheet["Hs"]}   # toPdf(click on the square)
-    fx, fy = display_fraction(stored, sheet["Ws"], sheet["Hs"], rotation)
+    assert (sheet["Wu"], sheet["Hu"]) == (W, H)                                   # EmbedPDF's page.size
+    stored = {"x": MARK[0], "y": MARK[1]}                                         # toPdf(click on the square)
+    fx, fy = display_fraction(stored, sheet["Wu"], sheet["Hu"], rotation)
     bx, by = _blue_centroid(sheet["image"])
     assert fx == pytest.approx(bx, abs=0.01) and fy == pytest.approx(by, abs=0.01), (rotation, (fx, fy), (bx, by))
 
@@ -168,6 +169,18 @@ def test_overlay_pdf_has_every_sheet_with_marks_and_a_legend(tmp_path, monkeypat
         assert needle in text, needle
     # sheet 2 has no marks of its own and says so
     assert "Šiame lape žymėjimų nėra" in _text(r.content, 1)
+
+
+def test_a_4_m_wall_on_a_rotated_sheet_prints_4_m(tmp_path, monkeypatch):
+    """A 4,00 m wall the viewer stored on a /Rotate 90 sheet (mediabox points) prints 4,00 m."""
+    _isolate(tmp_path, monkeypatch)
+    run = 4.0 / (50 * 0.0254 / 72)                                     # 4 m at 1:50, in points
+    _store(_sheet_pdf(90), {"measurements": [
+        {"kind": "distance", "page": 1, "points": [{"x": 20, "y": 100}, {"x": 20 + run, "y": 100}],
+         "color": "#2a6fb5", "classification": "Siena"}]})
+    r = TestClient(app).post("/api/projects/p1/export-overlay-pdf", json={})
+    assert r.status_code == 200, r.text
+    assert "Siena: 4,00 m" in _text(r.content)
 
 
 def test_layers_and_pages_are_chosen(tmp_path, monkeypatch):
