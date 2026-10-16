@@ -39,6 +39,14 @@ def test_a_row_edit_and_a_row_accept():
         "Eilutė: kiekį 3,0 patvirtinote kaip teisingą"
 
 
+def test_a_count_of_pieces_has_no_decimal():
+    rows = {"d": {"id": "d", "aprasymas": "Difūzorių montavimas", "mato_vnt": "vnt"}}
+    assert sentence_for({"source": "eilute_teisinga", "field_path": "eilute.d.kiekis", "new_value": 9.0}, rows) == \
+        "Eilutė „Difūzorių montavimas“: kiekį 9 vnt patvirtinote kaip teisingą"
+    assert sentence_for({"source": "eilute_kiekis", "field_path": "eilute.d.kiekis", "old_value": 9, "new_value": 8.5}, rows) == \
+        "Eilutė „Difūzorių montavimas“: kiekį pakeitėte 9,0 → 8,5 vnt"
+
+
 def test_rooms_outlines_questions_symbols_and_chat():
     assert sentence_for({"source": "konturas", "room_nr": "03", "field_path": "patalpa.03.kontūras",
                          "new_value": {"saltinis": "nubrezta", "plotas_m2": 10.12}}) == \

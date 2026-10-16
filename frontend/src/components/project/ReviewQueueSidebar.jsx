@@ -275,7 +275,7 @@ export default function ReviewQueueSidebar({
                 title={t('project.patikra.logTitle')}
               >
                 <GraduationCap className="w-3 h-3 shrink-0" />
-                <span data-testid="learning-count">{t('project.patikra.remembered', { count: corrections.length })}</span>
+                <span data-testid="learning-count-sidebar">{t('project.patikra.remembered', { count: corrections.length })}</span>
                 {logOpen
                   ? <ChevronDown className="w-3 h-3 ml-auto" />
                   : <ChevronRight className="w-3 h-3 ml-auto" />}
@@ -300,7 +300,7 @@ export default function ReviewQueueSidebar({
                     <a
                       href={correctionsCsvUrl(projectId)}
                       download
-                      data-testid="learning-csv"
+                      data-testid="learning-csv-sidebar"
                       className="text-[10.5px] underline underline-offset-2"
                       style={{ color: 'hsl(var(--primary))' }}
                     >

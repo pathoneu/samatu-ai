@@ -78,7 +78,11 @@ def _row_label(c: dict, rows: dict[str, dict]) -> tuple[str, str]:
     return (f"Eilutė „{label}“" if label else "Eilutė"), unit
 
 
-def _with_unit(n: str | None, unit: str) -> str:
+def _qty(value: Any, unit: str) -> str:
+    """A quantity with its unit; a whole count of pieces („vnt.") without a decimal."""
+    if unit.startswith("vnt") and isinstance(value, (int, float)) and not isinstance(value, bool) and float(value).is_integer():
+        return f"{int(value)} {unit}"
+    n = lt_number(value)
     return f"{n} {unit}".strip() if n is not None else "—"
 
 
@@ -98,10 +102,10 @@ def sentence_for(c: dict, rows: dict[str, dict] | None = None) -> str:
 
     if source == "eilute_teisinga":
         label, unit = _row_label(c, rows)
-        return f"{label}: kiekį {_with_unit(lt_number(new), unit)} patvirtinote kaip teisingą"
+        return f"{label}: kiekį {_qty(new, unit)} patvirtinote kaip teisingą"
     if source == "eilute_kiekis":
         label, unit = _row_label(c, rows)
-        return f"{label}: kiekį pakeitėte {lt_number(old) or '—'} → {_with_unit(lt_number(new), unit)}"
+        return f"{label}: kiekį pakeitėte {lt_number(old) or '—'} → {_qty(new, unit)}"
     if source == "patalpa_patvirtinta":
         area = lt_number(new)
         return f"{_room(c)}: plotą {area} m² patvirtinote" if area else f"{_room(c)}: patalpą patvirtinote"

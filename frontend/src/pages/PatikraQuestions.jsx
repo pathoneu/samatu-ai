@@ -393,6 +393,7 @@ export default function PatikraQuestions() {
       <StepBar
         step="patikra"
         hasPdf
+        projectId={id}
         setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
       />
 
