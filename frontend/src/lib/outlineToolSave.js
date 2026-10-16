@@ -26,7 +26,7 @@ function wallsOf(op) {
 /** The room keys a merge writes besides the geometry (mirror of backend MERGE_ROOM_KEYS). */
 export const MERGE_ROOM_KEYS = [
   'plotas_m2', 'plotas_saltinis', '_plotas_pries_sujungima', '_sujungimas', 'elementai',
-  '_sujungta_i', '_elementai_pries_sujungima', '_perimetras_pries_sujungima',
+  '_sujungta_i', '_elementai_pries_sujungima', '_perimetras_pries_sujungima', 'n_partition_walls',
 ];
 
 function withMergeKeys(rooms, sujungimas) {

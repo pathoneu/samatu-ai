@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from api.free_reread import NO_PDF, _project_for
 from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry, geometry_dimension_strings
 from extractor.pdf_vectors import page_geometry
+from extractor.universal_rules import ring_corner_counts
 from extractor.vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, joined_space, outline_at, propose_split, split_space
 
 log = logging.getLogger("samatu.room_outline")
@@ -390,7 +391,7 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
 # „Sujungti" writes these room keys besides the geometry ones (2026-10-16, follow-up (a)): the kept room bills BOTH
 # table rows and holds both rooms' openings; the absorbed one is marked structurally and lists nothing of its own.
 MERGE_ROOM_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_pries_sujungima", "_sujungimas", "elementai",
-                   "_sujungta_i", "_elementai_pries_sujungima", "_perimetras_pries_sujungima")
+                   "_sujungta_i", "_elementai_pries_sujungima", "_perimetras_pries_sujungima", "n_partition_walls")
 MERGED_AREA = "eksplikacija_sujungta"     # `plotas_saltinis` of a room that bills two eksplikacija rows
 
 
@@ -503,6 +504,21 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     }
     if finish_warning:
         kept["_sujungimas"]["apdaila_skiriasi"] = finish_warning
+    # The merged room's corners come off the union outline (counted here, once: a rebuild reads the numbers),
+    # and the partitions of the space still stand — rooms are merged because no wall separates them — so
+    # both rooms' partition ends stay with the kept room (2026-10-16 follow-up (1)).
+    vi, isr = ring_corner_counts([(x * W, y * H) for x, y in ring])
+    def ends(r):
+        v = r.get("n_partition_walls")
+        return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else 0
+    before_ends = (before or {}).get("pertvaru_galai_dalys") or [ends(kept)]
+    parts_ends = list(before_ends) + [ends(gone)]
+    kept["n_partition_walls"] = sum(parts_ends)
+    kept["_sujungimas"].update(
+        kampai_vidiniai=vi, kampai_isoriniai=isr, pertvaru_galai=kept["n_partition_walls"],
+        pertvaru_galai_dalys=parts_ends,
+        kampai=(f"Kampai iš sujungto kontūro: {vi} vidiniai, {isr} išoriniai; pertvarų galai: "
+                + " + ".join(str(p) for p in parts_ends) + " iš sujungtų patalpų — pataisykite, jei pertvara dingo"))
     carried = [{**e, "_is_patalpos": gone_nr} for e in (gone.get("elementai") or []) if isinstance(e, dict)]
     kept["elementai"] = [e for e in (kept.get("elementai") or []) if isinstance(e, dict)] + carried
 

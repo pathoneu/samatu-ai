@@ -2413,6 +2413,68 @@ FLOOR_COVERINGS: dict[str, tuple[str, bool]] = {
 }
 
 
+def ring_corner_counts(ring) -> tuple[int, int]:
+    """(inner, outer) corners of a room's outline seen from INSIDE the room: a convex vertex is where two
+    walls meet (vidinis kampas), a reflex one a wall edge sticking into the room (išorinis kampas). Straight
+    runs (a turn under ~10°) are no corner. A rectangle → (4, 0), an L → (5, 1). Any frame whose axes keep
+    their orientation (page points, page fractions) gives the same answer."""
+    pts = [(float(p[0]), float(p[1])) for p in (ring or []) if isinstance(p, (list, tuple)) and len(p) >= 2]
+    if len(pts) > 1 and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    n = len(pts)
+    if n < 3:
+        return 0, 0
+    area2 = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))
+    sign = 1.0 if area2 > 0 else -1.0
+    inner = outer = 0
+    for i in range(n):
+        (ax, ay), (bx, by), (cx, cy) = pts[i - 1], pts[i], pts[(i + 1) % n]
+        ux, uy, vx, vy = bx - ax, by - ay, cx - bx, cy - by
+        lu, lv = math.hypot(ux, uy), math.hypot(vx, vy)
+        if not lu or not lv:
+            continue
+        turn = sign * (ux * vy - uy * vx) / (lu * lv)
+        if turn > 0.17:
+            inner += 1
+        elif turn < -0.17:
+            outer += 1
+    return inner, outer
+
+
+EXPERIMENT_CORNERS_ENV = "SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE"
+_experiment_corners: bool | None = None
+
+
+def experiment_corners_from_outline() -> bool:
+    """Eval-only experiment (2026-10-16): EVERY room with a wall outline counts its corners off the outline.
+    Read once, default off; nothing ships with it on."""
+    global _experiment_corners
+    if _experiment_corners is None:
+        import os
+        _experiment_corners = os.environ.get(EXPERIMENT_CORNERS_ENV) == "1"
+    return _experiment_corners
+
+
+def room_outline_corners(room: dict) -> tuple[int, int] | None:
+    """(inner, outer) corner counts the calculator takes from an outline instead of the 4-corner default:
+    a merged room's, stored by the merge route in `_sujungimas` (a rebuild reads numbers, not geometry);
+    under the eval experiment any room with a wall outline. None → the default."""
+    m = room.get("_sujungimas") if isinstance(room.get("_sujungimas"), dict) else None
+    if m is not None:
+        vi, isr = m.get("kampai_vidiniai"), m.get("kampai_isoriniai")
+        if isinstance(vi, int) and not isinstance(vi, bool) and isinstance(isr, int) and not isinstance(isr, bool) \
+                and vi >= 0 and isr >= 0 and vi + isr >= 3:
+            return vi, isr
+    if experiment_corners_from_outline():
+        from .dimension_sum import WALL_OUTLINES
+        ring = room.get("polygon_pct")
+        if room.get("polygon_source") in WALL_OUTLINES and isinstance(ring, list) and len(ring) >= 3:
+            vi, isr = ring_corner_counts(ring)
+            if vi + isr >= 3:
+                return vi, isr
+    return None
+
+
 def holes_with_walls(room: dict) -> tuple[float, int]:
     """The holes in a room's drawn outline („Atimti", `_konturas.skyles`) whose faces are walls (`sienos`
     true — a column, a shaft): their summed perimeter (m) and convex corner count. A hole marked
@@ -3144,6 +3206,14 @@ def calc_room_quantities(room: dict,
         # Default to 4 for a rectangle; L-shape rooms set n_walls_estimate=6,
         # T-shape 8, etc.
         inner_corners_m = n_walls_estimate * H if count_inner_corners else 0.0
+        # A merged room („Sujungti", 2026-10-16) — and, only under the eval experiment, any room with a wall
+        # outline — counts its corners off the outline: convex vertices are inner corners (two walls meet),
+        # reflex ones outer (a wall edge sticks into the room: real bead, in both corner modes).
+        outline_corners = room_outline_corners(room)
+        outer_corners_m = 0.0
+        if outline_corners is not None:
+            inner_corners_m = outline_corners[0] * H if count_inner_corners else 0.0
+            outer_corners_m = outline_corners[1] * H
         # Door/window reveal edges (vertical perimeters around openings).
         opening_reveals_m = (
             n_doors * (door_width + 2 * door_height)
@@ -3163,12 +3233,13 @@ def calc_room_quantities(room: dict,
         # a column's / shaft's outer corners, full height (its faces' run along the ceiling is not a
         # wall-ceiling line of the room — the brief bills the corners only)
         hole_corners_m = hole_corners * H
-        kampai += hole_corners_m
+        kampai += hole_corners_m + outer_corners_m
     else:
         inner_corners_m = 0.0
         opening_reveals_m = 0.0
         pusiniai_m = 0.0
         hole_corners_m = 0.0
+        outer_corners_m = 0.0
         kampai = 0.0
 
     # Angokraščiai (atkosai = reveal length around openings). Per CLAUDE.md
@@ -3366,6 +3437,7 @@ def calc_room_quantities(room: dict,
             pusiniai_m if count_partition_corners else 0.0, 2),
         "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0 else 0.0, 2),
         "kampai_skyliu_m": round(hole_corners_m, 2),
+        "kampai_isoriniai_m": round(outer_corners_m, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "pasleptu_duru_staktu_m": round(pasleptu_duru_staktu_m, 2),
         "pasleptu_duru_kompl": pasleptu_duru_n,
