@@ -15,7 +15,7 @@ import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { SearchLayer } from '@embedpdf/plugin-search/react';
 import { PagePointerProvider, usePointerHandlers } from '@embedpdf/plugin-interaction-manager/react';
 import { makeViewport } from '@/lib/viewerEngine/pageViewport';
-import { displayRotationFor, mediaboxSizeFrom } from '@/lib/viewerEngine/pageRotation';
+import { displayRotationFor } from '@/lib/viewerEngine/pageRotation';
 import { makeEmbedAdapter } from '@/lib/viewerEngine/embedPdfAdapter';
 import { uncalibratedScale } from '@/lib/measureGeometry';
 import { polygonCentroid } from '@/lib/polygonGeometry';
@@ -35,10 +35,9 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
   // COORDINATE CONTRACT (verified in @embedpdf/plugin-interaction-manager dist):
   // PagePointerProvider's default convertEventToPoint runs restorePosition(),
   // which un-rotates the display click by the page's effective /Rotate AND
-  // divides by the zoom scale. So pos.x/pos.y arrive in EmbedPDF's own
-  // unrotated frame, which is sized by its reported `page.size` (swapped vs the
-  // mediabox on /Rotate 90/270 sheets). pageWidth/pageHeight passed along here
-  // must therefore be that REPORTED size (pageSizePt, not the mediabox), so that
+  // divides by the zoom scale. So pos.x/pos.y arrive ALREADY in UNROTATED
+  // mediabox PDF POINTS — not display px. pageWidth/pageHeight passed along
+  // here must therefore be the mediabox size in POINTS (pageSizePt), so that
   // consumers get pct with a straight divide. pageRotation (/Rotate enum) is
   // included for context only — no rotation math belongs in this path.
   useEffect(() => register({
@@ -131,12 +130,8 @@ export default function PageOverlayHost({
   const { width, height } = vp ? vp.renderedSize() : { width: 0, height: 0 };
   // Screen<->PDF-point boundary for the measure layer. Rebuilt on zoom (rendered
   // size) and rotation changes so overlays track the page exactly.
-  // pageSizePt is EmbedPDF's `page.size` — the DISPLAYED size, swapped on /Rotate 90/270 sheets. The
-  // adapter, the snap geometry and the outline layers want the mediabox (lib/viewerEngine/pageRotation
-  // mediaboxSizeFrom); PageClicks keeps the reported size — its points come from EmbedPDF's own frame.
-  const mediaboxPt = useMemo(() => mediaboxSizeFrom(pageSizePt, pageRotation), [pageSizePt, pageRotation]);
-  const pageWidthPt = mediaboxPt?.width;
-  const pageHeightPt = mediaboxPt?.height;
+  const pageWidthPt = pageSizePt?.width;
+  const pageHeightPt = pageSizePt?.height;
   const adapter = useMemo(() => {
     if (!width || !height || !pageWidthPt || !pageHeightPt) return null;
     return makeEmbedAdapter({
@@ -214,7 +209,7 @@ export default function PageOverlayHost({
             below the room zones so measure/zone interactions are unaffected. */}
         <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
       </div>
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageSizePt?.width} pageHeight={pageSizePt?.height} pageRotation={pageRotation} onPagePoint={onPagePoint} />
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       {checkMode && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -321,7 +316,7 @@ export default function PageOverlayHost({
             geometry={pageGeometry}
             renderedSize={{ width, height }}
             scale={measureScale}
-            pageSizePt={mediaboxPt}
+            pageSizePt={pageSizePt}
             pageRotation={pageRotation}
             tableAreaM2={outlineEdit.tableAreaM2 ?? null}
             holes={outlineEdit.holes || []}
@@ -338,7 +333,7 @@ export default function PageOverlayHost({
             geometry={pageGeometry}
             renderedSize={{ width, height }}
             scale={measureScale}
-            pageSizePt={mediaboxPt}
+            pageSizePt={pageSizePt}
             pageRotation={pageRotation}
           />
         </div>

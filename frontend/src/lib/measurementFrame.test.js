@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MEASUREMENTS_FRAME, migrateMeasurementFrame, recheckScalesNotice } from './measurementFrame.js';
+import { MEASUREMENTS_FRAME, migrateMeasurementFrame } from './measurementFrame.js';
 import { makeEmbedAdapter } from './viewerEngine/embedPdfAdapter.js';
 import { mediaboxSizeFrom } from './viewerEngine/pageRotation.js';
 
@@ -73,18 +73,4 @@ test('a calibration he drew on a rotated sheet is named for a recheck; the lane 
     { 1: { source: 'user' }, 2: { source: 'user', metersPerPointX: 0.01 } });
   assert.deepEqual(out.recheckScales, [2]);
   assert.deepEqual(migrateMeasurementFrame([], PAGES, undefined, { 2: { source: 'standard' } }).recheckScales, []);
-});
-
-test('the recheck notice names the sheets, once', () => {
-  assert.equal(recheckScalesNotice([]), null);
-  assert.equal(recheckScalesNotice(undefined), null);
-  assert.equal(recheckScalesNotice([2]), 'Lapo 2 mastelis nustatytas ranka pasuktame lape — patikrinkite jį vieną kartą');
-  assert.equal(recheckScalesNotice([2, 5]), 'Lapų 2, 5 masteliai nustatyti ranka pasuktuose lapuose — patikrinkite juos vieną kartą');
-});
-
-test('migrating twice is a no-op: the second pass sees the flag', () => {
-  const ms = [{ id: 'd', kind: 'distance', page: 2, points: [{ x: 10, y: 10 }, { x: 20, y: 30 }] }];
-  const once = migrateMeasurementFrame(ms, PAGES, null, {});
-  assert.equal(once.changed, 1);
-  assert.equal(migrateMeasurementFrame(once.measurements, PAGES, once.frame, {}), null);
 });

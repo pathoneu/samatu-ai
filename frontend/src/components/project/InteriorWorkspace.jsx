@@ -396,12 +396,11 @@ export default function InteriorWorkspace({
   // onto the CURRENT stored project, so a render-captured `project` spread can
   // no longer revert concurrent writes (async polygon patches, panel price
   // edits, a second tab) that landed after this component last rendered.
-  const handleMeasureDataChange = ({ measurements, measureScales, countTypes, measurementsFrame }) => {
+  const handleMeasureDataChange = ({ measurements, measureScales, countTypes }) => {
     const updated = updateProject(project.id, {
       measurements,
       pageScalesDurable: measureScales,
       ...(countTypes ? { countTypes } : {}),
-      ...(measurementsFrame ? { measurementsFrame } : {}),
     });
     if (updated) onProjectChange?.(updated);
   };

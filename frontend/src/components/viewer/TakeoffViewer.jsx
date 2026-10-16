@@ -22,8 +22,7 @@ import { usePrint } from '@embedpdf/plugin-print/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch, ListChecks, Lasso } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
-import { displayRotationFor, mediaboxSizeFrom, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
-import { migrateMeasurementFrame, recheckScalesNotice } from '@/lib/measurementFrame';
+import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
@@ -669,21 +668,6 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
 }
 
 /**
- * MeasurementFrameMigrator — once per project, when the document's page sizes and rotations are known,
- * moves measurements stored before 2026-10-16 into the mediabox frame (lib/measurementFrame). Renders
- * nothing; `onMigrate(result)` gets migrateMeasurementFrame's result (null → nothing to do).
- */
-function MeasurementFrameMigrator({ pages, needed, onMigrate }) {
-  const doneRef = useRef(false);
-  useEffect(() => {
-    if (doneRef.current || !needed || !Array.isArray(pages) || !pages.length) return;
-    doneRef.current = true;
-    onMigrate(pages);
-  }, [pages, needed, onMigrate]);
-  return null;
-}
-
-/**
  * FocusZoomer — „show me THIS place": jump to a page and fit a rectangle of it
  * in the viewport (check-sheet mode). `focus = { page, rect: [x0, y0, x1, y1]
  * in display-space page fractions, nonce }`; a new nonce re-runs it.
@@ -899,9 +883,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // change goes through setMeasurements(update) and becomes one undoable entry in „Istorija".
   const [measureHist, dispatchMeasureHist] = useReducer(historyReducer, initialMeasurements || [], initHistory);
   const measurements = measureHist.present;
-  // The frame the stored points are in (lib/measurementFrame): 'mediabox' once migrated. Read through a
-  // ref by the save payload; MeasurementFrameMigrator sets it the first time the document loads.
-  const measureFrameRef = useRef(project?.measurementsFrame ?? null);
   const [measureScales, setMeasureScales] = useState(() => initialMeasureScales || {});
   // Auto-calibration: pages whose traced rooms carry eksplikacija areas get a
   // derived meters-per-point — measurements read real meters with no manual
@@ -1126,11 +1107,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const pendingMeasureSaveRef = useRef(null);
   useEffect(() => {
     if (!measureDirtyRef.current) { measureDirtyRef.current = true; return undefined; } // skip mount
-    const payload = { measurements, measureScales, countTypes, measurementsFrame: measureFrameRef.current };
-    pendingMeasureSaveRef.current = payload;
+    pendingMeasureSaveRef.current = { measurements, measureScales, countTypes };
     const t = setTimeout(() => {
       pendingMeasureSaveRef.current = null;
-      onMeasureDataChangeRef.current?.(payload);
+      onMeasureDataChangeRef.current?.({ measurements, measureScales, countTypes });
     }, 600);
     return () => clearTimeout(t);
   }, [measurements, measureScales, countTypes]);
@@ -1144,27 +1124,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onMeasureDataChangeRef.current?.(payload);
   }, []);
   useEffect(() => () => flushMeasureSave(), [flushMeasureSave]);
-  // Rotated sheets (2026-10-16): points stored before the viewer used the mediabox size are converted
-  // once, as a reset (never an „Istorija" entry), and saved with the flag. Calibrations he DREW on a
-  // rotated sheet cannot be converted (the line's direction was not kept) — he is asked to check them.
-  const measureFrameNeeded = !check && !!onMeasureDataChange && measureFrameRef.current !== 'mediabox';
-  const migrateMeasureFrame = useCallback((pages) => {
-    const result = migrateMeasurementFrame(measurements, pages, measureFrameRef.current, measureScales);
-    if (!result) return;
-    measureFrameRef.current = result.frame;
-    if (result.changed) dispatchMeasureHist({ type: 'reset', present: result.measurements });
-    pendingMeasureSaveRef.current = null;
-    onMeasureDataChangeRef.current?.({ measurements: result.measurements, measureScales, countTypes, measurementsFrame: result.frame });
-    const notice = recheckScalesNotice(result.recheckScales);
-    if (notice) {
-      toast.warning(notice, {
-        description: 'Programa dabar teisingai skaičiuoja pasuktų lapų matmenis, bet ranka nubrėžto mastelio perskaičiuoti negali. Išmatuokite žinomą ilgį „Masteliai" skydelyje.',
-        duration: Infinity,
-        closeButton: true,
-        ...(project ? { action: { label: 'Masteliai', onClick: () => setScalesOpen(true) } } : {}),
-      });
-    }
-  }, [measurements, measureScales, countTypes, project]);
   // Closing / reloading the tab inside the 600 ms debounce window dropped the
   // last measurement (audit P2) — unmount was the only flush point.
   useEffect(() => {
@@ -1352,7 +1311,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
-          <MeasurementFrameMigrator pages={documentState?.document?.pages} needed={measureFrameNeeded} onMigrate={migrateMeasureFrame} />
           <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
@@ -1437,7 +1395,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                         readout: scaleCheckReadout({
                           a, b,
                           scale: effectiveScales[pageNr],
-                          pageSize: mediaboxSizeFrom(documentState?.document?.pages?.[layout.pageIndex]?.size, documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0),
+                          pageSize: documentState?.document?.pages?.[layout.pageIndex]?.size,
                           rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
                           strings: dimensionStringsOf(project)[pageNr] || [],
                         }),
@@ -1475,7 +1433,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               saving={outlineTools.saving}
               canSave={outlineTools.canSave}
               scale={outlineTools.tool ? effectiveScales[outlineTools.tool.page] || null : null}
-              pageSizePt={outlineTools.tool ? mediaboxSizeFrom(documentState?.document?.pages?.[outlineTools.tool.page - 1]?.size, documentState?.document?.pages?.[outlineTools.tool.page - 1]?.rotation ?? 0) : null}
+              pageSizePt={outlineTools.tool ? documentState?.document?.pages?.[outlineTools.tool.page - 1]?.size ?? null : null}
               pageRotation={outlineTools.tool ? documentState?.document?.pages?.[outlineTools.tool.page - 1]?.rotation ?? 0 : 0}
               onChange={outlineTools.change}
               onUndo={outlineTools.undo}

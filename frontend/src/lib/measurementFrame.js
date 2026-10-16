@@ -59,15 +59,3 @@ export function migrateMeasurementFrame(measurements, pages, frame, scales = {})
     .sort((a, b) => a - b);
   return { measurements: changed ? out : measurements || [], frame: MEASUREMENTS_FRAME, changed, recheckScales };
 }
-
-/**
- * The one-time notice for `recheckScales` (Lithuanian, shown once after the migration), or null.
- * Founder-side decision 2026-10-16: those calibrations are KEPT and he is asked to check them.
- */
-export function recheckScalesNotice(pages) {
-  const n = (Array.isArray(pages) ? pages : []).filter((p) => Number.isFinite(Number(p)));
-  if (!n.length) return null;
-  return n.length === 1
-    ? `Lapo ${n[0]} mastelis nustatytas ranka pasuktame lape — patikrinkite jį vieną kartą`
-    : `Lapų ${n.join(', ')} masteliai nustatyti ranka pasuktuose lapuose — patikrinkite juos vieną kartą`;
-}
