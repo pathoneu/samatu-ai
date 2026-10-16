@@ -281,6 +281,12 @@ test('countRoomsMissingGeometry: counts current-page rooms we cannot place', () 
   assert.equal(n, 1);                   // only room 3 (page 2, no geometry)
 });
 
+test('countRoomsMissingGeometry: a room merged into another is not „without a place"', () => {
+  const merged = { ...noGeom('5', 2), _konturas: { saltinis: 'sujungta', i: '1', page: 2, plotas_m2: 0 } };
+  const n = countRoomsMissingGeometry([poly('1', 2), merged, noGeom('3', 2)], { renderedWidth: 1000, renderedHeight: 800, page: 2 });
+  assert.equal(n, 1);
+});
+
 // ── 2026-07-12: duplicate-polygon disqualification + interior anchors ──────
 import {
   duplicatePolygonLosers, interiorMarkerAnchor, pointInPolygonPoints,

@@ -26,6 +26,8 @@ const INVALID = '#dc2626';  // red — the ring crosses itself
 export default function OutlineEditLayer({
   points, onChange, onGestureStart = null, geometry, renderedSize,
   scale = null, pageSizePt = null, pageRotation = 0, tableAreaM2 = null,
+  // „Atimti" cut-outs (2026-10-16): shown through the fill (even-odd), off the readout's area, kept on save.
+  holes = [],
 }) {
   const { width, height } = renderedSize || {};
   const svgRef = useRef(null);
@@ -44,12 +46,13 @@ export default function OutlineEditLayer({
     const pts = points.map(([fx, fy]) => ({ x: fx * W, y: fy * H }));
     const crossing = selfIntersects(pts);
     if (!scale?.calibrated) return { crossing, text: crossing ? 'Kontūras kertasi' : 'Mastelis nenustatytas' };
-    const area = shoelaceAreaM2(pts, scale);
+    const toPts = (ring) => ring.map(([fx, fy]) => ({ x: fx * W, y: fy * H }));
+    const area = Math.max(0, shoelaceAreaM2(pts, scale) - (holes || []).reduce((s, h) => s + shoelaceAreaM2(toPts(h), scale), 0));
     const perim = realPathLengthM(pts, scale, true);
     const table = Number(tableAreaM2);
     const vs = table > 0 ? ` · lentelėje ${formatNumberLT(table, 2)} m²` : '';
     return { crossing, text: crossing ? 'Kontūras kertasi pats su savimi' : `${formatNumberLT(area, 2)} m² · ${formatNumberLT(perim, 2)} m${vs}` };
-  }, [points, pageSizePt, pageRotation, scale, tableAreaM2]);
+  }, [points, holes, pageSizePt, pageRotation, scale, tableAreaM2]);
   if (!width || !height || !Array.isArray(points)) return null;
 
   const toPx = (p) => ({ x: p[0] * width, y: p[1] * height });
@@ -112,9 +115,10 @@ export default function OutlineEditLayer({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      <polygon
-        points={px.map((p) => `${p.x},${p.y}`).join(' ')}
-        fill={stroke} fillOpacity={0.08} stroke={stroke} strokeWidth={2} strokeLinejoin="round" pointerEvents="none"
+      <path
+        d={[px, ...(holes || []).map((h) => h.map(toPx))].filter((r) => r.length >= 3)
+          .map((r) => `M ${r.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`).join(' ')}
+        fill={stroke} fillOpacity={0.08} fillRule="evenodd" stroke={stroke} strokeWidth={2} strokeLinejoin="round" pointerEvents="none"
       />
       {px.map((p, i) => {
         const q = px[(i + 1) % px.length];

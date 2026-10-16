@@ -25,6 +25,7 @@ import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
 import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
+import OutlineToolLayer from './OutlineToolLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -74,6 +75,9 @@ export default function PageOverlayHost({
   outlineEdit = null,
   onOutlineEditChange = null,
   onOutlineGestureStart = null,
+  // Outline tools (2026-10-16): the active split / merge / subtract state (useOutlineTool) and its setter.
+  outlineTool = null,
+  onOutlineToolChange = null,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -84,7 +88,10 @@ export default function PageOverlayHost({
   orthoEnabled = false,
   countTypes = [],
   activeCountTypeId = null,
-  selectedMeasureId = null,
+  // The selection (one mark, or several from „Laso" — 2026-10-16).
+  selectedMeasureIds = [],
+  // With „Laso" armed and several marks selected, a right-click beside them opens the menu for all of them.
+  selectionMenuOnMiss = false,
   onMeasureCommit = null,
   onMeasureCalibrate = null,
   onMeasureSelect = null,
@@ -136,15 +143,16 @@ export default function PageOverlayHost({
   // scroll virtualization mounting and unmounting this host costs nothing after the first ask.
   const measureActive = measureTool != null;
   const editingHere = !!outlineEdit && outlineEdit.page === layout.pageNumber;
-  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible || editingHere);
+  const toolHere = !!outlineTool && outlineTool.page === layout.pageNumber;
+  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible || editingHere || toolHere);
   const drawingSnapPolygons = useMemo(
     () => snapPolygonsFromGeometry(pageGeometry, { pageWidthPt, pageHeightPt, pageRotation }),
     [pageGeometry, pageWidthPt, pageHeightPt, pageRotation],
   );
   if (!vp) return null;
 
-  const selectedMeasurement = (selectedMeasureId != null && adapter)
-    ? (measurements || []).find((m) => m.id === selectedMeasureId && m.page === layout.pageNumber)
+  const selectedMeasurement = (selectedMeasureIds.length === 1 && adapter)
+    ? (measurements || []).find((m) => m.id === selectedMeasureIds[0] && m.page === layout.pageNumber)
     : null;
   const deleteAt = selectedMeasurement ? deleteAnchorFor(selectedMeasurement, adapter) : null;
   // Right-click: hit-test the committed marks under the pointer (works with or without a tool armed —
@@ -154,9 +162,9 @@ export default function PageOverlayHost({
     const r = e.currentTarget.getBoundingClientRect();
     const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
     const id = hitTestMeasurement(raw, measurements || [], layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
-    if (!id) return;
+    if (!id && !selectionMenuOnMiss) return;
     e.preventDefault();
-    onMeasureContextMenu({ id, clientX: e.clientX, clientY: e.clientY });
+    onMeasureContextMenu({ id: id || null, clientX: e.clientX, clientY: e.clientY });
   } : undefined;
 
   return (
@@ -221,7 +229,7 @@ export default function PageOverlayHost({
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           zoneFillsVisible={zoneFillsVisible}
-          interactive={!measureActive && !outlineEdit}
+          interactive={!measureActive && !outlineEdit && !outlineTool}
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
@@ -245,7 +253,7 @@ export default function PageOverlayHost({
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
             onDelete={onMeasureDelete}
-            selectedId={selectedMeasureId}
+            selectedIds={selectedMeasureIds}
             draft={measureDraft}
             onDraftAction={onMeasureDraftAction}
             calibA={measureCalibA}
@@ -296,6 +304,22 @@ export default function PageOverlayHost({
             pageSizePt={pageSizePt}
             pageRotation={pageRotation}
             tableAreaM2={outlineEdit.tableAreaM2 ?? null}
+            holes={outlineEdit.holes || []}
+          />
+        </div>
+      )}
+      {/* Outline tools (2026-10-16) — topmost on the page holding the focused outline; they own the pointer. */}
+      {toolHere && (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <OutlineToolLayer
+            tool={outlineTool}
+            onChange={(update, opts) => onOutlineToolChange?.(update, opts)}
+            rooms={displayRooms}
+            geometry={pageGeometry}
+            renderedSize={{ width, height }}
+            scale={measureScale}
+            pageSizePt={pageSizePt}
+            pageRotation={pageRotation}
           />
         </div>
       )}

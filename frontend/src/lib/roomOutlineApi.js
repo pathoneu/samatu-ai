@@ -48,7 +48,18 @@ export async function fetchSplitProposal(projectId, roomNr, { signal } = {}) {
   return post(projectId, roomNr, 'split-proposal', {}, signal);
 }
 
-/** `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16). */
-export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct }, { signal } = {}) {
-  return post(projectId, roomNr, 'outline-set', { page, polygon_pct }, signal);
+/**
+ * `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16).
+ * `holes`: rings cut out of it („Atimti"); absent or empty clears the ones it had.
+ */
+export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct, holes = null }, { signal } = {}) {
+  return post(projectId, roomNr, 'outline-set', { page, polygon_pct, ...(holes?.length ? { holes } : {}) }, signal);
+}
+
+/**
+ * „Sujungti" (2026-10-16): room `goneNr` merged INTO `keptNr`, whose outline becomes the drawn union.
+ * `{status: 'ok', rooms: {kept, gone}, kitu_angos, neskaiciuoti: [goneNr]}`.
+ */
+export async function fetchOutlineMerge(projectId, goneNr, { page, kept_nr, polygon_pct, holes = null }, { signal } = {}) {
+  return post(projectId, goneNr, 'outline-merge', { page, kept_nr, polygon_pct, ...(holes?.length ? { holes } : {}) }, signal);
 }

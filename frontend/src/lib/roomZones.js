@@ -431,6 +431,8 @@ export function countRoomsMissingGeometry(rooms, { renderedWidth, renderedHeight
   const losers = duplicatePolygonLosers(rooms, page);
   return rooms
     .filter((r) => roomPageOf(r) === page)
+    // a room merged into another („Sujungti", 2026-10-16) has its place: inside the room that took it
+    .filter((r) => r?._konturas?.saltinis !== 'sujungta')
     .filter((r) => losers.has(String(r.nr)) || !buildRoomZone(r, { renderedWidth, renderedHeight }))
     .length;
 }

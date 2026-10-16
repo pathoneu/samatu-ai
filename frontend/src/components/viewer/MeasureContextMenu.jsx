@@ -8,9 +8,13 @@
  * ContextMenu primitive: ContextMenu opens on ANY right-click inside its
  * trigger, while this menu must open only when the click hits a mark (a miss
  * keeps the browser's own menu) — PageOverlayHost hit-tests and hands us the spot.
+ *
+ * Batch mode (2026-10-16, „Laso"): when the click lands inside a multi-mark selection, the menu acts
+ * on all of it — „Keisti žymių tipą" (count marks), „Spalva" (measurements), „Atžymėti", „Ištrinti
+ * visus". One history entry per action.
  */
 import { useEffect, useState } from 'react';
-import { Pencil, Shapes, Trash2, ListTree } from 'lucide-react';
+import { Pencil, Shapes, Trash2, ListTree, Palette, SquareDashedMousePointer } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -19,9 +23,32 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
+// The colours a measurement can take in a batch (the count-type palette of lib/measurements).
+const COLOURS = [
+  { id: '#2a6fb5', label: 'Mėlyna' }, { id: '#2f6b4f', label: 'Žalia' }, { id: '#d97706', label: 'Oranžinė' },
+  { id: '#dc2626', label: 'Raudona' }, { id: '#7c3aed', label: 'Violetinė' }, { id: '#475569', label: 'Pilka' },
+];
 
-export default function MeasureContextMenu({ target, measurement, countTypes = [], onClose, onRename, onChangeType, onDelete, onReveal }) {
+// „3 matavimai", „5 žymės" — Lithuanian count agreement for the two nouns the menu names.
+function ltMany(n, [one, few, many]) {
+  const t = n % 10;
+  const h = n % 100;
+  if (t === 1 && h !== 11) return `${n} ${one}`;
+  if (t >= 2 && t <= 9 && (h < 12 || h > 19)) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+const MEASURES = ['matavimas', 'matavimai', 'matavimų'];
+const MARKS = ['žymė', 'žymės', 'žymių'];
+
+export default function MeasureContextMenu({
+  target, measurement, selection = null, countTypes = [], onClose, onRename, onChangeType, onDelete, onReveal,
+  onDeleteMany, onChangeTypeMany, onRecolorMany, onDeselect,
+}) {
   const [renaming, setRenaming] = useState(null);       // { id, value } while the rename dialog is open
+  if (target && Array.isArray(selection) && selection.length > 1) {
+    return <BatchMenu target={target} selection={selection} countTypes={countTypes} onClose={onClose}
+      onDeleteMany={onDeleteMany} onChangeTypeMany={onChangeTypeMany} onRecolorMany={onRecolorMany} onDeselect={onDeselect} />;
+  }
   const open = !!(target && measurement);
   const typeLabel = measurement?.kind === 'count'
     ? (countTypes.find((t) => t.id === measurement.typeId)?.label || measurement.typeId)
@@ -112,5 +139,56 @@ function RenameDialog({ state, onCancel, onSave }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BatchMenu({ target, selection, countTypes, onClose, onDeleteMany, onChangeTypeMany, onRecolorMany, onDeselect }) {
+  const ids = selection.map((m) => m.id);
+  const marks = selection.filter((m) => m.kind === 'count');
+  const lines = selection.filter((m) => m.kind !== 'count');
+  const parts = [lines.length ? ltMany(lines.length, MEASURES) : null, marks.length ? ltMany(marks.length, MARKS) : null].filter(Boolean);
+  return (
+    <DropdownMenu open onOpenChange={(v) => { if (!v) onClose?.(); }} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <span aria-hidden style={{ position: 'fixed', left: target.clientX, top: target.clientY, width: 1, height: 1, pointerEvents: 'none' }} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={2} className="w-60" data-testid="measure-batch-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">Pažymėta: {parts.join(', ')}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {marks.length > 0 && countTypes.length > 0 && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger><Shapes className="w-3.5 h-3.5 mr-2" />Keisti žymių tipą ({marks.length})</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-52">
+              {countTypes.map((t) => (
+                <DropdownMenuItem key={t.id} onSelect={() => { onChangeTypeMany?.(ids, t.id); onClose?.(); }}>
+                  <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: t.color }} />
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        {lines.length > 0 && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger><Palette className="w-3.5 h-3.5 mr-2" />Spalva ({ltMany(lines.length, MEASURES)})</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-44">
+              {COLOURS.map((c) => (
+                <DropdownMenuItem key={c.id} onSelect={() => { onRecolorMany?.(ids, c.id); onClose?.(); }}>
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm mr-2" style={{ background: c.id }} />
+                  {c.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        <DropdownMenuItem onSelect={() => { onDeselect?.(); onClose?.(); }}>
+          <SquareDashedMousePointer className="w-3.5 h-3.5 mr-2" />Atžymėti
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => { onDeleteMany?.(ids); onClose?.(); }}>
+          <Trash2 className="w-3.5 h-3.5 mr-2" />Ištrinti visus ({selection.length})
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
