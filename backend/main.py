@@ -397,6 +397,7 @@ from api.project_stats import router as project_stats_router
 # Kainynai — xlsx import + durable per-user price-list storage (2026-09-02).
 from api.price_lists import router as price_lists_router
 from api.assemblies import router as assemblies_router
+from api.sudetis import router as sudetis_router
 # Sąmatų šablonai (2026-09-04): the contractor's own sections + labels as the
 # skeleton of our output, and a project rendered through them.
 from api.samata_templates import router as samata_templates_router
@@ -755,6 +756,7 @@ app.include_router(export_excel_router)
 app.include_router(project_stats_router)
 app.include_router(price_lists_router)
 app.include_router(assemblies_router)
+app.include_router(sudetis_router)
 app.include_router(samata_templates_router)
 app.include_router(user_settings_router)
 app.include_router(room_facts_router)
