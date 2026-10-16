@@ -38,14 +38,17 @@ export default function DrawingGeometryLayer({ geometry, rooms = [], page, rende
         const gaps = Number(r?._angos_sienose?.page) === page && Array.isArray(r?._angos_sienose?.angos)
           ? r._angos_sienose.angos : [];
         const confirmed = r.polygon_source === 'corrected' || r.polygon_source === 'manual';
+        // „Atimti" cut-outs (2026-10-16): a column or a shaft shows through the outline's fill (even-odd)
+        const holes = pts && Array.isArray(r.polygon_holes_pct) ? r.polygon_holes_pct.filter((h) => Array.isArray(h) && h.length >= 3) : [];
         return (
           <g key={`r${r.nr}`} data-room-nr={r.nr}>
             {pts && (
-              <polygon
-                points={poly(pts)}
-                fill={OUTLINE} fillOpacity={0.04}
+              <path
+                d={[pts, ...holes].map((ring) => `M ${poly(ring).replace(/ /g, ' L ')} Z`).join(' ')}
+                fill={OUTLINE} fillOpacity={0.04} fillRule="evenodd"
                 stroke={OUTLINE} strokeWidth={1.5} strokeLinejoin="round"
                 strokeDasharray={confirmed ? undefined : '6 4'}
+                data-holes={holes.length || undefined}
               />
             )}
             {gaps.filter((g) => Array.isArray(g.line_pct) && g.line_pct.length === 2).map((g, i) => {

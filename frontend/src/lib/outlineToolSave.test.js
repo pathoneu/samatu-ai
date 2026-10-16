@@ -1,0 +1,90 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { saveOutlineTool } from './outlineToolSave.js';
+
+const ring = [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]];
+const project = () => ({
+  patalpos: [
+    { nr: '01', pavadinimas: 'A', plotas_m2: 12, polygon_pct: ring },
+    { nr: '02', pavadinimas: 'B', plotas_m2: 9 },
+    { nr: '03', pavadinimas: 'C', plotas_m2: 5, _angos_sienose: { page: 1, angos: [] } },
+  ],
+  v8_rooms: [{ nr: '01' }, { nr: '02' }, { nr: '03' }],
+  _apimtis: { patalpos_ne: [], darbai_ne: [] },
+});
+
+test('set: the answer lands on the room, holes travel with the request', async () => {
+  const calls = [];
+  const api = {
+    outlineSet: async (nr, body) => {
+      calls.push([nr, body]);
+      return { status: 'ok', room: { polygon_pct: body.polygon_pct, polygon_holes_pct: body.holes, _konturas: { plotas_m2: 11.5 } } };
+    },
+  };
+  const holes = [[[0.12, 0.12], [0.13, 0.12], [0.13, 0.13]]];
+  const patch = await saveOutlineTool({ kind: 'set', nr: '01', page: 1, polygon: ring, holes }, { api, getFresh: project });
+  assert.deepEqual(calls, [['01', { page: 1, polygon_pct: ring, holes }]]);
+  assert.deepEqual(patch.patalpos[0].polygon_holes_pct, holes);
+  assert.equal(patch.patalpos[0].pavadinimas, 'A');            // nothing but geometry changes
+  assert.equal(patch.v8_rooms[0].polygon_holes_pct, holes);
+  assert.equal(patch._apimtis, undefined);
+});
+
+test('split: both halves land in ONE patch; the answers never speak for the two rooms that changed', async () => {
+  const api = {
+    outlineSet: async (nr, body) => ({
+      status: 'ok',
+      room: { polygon_pct: body.polygon_pct, _konturas: { nr } },
+      kitu_angos: { '01': { stale: nr }, '02': { stale: nr }, '03': { page: 1, angos: [{ i: nr }] } },
+    }),
+  };
+  const other = [[0.2, 0.1], [0.3, 0.1], [0.3, 0.2]];
+  const patch = await saveOutlineTool(
+    { kind: 'split', nr: '01', page: 1, polygon: ring, holes: [], other: { nr: '02', polygon: other, holes: [] } },
+    { api, getFresh: project },
+  );
+  const [a, b, c] = patch.patalpos;
+  assert.deepEqual(a.polygon_pct, ring);
+  assert.deepEqual(b.polygon_pct, other);
+  assert.equal(a._angos_sienose, undefined);
+  assert.equal(b._angos_sienose, undefined);
+  assert.deepEqual(c._angos_sienose, { page: 1, angos: [{ i: '02' }] });
+});
+
+test('split: a refused second half refuses the whole operation', async () => {
+  let n = 0;
+  const api = { outlineSet: async () => (n++ ? { status: 'bad', detail: 'Išpjova turi būti visa kontūro viduje' } : { status: 'ok', room: {} }) };
+  await assert.rejects(
+    saveOutlineTool({ kind: 'split', nr: '01', page: 1, polygon: ring, other: { nr: '02', polygon: ring } }, { api, getFresh: project }),
+    /kontūro viduje/,
+  );
+});
+
+test('merge: the kept room takes the union, the absorbed one is taken out through the scope', async () => {
+  const api = {
+    outlineMerge: async (gone, body) => {
+      assert.equal(gone, '02');
+      assert.equal(body.kept_nr, '01');
+      return {
+        status: 'ok',
+        rooms: {
+          '01': { polygon_pct: body.polygon_pct, _konturas: { prijungta: ['02'] } },
+          '02': { polygon_pct: null, _konturas: { saltinis: 'sujungta', i: '01', plotas_m2: 0 } },
+        },
+        kitu_angos: {},
+        neskaiciuoti: ['02'],
+      };
+    },
+  };
+  const patch = await saveOutlineTool({ kind: 'merge', keptNr: '01', goneNr: '02', page: 1, polygon: ring }, { api, getFresh: project });
+  assert.deepEqual(patch._apimtis.patalpos_ne, ['02']);
+  assert.equal('polygon_pct' in patch.patalpos[1], false);
+  assert.equal(patch.patalpos[1]._konturas.saltinis, 'sujungta');
+  assert.equal(patch.patalpos[1].plotas_m2, 9);                 // the table's area is not touched — the scope takes it out
+});
+
+test('unknown operations and refused answers throw with the server sentence', async () => {
+  await assert.rejects(saveOutlineTool({ kind: 'x' }, { api: {}, getFresh: project }), /Nežinomas/);
+  const api = { outlineSet: async () => ({ status: 'nope', detail: 'Kontūras per mažas arba išsigimęs' }) };
+  await assert.rejects(saveOutlineTool({ kind: 'set', nr: '01', page: 1, polygon: ring }, { api, getFresh: project }), /per mažas/);
+});

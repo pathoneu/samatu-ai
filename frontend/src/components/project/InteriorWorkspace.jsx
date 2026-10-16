@@ -34,8 +34,9 @@ import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
-import { fetchOutlineSet } from '@/lib/roomOutlineApi';
+import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
+import { saveOutlineTool } from '@/lib/outlineToolSave';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 
 // Outlines that must never be re-detected over. The last two are traced by the
@@ -345,8 +346,8 @@ export default function InteriorWorkspace({
   // roomsWithOutline applies them to the rooms and nothing else. Saving dispatches
   // samatu:project-recompute, which InteriorProject routes through /recompute-interior — the one path
   // every other room edit takes.
-  const handleRoomOutlineEdit = async (roomNr, page, points) => {
-    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points });
+  const handleRoomOutlineEdit = async (roomNr, page, points, holes = null) => {
+    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points, holes });
     const fresh = getProject(project.id) || project;
     const rooms = roomsWithOutline(fresh, roomNr, answer);
     if (!rooms) throw new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
@@ -360,6 +361,25 @@ export default function InteriorWorkspace({
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
         detail: { projectId: project.id, reason: 'outline-edited', roomNr },
+      }));
+    }
+  };
+
+  // Outline tools (2026-10-16): „Padalyti" / „Sujungti" / „Atimti" — lib/outlineToolSave builds ONE patch
+  // from the server's answers, then the sheet recomputes once on the usual path.
+  const handleOutlineTool = async (op) => {
+    const patch = await saveOutlineTool(op, {
+      api: {
+        outlineSet: (nr, body) => fetchOutlineSet(project.id, nr, body),
+        outlineMerge: (nr, body) => fetchOutlineMerge(project.id, nr, body),
+      },
+      getFresh: () => getProject(project.id) || project,
+    });
+    const updated = updateProject(project.id, patch);
+    if (updated) onProjectChange?.(updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
+        detail: { projectId: project.id, reason: `outline-${op.kind}`, roomNr: op.nr ?? op.keptNr },
       }));
     }
   };
@@ -480,6 +500,7 @@ export default function InteriorWorkspace({
               onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
               onRoomPolygonFill={handleRoomPolygonFill}
               onRoomOutlineEdit={handleRoomOutlineEdit}
+              onOutlineTool={handleOutlineTool}
               fillRequest={fillRequest}
               exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
               initialMeasurements={project?.measurements || []}

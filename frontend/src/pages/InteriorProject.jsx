@@ -978,8 +978,12 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // Phase C-1 Task 21: wrapped in useCallback so the samatu:project-recompute
   // listener (below) gets a stable reference and re-binds only when project
   // identity / overrides change, not on every render.
-  const handleRoomsChange = useCallback(async (newRooms) => {
+  const handleRoomsChange = useCallback(async (newRooms, opts = null) => {
     if (!Array.isArray(newRooms)) return;
+    // `opts.stored` (the samatu:project-recompute listener): the project as just written — an edit that also
+    // changed the scope (a merged-away room, 2026-10-16) lands before this component re-renders with it.
+    // RoomsGrid passes its totals in this slot, which carry no `stored`.
+    const stored = opts?.stored || null;
     setIsRecomputing(true);
     try {
       const res = await fetch(`${API_BASE}/recompute-interior`, {
@@ -988,7 +992,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patalpos: newRooms,
-          rules_override: rulesWithScope(project._overrides, project._apimtis),
+          rules_override: rulesWithScope(project._overrides, (stored || project)._apimtis),
           per_room_overrides: project._per_room_overrides || {},
           archetipas: project.archetipas,
           bendras_plotas_m2: newRooms.reduce(
@@ -1019,7 +1023,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       // room edit and 15 deleted priced rows. (P0 2026-07-28.)
       const notes = [];
       const merged = {
-        ...project,
+        ...(stored || project),
         ...result,
         // Preserve metadata user may have edited
         name: project.name,
@@ -1053,7 +1057,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       if (!e?.detail || e.detail.projectId !== project.id) return;
       const fresh = getProject(project.id);
       if (fresh?.patalpos) {
-        handleRoomsChange(fresh.patalpos);
+        handleRoomsChange(fresh.patalpos, { stored: fresh });
       }
     };
     window.addEventListener('samatu:project-recompute', onRecompute);

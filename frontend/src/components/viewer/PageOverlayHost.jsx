@@ -24,6 +24,7 @@ import MeasureLayer, { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from 
 import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
 import OutlineEditLayer from './OutlineEditLayer';
+import OutlineToolLayer from './OutlineToolLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -73,6 +74,9 @@ export default function PageOverlayHost({
   outlineEdit = null,
   onOutlineEditChange = null,
   onOutlineGestureStart = null,
+  // Outline tools (2026-10-16): the active split / merge / subtract state (useOutlineTool) and its setter.
+  outlineTool = null,
+  onOutlineToolChange = null,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -133,7 +137,8 @@ export default function PageOverlayHost({
   // scroll virtualization mounting and unmounting this host costs nothing after the first ask.
   const measureActive = measureTool != null;
   const editingHere = !!outlineEdit && outlineEdit.page === layout.pageNumber;
-  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible || editingHere);
+  const toolHere = !!outlineTool && outlineTool.page === layout.pageNumber;
+  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible || editingHere || toolHere);
   const drawingSnapPolygons = useMemo(
     () => snapPolygonsFromGeometry(pageGeometry, { pageWidthPt, pageHeightPt, pageRotation }),
     [pageGeometry, pageWidthPt, pageHeightPt, pageRotation],
@@ -218,7 +223,7 @@ export default function PageOverlayHost({
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           zoneFillsVisible={zoneFillsVisible}
-          interactive={!measureActive && !outlineEdit}
+          interactive={!measureActive && !outlineEdit && !outlineTool}
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
@@ -276,6 +281,22 @@ export default function PageOverlayHost({
             pageSizePt={pageSizePt}
             pageRotation={pageRotation}
             tableAreaM2={outlineEdit.tableAreaM2 ?? null}
+            holes={outlineEdit.holes || []}
+          />
+        </div>
+      )}
+      {/* Outline tools (2026-10-16) — topmost on the page holding the focused outline; they own the pointer. */}
+      {toolHere && (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <OutlineToolLayer
+            tool={outlineTool}
+            onChange={(update, opts) => onOutlineToolChange?.(update, opts)}
+            rooms={displayRooms}
+            geometry={pageGeometry}
+            renderedSize={{ width, height }}
+            scale={measureScale}
+            pageSizePt={pageSizePt}
+            pageRotation={pageRotation}
           />
         </div>
       )}

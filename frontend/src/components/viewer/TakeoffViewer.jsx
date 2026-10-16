@@ -39,6 +39,9 @@ import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
 import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu from './MeasureContextMenu';
+import OutlineToolButtons from './OutlineToolButtons';
+import OutlineToolPanel from './OutlineToolPanel';
+import useOutlineTool, { roomHoles } from './useOutlineTool';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 
@@ -168,7 +171,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, outlineToolsSlot = null, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -311,6 +314,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               <span>Redaguoti kontūrą</span>
             </button>
           ) : null}
+          {!outlineEdit && fillFor == null && outlineToolsSlot}
           {fillFor == null ? (
             <button
               className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
@@ -716,7 +720,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
+function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, onOutlineTool = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -749,11 +753,12 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
       return;
     }
-    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null);
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); outlineTools.cancel();
     setOutlineEdit({
       nr: String(r.nr),
       page: roomPageOf(r),
       points: r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]),
+      holes: roomHoles(r),       // „Atimti" cut-outs ride along: a vertex edit keeps them
       history: [],
       tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
     });
@@ -773,7 +778,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     if (outlineInvalid) { toast.error('Kontūras kertasi pats su savimi — pataisykite viršūnes prieš išsaugant'); return; }
     setOutlineSaving(true);
     try {
-      await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points);
+      await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points, outlineEdit.holes);
       toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`);
       setOutlineEdit(null);
     } catch (e) {
@@ -797,6 +802,15 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [!!outlineEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Outline tools (2026-10-16): „Padalyti" / „Sujungti" / „Atimti" on the focused room's outline —
+  // state in useOutlineTool, the page half in OutlineToolLayer, numbers and choices in OutlineToolPanel.
+  const outlineTools = useOutlineTool({
+    rooms,
+    focusedRoom,
+    onSave: onOutlineTool,
+    onBeforeStart: () => { setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null); },
+  });
 
   // ---- Measurement subsystem (Phase 3) ------------------------------------
   // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
@@ -866,6 +880,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // same thing plain Z does there — so Ctrl+Z never jumps over the work under the cursor.
   const undoMeasure = () => {
     if (outlineEdit) { undoOutline(); return; }
+    if (outlineTools.tool) { outlineTools.undo(); return; }
     if (draftPoints > 0) { dispatchDraft(draftSlot.pageNr, { type: 'undo' }); return; }
     const last = measureHist.past[measureHist.past.length - 1];
     if (!last) { toast.info('Nėra ką atšaukti'); return; }
@@ -873,7 +888,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     toast(`Atšaukta: ${last.label}`, { description: `${keyText('redo')} — grąžinti` });
   };
   const redoMeasure = () => {
-    if (outlineEdit || draftPoints > 0) return;
+    if (outlineEdit || outlineTools.tool || draftPoints > 0) return;
     const next = measureHist.future[measureHist.future.length - 1];
     if (!next) { toast.info('Nėra ką grąžinti'); return; }
     dispatchMeasureHist({ type: 'redo' });
@@ -952,6 +967,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // the active tool (MeasureLayer resets its own draft when the tool changes).
   const measureEscape = () => {
     if (outlineEdit) { setOutlineEdit(null); return true; }
+    if (outlineTools.tool) { outlineTools.cancel(); return true; }
     if (calibRequest) { setCalibRequest(null); return true; }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
     return false;
@@ -1048,7 +1064,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       // tool owns the pointer, leave focus alone. Same while an outline is being
       // edited: a drag that starts a hair off a vertex must not drop the focus
       // (which would abandon the edit, 2026-10-16).
-      if (measureTool == null && !outlineEdit) {
+      if (measureTool == null && !outlineEdit && !outlineTools.tool) {
         onClearFocus?.();
         onPagePoint?.(pt);
       }
@@ -1163,6 +1179,14 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             outlineCanUndo={!!outlineEdit?.history?.length}
             outlineInvalid={outlineInvalid}
             outlineSaving={outlineSaving}
+            outlineToolsSlot={check || !onOutlineTool ? null : (
+              <OutlineToolButtons
+                focusedRoomNr={focusedRoomNr}
+                active={outlineTools.tool?.mode ?? null}
+                onStart={outlineTools.start}
+                onCancel={outlineTools.cancel}
+              />
+            )}
             onDownload={handleDownload}
             historyOpen={historyOpen}
             onToggleHistory={check ? null : () => setHistoryOpen((v) => !v)}
@@ -1217,6 +1241,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       outlineEdit={outlineEdit}
                       onOutlineEditChange={(points) => setOutlineEdit((cur) => (cur ? { ...cur, points } : cur))}
                       onOutlineGestureStart={snapshotOutline}
+                      outlineTool={outlineTools.tool}
+                      onOutlineToolChange={outlineTools.change}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}
@@ -1270,6 +1296,19 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                 {outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
             )}
+            <OutlineToolPanel
+              tool={outlineTools.tool}
+              rooms={rooms}
+              saving={outlineTools.saving}
+              canSave={outlineTools.canSave}
+              scale={outlineTools.tool ? effectiveScales[outlineTools.tool.page] || null : null}
+              pageSizePt={outlineTools.tool ? documentState?.document?.pages?.[outlineTools.tool.page - 1]?.size ?? null : null}
+              pageRotation={outlineTools.tool ? documentState?.document?.pages?.[outlineTools.tool.page - 1]?.rotation ?? 0 : 0}
+              onChange={outlineTools.change}
+              onUndo={outlineTools.undo}
+              onCancel={outlineTools.cancel}
+              onSave={outlineTools.save}
+            />
             {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
             {wallsLayerVisible && !check && (
               <div className="absolute bottom-2 right-2 z-30 px-3 py-1.5 rounded border border-border bg-card/95 text-[11px] text-foreground shadow-md pointer-events-none flex items-center gap-3" data-testid="walls-legend">
@@ -1374,6 +1413,8 @@ export default function TakeoffViewer({
   fileUrl,
   // (nr, page, points_pct) => Promise — saves an outline edited vertex by vertex (2026-10-16).
   onRoomOutlineEdit = null,
+  // (op) => Promise — saves an outline tool's result: split / merge / subtract (lib/outlineToolSave, 2026-10-16).
+  onOutlineTool = null,
   rooms = [],
   focusedRoom = null,
   focusedPage = null,
@@ -1418,6 +1459,7 @@ export default function TakeoffViewer({
       <EmbedPDF engine={engine} plugins={plugins}>
         <ViewerInner
           onRoomOutlineEdit={onRoomOutlineEdit}
+          onOutlineTool={onOutlineTool}
           check={check}
           focus={focus}
           rooms={rooms}

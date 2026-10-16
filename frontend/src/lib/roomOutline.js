@@ -22,6 +22,7 @@ export const GEOMETRY_ROOM_KEYS = [
   'perimetras_m', 'perimetras_saltinis', '_sienos', '_perimetras_suma', '_perimetras_priezastis',
   '_perimetras_ivertis_m', '_perimetras_ivertis_saltinis', '_perimetras_pries_geometrija',
   '_angos_sienose', 'grindu_danga', 'grindu_danga_saltinis', '_grindu_danga', '_grindu_dangos_dvi',
+  'polygon_holes_pct',
 ];
 
 /**
