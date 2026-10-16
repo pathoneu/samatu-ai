@@ -278,3 +278,93 @@ def test_outline_set_rejects_a_degenerate_ring(tmp_path, monkeypatch):
     assert c.post("/api/projects/p1/rooms/01/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.2]]}).status_code == 422
     assert c.post("/api/projects/p1/rooms/01/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.1, 0.1], [0.1, 0.1]]}).status_code == 400
     assert c.post("/api/projects/p1/rooms/99/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]]}).status_code == 404
+
+
+# ── holes („Atimti", 2026-10-16): a column or a shaft cut out of a drawn outline ─────────────────────
+
+def _set_holes(client, ring_m, holes_m, nr="01", page=1, project_id="p1"):
+    ring = [list(_pct(x, y)) for x, y in ring_m]
+    holes = [[list(_pct(x, y)) for x, y in h] for h in holes_m]
+    return client.post(f"/api/projects/{project_id}/rooms/{nr}/outline-set",
+                       json={"page": page, "polygon_pct": ring, "holes": holes})
+
+
+def test_a_hole_comes_off_the_area_and_its_perimeter_is_kept_apart(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    outer = [(t, t), (4 + t, t), (4 + t, 3 + t), (t, 3 + t)]
+    column = [(1.0, 1.0), (1.5, 1.0), (1.5, 1.5), (1.0, 1.5)]          # 0,5 × 0,5 m
+    r = _set_holes(TestClient(app), outer, [column])
+    assert r.status_code == 200, r.text
+    room = r.json()["room"]
+    k = room["_konturas"]
+    assert abs(k["plotas_m2"] - (12.0 - 0.25)) < 0.2                    # outer − hole
+    assert abs(k["perimetras_m"] - 14.0) < 0.2                          # the OUTER ring only
+    assert k["skyles"] == 1 and abs(k["skyliu_plotas_m2"] - 0.25) < 0.02 and abs(k["skyliu_perimetras_m"] - 2.0) < 0.05
+    assert len(room["polygon_holes_pct"]) == 1 and len(room["polygon_holes_pct"][0]) == 4
+    # a ring without holes clears the ones it had
+    plain = _set(TestClient(app), outer).json()["room"]
+    assert plain["polygon_holes_pct"] is None and "skyles" not in plain["_konturas"]
+
+
+def test_a_hole_outside_the_outline_or_overlapping_another_is_refused(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    c = TestClient(app)
+    t = 0.2
+    outer = [(t, t), (4 + t, t), (4 + t, 3 + t), (t, 3 + t)]
+    out = _set_holes(c, outer, [[(3.9, 1.0), (4.8, 1.0), (4.8, 1.5), (3.9, 1.5)]])
+    assert out.status_code == 400 and "kontūro viduje" in out.json()["detail"]
+    a = [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0), (1.0, 2.0)]
+    b = [(1.5, 1.5), (2.5, 1.5), (2.5, 2.5), (1.5, 2.5)]
+    assert _set_holes(c, outer, [a, b]).status_code == 400
+    assert c.post("/api/projects/p1/rooms/01/outline-set",
+                  json={"page": 1, "polygon_pct": [list(_pct(x, y)) for x, y in outer], "holes": [[[0.3, 0.3], [0.31, 0.3]]]}).status_code == 400
+    assert c.post("/api/projects/p1/rooms/01/outline-set",
+                  json={"page": 1, "polygon_pct": [list(_pct(x, y)) for x, y in outer], "holes": [[[0.3, 0.3], [1.3, 0.3], [0.3, 0.4]]]}).status_code == 400
+
+
+# ── outline-merge („Sujungti", 2026-10-16): one room absorbed into another ─────────────────────────────
+
+def _merge(client, ring_m, *, gone="02", kept="01", page=1, project_id="p1"):
+    ring = [list(_pct(x, y)) for x, y in ring_m]
+    return client.post(f"/api/projects/{project_id}/rooms/{gone}/outline-merge",
+                       json={"page": page, "kept_nr": kept, "polygon_pct": ring})
+
+
+def test_merge_gives_the_kept_room_the_union_and_takes_the_other_out(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    before = copy.deepcopy(db.get_project("p1"))
+    t = 0.2
+    union = [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]       # both rooms and the partition between them
+    r = _merge(TestClient(app), union)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["status"] == "ok" and out["neskaiciuoti"] == ["02"]
+    kept, gone = out["rooms"]["01"], out["rooms"]["02"]
+    assert kept["polygon_source"] == "corrected" and kept["_konturas"]["saltinis"] == "nubrezta"
+    assert kept["_konturas"]["prijungta"] == ["02"] and kept["_konturas"]["plotas_uzrasas_kartu_m2"] == 21.0
+    # the drawn union is compared with BOTH printed areas, not with the kept room's alone
+    assert abs(kept["_konturas"]["plotas_m2"] - 21.6) < 0.3 and abs(kept["_konturas"]["paklaida"]) < 0.05
+    # the absorbed room keeps no outline and bills no area of its own
+    assert gone["polygon_pct"] is None and gone["polygon_source"] is None
+    assert gone["_konturas"] == {"page": 1, "saltinis": "sujungta", "i": "01", "plotas_m2": 0.0, "perimetras_m": 0.0,
+                                 "plotas_uzrasas_m2": 9.0}
+    assert gone["_sienos"] is None and gone["_angos_sienose"] is None
+    # …and nothing was saved
+    assert db.get_project("p1")["patalpos"] == before["patalpos"]
+
+
+def test_merge_bad_requests(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    c = TestClient(app)
+    t = 0.2
+    union = [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]
+    assert _merge(c, union, gone="01", kept="01").status_code == 400
+    assert _merge(c, union, gone="77").status_code == 404
+    assert _merge(c, union, kept="77").status_code == 404
+    assert _merge(c, union, project_id="nope").status_code == 404
+    assert c.post("/api/projects/p1/rooms/02/outline-merge", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]]}).status_code == 422

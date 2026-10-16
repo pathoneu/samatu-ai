@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
@@ -53,6 +52,7 @@ GEOMETRY_ROOM_KEYS = (
     "perimetras_m", "perimetras_saltinis", "_sienos", "_perimetras_suma", "_perimetras_priezastis",
     "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis", "_perimetras_pries_geometrija",
     "_angos_sienose", "grindu_danga", "grindu_danga_saltinis", "_grindu_danga", "_grindu_dangos_dvi",
+    "polygon_holes_pct",
 )
 
 
@@ -76,12 +76,21 @@ class SplitSpace(BaseModel):
 
 
 class OutlineSet(BaseModel):
-    """A ring a PERSON drew or edited in the viewer (2026-10-16): display-frame page fractions, ≥ 3 points."""
+    """A ring a PERSON drew or edited in the viewer (2026-10-16): display-frame page fractions, ≥ 3 points.
+    `holes`: what he cut out of it („Atimti" — a column, a built-in closet, a shaft), each a ring inside it."""
     page: int = Field(ge=1)
     polygon_pct: list[list[float]] = Field(min_length=3, max_length=500)
+    holes: list[list[list[float]]] | None = Field(default=None, max_length=50)
+
+
+class OutlineMerge(OutlineSet):
+    """„Sujungti" (2026-10-16): the room in the path is ABSORBED into `kept_nr`, whose outline becomes the
+    union the viewer drew (`polygon_pct`, `holes`)."""
+    kept_nr: str = Field(min_length=1, max_length=8)
 
 
 DRAWN = "nubrezta"               # `_konturas.saltinis` of an outline a person drew or edited vertex by vertex
+MERGED = "sujungta"              # …of a room a person merged INTO another (`i`: the room that took its place)
 
 
 def _nr(room: dict) -> str:
@@ -208,57 +217,166 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
     }
 
 
-@router.post("/{project_id}/rooms/{room_nr}/outline-set")
-def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: OutlineSet):
-    """The ring the person drew IS the room's outline (2026-10-16, Togal analysis §10): marked `corrected`
-    (the lane never re-traces it), its area and perimeter measured at the sheet's scale, its walls and
-    openings read again — exactly what a click (`outline-at`) does, with the person's geometry instead of
-    the wall solid's face. The printed area stays the room's area; the drawn one is shown beside it
-    (`_konturas.plotas_m2`, `paklaida`). Saves nothing — the sheet patches the room and recomputes."""
-    # Ownership FIRST (tests/test_route_ownership_policy.py): a stranger's malformed ring must get the
-    # same 404 as a stranger's well-formed one — never a 400 that says the project exists.
-    _project_for(request, project_id)
+def _ring_of(raw: list[list[float]], what: str) -> list[tuple[float, float]]:
     ring: list[tuple[float, float]] = []
-    for pt in body.polygon_pct:
+    for pt in raw:
         if len(pt) != 2 or not all(0.0 <= float(v) <= 1.0 for v in pt):
-            raise HTTPException(status_code=400, detail="Kontūro taškai turi būti lapo dalys 0–1")
+            raise HTTPException(status_code=400, detail=f"{what} taškai turi būti lapo dalys 0–1")
         ring.append((float(pt[0]), float(pt[1])))
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
-    pts = [(x * W, y * H) for x, y in ring]
-    n = len(pts)
-    area_pt2 = abs(sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))) / 2
-    if area_pt2 < 1.0:
-        raise HTTPException(status_code=400, detail="Kontūras per mažas arba išsigimęs")
-    perim_pt = sum(math.dist(pts[i], pts[(i + 1) % n]) for i in range(n))
-    plotas = round(area_pt2 * scale * scale, 2)
-    perimetras = round(perim_pt * scale, 2)
-    table = room.get("plotas_m2")
-    has_table = isinstance(table, (int, float)) and not isinstance(table, bool) and float(table) > 0
-    paklaida = round((plotas - float(table)) / float(table), 4) if has_table else None
+    return ring
 
+
+def _drawn_rings(body: OutlineSet) -> tuple[list[tuple[float, float]], list[list[tuple[float, float]]]]:
+    """The outline and its holes as page fractions — validated AFTER ownership (a stranger's malformed ring
+    gets the same 404 as a well-formed one)."""
+    ring = _ring_of(body.polygon_pct, "Kontūro")
+    holes = []
+    for raw in body.holes or []:
+        if not 3 <= len(raw) <= 200:
+            raise HTTPException(status_code=400, detail="Išpjovoje turi būti nuo 3 iki 200 taškų")
+        holes.append(_ring_of(raw, "Išpjovos"))
+    return ring, holes
+
+
+def _measured(ring, holes, size: tuple[float, float], scale: float) -> dict:
+    """Area (outer − holes), the OUTER perimeter, and the holes' own perimeter kept apart — whether the
+    faces round a column count as wall surface is the engine's question, not this route's."""
+    from shapely.geometry import Polygon
+    W, H = size
+    outer = Polygon([(x * W, y * H) for x, y in ring])
+    if outer.area < 1.0:
+        raise HTTPException(status_code=400, detail="Kontūras per mažas arba išsigimęs")
+    if not outer.is_valid:
+        raise HTTPException(status_code=400, detail="Kontūras kertasi pats su savimi")
+    cut = []
+    for h in holes:
+        hole = Polygon([(x * W, y * H) for x, y in h])
+        if hole.area < 1.0 or not hole.is_valid:
+            raise HTTPException(status_code=400, detail="Išpjova per maža arba kertasi pati su savimi")
+        if not outer.contains(hole):
+            raise HTTPException(status_code=400, detail="Išpjova turi būti visa kontūro viduje")
+        if any(hole.intersects(o) for o in cut):
+            raise HTTPException(status_code=400, detail="Išpjovos persidengia")
+        cut.append(hole)
+    perim_pt = outer.exterior.length
+    return {
+        "plotas_m2": round((outer.area - sum(h.area for h in cut)) * scale * scale, 2),
+        "perimetras_m": round(perim_pt * scale, 2),
+        "skyliu_plotas_m2": round(sum(h.area for h in cut) * scale * scale, 2) if cut else None,
+        "skyliu_perimetras_m": round(sum(h.exterior.length for h in cut) * scale, 2) if cut else None,
+    }
+
+
+def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], scale: float,
+                 *, table_m2: float | None = None, extra: dict | None = None) -> float:
+    """Write the person's ring (and holes) onto `room` as its corrected outline → the drawn perimeter.
+    `table_m2`: the printed area the drawn one is compared with (default: the room's own)."""
+    m = _measured(ring, holes, size, scale)
+    if table_m2 is None:
+        table = room.get("plotas_m2")
+        table_m2 = float(table) if isinstance(table, (int, float)) and not isinstance(table, bool) and float(table) > 0 else None
+    paklaida = round((m["plotas_m2"] - table_m2) / table_m2, 4) if table_m2 else None
     room["polygon_pct"] = [[round(x, 5), round(y, 5)] for x, y in ring]
+    if holes:
+        room["polygon_holes_pct"] = [[[round(x, 5), round(y, 5)] for x, y in h] for h in holes]
+    else:
+        room.pop("polygon_holes_pct", None)
     room["polygon_source"] = "corrected"
     room["polygon_corrected_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    room["_konturas"] = {"page": body.page, "plotas_m2": plotas, "perimetras_m": perimetras,
-                         "plotas_uzrasas_m2": table if has_table else None, "paklaida": paklaida,
-                         "plotas_nesutampa": False, "saltinis": DRAWN}
+    own = room.get("plotas_m2")
+    room["_konturas"] = {"page": page, "plotas_m2": m["plotas_m2"], "perimetras_m": m["perimetras_m"],
+                         "plotas_uzrasas_m2": own if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0 else None,
+                         "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": DRAWN}
+    if holes:
+        room["_konturas"].update(skyles=len(holes), skyliu_plotas_m2=m["skyliu_plotas_m2"],
+                                 skyliu_perimetras_m=m["skyliu_perimetras_m"])
+    if extra:
+        room["_konturas"].update(extra)
     for stale in ("_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve", "_angos_sienose"):
         room.pop(stale, None)
     if str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis", "sienu_konturas"):
         # a perimeter that rested on the OLD outline — the walls are read afresh along the new one
         for stale in _ESTIMATE_KEYS:
             room.pop(stale, None)
-    apply_geometry(parsed, pdf_bytes, dims)
+    return m["perimetras_m"]
+
+
+def _drawn_perimeter_if_unread(room: dict, perimetras: float) -> None:
     if str(room.get("perimetras_saltinis") or "") in ("", "vision"):
         # no dimension strings along the drawn walls: the drawn perimeter is the room's, named as such
         room["_perimetras_pries_geometrija"] = room.get("perimetras_m")
         room["perimetras_m"] = perimetras
         room["perimetras_saltinis"] = "sienu_konturas"
+
+
+@router.post("/{project_id}/rooms/{room_nr}/outline-set")
+def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: OutlineSet):
+    """The ring the person drew IS the room's outline (2026-10-16, Togal analysis §10): marked `corrected`
+    (the lane never re-traces it), its area and perimeter measured at the sheet's scale, its walls and
+    openings read again — exactly what a click (`outline-at`) does, with the person's geometry instead of
+    the wall solid's face. The printed area stays the room's area; the drawn one is shown beside it
+    (`_konturas.plotas_m2`, `paklaida`). Holes („Atimti") come off the drawn area; their perimeter is kept
+    apart (`_konturas.skyliu_perimetras_m`), never added to the room's. Saves nothing — the sheet patches
+    the room and recomputes."""
+    # Ownership FIRST (tests/test_route_ownership_policy.py): a stranger's malformed ring must get the
+    # same 404 as a stranger's well-formed one — never a 400 that says the project exists.
+    _project_for(request, project_id)
+    ring, holes = _drawn_rings(body)
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale)
+    apply_geometry(parsed, pdf_bytes, dims)
+    _drawn_perimeter_if_unread(room, perimetras)
     return {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
+    }
+
+
+@router.post("/{project_id}/rooms/{room_nr}/outline-merge")
+def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body: OutlineMerge):
+    """„Sujungti" (2026-10-16): room `room_nr` is merged INTO `kept_nr`. The kept room takes the union the
+    viewer drew — exactly as `outline-set` writes a drawn ring, its drawn area compared with BOTH printed
+    areas — and the absorbed one keeps no outline: `_konturas = {saltinis: "sujungta", i: kept_nr,
+    plotas_m2: 0}`. It must not keep billing its own area, so the answer names it in `neskaiciuoti` and the
+    sheet takes it out the way every excluded room is taken out (`_apimtis.patalpos_ne`, extractor/scope.py:
+    kept on the sheet, out of every row, put back with one switch). Saves nothing."""
+    _project_for(request, project_id)
+    ring, holes = _drawn_rings(body)
+    kept_nr, gone_nr = str(body.kept_nr).strip(), str(room_nr).strip()
+    if kept_nr == gone_nr:
+        raise HTTPException(status_code=400, detail="Patalpos su ja pačia sujungti negalima")
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, kept = _todays_reading(request, project_id, kept_nr, body.page, "room_outline")
+    gone = next((r for r in rooms if _nr(r) == gone_nr), None)
+    if gone is None:
+        raise HTTPException(status_code=404, detail="Patalpa nerasta")
+
+    def printed(r):
+        v = r.get("plotas_m2")
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and float(v) > 0 else None
+
+    both = (printed(kept) or 0.0) + (printed(gone) or 0.0)
+    perimetras = _set_outline(kept, ring, holes, body.page, (W, H), scale, table_m2=both or None,
+                              extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": round(both, 2) if both else None})
+
+    def absorb(r):
+        for k in GEOMETRY_ROOM_KEYS:
+            if k not in ("perimetras_m", "perimetras_saltinis", "grindu_danga", "grindu_danga_saltinis", "_grindu_danga", "_grindu_dangos_dvi"):
+                r.pop(k, None)
+        r["_konturas"] = {"page": body.page, "saltinis": MERGED, "i": kept_nr, "plotas_m2": 0.0, "perimetras_m": 0.0,
+                          "plotas_uzrasas_m2": printed(r)}
+
+    absorb(gone)
+    apply_geometry(parsed, pdf_bytes, dims)
+    absorb(gone)            # whatever the lane made of a room with no outline today is not its geometry: it is merged
+    _drawn_perimeter_if_unread(kept, perimetras)
+    return {
+        "status": "ok",
+        "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
+        "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
+                       if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
+        "neskaiciuoti": [gone_nr],
     }
 
 
