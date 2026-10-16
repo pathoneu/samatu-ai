@@ -411,6 +411,7 @@ from api.free_reread import router as free_reread_router
 from api.detect_run import router as detect_run_router
 from api.room_outline import router as room_outline_router
 from api.page_geometry import router as page_geometry_router
+from api.sheet_links import router as sheet_links_router
 from api.project_questions import router as project_questions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
 
@@ -759,6 +760,7 @@ app.include_router(free_reread_router)
 app.include_router(detect_run_router)
 app.include_router(room_outline_router)
 app.include_router(page_geometry_router)
+app.include_router(sheet_links_router)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
 app.include_router(account_router)

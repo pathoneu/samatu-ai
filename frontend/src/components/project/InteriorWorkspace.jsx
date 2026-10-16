@@ -34,7 +34,7 @@ import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { laneScalesOf } from '@/lib/durableScale';
-import { getProject, updateProject } from '@/lib/projectStore';
+import { getProject, updateProject, flushProjectSaves } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
@@ -405,6 +405,16 @@ export default function InteriorWorkspace({
     if (updated) onProjectChange?.(updated);
   };
 
+  // Sheet names / types / groups the user set in the viewer's sheet rail (Togal-v2 W7) — a frontend
+  // key on the project blob like `measurements`. The links between sheets are read server side from
+  // the SAVED blob, so they are asked for again (version bump) once this save has landed.
+  const [sheetLinksVersion, setSheetLinksVersion] = useState(0);
+  const handleSheetOverridesChange = (next) => {
+    const updated = updateProject(project.id, { sheet_overrides: next });
+    if (updated) onProjectChange?.(updated);
+    flushProjectSaves().finally(() => setSheetLinksVersion((v) => v + 1));
+  };
+
   // Per-room canvas visibility handlers (panel eye toggles, Phase 1 declutter).
   const handleToggleRoomVisibility = (nr) => {
     const key = String(nr);
@@ -522,6 +532,10 @@ export default function InteriorWorkspace({
               project={project}
               initialCountTypes={project?.countTypes || null}
               onMeasureDataChange={handleMeasureDataChange}
+              sheetPages={project?.puslapiai || project?.v8_pages || []}
+              sheetOverrides={project?.sheet_overrides || null}
+              onSheetOverridesChange={handleSheetOverridesChange}
+              sheetLinksVersion={sheetLinksVersion}
               onRoomZoneClick={(room) => {
                 if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
                 setLocalFocusedRoom(room);

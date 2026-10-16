@@ -26,6 +26,7 @@ import DrawingGeometryLayer from './DrawingGeometryLayer';
 import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
 import OutlineToolLayer from './OutlineToolLayer';
+import CalloutLayer from './CalloutLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -111,6 +112,9 @@ export default function PageOverlayHost({
   checkData = null,
   // „Rasti panašius" (2026-10-16): the useSymbolSearch session from TakeoffViewer, or null.
   symbolSearch = null,
+  // Sheet links (Togal-v2 W7): { sheets, version } — references on this sheet to other sheets,
+  // underlined; `sheets` is the rail's model so the hover names a sheet the way the rail does.
+  sheetLinks = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -233,6 +237,17 @@ export default function PageOverlayHost({
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
+      )}
+      {!checkMode && sheetLinks && projectId && (
+        <CalloutLayer
+          documentId={documentId}
+          projectId={projectId}
+          page={layout.pageNumber}
+          version={sheetLinks.version}
+          renderedSize={{ width, height }}
+          sheets={sheetLinks.sheets}
+          interactive={!measureActive && !outlineEdit}
+        />
       )}
       {/* Measure layer — top of the page z-stack. Mounted always so committed
           measurements render; tool='pan' when idle keeps its SVG click-through. */}
