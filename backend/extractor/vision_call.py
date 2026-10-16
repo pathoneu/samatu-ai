@@ -29,7 +29,7 @@ from .prompt import (
 from models_config import model_for
 from . import ledger as _ledger
 from . import run_usage as _run_usage
-from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, gkp_ceiling_areas_m2, kiekis_units, lt_num
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, SKIRTING_WASTE, gkp_ceiling_areas_m2, kiekis_units, lt_num
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -1276,7 +1276,7 @@ _PAINT_CLASS_DEFAULT = 2
 PRIMER_COVERAGE_M2_PER_L = 7.0        # gruntas: 1 coat, m² per litre
 ROTBAND_KG_PER_M2 = 10.0              # Rotband at ~5 mm
 CORNER_BEAD_M_PER_M = 0.3             # PVC kampuotės per metre of „Dažymo kampų montavimas"
-SKIRTING_WASTE = 1.10                 # grindjuostės + 10 % atliekų
+# SKIRTING_WASTE (grindjuostės + 10 % atliekų) is owned by universal_rules, imported above.
 CORNICE_WASTE = 1.05                  # karnizas + 5 % atliekų
 NICHE_PROFILE_M_PER_M = 2.5           # GKP profiliai per metre of niche
 GKP_CD_PROFILE_M_PER_M2 = 1.6         # CD (laikantieji) per m² of GKP ceiling
@@ -4030,7 +4030,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "perimetras": round(float(_perim), 2),
                     # `or 0.0` so a doorless room reads „0,00", never „−0,00".
                     "durys": -round(float(_duru), 2) or 0.0,
-                    "atliekos 10 %": round(float(_baze) * 0.10, 2),
+                    f"atliekos {lt_num(round((SKIRTING_WASTE - 1) * 100), 0)} %": round(float(_baze) * (SKIRTING_WASTE - 1), 2),
                 }
             _g_contribs.append(_ledger.contribution(
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))

@@ -207,6 +207,10 @@ def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
 # the standard-height ceilings, so every project with GKP ceilings above 3 m read
 # „GKP lapų skaičius nesutampa" against a correct row.
 GKP_SHEET_WASTE = 1.10
+# Grindjuostės: the billed length (perimetras − durys) + 10 % atliekų. ONE
+# factor for the work row, its material row and the ledger's „atliekos" term
+# (vision_call imports it), so the sentence can never disagree with the number.
+SKIRTING_WASTE = 1.10
 
 
 def gkp_sheet_count(area_m2: float) -> int:
@@ -3235,7 +3239,7 @@ def calc_room_quantities(room: dict,
         if (not tile_floor and floor_type_for_grindjuostes != "concrete" and walls_paint_factor > 0)
         else 0
     )
-    grindjuostes = grindjuostes_base * 1.10  # +10% waste (NRM2 §27)
+    grindjuostes = grindjuostes_base * SKIRTING_WASTE  # +10% waste (NRM2 §27)
     # …and which predicate zeroed it, for the same reason as the walls one
     # above: „Šios patalpos grindjuosčių sąmatoje nėra" restates the outcome
     # instead of naming the input the contractor would go and change.
