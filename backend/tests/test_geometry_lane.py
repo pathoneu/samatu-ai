@@ -754,3 +754,24 @@ def test_a_sheet_read_at_another_scale_than_it_writes_is_noted_in_the_lane_meta(
     g = parsed["_meta"]["geometrija"]
     assert g["masteliai_kiti"] == {"2": {"ismatuota": 100, "uzrasyta": [50]}}
     assert g["masteliai_atmesti"] == {}
+
+
+def test_a_room_merged_into_another_is_left_alone_and_the_kept_union_keeps_its_openings():
+    """„Sujungti": 02 is merged into 01, whose corrected outline is the union of both. The lane does not
+    place, trace, open or floor 02 — nor name it as 01's neighbour — and 01's union keeps its openings."""
+    import copy
+    pct = lambda x, y: [(60 + x * 28.3465) / 595.2756, (80 + y * 28.3465) / 841.8898]  # noqa: E731
+    union = [pct(x, y) for x, y in ((0.25, 0.25), (7.35, 0.25), (7.35, 3.15), (0.25, 3.15))]
+    parsed = _parsed(polygon_pct=union, polygon_source="corrected", plotas_m2=21.0, plotas_saltinis="eksplikacija_sujungta")
+    gone = parsed["patalpos"][1]
+    gone.update(_sujungta_i="01", elementai=[],
+                _konturas={"page": 1, "saltinis": "sujungta", "i": "01", "plotas_m2": 0.0, "perimetras_m": 0.0})
+    before = copy.deepcopy(gone)
+    gl.apply_geometry(parsed, _two_sheets())
+    r1, r2 = parsed["patalpos"]
+    assert r2 == before                                                    # untouched: no _vieta, no outline, no openings
+    assert r1["polygon_source"] == "corrected" and r1["polygon_pct"] == union
+    assert r1["_angos_sienose"]["page"] == 1
+    assert "02" not in [a["i"] for a in r1["_angos_sienose"]["angos"]]   # an absorbed room is nobody's neighbour
+    g = parsed["_meta"]["geometrija"]
+    assert "02" not in g["konturai"] and "02" not in g["perimetrai_sudeti"]

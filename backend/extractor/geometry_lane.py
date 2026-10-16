@@ -406,7 +406,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
     status = "insufficient"
     try:
         _stage(on_stage, "mastelis")
-        rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict) and _nr(r)]
+        # A room merged into another („Sujungti", `_sujungta_i`) has no outline of its own: the kept room's
+        # union is it. The lane does not place, trace, open or floor it, nor count it as anyone's neighbour.
+        rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict) and _nr(r) and not r.get("_sujungta_i")]
         plan_pages = plan_pages_from_classification(parsed.get("puslapiai"))
         if not plan_pages:
             plan_pages = sorted({int(r["puslapio_nr"]) for r in rooms if r.get("puslapio_nr")}) or [1]
