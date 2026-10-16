@@ -103,6 +103,10 @@ function familyEntry(row, index, roomsByNr, roomOrder, hidden) {
     confidence: normalizeConfidence(row?.confidence),
     confidenceReason: row?._confidence_reason || null,
     manual: isManualRow(row),
+    // The user typed this line's quantity over the program's (lib/quantityOverride.js): the rooms below
+    // are what the program computed, not a split of the typed number.
+    overridden: row?.manual_override === true,
+    programTotal: row?.manual_override === true ? numberOr(row?.ai_kiekis_original, null) : null,
     hasLedger: hasLedger(row),
     // The chain is the number: the rooms below are supporting detail, not an addition to check.
     rollUpAuthoritative: authoritative,

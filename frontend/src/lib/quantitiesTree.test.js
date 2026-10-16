@@ -91,6 +91,16 @@ test('room entries carry the server value, unit, geometry source, hidden flag an
   assert.deepEqual(walls.excluded, [{ nr: '01', name: 'Tambūras', because: 'Sienos neapdailinamos' }]);
 });
 
+test('a hand-typed quantity is flagged and keeps the program\'s own number for the explanation', () => {
+  const typed = { ...ROWS[0], kiekis: 100, manual_override: true, ai_kiekis_original: 81.8 };
+  const fam = buildQuantitiesTree([typed], ROOMS).families[0];
+  assert.equal(fam.total, 100);
+  assert.equal(fam.overridden, true);
+  assert.equal(fam.programTotal, 81.8);
+  assert.equal(fam.rooms.length, 2);
+  assert.equal(buildQuantitiesTree(ROWS, ROOMS).families[0].overridden, false);
+});
+
 test('confidence normalizes through lib/confidence (legacy EN, unstamped)', () => {
   const tree = buildQuantitiesTree([
     { id: 'a', aprasymas: 'A', kiekis: 1, confidence: 'low' },
