@@ -16,10 +16,7 @@ import { Button } from '@/components/ui/button';
 import { listAssemblies } from '@/lib/assembliesApi';
 import { applyAssembliesToPositions, hasPrices } from '@/lib/assemblyPricing';
 import { describeMaterialPrices, describeAmbiguous } from '@/lib/applyPriceList';
-
-function fmtEur(val) {
-  return `${Number(val || 0).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-}
+import { priceSplitText } from '@/lib/priceSplit';
 
 export function useAssemblies() {
   const [state, setState] = useState({ assemblies: [], kodai: {}, loaded: false });
@@ -34,8 +31,8 @@ export function useAssemblies() {
 }
 
 export function priceSplitTitle(item) {
-  if (item?.kaina_darbo == null && item?.kaina_medziagu == null) return null;
-  return `Darbo ${fmtEur(item.kaina_darbo || 0)} + medžiagų ${fmtEur(item.kaina_medziagu || 0)}`;
+  const s = priceSplitText(item);
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
 }
 
 /**
@@ -101,7 +98,7 @@ export function ApplyAssembliesButton({ project, onProjectChange, assemblies }) 
       return;
     }
     onProjectChange?.({ ...project, darbu_sarasas: out.items });
-    toast.success(`Pritaikyta iš rinkinių: ${out.applied} darbo kainų`,
+    toast.success(`Pritaikyta iš rinkinių — darbo kainos įrašytos eilučių: ${out.applied}`,
       { description: describeMaterialPrices(out, t) });
     if (out.ambiguous.length) {
       toast.warning(`${out.ambiguous.length} eil. praleista — joms tinka keli rinkiniai skirtingomis kainomis.`,

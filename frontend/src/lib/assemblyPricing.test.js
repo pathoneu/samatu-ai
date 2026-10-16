@@ -185,3 +185,16 @@ test('the apply result names what happened to the material prices', async () => 
   assert.equal(describeMaterialPrices({ materialsInRow: 2, materialsPriced: 12, kept: [{}, {}] }, t),
     'materialsInRow:2 · materialsPriced:12 · materialsKept:2');
 });
+
+test('unitPriceSplit: labour + machinery vs materials, per unit of work', async () => {
+  const { unitPriceSplit } = await import('./assemblyPricing.js');
+  assert.deepEqual(unitPriceSplit(asm([labour(4.2), { rusis: 'mechanizmai', norma: 0.1, kaina: 10 },
+    { rusis: 'medziaga', norma: 1.25, atliekos_proc: 10, kaina: 0.8 }])), { darbo: 5.2, medziagu: 1.1, viso: 6.3 });
+});
+
+test('priceSplitText says where the materials are priced', async () => {
+  const { priceSplitText } = await import('./priceSplit.js');
+  assert.equal(priceSplitText({ kaina: 4 }), null);
+  assert.match(priceSplitText({ kaina_darbo: 4.2, kaina_medziagu: 1.8 }), /^darbo kaina 4,20 € \+ medžiagų kaina 1,80 €$/u);
+  assert.match(priceSplitText({ kaina_darbo: 6, kaina_medziagu: 0 }), /medžiagos įkainojamos skyriuje „Medžiagos“/u);
+});

@@ -19,6 +19,8 @@ import {
 } from '@/lib/confidence';
 import { ltEur, ltQuantity } from '@/lib/ledger';
 import LedgerTree from './LedgerTree';
+import SudetisBlock from './SudetisBlock';
+import { priceSplitText } from '@/lib/priceSplit';
 import { cleanUserText } from '@/lib/userText';
 
 export default function RowDetailPanel({
@@ -27,6 +29,7 @@ export default function RowDetailPanel({
   onClose,
   onFocusRoom = null,
   onOpenAssumptions = null,
+  projectId = null,
 }) {
   // Esc closes the slide-over — it covers a third of the workspace and the ✕ is
   // at the far right of a wide screen.
@@ -124,6 +127,9 @@ export default function RowDetailPanel({
               <p className="mono tabular text-sm text-foreground">
                 {row.kaina ? ltEur(row.kaina, 2) : '—'}
               </p>
+              {priceSplitText(row) && (
+                <p className="text-[11px] text-muted-foreground tabular">{priceSplitText(row)}</p>
+              )}
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -152,6 +158,8 @@ export default function RowDetailPanel({
               </span>
             </div>
           )}
+
+          <SudetisBlock projectId={projectId} row={row} />
 
           <LedgerTree
             row={row}

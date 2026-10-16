@@ -1181,6 +1181,7 @@ export default function ProjectMainView({
           onClose={() => setDetailRow(null)}
           onFocusRoom={onJumpToPage}
           onOpenAssumptions={onOpenAssumptions}
+          projectId={project?.id}
         />
       )}
     </div>

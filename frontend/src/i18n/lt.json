@@ -406,6 +406,7 @@
       "aktyvusProjektas": "Aktyvus projektas",
       "naujasProjektas": "Naujas projektas",
       "kainynai": "Kainynai",
+      "rinkiniai": "Rinkiniai",
       "administravimas": "Administravimas",
       "planai": "Prenumeratos planai",
       "noActiveProject": "Aktyvaus projekto nėra — pirmiausia atidarykite projektą",
@@ -1529,7 +1530,7 @@
     },
     "exportInternal": {
       "label": "Vidinė kopija su pastabomis",
-      "desc": "Prideda lapą su programos pastabomis jums. Klientui siųskite failą be jo."
+      "desc": "Prideda lapą su programos pastabomis jums ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
     },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",

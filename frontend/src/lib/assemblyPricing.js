@@ -57,6 +57,18 @@ export function assemblyUnitPrice(assembly) {
   return round2((assembly?.komponentai || []).reduce((s, c) => s + componentUnitCost(c), 0));
 }
 
+/** What one unit of the work costs by this assembly, split the way the
+ *  sąmata row would carry it (if no „Medžiagos" row takes the materials). */
+export function unitPriceSplit(assembly) {
+  let darbo = 0;
+  let medziagu = 0;
+  for (const c of assembly?.komponentai || []) {
+    if (c?.rusis === 'medziaga') medziagu += componentUnitCost(c);
+    else darbo += componentUnitCost(c);
+  }
+  return { darbo: round2(darbo), medziagu: round2(medziagu), viso: round2(darbo + medziagu) };
+}
+
 /** `{vieta}` part of `label` for a template label, '' for a plain one, null
  *  when it does not fit. Twin of api/sudetis.match_template. */
 export function matchTemplate(template, label) {
