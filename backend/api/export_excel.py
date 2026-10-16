@@ -18,14 +18,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 import db as _db
 import auth as _auth
 import storage as _storage
+from api import export_grouping as _grouping
 from extractor.spreadsheet_safety import sanitize_spreadsheet_cell as _safe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -196,3 +198,33 @@ async def export_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ── „Grupuoti pagal" preview (togal-v2 W8) ─────────────────────────────────────────────────────────────
+#
+# The Excel the export dialog downloads is /generate-excel (main.py, `grupavimas` in its body); this route is
+# its dry run: the same lines through the same api/export_grouping.group_export_lines, returned as the first
+# rows the sheet will print, so the dialog shows exactly what the file holds. Saves nothing, reads nothing
+# from the stored project beyond the ownership gate.
+
+class ExportPreviewBody(BaseModel):
+    grupavimas: str | None = Field(default=None, max_length=32)
+    eilutes: list[dict] = Field(default_factory=list, max_length=5000)
+    patalpos: list[dict] = Field(default_factory=list, max_length=2000)
+    lapai: list[dict] = Field(default_factory=list, max_length=2000)
+    limit: int = Field(default=20, ge=1, le=200)
+
+
+@router.post("/{project_id}/export-excel/preview")
+def export_excel_preview(
+    body: ExportPreviewBody,
+    project_id: str,
+    _owner: dict = Depends(_auth.require_owned_project),   # runs before the body is validated
+) -> dict:
+    try:
+        mode = _grouping.normalize_grouping(body.grupavimas)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    rows = _grouping.group_export_lines(body.eilutes, mode, rooms=body.patalpos, sheets=body.lapai)
+    out = _grouping.preview(rows, limit=body.limit)
+    return {"grupavimas": mode, **out}
