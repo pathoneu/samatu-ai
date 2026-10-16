@@ -406,6 +406,7 @@
       "aktyvusProjektas": "Aktyvus projektas",
       "naujasProjektas": "Naujas projektas",
       "kainynai": "Kainynai",
+      "rinkiniai": "Rinkiniai",
       "administravimas": "Administravimas",
       "planai": "Prenumeratos planai",
       "noActiveProject": "Aktyvaus projekto nėra — pirmiausia atidarykite projektą",
@@ -1080,6 +1081,9 @@
       "toastApplyFail": "Iš kainyno „{{name}}\" nepavyko pritaikyti nė vienos eilutės. Patikrinkite, ar aprašymai panašūs ir vienetai sutampa (m² / m / vnt).",
       "toastApplied": "Pritaikyta: {{applied}} eilučių iš kainyno „{{name}}\" ({{exact}} tikslių, {{similar}} panašių). Praleista: {{skipped}}.",
       "toastAmbiguous": "{{count}} eil. praleista — kainyne kelios panašios eilutės skirtingomis kainomis. Įveskite kainą rankomis.",
+      "materialsInRow": "{{count}} medžiagų kainų pridėta prie darbo kainos",
+      "materialsPriced": "{{count}} „Medžiagos“ eilučių įkainota",
+      "materialsKept": "{{count}} paliktos jūsų kainos",
       "toastAmbiguousRows": "Įveskite kainą rankomis: {{rows}}",
       "priceFromKainynas": "Kaina iš kainyno",
       "priceFromKainynasTitle": "Kainą įrašė kainynas — eilutė sutapo tiksliai. Spustelėkite, jei norite pakeisti.",
@@ -1530,7 +1534,7 @@
     },
     "exportInternal": {
       "label": "Vidinė kopija su pastabomis",
-      "desc": "Prideda lapą su programos pastabomis jums. Klientui siųskite failą be jo."
+      "desc": "Prideda lapą su programos pastabomis jums ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
     },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",

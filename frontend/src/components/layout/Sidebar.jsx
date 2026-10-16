@@ -14,7 +14,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
-  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard,
+  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard, Layers,
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { useBilling } from '@/hooks/useBilling';
@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { path: '/active-project', icon: FileText, labelKey: 'layout.nav.aktyvusProjektas', requiresProject: true },
   { path: '/new-project', icon: Plus, labelKey: 'layout.nav.naujasProjektas' },
   { path: '/price-lists', icon: Sliders, labelKey: 'layout.nav.kainynai' },
+  { path: '/rinkiniai', icon: Layers, labelKey: 'layout.nav.rinkiniai' },
 ];
 
 function NavBtn({ to, icon: Icon, label, isActive, onClick, disabled, disabledLabel }) {

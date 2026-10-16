@@ -396,6 +396,8 @@ from api.export_excel import router as export_excel_router
 from api.project_stats import router as project_stats_router
 # Kainynai — xlsx import + durable per-user price-list storage (2026-09-02).
 from api.price_lists import router as price_lists_router
+from api.assemblies import router as assemblies_router
+from api.sudetis import router as sudetis_router
 # Sąmatų šablonai (2026-09-04): the contractor's own sections + labels as the
 # skeleton of our output, and a project rendered through them.
 from api.samata_templates import router as samata_templates_router
@@ -754,6 +756,8 @@ app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
 app.include_router(project_stats_router)
 app.include_router(price_lists_router)
+app.include_router(assemblies_router)
+app.include_router(sudetis_router)
 app.include_router(samata_templates_router)
 app.include_router(user_settings_router)
 app.include_router(room_facts_router)
@@ -5396,23 +5400,29 @@ def generate_excel(request: Request, data: dict):
 
     ws_main = wb.active
     ws_main.title = "Sąmata"
+    def _extra_style(c, header):
+        c.font = Font(bold=True, size=9, color="FFFFFF") if header else Font(size=9, color="444444")
+        if header:
+            c.fill = PatternFill("solid", fgColor=C_MID)
+        c.border = border
+        c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=not header)
+
     if _grouping == _export_grouping.DEFAULT_GROUPING:
         _write_sheet_header(ws_main, "SĄMATA")
-        last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True)
+        # His internal copy may carry the darbo + medžiagų split (togal-v2 W9); none → today's sheet.
+        _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")),
+                                               lines=eilutes, kodas=data.get("su_kodu") is True)
+        _hook = (_export_grouping.make_row_hook(ws_main, _cols, header_row=3, first_col=7, style=_extra_style)
+                 if _cols else None)
+        last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True, row_hook=_hook)
     else:
         # „Grupuoti pagal" (togal-v2 W8): the same lines, in another order with other subtotals —
         # never another number (api/export_grouping.py; the sections' own sheets below stay as they are).
         _grouped = _export_grouping.group_export_lines(
             eilutes, _grouping, rooms=patalpos, sheets=data.get("lapai") or [])
         _write_sheet_header(ws_main, f"SĄMATA · {_export_grouping.TITLE_SUFFIX[_grouping]}")
-
-        def _extra_style(c, header):
-            c.font = Font(bold=True, size=9, color="FFFFFF") if header else Font(size=9, color="444444")
-            if header:
-                c.fill = PatternFill("solid", fgColor=C_MID)
-            c.border = border
-            c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=not header)
-        _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")))
+        _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")),
+                                               lines=eilutes, kodas=data.get("su_kodu") is True)
         _hook = _export_grouping.make_row_hook(ws_main, _cols, header_row=3, first_col=7, style=_extra_style)
         last_r = _write_rows(ws_main, _grouped, start_row=4, section_subtotals=True, row_hook=_hook,
                              subtotal_label=_export_grouping.SUBTOTAL_LABELS.get(_grouping, "Skyriaus suma:"))

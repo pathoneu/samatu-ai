@@ -755,7 +755,7 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
         kaina = row.get("kaina")
         if kaina not in (None, 0):
             p["kaina"] = kaina
-            for key in _PRICE_PROVENANCE_KEYS:
+            for key in (*_PRICE_PROVENANCE_KEYS, *_ROW_CHOICE_KEYS):
                 if row.get(key) is not None:
                     p[key] = row[key]
             kiekis = p.get("kiekis")
@@ -776,7 +776,14 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
 # the carry, the compat emit and the darbu_sarasas hydration — because the UI's
 # "hand-typed prices are left alone" guarantee is enforced on `kaina_source`
 # alone, and a rebuild that drops it silently unprotects the price.
-_PRICE_PROVENANCE_KEYS = ("kaina_source", "kaina_match_score")
+_PRICE_PROVENANCE_KEYS = ("kaina_source", "kaina_match_score",
+                          # the darbo + medžiagų split (togal-v2 W9): it describes
+                          # THIS price, so it travels exactly where the price does
+                          "kaina_darbo", "kaina_medziagu", "medziagos_kainoje")
+# His choices on a row that are not money: the cost code he typed and the
+# rinkinys he bound it to. Carried with the row whatever happens to its price.
+# Mirror of mergeDarbuSarasas.js `ROW_CHOICE_KEYS`.
+_ROW_CHOICE_KEYS = ("kodas", "rinkinys_id")
 
 
 def _carry_edit(prev: dict, p: dict) -> None:
@@ -808,6 +815,9 @@ def _carry_edit(prev: dict, p: dict) -> None:
         for key in _PRICE_PROVENANCE_KEYS:
             if prev.get(key) is not None:
                 p[key] = prev[key]
+    for key in _ROW_CHOICE_KEYS:
+        if prev.get(key) is not None:
+            p[key] = prev[key]
     # 3. Verification („Teisinga ✓" / review status). It certified a NUMBER, so
     #    it survives only when that number survived the rebuild (or the row is a
     #    manual override, whose number the user owns). A row whose quantity
@@ -1289,7 +1299,7 @@ def recompute(
                    # frontend writes back onto the project — came back with the
                    # money but not the 'manual' flag that protects it, so the
                    # next "Taikyti kainyną" overwrote a hand-typed price.
-                   *_PRICE_PROVENANCE_KEYS)
+                   *_PRICE_PROVENANCE_KEYS, *_ROW_CHOICE_KEYS)
     # Verification rides only with a quantity that survived (`_carry_verification`);
     # everything else is carried outright. The by-label fallback below used to
     # copy the checkmark unconditionally (2026-09-15 review).

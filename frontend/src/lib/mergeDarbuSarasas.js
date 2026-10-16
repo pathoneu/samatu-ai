@@ -67,7 +67,17 @@ export const MEDZIAGOS_SKYRIUS = 'Medžiagos';
  * `kaina_source` alone — a merge that drops it silently unprotects the price.
  * Mirror of the backend's `_PRICE_PROVENANCE_KEYS`.
  */
-const PRICE_PROVENANCE_KEYS = ['kaina_source', 'kaina_match_score'];
+const PRICE_PROVENANCE_KEYS = ['kaina_source', 'kaina_match_score',
+  // the darbo + medžiagų split (togal-v2 W9): it describes THIS price, so it
+  // travels exactly where the price does
+  'kaina_darbo', 'kaina_medziagu', 'medziagos_kainoje'];
+
+/**
+ * His choices on a row that are not money: the cost code he typed and the
+ * rinkinys he bound it to. Carried with the row whatever happens to its price.
+ * Mirror of the backend's `_ROW_CHOICE_KEYS`.
+ */
+const ROW_CHOICE_KEYS = ['kodas', 'rinkinys_id'];
 
 /**
  * Stable-partition the shopping list to the foot of the sąmata. Mirror of the
@@ -324,6 +334,9 @@ export function mergeDarbuSarasasEdits(rebuilt, old, notes, serverRelabeled, opt
       for (const key of PRICE_PROVENANCE_KEYS) {
         if (oldItem[key] != null) out[key] = oldItem[key];
       }
+    }
+    for (const key of ROW_CHOICE_KEYS) {
+      if (oldItem[key] != null) out[key] = oldItem[key];
     }
     carryVerification(oldItem, out);
     return out;

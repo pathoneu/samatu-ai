@@ -118,6 +118,8 @@ export default function ExportFilterModal({
   // „Vidinė kopija" (audit exports-money-5): the notes sheet is for him, so the
   // client workbook leaves it out unless he ticks this. Excel only, never kept.
   const [internalCopy, setInternalCopy] = useState(false);
+  // „Kodas" (togal-v2 W9): an optional cost-code column, Excel only, off by default.
+  const [suKodu, setSuKodu] = useState(false);
 
   // „Grupuoti pagal" (togal-v2 W8): Excel in the Pathon layout only — his own layout has his sections, the
   // PDF pasiūlymas stays a client document. Default = today's skyriai.
@@ -149,6 +151,7 @@ export default function ExportFilterModal({
       objektas: objektas.trim(),
       vat_mode: vatMode,
       vidine_kopija: format !== 'pdf' && internalCopy,
+      su_kodu: format !== 'pdf' && suKodu,
       grupavimas: canGroup ? grupavimas : DEFAULT_GROUPING,
     });
   };
@@ -278,6 +281,20 @@ export default function ExportFilterModal({
               <span className="flex-1">
                 <span className="block text-sm text-foreground">{t('project.exportInternal.label')}</span>
                 <span className="block text-[12px] text-muted-foreground">{t('project.exportInternal.desc')}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5 px-2 py-1.5 rounded hover:bg-muted/40 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={suKodu}
+                onChange={e => setSuKodu(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-foreground"
+              />
+              <span className="flex-1">
+                <span className="block text-sm text-foreground">Stulpelis „Kodas“</span>
+                <span className="block text-[12px] text-muted-foreground">
+                  Kiekvienos eilutės kodas: jūsų įrašytas, rinkinio arba skyriaus.
+                </span>
               </span>
             </label>
           </div>

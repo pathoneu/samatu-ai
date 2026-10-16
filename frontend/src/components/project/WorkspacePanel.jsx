@@ -808,6 +808,7 @@ export default function WorkspacePanel({
           onClose={() => setDetailRow(null)}
           onFocusRoom={onJumpToPage}
           onOpenAssumptions={onOpenAssumptions}
+          projectId={project?.id}
         />
       )}
       {popoverState && (

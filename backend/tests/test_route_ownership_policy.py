@@ -52,7 +52,7 @@ _PINNED_FOREIGN_CODES: dict[tuple[str, str], set[int]] = {
 }
 
 # Dummy values for path parameters other than project_id.
-_DUMMY_PATH_VALUES = {"room_nr": "1"}
+_DUMMY_PATH_VALUES = {"room_nr": "1", "row_id": "x"}
 
 _TINY_PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 

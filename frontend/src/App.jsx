@@ -19,6 +19,7 @@ import Login from '@/pages/Login';
 const NewProject = lazy(() => import('@/pages/NewProject'));
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'));
 const PriceLists = lazy(() => import('@/pages/PriceLists'));
+const Rinkiniai = lazy(() => import('@/pages/Rinkiniai'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Register = lazy(() => import('@/pages/Register'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
@@ -141,6 +142,7 @@ function App() {
                   <Route path="/project/:id/annotator" element={<Annotator />} />
                 )}
                 <Route path="/price-lists" element={<PriceLists />} />
+                <Route path="/rinkiniai" element={<Rinkiniai />} />
                 {/* Phase 7 billing — result pages self-gate via useBilling()
                     and bounce back when the flag is off. (/pricing is public,
                     registered above.) */}

@@ -29,7 +29,7 @@ from .prompt import (
 from models_config import model_for
 from . import ledger as _ledger
 from . import run_usage as _run_usage
-from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, gkp_ceiling_areas_m2, kiekis_units, lt_num
+from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, SKIRTING_WASTE, gkp_ceiling_areas_m2, kiekis_units, lt_num
 from . import scope as _scope
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
@@ -1269,6 +1269,33 @@ _PAINT_CLASS_PROFILES = {
 }
 _PAINT_CLASS_DEFAULT = 2
 
+# Consumption norms and waste factors — read by api/assemblies_default; change a
+# value only with the eval gate. Each one was an inline literal at the line that
+# uses it (hoisted 2026-10-16, togal-v2 W9, values unchanged) so the default
+# „rinkiniai" import the engine's numbers instead of retyping them.
+PRIMER_COVERAGE_M2_PER_L = 7.0        # gruntas: 1 coat, m² per litre
+ROTBAND_KG_PER_M2 = 10.0              # Rotband at ~5 mm
+CORNER_BEAD_M_PER_M = 0.3             # PVC kampuotės per metre of „Dažymo kampų montavimas"
+# SKIRTING_WASTE (grindjuostės + 10 % atliekų) is owned by universal_rules, imported above.
+NICHE_PROFILE_M_PER_M = 2.5           # GKP profiliai per metre of niche
+GKP_CD_PROFILE_M_PER_M2 = 1.6         # CD (laikantieji) per m² of GKP ceiling
+GKP_UW_PROFILE_M_PER_M2 = 0.4         # UW (pakraščio) per m² of GKP ceiling
+GKP_JOINT_M_PER_M2 = 1.5              # joint metres per m² of GKP ceiling
+GKP_SCREWS_PER_M2 = 30                # savisriegiai per m² of GKP ceiling
+TILE_ADHESIVE_KG_PER_M2 = 5.0         # plytelių klijai
+TILE_WASTE = 1.08                     # plytelės + 8 % atliekų
+GROUT_KG_PER_M2 = 0.3                 # fugavimo masė
+LARGE_TILE_ADHESIVE_KG_PER_M2 = 5.0   # back-buttering on large-format tiles
+EPOXY_KG_PER_M = 0.05                 # epoxy adhesive per metre of 45° cut
+SILICONE_M_PER_TUBE = 10              # silicone metres per tube
+WATERPROOFING_KG_PER_M2 = 3.0         # membrane, 2 coats × 1,5 kg/m²
+SELF_LEVELLING_KG_PER_M2 = 6.0        # ~3 mm × 2 kg/m²/mm
+FLOOR_COVERING_WASTE = 1.10           # grindų danga + 10 % atliekų
+DUCT_WASTE = 1.05                     # ortakiai + 5 % atliekų
+# Waste inside two billed WORK quantities (not material norms):
+TILE_PLINTH_WASTE = 1.10              # plytelių grindjuostės: (perimetras − durys) + 10 %
+CORNICE_LENGTH_WASTE = 1.05           # lubų karnizo ilgis: perimetras + 5 %
+
 
 def putty_q_level(overrides: dict | None, default: str | None = "Q2") -> str | None:
     """The putty (glaistymo) Q-level he chose, whichever key name carries it.
@@ -1436,7 +1463,7 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "", evidence: bool | No
         return 0.0
     if normalize_paskirtis(paskirtis) not in _KARNIZAS_PASKIRTYS:
         return 0.0
-    return round(perim * 1.05, 2)
+    return round(perim * CORNICE_LENGTH_WASTE, 2)
 
 
 def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> float:
@@ -1912,7 +1939,7 @@ def derive_room_extras(room: dict, counts: dict, rules_override: dict | None,
     room["_paint_class"] = paint_class  # surface to UI / debug
 
     # 4.3 Gruntas (litrai) — 1 coat at lower coverage (~7 m²/l)
-    room["gruntas_l"] = round(dazymo / 7.0, 2) if dazymo > 0 else 0.0
+    room["gruntas_l"] = round(dazymo / PRIMER_COVERAGE_M2_PER_L, 2) if dazymo > 0 else 0.0
 
     # 4.4 Lubų karnizas (cornice) — perim + 5%, no door deduct,
     # only for living-quality rooms (not vonia/garažas/utility)
@@ -3511,7 +3538,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 return 0.0
             n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
-            return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10
+            return max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * TILE_PLINTH_WASTE
 
         def _pjovimas_45(r: dict) -> float:
             # mirrors the line: max(Σ perim × 0,4 ; 2 × n × vidutinis plytelių aukštis)
@@ -3708,7 +3735,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "skyrius": SK_GD, "aprasymas": "Sienų lyginimas Knauf Rotband",
                 "vnt": "m2", "kiekis": rotband_m2, "saltinis": SAL,
                 "medziagos_aprasymas": "Rotband (~10 kg/m² esant 5mm storiui)",
-                "medziagos_kiekis": round(rotband_m2 * 10.0, 2),
+                "medziagos_kiekis": round(rotband_m2 * ROTBAND_KG_PER_M2, 2),
                 "medziagos_vnt": "kg",
                 "_rotband_share": rotband_share,
                 "_rotband_source": rotband_src,
@@ -3827,7 +3854,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_GD, "aprasymas": "Dažymo kampų montavimas",
             "vnt": "m", "kiekis": kampai_total, "saltinis": SAL,
             "medziagos_aprasymas": "PVC kampuotės (išoriniai kampai)",
-            "medziagos_kiekis": round(kampai_total * 0.3, 2), "medziagos_vnt": "m",
+            "medziagos_kiekis": round(kampai_total * CORNER_BEAD_M_PER_M, 2), "medziagos_vnt": "m",
         }
         # The founder's own example of a line nobody could check: 501,30 m of
         # corner bead with no way to see which room or which term produced it.
@@ -4004,7 +4031,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "perimetras": round(float(_perim), 2),
                     # `or 0.0` so a doorless room reads „0,00", never „−0,00".
                     "durys": -round(float(_duru), 2) or 0.0,
-                    "atliekos 10 %": round(float(_baze) * 0.10, 2),
+                    f"atliekos {lt_num(round((SKIRTING_WASTE - 1) * 100), 0)} %": round(float(_baze) * (SKIRTING_WASTE - 1), 2),
                 }
             _g_contribs.append(_ledger.contribution(
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
@@ -4029,7 +4056,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_GD, "aprasymas": "Grindjuosčių sumontavimas",
                  "vnt": "m", "kiekis": grindjuostes_total, "saltinis": SAL,
                  "medziagos_aprasymas": "Grindjuostės (m + 10% atliekų)",
-                 "medziagos_kiekis": round(grindjuostes_total * 1.10, 2),
+                 "medziagos_kiekis": round(grindjuostes_total * SKIRTING_WASTE, 2),
                  "medziagos_vnt": "m", **_g_reason},
                 *_g_copy()),
             _ledger.attach(
@@ -4044,7 +4071,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GD, "aprasymas": "Lubų karnizo sumontavimas",
              "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL,
              "medziagos_aprasymas": "Karnizas (m + 5% atliekų)",
-             "medziagos_kiekis": round(karnizas_total * 1.05, 2),
+             # The work length already carries the one +5 % (CORNICE_LENGTH_WASTE,
+             # CLAUDE.md §1.4) — multiplying again billed +10,25 % (2026-10-16).
+             "medziagos_kiekis": round(karnizas_total, 2),
              "medziagos_vnt": "m"},
             {"skyrius": SK_GD, "aprasymas": "Lubų karnizo dažymas",
              "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL},
@@ -4064,7 +4093,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GKP, "aprasymas": "Nišų formavimas GKP konstrukcijoje",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL,
              "medziagos_aprasymas": "GKP profiliai + savisriegiai",
-             "medziagos_kiekis": round(nisu_total * 2.5, 2),  # ~2.5 m profilio per ilgiui
+             "medziagos_kiekis": round(nisu_total * NICHE_PROFILE_M_PER_M, 2),  # ~2.5 m profilio per ilgiui
              "medziagos_vnt": "m", **_led_flags},
             {"skyrius": SK_GD, "aprasymas": "LED nišų glaistymas",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
@@ -4116,8 +4145,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # different profile types separately. Total ~2.0 m/m² (was 3.0,
         # within audit's 1.8-2.5 range for ceiling GKP). Source:
         # docs/formulas/2026-05-06-formula-audit.md §8 (Knauf W111).
-        cd_total = round(gkp_total * 1.6, 2)
-        uw_total = round(gkp_total * 0.4, 2)
+        cd_total = round(gkp_total * GKP_CD_PROFILE_M_PER_M2, 2)
+        uw_total = round(gkp_total * GKP_UW_PROFILE_M_PER_M2, 2)
         # CD / UW / savisriegiai: metres and counts of PRODUCT, not of labour —
         # the fitting is inside the montavimas m² above. They move to the
         # shopping list whole; cloning them billed the same profiles twice.
@@ -4131,11 +4160,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "vnt": "m", "kiekis": uw_total, "saltinis": SAL,
              "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True},
             {"skyrius": SK_GKP, "aprasymas": "GKP siūlių glaistymas + armavimo juostelė",
-             "vnt": "m", "kiekis": round(gkp_total * 1.5, 2), "saltinis": SAL,
+             "vnt": "m", "kiekis": round(gkp_total * GKP_JOINT_M_PER_M2, 2), "saltinis": SAL,
              "medziagos_aprasymas": "Armavimo juostelė + glaistas siūlėms",
-             "medziagos_kiekis": round(gkp_total * 1.5, 2), "medziagos_vnt": "m"},
+             "medziagos_kiekis": round(gkp_total * GKP_JOINT_M_PER_M2, 2), "medziagos_vnt": "m"},
             {"skyrius": SK_GKP, "aprasymas": "Savisriegiai GKP montavimui",
-             "vnt": "vnt", "kiekis": int(gkp_total * 30), "saltinis": SAL,
+             "vnt": "vnt", "kiekis": int(gkp_total * GKP_SCREWS_PER_M2), "saltinis": SAL,
              "susijes_darbas": gkp_parent, _IS_MATERIAL_LINE: True},
         ])
 
@@ -4206,7 +4235,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "aprasymas": f"{vieta} plytelių klijavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
             "medziagos_aprasymas": f"{vieta} plytelių klijai (~5 kg/m²)",
-            "medziagos_kiekis": round(kiekis * 5.0, 2),
+            "medziagos_kiekis": round(kiekis * TILE_ADHESIVE_KG_PER_M2, 2),
             "medziagos_vnt": "kg",
         }
         pozicijos.append(_family_ledger(_klij, _t_contribs, _t_excluded) if field else _klij)
@@ -4216,7 +4245,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelės",
-            "vnt": "m2", "kiekis": round(kiekis * 1.08, 2), "saltinis": SAL,
+            "vnt": "m2", "kiekis": round(kiekis * TILE_WASTE, 2), "saltinis": SAL,
             "susijes_darbas": f"{vieta} plytelių klijavimas",
             _IS_MATERIAL_LINE: True,
         })
@@ -4225,7 +4254,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "aprasymas": f"{vieta} plytelių fugavimas",
             "vnt": "m2", "kiekis": kiekis, "saltinis": SAL,
             "medziagos_aprasymas": f"{vieta} plytelių fugavimo masė (~0.3 kg/m²)",
-            "medziagos_kiekis": round(kiekis * 0.3, 2),
+            "medziagos_kiekis": round(kiekis * GROUT_KG_PER_M2, 2),
             "medziagos_vnt": "kg",
         }
         pozicijos.append(_family_ledger(_fug, _t_contribs, _t_excluded) if field else _fug)
@@ -4264,7 +4293,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Didžiaformačių plytelių klijavimas (>600×600 mm) — papildoma rūpestis",
                 "vnt": "m2", "kiekis": didzformat_m2, "saltinis": SAL,
                 "medziagos_aprasymas": "Klijų sluoksnis storas (back-buttering) — ~5 kg/m²",
-                "medziagos_kiekis": round(didzformat_m2 * 5.0, 1),
+                "medziagos_kiekis": round(didzformat_m2 * LARGE_TILE_ADHESIVE_KG_PER_M2, 1),
                 "medziagos_vnt": "kg",
                 "confidence": "medium",
             })
@@ -4321,7 +4350,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "aprasymas": "Plytelių 45° pjovimas EPOKSIDU (premium kampai)",
                     "vnt": "m", "kiekis": pjovimas_45, "saltinis": SAL,
                     "medziagos_aprasymas": "Epoksidinis klijuoklis (Mapei Kerapoxy ar pan.)",
-                    "medziagos_kiekis": round(pjovimas_45 * 0.05, 2),  # ~0.05 kg/m
+                    "medziagos_kiekis": round(pjovimas_45 * EPOXY_KG_PER_M, 2),  # ~0.05 kg/m
                     "medziagos_vnt": "kg",
                 })
             # Silikonavimas split (rangovas audit 2026-04-29): separate corner
@@ -4343,7 +4372,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Silikonavimas tarp plytelių zonos ir sanitarinės įrangos",
                 "vnt": "m", "kiekis": silikon_san_m, "saltinis": SAL,
                 "medziagos_aprasymas": "Sanitarinis silikonas (~10 m/tūbelę)",
-                "medziagos_kiekis": max(1, round(silikon_san_m / 10, 0)),
+                "medziagos_kiekis": max(1, round(silikon_san_m / SILICONE_M_PER_TUBE, 0)),
                 "medziagos_vnt": "vnt",
             })
             pozicijos.append({
@@ -4351,7 +4380,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "aprasymas": "Plytelių vidinių kampų silikonavimas",
                 "vnt": "m", "kiekis": silikon_kampai_m, "saltinis": SAL,
                 "medziagos_aprasymas": "Spalvotas silikonas pagal fugavimo spalvą",
-                "medziagos_kiekis": max(1, round(silikon_kampai_m / 10, 0)),
+                "medziagos_kiekis": max(1, round(silikon_kampai_m / SILICONE_M_PER_TUBE, 0)),
                 "medziagos_vnt": "vnt",
             })
         # Skylių gręžimas — symbol-driven (klozetas×4 + praustuvė×6 + vonia×8
@@ -4451,7 +4480,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             0,85 m per door, +10 % waste — the same primitives as the MDF line."""
             n_d = sum(kiekis_units(el.get("kiekis")) for el in (r.get("elementai") or [])
                       if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris"))
-            return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * 1.10, 2)
+            return round(max(0.0, float(r.get("perimetras_m") or 0) - n_d * 0.85) * TILE_PLINTH_WASTE, 2)
 
         # The floor plan's own tile-skirting length (grindų plano legenda,
         # „Grindjuostės (iš plytelių)"), when the drawing states one. It covers
@@ -4547,7 +4576,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms_pl
                               if _pask(r) in WET), 2)
         # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
-        membrana_kg = round(hidro_m2 * 3.0, 2)  # 2 sluoksniai
+        membrana_kg = round(hidro_m2 * WATERPROOFING_KG_PER_M2, 2)  # 2 sluoksniai
         _h_contribs = [
             _ledger.contribution(r, 1, "vnt", "Drėgna patalpa — hidroizoliacija po plytelėmis")
             for r in rooms_pl if _pask(r) in WET]
@@ -4594,7 +4623,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_GR, "aprasymas": "Grindų išlyginamasis sluoksnis",
             "vnt": "m2", "kiekis": isliginamasis, "saltinis": SAL,
             "medziagos_aprasymas": "Savaime išsilyginantis mišinys (~2 kg/m²/mm)",
-            "medziagos_kiekis": round(isliginamasis * 6.0, 2),  # ~3mm × 2 kg
+            "medziagos_kiekis": round(isliginamasis * SELF_LEVELLING_KG_PER_M2, 2),  # ~3mm × 2 kg
             "medziagos_vnt": "kg",
         }, _i_contribs, _choice_excluded("grindys")))
 
@@ -4621,7 +4650,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_GR, "aprasymas": "Parketo / laminato klojimas",
             "vnt": "m2", "kiekis": pvc_billed, "saltinis": SAL,
             "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
-            "medziagos_kiekis": round(pvc_billed * 1.10, 2),
+            "medziagos_kiekis": round(pvc_billed * FLOOR_COVERING_WASTE, 2),
             "medziagos_vnt": "m2"}
         if _lam_meta["source"] == "anchor":
             _lam_row["_confidence_reason"] = _lam_meta["provenance"]
@@ -5004,7 +5033,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m", "kiekis": ortakiai_d100,
             "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d100_m") else "skaiciuota_is_brezinio",
             "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D100",
-            "medziagos_kiekis": round(ortakiai_d100 * 1.05, 1),  # 5% atliekos
+            "medziagos_kiekis": round(ortakiai_d100 * DUCT_WASTE, 1),  # 5% atliekos
             "medziagos_vnt": "m",
         })
     if ortakiai_d125 > 0:
@@ -5013,7 +5042,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m", "kiekis": ortakiai_d125,
             "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d125_m") else "skaiciuota_is_brezinio",
             "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D125",
-            "medziagos_kiekis": round(ortakiai_d125 * 1.05, 1),
+            "medziagos_kiekis": round(ortakiai_d125 * DUCT_WASTE, 1),
             "medziagos_vnt": "m",
         })
     if ortakiai_d160 > 0:
@@ -5022,7 +5051,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m", "kiekis": ortakiai_d160,
             "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d160_m") else "skaiciuota_is_brezinio",
             "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D160",
-            "medziagos_kiekis": round(ortakiai_d160 * 1.05, 1),
+            "medziagos_kiekis": round(ortakiai_d160 * DUCT_WASTE, 1),
             "medziagos_vnt": "m",
         })
     if ortakiai_total > 0:

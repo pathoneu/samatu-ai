@@ -1,0 +1,18 @@
+{
+  "_about": "Shared cases for the cost code a row prints. Read by frontend/src/lib/kodas.test.js AND backend/tests/test_kodas.py — the two implementations (lib/kodas.js effectiveKodas, api/sudetis.effective_kodas) must agree on every one.",
+  "own": [
+    {"id": "mine", "kodas": "M-7", "taikoma": {"aprasymas": "Mano darbas"}, "komponentai": []}
+  ],
+  "cases": [
+    {"name": "typed code wins", "row": {"aprasymas": "Sienų glaistymas/dažymas", "skyrius_enum": "paint", "kodas": " A-1 ", "rinkinys_id": "mine"}, "want": "A-1"},
+    {"name": "his rinkinys", "row": {"aprasymas": "Kažkas", "skyrius_enum": "extras", "rinkinys_id": "mine"}, "want": "M-7"},
+    {"name": "a default rinkinys by id", "row": {"aprasymas": "Kažkas", "skyrius_enum": "extras", "rinkinys_id": "numatyta-rotband"}, "want": "01.03"},
+    {"name": "default family by the engine's label", "row": {"aprasymas": "Sienų glaistymas/dažymas", "skyrius_enum": "paint"}, "want": "01.01"},
+    {"name": "templated default label", "row": {"aprasymas": "Vonios sienų plytelių klijavimas", "skyrius_enum": "tile"}, "want": "03.01"},
+    {"name": "tier suffix still the family", "row": {"aprasymas": "Lubų glaistymas/dažymas virš 3 m", "skyrius_enum": "paint"}, "want": "01.02"},
+    {"name": "no family: the section", "row": {"aprasymas": "Klozeto montavimas", "skyrius_enum": "plumbing"}, "want": "06"},
+    {"name": "a material row is the materials section", "row": {"aprasymas": "Glaistas sienoms (pradinis + baigiamasis)", "skyrius": "Medžiagos", "skyrius_enum": "materials", "_medziaga": true}, "want": "09"},
+    {"name": "legacy row without enum: from its section name", "row": {"aprasymas": "Klozeto montavimas", "skyrius": "Santechnikos darbai"}, "want": "06"},
+    {"name": "unknown rinkinys falls through", "row": {"aprasymas": "Klozeto montavimas", "skyrius_enum": "plumbing", "rinkinys_id": "gone"}, "want": "06"}
+  ]
+}

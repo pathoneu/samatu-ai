@@ -1251,6 +1251,99 @@ def delete_samata_template(template_id: str, user_id: str) -> bool:
         return cur.rowcount > 0
 
 
+# ── Rinkiniai / assemblies (2026-10-16, togal-v2 W9) ─────────────────────────
+#
+# One row per assembly he keeps: `taikoma` (how it binds to a darbu_sarasas
+# line) and `komponentai` are JSON, validated by api/assemblies.py before they
+# get here. Ownership follows price_lists EXACTLY: user_id required on every
+# call, no unscoped branch, an owner-less row is unwritable.
+
+_ASSEMBLY_JSON_COLS = (("taikoma", dict), ("komponentai", list))
+
+
+def _assembly_row_to_dict(row) -> dict:
+    d = dict(row)
+    for col, typ in _ASSEMBLY_JSON_COLS:
+        try:
+            v = json.loads(d.get(col) or ("{}" if typ is dict else "[]"))
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            log.error("assembly %s has a corrupt %s blob (%s)", d.get("id"), col, exc)
+            v = typ()
+            d["_corrupt"] = True
+        d[col] = v if isinstance(v, typ) else typ()
+    d["is_default"] = False
+    return d
+
+
+def list_assemblies(user_id: str) -> list[dict]:
+    """All of one user's own assemblies, newest first (defaults not included)."""
+    _require_user_id(user_id)
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM assemblies WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)).fetchall()
+        return [_assembly_row_to_dict(r) for r in rows]
+
+
+def get_assembly(assembly_id: str, user_id: str) -> dict | None:
+    _require_user_id(user_id)
+    with _conn() as c:
+        row = c.execute("SELECT * FROM assemblies WHERE id = ? AND user_id = ?",
+                        (assembly_id, user_id)).fetchone()
+        return _assembly_row_to_dict(row) if row else None
+
+
+def assembly_owner(assembly_id: str) -> tuple[bool, str | None]:
+    """(exists, owner) — for the route's ownership check BEFORE it reads a body."""
+    with _conn() as c:
+        row = c.execute("SELECT user_id FROM assemblies WHERE id = ?",
+                        (assembly_id,)).fetchone()
+        return (True, row["user_id"]) if row else (False, None)
+
+
+def upsert_assembly(assembly_id: str, payload: dict, user_id: str) -> dict:
+    """Insert or full-replace one assembly. `payload` is already validated."""
+    _require_user_id(user_id)
+    now = _now_iso()
+    with _conn() as c:
+        existing = c.execute(
+            "SELECT created_at, user_id FROM assemblies WHERE id = ?",
+            (assembly_id,)).fetchone()
+        if existing:
+            if existing["user_id"] != user_id:
+                raise PermissionError(
+                    f"User {user_id} does not own assembly {assembly_id}")
+            created_at = existing["created_at"]
+        else:
+            created_at = now
+        c.execute("""
+            INSERT INTO assemblies
+                (id, user_id, name, skyrius, taikoma, vnt, komponentai, kodas,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name, skyrius=excluded.skyrius,
+                taikoma=excluded.taikoma, vnt=excluded.vnt,
+                komponentai=excluded.komponentai, kodas=excluded.kodas,
+                updated_at=excluded.updated_at
+        """, (assembly_id, user_id, payload["name"], payload.get("skyrius"),
+              json.dumps(payload.get("taikoma") or {}, ensure_ascii=False),
+              payload.get("vnt"),
+              json.dumps(payload.get("komponentai") or [], ensure_ascii=False),
+              payload.get("kodas"), created_at, now))
+        row = c.execute("SELECT * FROM assemblies WHERE id = ?",
+                        (assembly_id,)).fetchone()
+        return _assembly_row_to_dict(row) if row else {}
+
+
+def delete_assembly(assembly_id: str, user_id: str) -> bool:
+    _require_user_id(user_id)
+    with _conn() as c:
+        cur = c.execute("DELETE FROM assemblies WHERE id = ? AND user_id = ?",
+                        (assembly_id, user_id))
+        return cur.rowcount > 0
+
+
 # ── Company details / user settings (2026-09-29) ─────────────────────────────
 #
 # Company name, logo (a data URL), company and PVM codes, IBAN, address and
@@ -1492,6 +1585,27 @@ def _migrate_schema() -> None:
                   "ON extraction_jobs(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_extraction_jobs_user "
                   "ON extraction_jobs(user_id, started_at DESC)")
+        # assemblies (2026-10-16, togal-v2 W9): his own „rinkiniai" — what a
+        # work row is made of (materials by norm, waste, labour) with unit
+        # prices split into labour and materials, and a cost code. Owner-scoped
+        # like price_lists, same NULL-owner write barrier. The „numatyta" set is
+        # NOT stored: `assemblies_default.py` builds it from the engine's own
+        # constants on every read, so it can never drift from them.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS assemblies (
+                id           TEXT PRIMARY KEY,
+                user_id      TEXT,
+                name         TEXT NOT NULL,
+                skyrius      TEXT,
+                taikoma      TEXT NOT NULL,      -- JSON object: how it binds to a row
+                vnt          TEXT,
+                komponentai  TEXT NOT NULL,      -- JSON array
+                kodas        TEXT,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_assemblies_user "
+                  "ON assemblies(user_id, created_at DESC)")
 
 
 # ── Extraction jobs: the record that outlives the process (2026-10-03) ───────
@@ -1901,7 +2015,7 @@ _DELETED_PASSWORD_HASH = "!deleted"
 # The account-level rows that go with the account. Literals only: they are
 # interpolated into the DELETE below.
 _ACCOUNT_TABLES = ("user_settings", "extraction_jobs", "price_lists",
-                   "samata_templates")
+                   "samata_templates", "assemblies")
 # Older than this, a 'running' row is a record that never got its ending, not a
 # read in flight: runs take 15-35 min, and each boot marks every earlier one
 # interrupted. Bounded so a stuck row cannot block a deletion for good.

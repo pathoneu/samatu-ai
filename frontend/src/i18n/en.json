@@ -406,6 +406,7 @@
       "aktyvusProjektas": "Active project",
       "naujasProjektas": "New project",
       "kainynai": "Price lists",
+      "rinkiniai": "Assemblies",
       "administravimas": "Administration",
       "planai": "Subscription plans",
       "noActiveProject": "No active project — open a project first",
@@ -1065,6 +1066,9 @@
       "toastApplyFail": "Could not apply a single row from price list „{{name}}\". Check that descriptions are similar and units match (m² / m / pcs).",
       "toastApplied": "Applied: {{applied}} rows from price list „{{name}}\" ({{exact}} exact, {{similar}} similar). Skipped: {{skipped}}.",
       "toastAmbiguous": "{{count}} rows skipped — the price list has several similar rows at different prices. Enter the price manually.",
+      "materialsInRow": "{{count}} material prices added to the work price",
+      "materialsPriced": "{{count}} „Medžiagos“ rows priced",
+      "materialsKept": "{{count}} of your prices kept",
       "toastAmbiguousRows": "Enter these prices manually: {{rows}}",
       "priceFromKainynas": "Price from the price list",
       "priceFromKainynasTitle": "Filled in from your price list on an exact row match. Click to change it.",
@@ -1479,7 +1483,7 @@
     },
     "exportInternal": {
       "label": "Internal copy with notes",
-      "desc": "Adds a sheet with the app's notes for you. Send your client the file without it."
+      "desc": "Adds a sheet with the app's notes for you and, when prices are split, labour and material price columns. Send your client the file without them."
     },
     "samataTemplate": {
       "layoutLabel": "Layout",

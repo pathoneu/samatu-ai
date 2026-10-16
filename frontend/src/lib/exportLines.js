@@ -49,7 +49,7 @@ export function exportSectionOf(row) {
  * `allowedSkyriai` (a Set) only the sections he left ticked are kept. A
  * project with no darbu_sarasas falls back to `project.rows` (KŽ), as before.
  */
-export function exportLines(project, allowedSkyriai = null) {
+export function exportLines(project, allowedSkyriai = null, { kodasOf = null } = {}) {
   const keep = (skyrius) => !allowedSkyriai || allowedSkyriai.has(skyrius);
   const floorCount = getFloorCount(project);
   const mult = (n) => (n || 0) * floorCount;
@@ -69,6 +69,12 @@ export function exportLines(project, allowedSkyriai = null) {
           suma: kiekis * (it.kaina || 0),
           skyrius: exportSectionOf(it),
           confidence: it.confidence || 'medium',
+          // The darbo + medžiagų split (togal-v2 W9) — printed only in his
+          // internal copy; absent keys keep the payload as it always was.
+          ...(it.kaina_darbo != null ? { kaina_darbo: it.kaina_darbo } : {}),
+          ...(it.kaina_medziagu != null ? { kaina_medziagu: it.kaina_medziagu } : {}),
+          // „Kodas" (W9) — only when he asked for the column.
+          ...(kodasOf ? { kodas: kodasOf(it) || '' } : {}),
         };
       })
       .filter(it => keep(it.skyrius));

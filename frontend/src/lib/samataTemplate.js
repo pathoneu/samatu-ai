@@ -266,6 +266,7 @@ export function exportRows(rows, allowedSkyriai = null) {
         skyrius,
         confidence: r.confidence || 'medium',
         ...(own && r._dalis_be_kainos ? { _dalis_be_kainos: true } : {}),
+        ...(r.kodas ? { kodas: r.kodas } : {}),
       };
     })
     .filter((r) => keep(r.skyrius));

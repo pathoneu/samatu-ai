@@ -261,3 +261,20 @@ def test_the_project_area_follows_the_rooms_he_counts(client):
     assert out["bendras_plotas_m2"] == pytest.approx(44.0)
     back = _recompute(client)
     assert back["bendras_plotas_m2"] == pytest.approx(50.0)
+
+
+# ── the cornice carries its +5 % once (2026-10-16) ──────────────────────────
+
+def test_cornice_material_is_the_work_length_not_wasted_twice(client):
+    """CLAUDE.md §1.4: cornice = perimeter + 5 %. The work row already holds
+    it (CORNICE_LENGTH_WASTE); the material row buys exactly those metres —
+    it used to multiply by 1,05 again (+10,25 %)."""
+    from extractor.vision_call import CORNICE_LENGTH_WASTE
+    rooms = _rooms()
+    out = _recompute(client, rooms, legend={"text_layer_ok": True, "karnizas": {"defined": True, "pages": [1], "samples": []}})
+    work = _row(out, "Lubų karnizo sumontavimas")
+    mat = next(r for r in out["darbu_sarasas"] if (r.get("aprasymas") or "").startswith("Karnizas (m + 5"))
+    assert mat["susijes_darbas"] == "Lubų karnizo sumontavimas"
+    assert float(mat["kiekis"]) == pytest.approx(float(work["kiekis"]), abs=0.005)
+    perims = [float(r["perimetras_m"]) for r in rooms if r["paskirtis"] in ("gyvenamoji", "miegamasis")]
+    assert float(work["kiekis"]) == pytest.approx(sum(round(p * CORNICE_LENGTH_WASTE, 2) for p in perims), abs=0.01)
