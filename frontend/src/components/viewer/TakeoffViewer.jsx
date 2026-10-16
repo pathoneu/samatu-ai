@@ -48,6 +48,7 @@ import MeasureContextMenu from './MeasureContextMenu';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
+import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -1403,6 +1404,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   activeCountTypeId={activeCountTypeId}
                   onSelectType={setActiveCountTypeId}
                   tallies={countTallies}
+                  aiTallies={aiTalliesOf(measurements)}
                   collapsed={countLegendCollapsed}
                   onToggleCollapse={() => setCountLegendCollapsed((v) => !v)}
                   onAddType={addCountType}

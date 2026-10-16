@@ -54,6 +54,9 @@ export default function CountLegendPanel({
   activeCountTypeId = null,
   onSelectType,
   tallies = {},
+  // {typeId: n} marks added by „Rasti panašius" (lib/symbolSearch.aiTallies) — found by
+  // shape, not checked; drawn hollow on the sheet.
+  aiTallies = {},
   // The panel floats OVER the canvas and swallows placement clicks in the
   // region it covers (audit P2) — collapsible so the user can tuck it away.
   collapsed = false,
@@ -107,6 +110,7 @@ export default function CountLegendPanel({
         {countTypes.map((type) => {
           const active = type.id === activeCountTypeId;
           const tally = tallies[type.id] || 0;
+          const ai = aiTallies[type.id] || 0;
           return (
             <button
               key={type.id}
@@ -128,6 +132,15 @@ export default function CountLegendPanel({
             >
               <Glyph shape={type.shape} color={type.color} />
               <span className="flex-1 min-w-0 truncate">{type.label}</span>
+              {ai > 0 && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1 rounded-sm text-[10px] leading-4 bg-[hsl(var(--conf-med)/0.12)] text-[hsl(var(--conf-med))]"
+                  title={`${ai} iš ${tally} rasta automatiškai („Rasti panašius") — tuščiavidurės žymės brėžinyje, patikrinkite`}
+                  data-testid={`clegend-ai-${type.id}`}
+                >
+                  {ai} AI
+                </span>
+              )}
               <span
                 className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right"
                 title={`Pažymėta ${tally} vnt.`}
@@ -175,6 +188,14 @@ export default function CountLegendPanel({
             </button>
           );
         })}
+        {Object.values(aiTallies).some((n) => n > 0) && (
+          <p className="flex items-center gap-1.5 px-2 pt-1 text-[11px] text-muted-foreground leading-snug" data-testid="clegend-ai-note">
+            <svg width={12} height={12} viewBox="0 0 12 12" aria-hidden="true" className="shrink-0">
+              <circle cx={6} cy={6} r={4.5} fill="none" stroke="currentColor" strokeWidth={1.6} />
+            </svg>
+            Tuščiavidurė žymė — rasta automatiškai, patikrinkite; pilna — pažymėta ranka.
+          </p>
+        )}
         {countTypes.length === 0 && !adding && (
           <p className="px-2 py-1 text-xs text-muted-foreground">
             Sukurkite tipą, kurį skaičiuosite (pvz., „Rozetės").

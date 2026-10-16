@@ -489,6 +489,17 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   const shape = type.shape || 'circle';
   const r = selected ? 8 : 6;
   const stroke = selected ? '#1d4ed8' : color;
+  // „Rasti panašius" marks are found by shape, not checked: same type colour, drawn
+  // hollow (white fill, thick outline) so they never pass for hand-placed ones.
+  if (m.source === 'symbol_search') {
+    const w = selected ? 2.5 : 2;
+    const hollow = shape === 'square'
+      ? <rect x={x - r} y={y - r} width={r * 2} height={r * 2} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />
+      : shape === 'diamond'
+        ? <path d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />
+        : <circle cx={x} cy={y} r={r} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />;
+    return <g pointerEvents="none" data-ai-mark>{hollow}</g>;
+  }
 
   let mark;
   if (shape === 'square') {
