@@ -72,6 +72,7 @@ export default function PageOverlayHost({
   // Outline editing (2026-10-16): {nr, page, points} of the room whose polygon_pct is being edited.
   outlineEdit = null,
   onOutlineEditChange = null,
+  onOutlineGestureStart = null,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -255,8 +256,13 @@ export default function PageOverlayHost({
           <OutlineEditLayer
             points={outlineEdit.points}
             onChange={(pts) => onOutlineEditChange?.(pts)}
+            onGestureStart={onOutlineGestureStart}
             geometry={pageGeometry}
             renderedSize={{ width, height }}
+            scale={measureScale}
+            pageSizePt={pageSizePt}
+            pageRotation={pageRotation}
+            tableAreaM2={outlineEdit.tableAreaM2 ?? null}
           />
         </div>
       )}

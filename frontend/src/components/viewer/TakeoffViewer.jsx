@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2 } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -30,6 +30,8 @@ import { uncalibratedScale } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms } from '@/lib/durableScale';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
+import { selfIntersects } from '@/lib/polygonGeometry';
+import { usePageGeometry } from '@/hooks/usePageGeometry';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
@@ -63,6 +65,13 @@ const MEASURE_HINTS = {
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
   count: 'Kiekis: 1) pasirinkite tipą dešinėje 2) spustelėkite elementus · ant žymės — pašalinti',
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
+};
+// Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
+const OUTLINE_HINT = 'Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · Z — atgal · Enter — išsaugoti · Esc — atšaukti';
+// What the status bar adds to a measure hint about snapping, by the sheet's wall geometry status.
+const SNAP_NOTE = {
+  ok: ' · prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)',
+  no_walls: ' · šiame lape vektorinių sienų nėra — prilimpa tik prie matavimų',
 };
 
 // The page the user is actually LOOKING at. The scroll plugin's `currentPage`
@@ -152,7 +161,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, outlineSaving = false, onDownload }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -252,14 +261,25 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               <button
                 type="button"
                 className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white disabled:opacity-60"
-                title="Išsaugoti pakeistą kontūrą — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti"
-                disabled={outlineSaving}
+                title={outlineInvalid
+                  ? 'Kontūras kertasi pats su savimi — pataisykite viršūnes, tada išsaugokite'
+                  : 'Išsaugoti pakeistą kontūrą (Enter) — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti'}
+                disabled={outlineSaving || outlineInvalid}
                 onClick={onSaveOutlineEdit}
                 data-testid="outline-edit-save"
               >
                 <Pentagon className="w-3.5 h-3.5" />
                 <span>{outlineSaving ? 'Saugoma…' : `Išsaugoti kontūrą (${outlineEdit.nr})`}</span>
               </button>
+              <button
+                type="button"
+                className={btn}
+                title="Atšaukti paskutinį viršūnės pakeitimą (Z)"
+                aria-label="Atgal"
+                disabled={!outlineCanUndo}
+                onClick={onUndoOutlineEdit}
+                data-testid="outline-edit-undo"
+              ><Undo2 className="w-4 h-4" /></button>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
@@ -356,7 +376,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null, outlineEdit = null, projectId = null }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -371,7 +391,12 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   }
   const pageScale = measureScales?.[cur];
   const scaleText = scaleStatusText(pageScale);
-  const measureHint = measureTool ? MEASURE_HINTS[measureTool] : null;
+  // Whether the visible sheet has wall geometry to snap to — same cache the page hosts fill, so this
+  // costs no extra request; `select` and `count` do not snap, the others do.
+  const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
+  const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
+  const snapNote = snapsHere ? (SNAP_NOTE[geometryStatus] || '') : '';
+  const measureHint = outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null);
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
@@ -695,11 +720,27 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       return;
     }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null);
-    setOutlineEdit({ nr: String(r.nr), page: roomPageOf(r), points: r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]) });
+    setOutlineEdit({
+      nr: String(r.nr),
+      page: roomPageOf(r),
+      points: r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]),
+      history: [],
+      tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
+    });
   };
   const cancelOutlineEdit = () => setOutlineEdit(null);
+  // Undo: every drag / insert / delete snapshots the ring first (OutlineEditLayer.onGestureStart);
+  // Z or the toolbar arrow steps back. Bounded, like the measurement draft's undo.
+  const snapshotOutline = () => setOutlineEdit((cur) => (cur
+    ? { ...cur, history: [...(cur.history || []).slice(-49), cur.points] }
+    : cur));
+  const undoOutline = () => setOutlineEdit((cur) => (cur && cur.history?.length
+    ? { ...cur, points: cur.history[cur.history.length - 1], history: cur.history.slice(0, -1) }
+    : cur));
+  const outlineInvalid = !!outlineEdit && selfIntersects(outlineEdit.points.map(([x, y]) => ({ x, y })));
   const saveOutlineEdit = async () => {
     if (!outlineEdit || !onRoomOutlineEdit) return;
+    if (outlineInvalid) { toast.error('Kontūras kertasi pats su savimi — pataisykite viršūnes prieš išsaugant'); return; }
     setOutlineSaving(true);
     try {
       await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points);
@@ -713,6 +754,19 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   };
   // Focus moving to another room abandons an unsaved edit (the editor is bound to the focused room).
   useEffect(() => { setOutlineEdit(null); }, [focusedRoomNr]);
+  // Keyboard while editing: Enter saves, Z undoes (Esc is in ViewerHotkeys' chain via measureEscape).
+  const saveOutlineEditRef = useRef(saveOutlineEdit);
+  useEffect(() => { saveOutlineEditRef.current = saveOutlineEdit; });
+  useEffect(() => {
+    if (!outlineEdit) return undefined;
+    const onKey = (e) => {
+      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (e.key === 'Enter') { e.preventDefault(); saveOutlineEditRef.current?.(); }
+      else if ((e.key === 'z' || e.key === 'Z') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); undoOutline(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [!!outlineEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Measurement subsystem (Phase 3) ------------------------------------
   // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
@@ -1018,6 +1072,9 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onStartOutlineEdit={check || !onRoomOutlineEdit ? null : startOutlineEdit}
             onSaveOutlineEdit={saveOutlineEdit}
             onCancelOutlineEdit={cancelOutlineEdit}
+            onUndoOutlineEdit={undoOutline}
+            outlineCanUndo={!!outlineEdit?.history?.length}
+            outlineInvalid={outlineInvalid}
             outlineSaving={outlineSaving}
             onDownload={handleDownload}
           />
@@ -1064,6 +1121,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       wallsLayerVisible={wallsLayerVisible}
                       outlineEdit={outlineEdit}
                       onOutlineEditChange={(points) => setOutlineEdit((cur) => (cur ? { ...cur, points } : cur))}
+                      onOutlineGestureStart={snapshotOutline}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}
@@ -1111,9 +1169,18 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             </Viewport>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
-            {measureTool != null && (
+            {(measureTool != null || outlineEdit) && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap">
-                {MEASURE_HINTS[measureTool]}
+                {outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
+              </div>
+            )}
+            {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
+            {wallsLayerVisible && !check && (
+              <div className="absolute bottom-2 right-2 z-30 px-3 py-1.5 rounded border border-border bg-card/95 text-[11px] text-foreground shadow-md pointer-events-none flex items-center gap-3" data-testid="walls-legend">
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(71,85,105,0.5)' }} />Sienos (iš vektorinio PDF)</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>
               </div>
             )}
             {/* Floating count-type legend while the count tool is armed. */}
@@ -1146,6 +1213,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             measureScales={effectiveScales}
             measureTool={measureTool}
             onCalibrateClick={() => armMeasureTool('calibrate')}
+            outlineEdit={outlineEdit}
+            projectId={projectId}
           />
           <CalibrateDialog
             request={calibRequest}
@@ -1165,6 +1234,11 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
               // (2026-07-28 UX walkthrough.)
               setMeasureTool(null);
               setSelectedMeasureId(null);
+              // Say what was set, in the status bar's words (2026-10-16): the dialog closes at once and
+              // the status bar is small — a confirmation nobody has to look for.
+              toast.success(scaleStatusText(scale), {
+                description: pages ? `Pritaikyta visiems ${pages.length} lapams.` : `Pritaikyta ${calibRequest.pageNr} lapui. Patikrinkite „Atstumo" įrankiu ties žinomu matmeniu.`,
+              });
             }}
             onClose={() => setCalibRequest(null)}
           />
