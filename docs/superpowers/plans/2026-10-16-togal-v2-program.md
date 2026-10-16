@@ -74,3 +74,10 @@ Demo project with vector PDF, 11 rooms, 8 sheets: `http://localhost:<VITE_PORT>/
 2. Manager merges into `togal-v2` with `git merge --no-ff togal/<scope>`; conflicts are resolved by the manager, never by force.
 3. After each merge: `npm run test:units && npx eslint . --quiet && npm run build` and the touched backend test files; the full backend suite at the end of each wave.
 4. Wave done → founder reviews on 5173/8000 from `togal-v2`. No PR, no push, no deploy until the founder says so.
+
+## Baseline for every lane-touching merge (togal-v2 @ bad14b7, `eval_harness.py --recompute --gate`, zero API, taken by the backend manager 2026-10-16 11:49)
+
+- Totals: his billed lines **22,60 %** (a 6,21 · b 18,07 · c 36,29 · d 16,22 · g 56,83 · h 17,12); legacy totals MAE 15,44 %; gate OK. Run: `eval_runs/2026-10-16_11-49-56_multi_totals_only`.
+- Rows: within ±10 % corpus mean **26,1 %**, € share 34,7 % (a 37,7/32,4 · b 9,9/21,0 · c 22,2/12,1 · d 36,0/60,3 · g 30,0/55,6 · h 20,8/26,7); gate OK.
+
+Merge key: the viewer manager merges into togal-v2; the backend manager reviews and gates W3/W9/W10/W11 and signals „merge-ready". W3 review (backend manager): stage progress through an explicit `on_stage` callback on `geometry_lane.apply_geometry` (authorised, pass-through only), per-room landing for narrowed runs, a fixed honesty sentence in every job snapshot (the lane reads the whole drawing; the sheet only narrows what lands). Stage label for sheet alignment: „Planas".
