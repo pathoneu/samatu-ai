@@ -274,3 +274,49 @@ def test_point_pixel_round_trip(rot):
     px = pt_box_to_px(box, W, H, rot, rw, rh)
     back = px_box_to_pt(px, W, H, rot, rw, rh)
     assert all(abs(a - b) < 1.0 for a, b in zip(box, back)), (rot, px, back)
+
+
+def _grey_pdf() -> bytes:
+    """The same doors on a mid-grey background — a render or a dark scan."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFillGray(0.6)
+    c.rect(0, 0, PAGE_W, PAGE_H, stroke=0, fill=1)
+    c.setFillGray(0)
+    for d in DOORS:
+        _draw_door(c, *d)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def test_line_drawing_has_no_raster_warning(env):
+    cl = _login("owner@x.lt")
+    out = cl.post("/api/cv/find-symbol", json={
+        "project_id": "proj-A", "page_idx": 0, "box_pt": _door_box(*DOORS[0]),
+    }).json()
+    assert out["page_ink_share"] < 0.05
+    assert out["warning_lt"] is None
+    assert out["dpi"] == 150
+
+
+def test_grey_sheet_says_the_search_is_not_trustworthy(env):
+    _pdf_cache.store_pdf("proj-R", _grey_pdf())
+    cl = _login("owner@x.lt")
+    r = cl.post("/api/cv/find-symbol", json={
+        "project_id": "proj-R", "page_idx": 0, "box_pt": _door_box(*DOORS[0]),
+    })
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["page_ink_share"] > 0.9
+    assert "nepatikima" in out["warning_lt"]
+    assert out["skipped"] == "raster" and out["candidates"] == []
+
+
+def test_big_sheets_are_searched_at_a_lower_dpi():
+    from extractor.cv_match import search_dpi, BOX_SEARCH_MAX_PX
+    assert search_dpi(595, 842) == 150                      # A4
+    a3 = search_dpi(842, 1191)
+    assert 115 <= a3 <= 130
+    assert (842 / 72 * a3) * (1191 / 72 * a3) <= BOX_SEARCH_MAX_PX * 1.02
+    assert search_dpi(2384, 3370) == 72                     # A0: floor, not below

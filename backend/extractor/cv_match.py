@@ -123,6 +123,17 @@ def find_similar_symbols(
 
 INK_LEVEL = 220                     # grey < this is ink (thin grey arcs included)
 BOX_SEARCH_DPI = 150
+# Cost (measured 2026-10-16, 6 scales × 8 orientations): objektas_h A4 plan at
+# 150 dpi (2.2 Mpx) 2.9 s / 88 MB peak; objektas_g A3 at 150 dpi (4.4 Mpx) 6.7 s
+# / ~200 MB. Time and memory follow the pixel count, so a larger sheet is
+# searched at a lower dpi: the raster stays near BOX_SEARCH_MAX_PX.
+BOX_SEARCH_MAX_PX = 3_000_000
+BOX_SEARCH_MIN_DPI = 72
+# Ink share of a sheet above which the search is not trusted: the demo line
+# drawings measure 0.05–0.16 (a material board 0.28), objektas_g's rendered
+# elevations and visualisations 0.50–0.69 — there "ink" is shading, every
+# window is full of it and scores mean nothing.
+RASTER_INK_SHARE = 0.25
 BOX_SEARCH_SCALES = (0.7, 0.8, 0.9, 1.0, 1.12, 1.25)   # door 700 vs 900 mm = 0.78
 BOX_SEARCH_ROTATIONS = (0, 90, 180, 270)
 MAX_PEAKS_PER_VARIANT = 150
@@ -136,6 +147,20 @@ def _ink(gray: np.ndarray) -> np.ndarray:
 def _capped_distance(ink: np.ndarray, tau: float) -> np.ndarray:
     dist = cv2.distanceTransform((1 - ink).astype(np.uint8), cv2.DIST_L2, 3)
     return np.minimum(dist, tau).astype(np.float32)
+
+
+def search_dpi(page_w_pt: float, page_h_pt: float) -> int:
+    """The dpi a sheet is searched at: BOX_SEARCH_DPI, lowered for big sheets so
+    the raster stays near BOX_SEARCH_MAX_PX (A3 → ~124 dpi, A1 → ~62 → 72)."""
+    area_in2 = (page_w_pt / 72.0) * (page_h_pt / 72.0)
+    if area_in2 <= 0:
+        return BOX_SEARCH_DPI
+    fit = int((BOX_SEARCH_MAX_PX / area_in2) ** 0.5)
+    return max(BOX_SEARCH_MIN_DPI, min(BOX_SEARCH_DPI, fit))
+
+
+def ink_share(gray: np.ndarray) -> float:
+    return float(_ink(gray).mean())
 
 
 def template_ink_px(template: np.ndarray) -> int:
@@ -155,14 +180,18 @@ def find_symbol_by_shape(
     page: np.ndarray,
     template: np.ndarray,
     min_score: float = 0.70,
-    tau: float = 4.5,
+    tau: float | None = None,
+    dpi: int = BOX_SEARCH_DPI,
     scales: tuple[float, ...] = BOX_SEARCH_SCALES,
     max_results: int = 300,
 ) -> dict:
     """Chamfer search for `template` (grey crop) on `page` (grey raster, same
     dpi). Returns {"candidates": [...], "truncated": bool} — candidates in page
     pixels, best first, after NMS; each carries bbox (x, y, w, h), center x/y,
-    score, scale, rotation, mirrored."""
+    score, scale, rotation, mirrored. τ defaults to 4.5 px at 150 dpi (≈ 0.76 mm),
+    scaled with `dpi` so a lower-dpi search means the same tolerance on paper."""
+    if tau is None:
+        tau = 4.5 * dpi / BOX_SEARCH_DPI
     page_ink = _ink(page)
     page_dist = _capped_distance(page_ink, tau)
     page_ink_f = page_ink.astype(np.float32)

@@ -33,7 +33,7 @@ import pypdfium2 as pdfium
 
 from extractor.cv_match import (
     find_similar_symbols, find_symbol_by_shape, pt_box_to_px, px_box_to_pt,
-    template_ink_px, BOX_SEARCH_DPI, MIN_TEMPLATE_INK_PX,
+    template_ink_px, search_dpi, ink_share, MIN_TEMPLATE_INK_PX, RASTER_INK_SHARE,
 )
 from extractor.pdfium_guard import PDFIUM_LOCK
 from extractor.cv_render_cache import render_page
@@ -231,21 +231,28 @@ def match_template(
     return {"candidates": candidates, "page_size": list(page.shape[::-1])}
 
 
-def _page_geometry(pdf: bytes, page_idx: int) -> tuple[float, float, int, int]:
-    """(width_pt, height_pt, /Rotate degrees, page count) of one page — the
-    UNROTATED mediabox size, which is what the viewer's points are relative to."""
+def _pages_geometry(pdf: bytes, *page_idxs: int) -> list[tuple[float, float, int]]:
+    """(width_pt, height_pt, /Rotate degrees) per requested page — the UNROTATED
+    mediabox size, which is what the viewer's points are relative to. One PDFium
+    parse for all of them."""
     with PDFIUM_LOCK:
         doc = pdfium.PdfDocument(pdf)
         try:
             n_pages = len(doc)
-            if page_idx >= n_pages:
-                raise HTTPException(400, f"Brėžinyje tik {n_pages} lap.")
-            page = doc[page_idx]
-            x0, y0, x1, y1 = page.get_mediabox()
-            rot = int(page.get_rotation() or 0) % 360
+            out = []
+            for idx in page_idxs:
+                if idx >= n_pages:
+                    raise HTTPException(400, f"Brėžinyje tik {n_pages} lap.")
+                page = doc[idx]
+                x0, y0, x1, y1 = page.get_mediabox()
+                out.append((float(x1 - x0), float(y1 - y0), int(page.get_rotation() or 0) % 360))
         finally:
             doc.close()
-    return float(x1 - x0), float(y1 - y0), rot, n_pages
+    return out
+
+
+def _page_geometry(pdf: bytes, page_idx: int) -> tuple[float, float, int]:
+    return _pages_geometry(pdf, page_idx)[0]
 
 
 @router.post("/find-symbol")
@@ -267,16 +274,17 @@ def find_symbol(
     started = time.monotonic()
     pdf = _load_project_pdf(body.project_id)
     t_idx = body.page_idx if body.template_page_idx is None else body.template_page_idx
-    tw, th, trot, _ = _page_geometry(pdf, t_idx)
+    (tw, th, trot), (pw, ph, prot) = _pages_geometry(pdf, t_idx, body.page_idx)
     if x1 > tw + 1 or y1 > th + 1:
         raise HTTPException(400, "Rėmelis už lapo ribų")
     if (x1 - x0) < 4 or (y1 - y0) < 4:
         raise HTTPException(400, "Rėmelis per mažas — apibrėžkite visą simbolį")
     if (x1 - x0) > tw * 0.25 or (y1 - y0) > th * 0.25:
         raise HTTPException(400, "Rėmelis per didelis — apibrėžkite vieną simbolį, ne plano dalį")
-    pw, ph, prot, _ = _page_geometry(pdf, body.page_idx)
-
-    template_raster = render_page(pdf, t_idx, BOX_SEARCH_DPI)
+    # Both rasters at the SEARCH page's dpi, so the template's pixels are the same
+    # size on paper as the page it is looked for on.
+    dpi = search_dpi(pw, ph)
+    template_raster = render_page(pdf, t_idx, dpi)
     bx, by, bw, bh = pt_box_to_px(body.box_pt, tw, th, trot,
                                   template_raster.shape[1], template_raster.shape[0])
     bx, by = max(0, bx), max(0, by)
@@ -286,9 +294,14 @@ def find_symbol(
     if template_ink_px(template) < MIN_TEMPLATE_INK_PX:
         raise HTTPException(422, "Rėmelyje beveik nėra linijų — apibrėžkite patį simbolį")
 
-    page = template_raster if body.page_idx == t_idx else render_page(pdf, body.page_idx, BOX_SEARCH_DPI)
-    found = find_symbol_by_shape(page, template, min_score=body.min_score,
-                                 max_results=body.max_results)
+    page = template_raster if body.page_idx == t_idx else render_page(pdf, body.page_idx, dpi)
+    share = ink_share(page)
+    raster = share > RASTER_INK_SHARE
+    # On a raster/dark sheet every window scores alike (measured on objektas_g's
+    # renders: ~200 "matches"); the search is not run and the answer says why.
+    found = ({"candidates": [], "truncated": False} if raster else
+             find_symbol_by_shape(page, template, min_score=body.min_score,
+                                  max_results=body.max_results, dpi=dpi))
     rh, rw = page.shape[:2]
     candidates = []
     for c in found["candidates"]:
@@ -316,6 +329,13 @@ def find_symbol(
         "candidates": candidates,
         "truncated": found["truncated"],
         "min_score": body.min_score,
+        "dpi": dpi,
+        # Raster honesty: a sheet that is mostly "ink" (a render, a scan, a dark
+        # background) makes every window look alike — say so, do not just list.
+        "page_ink_share": round(share, 4),
+        "skipped": "raster" if raster else None,
+        "warning_lt": ("Lapas rastrinis arba tamsus — panašumų paieška nepatikima, šiame lape neieškota"
+                       if raster else None),
         "elapsed_s": round(time.monotonic() - started, 2),
     }
 
@@ -354,7 +374,7 @@ def record_decision(
     pdf = _load_project_pdf(body.project_id)
     page = render_page(pdf, body.page_idx, body.dpi)
     if body.box_pt is not None:
-        pw, ph, prot, _ = _page_geometry(pdf, body.page_idx)
+        pw, ph, prot = _page_geometry(pdf, body.page_idx)
         x, y, w, h = pt_box_to_px(body.box_pt, pw, ph, prot, page.shape[1], page.shape[0])
     else:
         x, y, w, h = body.bbox
