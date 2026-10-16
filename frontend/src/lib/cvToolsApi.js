@@ -22,6 +22,17 @@ const post = async (path, body) => {
 };
 
 export const matchTemplate = (body) => post('/api/cv/match-template', body);
+
+/** „Rasti panašius": box in top-left mediabox points on `templatePageIdx` →
+ *  similar symbols on `pageIdx` (both 0-based), best first, same points.
+ *  The backend loads the project's stored drawing itself — no upload needed. */
+export const findSymbol = ({ projectId, pageIdx, templatePageIdx = null, boxPt, minScore = 0.8 }) => post('/api/cv/find-symbol', {
+  project_id: projectId,
+  page_idx: pageIdx,
+  template_page_idx: templatePageIdx,
+  box_pt: boxPt,
+  min_score: minScore,
+});
 export const magicWand = (body) => post('/api/cv/magic-wand', body);
 export const recordDecision = (body) => post('/api/cv/record-decision', body);
 
