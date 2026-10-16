@@ -1,7 +1,9 @@
-"""HTTP API for the CV layer. Four endpoints:
+"""HTTP API for the CV layer. Five endpoints:
 
   POST /api/cv/upload-pdf     — prime the PDF cache for a session
   POST /api/cv/match-template — click → count similar symbols on a page
+  POST /api/cv/find-symbol    — box in PDF points → similar symbols on a page
+                                (the viewer's „Rasti panašius"; shape score)
   POST /api/cv/magic-wand     — click → suggest room polygon
   POST /api/cv/record-decision — append accept/reject as training data
 
@@ -12,8 +14,9 @@ out of MVP scope.
 
 PDFs come from `page_raster_cache._PDF_CACHE` (1h LRU). The frontend
 primes the cache once via `/upload-pdf`; subsequent JSON calls reuse
-it. When the cache has evicted, compute endpoints return 409 so the
-frontend can re-upload from local browser state.
+it. On a cache miss the project's stored drawing (object storage, the
+same bytes `/api/projects/{id}/pdf` serves) is loaded into the cache;
+only when neither has it do compute endpoints return 409.
 """
 from __future__ import annotations
 
@@ -23,7 +26,16 @@ from pydantic import BaseModel, Field
 import auth as _auth
 import db as _db
 import page_raster_cache as _pdf_cache
-from extractor.cv_match import find_similar_symbols
+
+import time
+
+import pypdfium2 as pdfium
+
+from extractor.cv_match import (
+    find_similar_symbols, find_symbol_by_shape, pt_box_to_px, px_box_to_pt,
+    template_ink_px, search_dpi, ink_share, MIN_TEMPLATE_INK_PX, RASTER_INK_SHARE,
+)
+from extractor.pdfium_guard import PDFIUM_LOCK
 from extractor.cv_render_cache import render_page
 from extractor.cv_wand import suggest_room_polygon
 from extractor.training_data import KLASS_PATTERN, record_label
@@ -110,6 +122,18 @@ class MatchTemplateBody(BaseModel):
     dpi: int = 200
 
 
+class FindSymbolBody(BaseModel):
+    project_id: str
+    # 0-based, like the other /api/cv bodies. The template is cut from
+    # template_page_idx and searched on page_idx (the same page by default).
+    page_idx: int = Field(ge=0)
+    template_page_idx: int | None = Field(default=None, ge=0)
+    # [x0, y0, x1, y1] in TOP-LEFT mediabox PDF points (the viewer's measurement space).
+    box_pt: list[float] = Field(min_length=4, max_length=4)
+    min_score: float = Field(default=0.70, ge=0.5, le=0.99)
+    max_results: int = Field(default=300, ge=1, le=500)
+
+
 class MagicWandBody(BaseModel):
     project_id: str
     page_idx: int = Field(ge=0)
@@ -121,10 +145,15 @@ class MagicWandBody(BaseModel):
 class RecordDecisionBody(BaseModel):
     project_id: str
     page_idx: int
-    bbox: list[int]
+    # One of the two: `bbox` = [x, y, w, h] raster pixels at `dpi` (the click
+    # tools), or `box_pt` = [x0, y0, x1, y1] mediabox points (the box search,
+    # converted server side so the viewer never does /Rotate pixel math).
+    bbox: list[int] | None = Field(default=None, min_length=4, max_length=4)
+    box_pt: list[float] | None = Field(default=None, min_length=4, max_length=4)
     klass: str = Field(pattern=KLASS_PATTERN)  # becomes a directory name
     decision: str  # "accept" | "reject"
     confidence: float | None = None
+    source: str | None = Field(default=None, max_length=40)
     dpi: int = 200
 
 
@@ -147,8 +176,26 @@ async def upload_pdf(
     return {"status": "ok", "size": len(pdf_bytes)}
 
 
+def _stored_project_pdf(project_id: str) -> bytes | None:
+    """The drawing the project was saved with (local disk or R2). Callers have
+    already checked ownership. A storage hiccup reads as "not there" — the
+    409 below then says what to do."""
+    try:
+        from storage import get_storage, pdf_key
+        data = get_storage().get(pdf_key(project_id))
+    except Exception:  # noqa: BLE001
+        return None
+    if not data or not data[:4].startswith(b"%PDF"):
+        return None
+    return data
+
+
 def _load_project_pdf(project_id: str) -> bytes:
     pdf = _pdf_cache.get_pdf(project_id)
+    if pdf is None:
+        pdf = _stored_project_pdf(project_id)
+        if pdf is not None:
+            _pdf_cache.store_pdf(project_id, pdf)
     if pdf is None:
         # Either the project doesn't exist OR the in-memory cache expired
         # (1h TTL). Frontend's job to re-upload from local state.
@@ -184,6 +231,115 @@ def match_template(
     return {"candidates": candidates, "page_size": list(page.shape[::-1])}
 
 
+def _pages_geometry(pdf: bytes, *page_idxs: int) -> list[tuple[float, float, int]]:
+    """(width_pt, height_pt, /Rotate degrees) per requested page — the UNROTATED
+    mediabox size, which is what the viewer's points are relative to. One PDFium
+    parse for all of them."""
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf)
+        try:
+            n_pages = len(doc)
+            out = []
+            for idx in page_idxs:
+                if idx >= n_pages:
+                    raise HTTPException(400, f"Brėžinyje tik {n_pages} lap.")
+                page = doc[idx]
+                x0, y0, x1, y1 = page.get_mediabox()
+                out.append((float(x1 - x0), float(y1 - y0), int(page.get_rotation() or 0) % 360))
+        finally:
+            doc.close()
+    return out
+
+
+def _page_geometry(pdf: bytes, page_idx: int) -> tuple[float, float, int]:
+    return _pages_geometry(pdf, page_idx)[0]
+
+
+@router.post("/find-symbol")
+def find_symbol(
+    body: FindSymbolBody,
+    request: Request,
+    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
+) -> dict:
+    """Box around one symbol → every similar one on a page, best first.
+
+    Scores are a SHAPE agreement (chamfer, extractor/cv_match), not a
+    probability. Everything above `min_score` comes back so the viewer's
+    slider can filter without another call; the viewer decides what is shown."""
+    _rate_limit(request, "find-symbol")
+    _require_owned_project(user, body.project_id)  # ownership BEFORE body checks / compute
+    x0, y0, x1, y1 = body.box_pt
+    if not (x1 > x0 and y1 > y0) or x0 < 0 or y0 < 0:
+        raise HTTPException(400, "Rėmelis turi būti [x0, y0, x1, y1], x1 > x0, y1 > y0")
+    started = time.monotonic()
+    pdf = _load_project_pdf(body.project_id)
+    t_idx = body.page_idx if body.template_page_idx is None else body.template_page_idx
+    (tw, th, trot), (pw, ph, prot) = _pages_geometry(pdf, t_idx, body.page_idx)
+    if x1 > tw + 1 or y1 > th + 1:
+        raise HTTPException(400, "Rėmelis už lapo ribų")
+    if (x1 - x0) < 4 or (y1 - y0) < 4:
+        raise HTTPException(400, "Rėmelis per mažas — apibrėžkite visą simbolį")
+    if (x1 - x0) > tw * 0.25 or (y1 - y0) > th * 0.25:
+        raise HTTPException(400, "Rėmelis per didelis — apibrėžkite vieną simbolį, ne plano dalį")
+    # Both rasters at the SEARCH page's dpi, so the template's pixels are the same
+    # size on paper as the page it is looked for on.
+    dpi = search_dpi(pw, ph)
+    template_raster = render_page(pdf, t_idx, dpi)
+    bx, by, bw, bh = pt_box_to_px(body.box_pt, tw, th, trot,
+                                  template_raster.shape[1], template_raster.shape[0])
+    bx, by = max(0, bx), max(0, by)
+    template = template_raster[by:by + bh, bx:bx + bw]
+    if template.size == 0:
+        raise HTTPException(400, "Rėmelis tuščias")
+    if template_ink_px(template) < MIN_TEMPLATE_INK_PX:
+        raise HTTPException(422, "Rėmelyje beveik nėra linijų — apibrėžkite patį simbolį")
+
+    page = template_raster if body.page_idx == t_idx else render_page(pdf, body.page_idx, dpi)
+    share = ink_share(page)
+    raster = share > RASTER_INK_SHARE
+    # On a raster/dark sheet every window scores alike (measured on objektas_g's
+    # renders: ~200 "matches"); the search is not run and the answer says why.
+    found = ({"candidates": [], "truncated": False} if raster else
+             find_symbol_by_shape(page, template, min_score=body.min_score,
+                                  max_results=body.max_results, dpi=dpi))
+    rh, rw = page.shape[:2]
+    candidates = []
+    for c in found["candidates"]:
+        box = px_box_to_pt(c["bbox"], pw, ph, prot, rw, rh)
+        is_source = False
+        if body.page_idx == t_idx:
+            ix = max(0.0, min(box[2], x1) - max(box[0], x0))
+            iy = max(0.0, min(box[3], y1) - max(box[1], y0))
+            inter = ix * iy
+            union = (box[2] - box[0]) * (box[3] - box[1]) + (x1 - x0) * (y1 - y0) - inter
+            is_source = union > 0 and inter / union > 0.3
+        candidates.append({
+            "x": round((box[0] + box[2]) / 2, 2),
+            "y": round((box[1] + box[3]) / 2, 2),
+            "box_pt": box,
+            "score": c["score"],
+            "scale": c["scale"],
+            "rotation": c["rotation"],
+            "mirrored": c["mirrored"],
+            "is_source": is_source,
+        })
+    return {
+        "page_idx": body.page_idx,
+        "template_page_idx": t_idx,
+        "candidates": candidates,
+        "truncated": found["truncated"],
+        "min_score": body.min_score,
+        "dpi": dpi,
+        # Raster honesty: a sheet that is mostly "ink" (a render, a scan, a dark
+        # background) makes every window look alike — say so, do not just list.
+        "page_ink_share": round(share, 4),
+        "skipped": "raster" if raster else None,
+        "warning_lt": ("Lapas rastrinis arba tamsus — panašumų paieška nepatikima, šiame lape neieškota"
+                       if raster else None),
+        "elapsed_s": round(time.monotonic() - started, 2),
+    }
+
+
 @router.post("/magic-wand")
 def magic_wand(
     body: MagicWandBody,
@@ -213,9 +369,15 @@ def record_decision(
     _require_owned_project(user, body.project_id)  # N6: ownership BEFORE record
     if body.decision not in ("accept", "reject"):
         raise HTTPException(400, "decision must be 'accept' or 'reject'")
+    if (body.bbox is None) == (body.box_pt is None):
+        raise HTTPException(400, "give exactly one of bbox / box_pt")
     pdf = _load_project_pdf(body.project_id)
     page = render_page(pdf, body.page_idx, body.dpi)
-    x, y, w, h = body.bbox
+    if body.box_pt is not None:
+        pw, ph, prot = _page_geometry(pdf, body.page_idx)
+        x, y, w, h = pt_box_to_px(body.box_pt, pw, ph, prot, page.shape[1], page.shape[0])
+    else:
+        x, y, w, h = body.bbox
     if w <= 0 or h <= 0 or x < 0 or y < 0:
         raise HTTPException(400, "bbox must be positive [x, y, w, h]")
     if y + h > page.shape[0] or x + w > page.shape[1]:
@@ -230,8 +392,11 @@ def record_decision(
         meta={
             "project_id": body.project_id,
             "page_idx": body.page_idx,
-            "bbox": body.bbox,
+            "bbox": [x, y, w, h],
+            "box_pt": body.box_pt,
+            "dpi": body.dpi,
             "confidence": body.confidence,
+            "source": body.source,
         },
     )
     return {"status": "ok"}

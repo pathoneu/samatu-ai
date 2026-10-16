@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -41,6 +41,7 @@ import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu from './MeasureContextMenu';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
+import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -168,7 +169,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -257,6 +258,20 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               <span className="text-[11px] leading-none hidden lg:inline">{label}</span>
             </button>
           ))}
+          {/* „Rasti panašius" (2026-10-16, Togal's AI Image Search): box one symbol → similar ones → count. */}
+          {onToggleSymbolSearch && (
+            <button
+              type="button"
+              className={(symbolSearchActive ? pressed : btn) + ' inline-flex items-center gap-1'}
+              title="Rasti panašius: apveskite vieną simbolį (pvz., duris) — programa suras panašius pagal formą, jūs peržiūrite ir pridedate kaip kiekį"
+              aria-pressed={!!symbolSearchActive}
+              onClick={onToggleSymbolSearch}
+              data-testid="viewer-symbol-search"
+            >
+              <ScanSearch className="w-4 h-4" />
+              <span className="text-[11px] leading-none hidden lg:inline">Rasti panašius</span>
+            </button>
+          )}
         </>
       )}
       {canFill && (
@@ -409,7 +424,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null, outlineEdit = null, projectId = null }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null, outlineEdit = null, projectId = null, symbolHint = null }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -429,7 +444,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
   const snapNote = snapsHere ? (SNAP_NOTE[geometryStatus] || '') : '';
-  const measureHint = outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null);
+  const measureHint = symbolHint || (outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null));
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
@@ -749,7 +764,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
       return;
     }
-    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null);
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close();
     setOutlineEdit({
       nr: String(r.nr),
       page: roomPageOf(r),
@@ -888,6 +903,16 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     setCountTypes((prev) => prev.filter((t) => t.id !== typeId));
     setActiveCountTypeId((cur) => (cur === typeId ? (countTypes.find((t) => t.id !== typeId)?.id ?? null) : cur));
   };
+  // „Rasti panašius" (2026-10-16): one box-search session; its marks join the count tool's.
+  const symbol = useSymbolSearch({
+    projectId,
+    countTypes,
+    onAdd: (marks, createdType) => {
+      if (createdType) setCountTypes((prev) => [...prev, createdType]);
+      setMeasurements((prev) => [...prev, ...marks]);
+      if (marks[0]?.typeId) setActiveCountTypeId(marks[0].typeId);
+    },
+  });
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   const [selectedMeasureId, setSelectedMeasureId] = useState(null);
@@ -927,6 +952,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       return;
     }
     setFillFor(null);
+    if (symbol.active) symbol.close();
     // Arming the count tool with no types yet would be a silent no-op (clicks
     // do nothing without an active type) — make the "Sukurkite tipą" hint
     // visible even if the legend was left collapsed.
@@ -937,7 +963,13 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       return next;
     });
   };
-  const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); setFillFor(nr); };
+  const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); if (symbol.active) symbol.close(); setFillFor(nr); };
+  // „Rasti panašius" owns the pointer alone: every other tool steps aside, and they close it in turn.
+  const toggleSymbolSearch = () => {
+    if (symbol.active) { symbol.close(); return; }
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
+    symbol.open();
+  };
   // External fill arming (review-queue pencil → "Taisyti kontūrą" armed here).
   // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
   useEffect(() => {
@@ -951,6 +983,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // Esc chain, measure segment: close the calibration dialog first, then drop
   // the active tool (MeasureLayer resets its own draft when the tool changes).
   const measureEscape = () => {
+    if (symbol.active) { symbol.close(); return true; }
     if (outlineEdit) { setOutlineEdit(null); return true; }
     if (calibRequest) { setCalibRequest(null); return true; }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
@@ -1041,6 +1074,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   } : null;
 
   const handlePagePoint = async (pt) => {
+    if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
     if (fillFor == null) {
       // Plain canvas click (no fill, no measure tool): clear the focused-room
       // chip — a room stays "selected" only while the user means it (audit P2
@@ -1167,6 +1201,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             historyOpen={historyOpen}
             onToggleHistory={check ? null : () => setHistoryOpen((v) => !v)}
             onOpenGuide={() => setGuideOpen(true)}
+            symbolSearchActive={symbol.active}
+            onToggleSymbolSearch={check ? null : toggleSymbolSearch}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
@@ -1209,6 +1245,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       pageSizePt={documentState?.document?.pages?.[layout.pageIndex]?.size ?? null}
                       checkMode={!!check}
                       checkData={check?.pages?.[layout.pageNumber] || null}
+                      symbolSearch={symbol.active ? symbol : null}
                       focusedRoomNr={focusedRoomNr}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
@@ -1265,9 +1302,9 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             </Viewport>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
-            {(measureTool != null || outlineEdit) && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap">
-                {outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
+            {(measureTool != null || outlineEdit || symbol.active) && (
+              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap`}>
+                {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
             )}
             {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
@@ -1288,6 +1325,12 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                   onRevertTo={(entryId) => dispatchMeasureHist({ type: 'revertTo', entryId })}
                   onClose={() => setHistoryOpen(false)}
                 />
+              </div>
+            )}
+            {/* „Rasti panašius" review list (2026-10-16). */}
+            {symbol.active && (
+              <div className="absolute top-2 z-30 w-72" style={{ left: railOpen ? 156 : 8 }}>
+                <SymbolReviewPanel documentId={activeDocumentId} search={symbol} countTypes={countTypes} totalPages={totalPages || 1} />
               </div>
             )}
             {/* Floating count-type legend while the count tool is armed. */}
@@ -1322,6 +1365,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onCalibrateClick={() => armMeasureTool('calibrate')}
             outlineEdit={outlineEdit}
             projectId={projectId}
+            symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
           />
           <CalibrateDialog
             request={calibRequest}

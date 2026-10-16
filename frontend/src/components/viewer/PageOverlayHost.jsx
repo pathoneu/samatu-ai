@@ -24,6 +24,7 @@ import MeasureLayer, { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from 
 import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
 import OutlineEditLayer from './OutlineEditLayer';
+import SymbolSearchLayer from './SymbolSearchLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -101,6 +102,8 @@ export default function PageOverlayHost({
   // one room is being checked, nothing may compete with its outline.
   checkMode = false,
   checkData = null,
+  // „Rasti panašius" (2026-10-16): the useSymbolSearch session from TakeoffViewer, or null.
+  symbolSearch = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -261,6 +264,23 @@ export default function PageOverlayHost({
               <X className="w-3 h-3" />
             </button>
           )}
+        </div>
+      )}
+      {/* „Rasti panašius" (2026-10-16) — above the measurements while the search is open; it owns the pointer. */}
+      {adapter && symbolSearch?.active && (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <SymbolSearchLayer
+            adapter={adapter}
+            pageNr={layout.pageNumber}
+            canDraw={symbolSearch.phase !== 'searching'}
+            candidates={symbolSearch.visible.filter((c) => c.page === layout.pageNumber)}
+            numbers={symbolSearch.numbers}
+            templateBox={symbolSearch.template?.page === layout.pageNumber ? symbolSearch.template.box : null}
+            hoveredId={symbolSearch.hoveredId}
+            onBox={symbolSearch.runBox}
+            onRemove={symbolSearch.remove}
+            onHover={symbolSearch.setHoveredId}
+          />
         </div>
       )}
       {/* Outline editor (2026-10-16) — topmost on the page being edited; it owns the pointer. */}

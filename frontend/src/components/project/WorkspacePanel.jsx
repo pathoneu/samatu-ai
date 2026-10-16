@@ -221,8 +221,11 @@ export default function WorkspacePanel({
     for (const m of projMeasurements) {
       if (m.kind !== 'count' || !m.typeId) continue;
       const cur = byType.get(m.typeId);
+      // „Rasti panašius" marks (lib/symbolSearch): found by shape, not checked — the row says so.
+      const ai = m.source === 'symbol_search' ? 1 : 0;
       if (cur) {
         cur.count += 1;
+        cur.ai += ai;
         if (m.page && (!cur.firstPage || m.page < cur.firstPage)) cur.firstPage = m.page;
       } else {
         const type = (project.countTypes || []).find((t) => t.id === m.typeId)
@@ -232,6 +235,7 @@ export default function WorkspacePanel({
           label: type?.label || m.typeId,
           color: m.color || type?.color || 'hsl(var(--primary))',
           count: 1,
+          ai,
           firstPage: m.page || null,
         });
       }
@@ -277,7 +281,7 @@ export default function WorkspacePanel({
         kiekis: row.count,
         kaina: 0,
         skyrius: 'Matavimai',
-        confidence: 'high',
+        confidence: row.ai ? 'medium' : 'high',
         quantity_source: 'measurement_count',
         measure_type_id: row.typeId,
       });
@@ -694,6 +698,13 @@ export default function WorkspacePanel({
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
                 <span className="flex-1 min-w-0 truncate">{r.label}</span>
+                {r.ai > 0 && (
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${CONFIDENCE_DOT_CLASS[normalizeConfidence('yellow')]}`}
+                    title={`${confidenceLabel('yellow')}: ${r.ai} iš ${r.count} rasta automatiškai („Rasti panašius") — peržiūrėkite brėžinyje`}
+                    data-testid="meas-ai-dot"
+                  />
+                )}
                 <span className="font-mono tabular-nums text-foreground">{r.count} vnt.</span>
                 <button
                   type="button"
