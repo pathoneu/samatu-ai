@@ -87,22 +87,3 @@ export function rotateRoomGeometry(room, rot) {
   if (room.bbox_pct) out.bbox_pct = rotateBboxPct(room.bbox_pct, r);
   return out;
 }
-
-/**
- * The page's UNROTATED (mediabox) size from what EmbedPDF reports as `page.size`.
- *
- * EmbedPDF fills `page.size` from PDFium's FPDF_GetPageSizeByIndexF, which is the DISPLAYED size: on a
- * /Rotate 90 or 270 sheet width and height are swapped relative to the mediabox (measured 2026-10-16 with
- * EmbedPDF's own wasm build: a 400 × 200 mediabox at /Rotate 90 reports 200 × 400; objektas_a's /Rotate 270
- * sheets report 1191 × 842 for an 842 × 1191 mediabox). makeEmbedAdapter, the snap geometry and the outline
- * layers all want the mediabox size; passing the reported one stretched measurement points by H/W along one
- * axis and W/H along the other on rotated sheets, so their metres were wrong while their positions
- * round-tripped. Geometry gets this; layout (the sheet's mm label, zoom-to-area) keeps the reported size.
- */
-export function mediaboxSizeFrom(size, reportedRotation = 0) {
-  const w = Number(size?.width);
-  const h = Number(size?.height);
-  if (!(w > 0) || !(h > 0)) return null;
-  const r = displayRotationFor(normalizeRotation(reportedRotation));
-  return r === 90 || r === 270 ? { width: h, height: w } : { width: w, height: h };
-}
