@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeExportFilename } from './exportFilename.js';
+import { overlayPdfFilename, sanitizeExportFilename } from './exportFilename.js';
 
 test('sanitizeExportFilename: keeps Lithuanian diacritics', () => {
   assert.equal(sanitizeExportFilename('Ąžuolų g. 24'), 'Ąžuolų g. 24');
@@ -28,4 +28,9 @@ test('sanitizeExportFilename: falls back when nothing survives', () => {
   assert.equal(sanitizeExportFilename(''), 'projektas');
   assert.equal(sanitizeExportFilename(null), 'projektas');
   assert.equal(sanitizeExportFilename('***', 'atsarginis'), 'atsarginis');
+});
+
+test('overlayPdfFilename keeps Lithuanian letters and names the marks', () => {
+  assert.equal(overlayPdfFilename('Ąžuolų g. 24'), 'Ąžuolų g. 24_su_zymejimais.pdf');
+  assert.equal(overlayPdfFilename(''), 'projektas_su_zymejimais.pdf');
 });

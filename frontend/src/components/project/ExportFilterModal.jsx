@@ -13,6 +13,8 @@ import { VAT_REVERSE, VAT_STANDARD, vatChoice } from '@/lib/vatMode';
 import { staleRowsForExport, staleRowCarryTargets } from '@/lib/mergeDarbuSarasas';
 import { exportSections, linesForExport, linesWithoutPrice } from '@/lib/exportLines';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { DEFAULT_GROUPING, GROUPINGS } from '@/lib/exportGrouping';
+import ExportGroupingPreview from './ExportGroupingPreview';
 import {
   exportSelectionKey,
   loadExcludedSections,
@@ -117,6 +119,11 @@ export default function ExportFilterModal({
   // client workbook leaves it out unless he ticks this. Excel only, never kept.
   const [internalCopy, setInternalCopy] = useState(false);
 
+  // „Grupuoti pagal" (togal-v2 W8): Excel in the Pathon layout only — his own layout has his sections, the
+  // PDF pasiūlymas stays a client document. Default = today's skyriai.
+  const canGroup = format === 'excel';
+  const [grupavimas, setGrupavimas] = useState(DEFAULT_GROUPING);
+
   const allChecked = selected.size === sections.length;
   const noneChecked = selected.size === 0;
 
@@ -142,6 +149,7 @@ export default function ExportFilterModal({
       objektas: objektas.trim(),
       vat_mode: vatMode,
       vidine_kopija: format !== 'pdf' && internalCopy,
+      grupavimas: canGroup ? grupavimas : DEFAULT_GROUPING,
     });
   };
 
@@ -164,6 +172,9 @@ export default function ExportFilterModal({
           </button>
         </div>
 
+        {/* One scroll area between the title and the buttons (togal-v2 W8: the grouping and its preview made
+            the dialog taller than a laptop screen). */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {staleCount > 0 && (
           <div className="px-5 py-3 border-b border-border" role="status">
             {staleOpen ? (
@@ -272,6 +283,28 @@ export default function ExportFilterModal({
           </div>
         )}
 
+        {canGroup && (
+          <div className="px-5 py-3 border-b border-border">
+            <p className="text-[11px] text-muted-foreground">Grupuoti pagal</p>
+            <div role="radiogroup" aria-label="Grupuoti pagal" className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
+              {GROUPINGS.map((g) => (
+                <label key={g.value} title={g.desc}
+                  className="flex items-start gap-2 px-2 py-1 rounded hover:bg-muted/40 cursor-pointer transition-colors">
+                  <input type="radio" name="grupavimas" value={g.value} checked={grupavimas === g.value}
+                    onChange={() => setGrupavimas(g.value)} className="mt-0.5 w-4 h-4 accent-foreground" />
+                  <span className="text-sm text-foreground">{g.label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 px-2 text-[12px] text-muted-foreground">
+              {GROUPINGS.find((g) => g.value === grupavimas)?.desc}. Kiekiai ir sumos nesikeičia — tik tvarka ir tarpinės sumos.
+            </p>
+          </div>
+        )}
+        {canGroup && !noneChecked && (
+          <ExportGroupingPreview project={project} grupavimas={grupavimas} allowedSkyriai={selected} />
+        )}
+
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <button
             onClick={toggleAll}
@@ -285,7 +318,7 @@ export default function ExportFilterModal({
           </span>
         </div>
 
-        <div className="overflow-y-auto px-3 py-2 flex-1">
+        <div className="px-3 py-2">
           {sections.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
               Šiame projekte nėra eilučių, kurias būtų galima eksportuoti.
@@ -313,6 +346,8 @@ export default function ExportFilterModal({
               })}
             </ul>
           )}
+        </div>
+
         </div>
 
         {unpricedCount > 0 && (

@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2, Map as MapIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';
 import { getFloorCount } from '@/lib/floorMultiplier';
@@ -19,6 +19,8 @@ import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samata
 import { exportRows as templateExportRows, scaleExportRow } from '@/lib/samataTemplate';
 import { resolveStaleRows } from '@/lib/mergeDarbuSarasas';
 import { asksAboutPricesAfterDialog, exportLines, linesForExport } from '@/lib/exportLines';
+import { DEFAULT_GROUPING, exportLinesWithParts, exportSheets } from '@/lib/exportGrouping';
+import OverlayPdfDialog from './OverlayPdfDialog';
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
@@ -57,14 +59,18 @@ function collectWarnings(project) {
   return out;
 }
 
-function buildPayload(project, allowedSkyriai = null) {
+// `grupavimas` (togal-v2 W8): another „Grupuoti pagal" than today's skyriai sends each line's room parts
+// and the sheet names; the server groups them (api/export_grouping.py).
+function buildPayload(project, allowedSkyriai = null, grupavimas = DEFAULT_GROUPING) {
   // allowedSkyriai: Set<string> | null. If null = include everything.
   // SM02: daugiabučiams kiekiai padauginti × aukštų skaičiaus.
   const floorCount = getFloorCount(project);
   // The printed lines live in lib/exportLines.js (2026-10-06), so the warnings
   // before sending — the Siųsti step, this dialog, the client link — count
   // exactly the rows this payload carries.
-  const eilutes = exportLines(project, allowedSkyriai);
+  const grouped = grupavimas && grupavimas !== DEFAULT_GROUPING;
+  const eilutes = grouped ? exportLinesWithParts(project, allowedSkyriai) : exportLines(project, allowedSkyriai);
+  const grouping = grouped ? { grupavimas, lapai: exportSheets(project) } : {};
 
   // V8 darbu_sarasas — primary source
   if (Array.isArray(project.darbu_sarasas) && project.darbu_sarasas.length > 0) {
@@ -79,6 +85,7 @@ function buildPayload(project, allowedSkyriai = null) {
       perspejimani: collectWarnings(project),
       archetipas: project.archetipas || '',
       aukstu_skaicius: floorCount,
+      ...grouping,
     };
   }
   // Fallback (KŽ projektai)
@@ -120,7 +127,7 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   // „Vidinė kopija" (audit exports-money-5, 2026-09-30): the notes are for him;
   // unless he ticked the option they are not even sent, so no server version
   // can put them into the file his client gets.
-  const base = payloadOverride || buildPayload(project, allowedSkyriai);
+  const base = payloadOverride || buildPayload(project, allowedSkyriai, extra.grupavimas);
   const internalCopy = extra.vidine_kopija === true;
   const payload = {
     ...base,
@@ -195,8 +202,10 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     }
   };
 
+  const [overlayOpen, setOverlayOpen] = useState(false);
   const handle = async (action) => {
     setOpen(false);
+    if (action === 'overlay-pdf') { setOverlayOpen(true); return; }
     if (action === 'excel-template') {
       if (await renderTemplate(project.darbu_sarasas)) setFilterFor(action);
       return;
@@ -223,7 +232,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     });
   };
 
-  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija }) => {
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, grupavimas }) => {
     // Prices (2026-10-06 walkthrough): the dialog he just confirmed already says
     // „N eilučių be kainos — klientas jas matys su 0,00 € suma", counted on these
     // very lines (lib/exportLines.js), so the two confirms that followed it —
@@ -244,7 +253,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     setLoading(format);
     try {
       const safeName = sanitizeExportFilename(project.name);
-      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija };
+      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, grupavimas };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'excel-template') {
@@ -333,11 +342,26 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
               <div className="text-[11px] text-muted-foreground">Spausdintinas komercinis pasiūlymas</div>
             </div>
           </button>
+          {project?.has_pdf !== false && project?.id && (
+            <button
+              onClick={() => handle('overlay-pdf')}
+              title="Brėžinio lapai su patalpų kontūrais, matavimais ir skaičiavimais bei legenda kiekviename lape"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted text-left text-sm border-t border-border transition-colors"
+            >
+              <MapIcon className="w-4 h-4 text-muted-foreground" />
+              <div className="flex-1">
+                <div className="font-medium text-foreground">PDF su žymėjimais</div>
+                <div className="text-[11px] text-muted-foreground">Brėžiniai su kontūrais, matavimais ir legenda</div>
+              </div>
+            </button>
+          )}
           {/* Sprint §FIX-9 (2026-04-29): F2/F3 forms removed per user.
               Will return after contractor feedback — code in
               docs/superpowers/backup-2026-04-29-f2-f3-forms.py */}
         </div>
       )}
+
+      {overlayOpen && <OverlayPdfDialog project={project} onClose={() => setOverlayOpen(false)} />}
 
       {filterFor && (
         <ExportFilterModal

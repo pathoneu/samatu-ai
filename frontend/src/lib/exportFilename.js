@@ -21,4 +21,9 @@ export function sanitizeExportFilename(name, fallback = 'projektas') {
   return cleaned || fallback;
 }
 
+/** „Projektas_su_zymejimais.pdf" — the sheets with Pathon's marks (togal-v2 W8). */
+export function overlayPdfFilename(name) {
+  return `${sanitizeExportFilename(name)}_su_zymejimais.pdf`;
+}
+
 export default sanitizeExportFilename;

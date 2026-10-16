@@ -143,7 +143,7 @@ def scale_in_force(project: dict, page: int, client: dict[str, PageScale]) -> di
     """{mx, my, label} — metres per mediabox point on the sheet and how the legend names it; None when the
     sheet has no scale (measurements are then drawn without numbers and the legend says so)."""
     sources = {"user": "kalibruota jūsų", "standard": "pasirinkta jūsų", "auto": "apytiksliai, iš patalpų plotų",
-               "lane": "iš brėžinio", "none": ""}
+               "lane": "iš brėžinio", "plan": "iš brėžinio", "none": ""}
     s = client.get(str(page))
     if s is not None:
         mx = float(s.metersPerPointX)
