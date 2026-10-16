@@ -5,7 +5,7 @@ import {
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
   pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
-  consumePriceFillPending, refreshProjectFromBackend, noteServerVersion,
+  consumePriceFillPending, refreshProjectFromBackend, noteServerVersion, adoptServerProject,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -826,4 +826,35 @@ test('a newer server copy is kept; an imported copy newer than the server is sen
   assert.equal(res.projects_kept_server, 1);
   assert.equal(srv.rows.get('kept').name, 'Serverio naujesnis');
   assert.notEqual(getProject('kept')?.name, 'Senas iš failo', 'the older file copy is not adopted');
+});
+
+test('a versionSource rides the PUT that carries the edit, and a plain save after it carries none', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  const puts = installFetchRecorder();
+  updateProject('p1', { name: 'A1' }, { versionSource: 'perskaityta' });
+  updateProject('p1', { name: 'A2' });                 // same burst: still the re-read's PUT
+  await flushProjectSaves();
+  assert.equal(puts.length, 1);
+  assert.equal(JSON.parse(puts[0].body)._versija_saltinis, 'perskaityta');
+  assert.equal(JSON.parse(puts[0].body).name, 'A2');
+  updateProject('p1', { name: 'A3' });
+  await flushProjectSaves();
+  assert.equal('_versija_saltinis' in JSON.parse(puts[1].body), false);
+  assert.equal('_versija_saltinis' in getProject('p1'), false, 'never stored on the project');
+});
+
+test('adoptServerProject replaces the cached project and re-bases the next save, with no PUT', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'Dabar' }, { id: 'p2', name: 'Kitas' }]) });
+  const puts = installFetchRecorder();
+  const got = adoptServerProject({ id: 'p1', name: 'Grąžinta', updated_at: '2026-10-16T11:00:00Z' });
+  assert.equal(got.name, 'Grąžinta');
+  assert.equal(getProject('p2').name, 'Kitas');
+  assert.equal(_getServerVersion('p1'), '2026-10-16T11:00:00Z');
+  await tick(20);
+  assert.equal(puts.length, 0, 'adopting is not a save');
+  updateProject('p1', { name: 'Po to' });
+  await flushProjectSaves();
+  assert.equal(JSON.parse(puts[0].body).base_updated_at, '2026-10-16T11:00:00Z');
 });

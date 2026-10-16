@@ -255,7 +255,7 @@ const _syncToBackend = (project, opts = {}) => {
   return promise;
 };
 
-function _sendPut(project, { keepArchiveFlags = false } = {}) {
+function _sendPut(project, { keepArchiveFlags = false, versionSource = null } = {}) {
   const id = project.id;
   // Archive flags are persisted server-side SINCE 2026-07-15 (pre-prod QA:
   // localStorage-only soft-delete meant "deleted" projects resurrected after
@@ -267,7 +267,10 @@ function _sendPut(project, { keepArchiveFlags = false } = {}) {
   const { _archived, _archived_at, ...stripped } = project;
   const persisted = keepArchiveFlags ? project : stripped;
   const base = _serverVersions.get(id);
-  const body = base ? { ...persisted, base_updated_at: base } : persisted;
+  const withBase = base ? { ...persisted, base_updated_at: base } : persisted;
+  // What kind of save this is, for the project's version history (Istorija):
+  // a protocol field the server pops, like base_updated_at.
+  const body = versionSource ? { ...withBase, _versija_saltinis: versionSource } : withBase;
 
   // `token` is this PUT's slot. A user switch or a permanent delete drops the
   // slot, so a late answer is ignored — it is never aborted: the server may
@@ -349,7 +352,7 @@ function _scheduleSave(projects, id, opts) {
   _lsDirty = true;
   if (id) {
     _dirtyIds.add(id);
-    if (opts) _pendingOpts.set(id, opts);
+    if (opts) _pendingOpts.set(id, { ..._pendingOpts.get(id), ...opts });
   }
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => { _saveTimer = null; _doFlush(); }, SAVE_DEBOUNCE_MS);
@@ -711,7 +714,12 @@ export function createProject(data) {
   return project;
 }
 
-export function updateProject(id, updates) {
+/**
+ * @param {{versionSource?: string}} [opts] — `versionSource` names the save in
+ *   the project's history ('perskaityta' | 'lapas' | 'klausimas' …; default
+ *   'issaugota' on the server). It rides the debounced PUT that carries this edit.
+ */
+export function updateProject(id, updates, opts) {
   const projects = getProjects();
   const idx = projects.findIndex(p => p.id === id);
   if (idx < 0) {
@@ -729,8 +737,30 @@ export function updateProject(id, updates) {
   }
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
   // THE hot path — debounced. Everything else in this module saves immediately.
-  _scheduleSave(projects, id);
+  _scheduleSave(projects, id, opts?.versionSource ? { versionSource: opts.versionSource } : undefined);
   return projects[idx];
+}
+
+/**
+ * Take a project the SERVER has just written (a version restore) as the cached
+ * one, and its updated_at as the base for the next save — without a PUT. The
+ * caller flushes pending saves first; without re-basing, this tab's next save
+ * would 409 against its own restore.
+ */
+export function adoptServerProject(project) {
+  if (!project?.id) return null;
+  const id = project.id;
+  _dirtyIds.delete(id);
+  _pendingOpts.delete(id);
+  if (project.updated_at) _setServerVersion(id, project.updated_at);
+  const raw = _readProjectsRaw();
+  const projects = Array.isArray(raw) ? raw : [];
+  const next = projects.some((p) => p?.id === id)
+    ? projects.map((p) => (p?.id === id ? project : p))
+    : [project, ...projects];
+  _memProjects = next;
+  _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(next));
+  return getProject(id);
 }
 
 // Sprint §28 (2026-04-29): soft delete with 30d restore window.

@@ -735,6 +735,8 @@
       "tabKiekiaiTitle": "Apskaičiuoti kiekiai ir sąmata — čia suvedate kainas ir eksportuojate",
       "tabAiChatTitle": "Klauskite apie šio projekto patalpas, plotus ir kiekius",
       "prielaidosTitle": "Keisti nustatymus: glaistymo kokybė, maišytuvai, sienos storis, lubų aukštis kiekvienai patalpai, langai ir durys. Kiekiai persiskaičiuoja iš karto.",
+      "istorija": "Istorija",
+      "istorijaTitle": "Projekto versijos: kiekviena išsaugota būsena, palyginimas ir grąžinimas",
       "exportTitle": "Eksportuoti pasiūlymą",
       "recomputeErr": "Perskaičiavimo klaida",
       "toastRecomputed": "Kiekiai perskaičiuoti",

@@ -725,6 +725,8 @@
       "tabKiekiaiTitle": "Calculated quantities and the estimate — enter prices and export here",
       "tabAiChatTitle": "Ask about this project's rooms, areas and quantities",
       "prielaidosTitle": "Change the settings: skim quality, mixers, wall thickness, ceiling height per room, windows and doors. Quantities recalculate immediately.",
+      "istorija": "History",
+      "istorijaTitle": "Project versions: every saved state, compare and restore",
       "exportTitle": "Export the bid",
       "recomputeErr": "Recompute error",
       "toastRecomputed": "Quantities recalculated",

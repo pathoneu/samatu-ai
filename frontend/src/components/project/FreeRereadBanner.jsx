@@ -64,7 +64,7 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
     try {
       const base = getProject(id) || project;
       const { project: merged } = await runFreeReread(base);
-      updateProject(id, merged);
+      updateProject(id, merged, { versionSource: 'perskaityta' });
       await flushProjectSaves();
       recordPilot(id, 'free_reread', { kind: 'reread', id: String((merged._reread_diff?.changed || []).length) });
       setDone(freeRereadState(merged));

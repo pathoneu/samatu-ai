@@ -80,7 +80,7 @@ export async function applyRereadResult(projectId, result, { runId = null, fallb
     const merged = await projectAfterReread(base, result);
     const saved = runId ? { ...merged, _reread_run_id: runId } : merged;
     recordPilot(projectId, 'reread', { kind: 'reread', id: String((saved._reread_diff?.changed || []).length) });
-    updateProject(projectId, saved);
+    updateProject(projectId, saved, { versionSource: 'perskaityta' });
     if (runId) forgetRereadRun(projectId, runId);
     return saved;
   } finally {

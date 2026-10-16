@@ -26,7 +26,8 @@ import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
 import { consequenceOf, rippleText, undoPatch } from '@/lib/roomSheet';
 
-export function useProjectFixes({ project, setProject, t, afterLand, onUndo = null }) {
+// `versionSource` names a landed fix in the project's history (Istorija): the question list passes 'klausimas'.
+export function useProjectFixes({ project, setProject, t, afterLand, onUndo = null, versionSource = null }) {
   const [busy, setBusy] = useState(false);
   const [ripple, setRipple] = useState(null);
   // The last fix: which fact (or question), what it moved in the sąmata, and the project as it was before.
@@ -80,7 +81,7 @@ export function useProjectFixes({ project, setProject, t, afterLand, onUndo = nu
         _overrides: { ...(project._overrides || {}), ...(result.assumptions || {}) },
       };
     setProject(next);
-    updateProject(project.id, next);
+    updateProject(project.id, next, versionSource ? { versionSource } : undefined);
     const diff = diffDarbuSarasas(prior, next.darbu_sarasas || []);
     if (factKey) {
       // a FACT was fixed: what it moved is shown under that fact, with the way back
@@ -91,7 +92,7 @@ export function useProjectFixes({ project, setProject, t, afterLand, onUndo = nu
       setRipple(rippleText(diff, t));
     }
     return flushProjectSaves().then(afterLand, afterLand);
-  }, [project, setProject, t, afterLand]);
+  }, [project, setProject, t, afterLand, versionSource]);
 
   const undoLastFix = useCallback(() => run(async () => {
     if (!lastFix?.prevProject) return;
