@@ -34,6 +34,14 @@ export async function runFreeReread(base) {
   const result = await readJson(await fetch(url(base.id), {
     method: 'POST', credentials: 'include', signal: AbortSignal.timeout(180_000),
   }));
+  return landFreeRereadResult(base, result);
+}
+
+/**
+ * A free re-read's answer (POST /free-reread, or a finished /detect-run job — the same shape) landed on the
+ * stored project: merged by the re-read's rules, the rows rebuilt on the merged rooms. Nothing to save on failure.
+ */
+export async function landFreeRereadResult(base, result) {
   const { project: merged, diff } = mergeFreeReread(base, result);
   if (!merged) {
     const err = new Error('lane_failed');
