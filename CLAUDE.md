@@ -32,6 +32,7 @@ I do not want a yes-man. The single most valuable thing you can do is push back 
 - **Window fallback** — when Vision returns 0 windows, warns + suggests standard sizes per room type.
 - **PDF viewer Phase C-1 / C-2 / C-4** — polygon editor (sienos/grindys redagavimas), trust signals (provenance popovers), visual polish (theme tokens, toolbar grouping, thumbnails, status bar).
 - **AI Takeoff Viewer** — `TakeoffViewer` on **EmbedPDF/PDFium** is the DEFAULT viewer; room zones (red-ring model), measurement tools (distance/perimeter/area/count + calibration), click-to-fill. The old react-pdf `PlanViewer` survives behind `?viewer=legacy`. See `docs/ARCHITECTURE.md` § "The viewer stack".
+- **Viewer drawing geometry (2026-10-16)** — measure and calibrate tools snap to the drawing's wall corners and faces (orange markers), calibration suggests the nearest standard scale with its % difference, a walls/outlines/openings layer behind the wall icon, and „Redaguoti kontūrą" edits a room's outline vertex by vertex with the walls re-read server side (`POST …/rooms/{nr}/outline-set`). From the Togal analysis `docs/superpowers/research/2026-10-16-togal-pipeline-analysis.md`; plan `docs/superpowers/plans/2026-10-16-viewer-drawing-geometry.md`.
 - **Project type selection** — **Interjero projektas is the only default choice**; Automatinis / KŽ / Fasadai / Stogas / Žemės / Betonas sit behind the "kitas tipas" advanced disclosure in `NewProject.jsx`.
 
 ## What we tried — worked

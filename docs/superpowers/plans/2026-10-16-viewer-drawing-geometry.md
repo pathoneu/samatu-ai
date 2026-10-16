@@ -48,7 +48,7 @@
 - Create: `backend/tests/test_page_geometry_api.py`
 - Modify: `backend/main.py` (after `app.include_router(room_outline_router)`, ~line 756)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 """`GET /api/projects/{id}/pages/{page}/geometry` — the sheet's wall solid as rings in page fractions,
@@ -142,12 +142,12 @@ def test_foreign_project_is_404_when_auth_is_on(tmp_path, monkeypatch):
 
 If `db.create_user` has a different name, use the helper `test_room_outline_api.py` uses for its foreign-tenant test (search that file for `register`); keep the assertion (404, never 403, never 200).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q tests/test_page_geometry_api.py`
 Expected: FAIL — every test gets 404 from an unknown route (or `ModuleNotFoundError` once the import is added to main).
 
-- [ ] **Step 3: Write the endpoint**
+- [x] **Step 3: Write the endpoint**
 
 ```python
 """GET /api/projects/{project_id}/pages/{page}/geometry — the drawing's wall geometry of one sheet.
@@ -252,17 +252,17 @@ and after `app.include_router(room_outline_router)` add
 app.include_router(page_geometry_router)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q tests/test_page_geometry_api.py tests/test_room_outline_api.py`
 Expected: all PASS. If `_near(flat, _pct(4.2, 1.0))` fails, print the ring vertices nearest to the door and widen `tol` to 0.006 only if the miss is the simplification (a vertex within 0.5 pt), never if the corner is absent.
 
-- [ ] **Step 5: Smoke the live endpoint**
+- [x] **Step 5: Smoke the live endpoint**
 
 Run: `curl -s http://localhost:8000/api/projects/demo-objektas_h/pages/1/geometry | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['status'], len(d['walls_pct']), d['vertex_count'], d['truncated'])"`
 Expected: `ok <rings> <vertices ≤ 20000> False`. If the backend did not reload, `pkill -f "uvicorn main:app"` and relaunch `backend-dev`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/api/page_geometry.py backend/tests/test_page_geometry_api.py backend/main.py
@@ -279,7 +279,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `frontend/src/lib/drawingSnap.js`
 - Create: `frontend/src/lib/drawingSnap.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 import test from 'node:test';
@@ -319,12 +319,12 @@ test('pickSnap prefers a drawing corner, then a measurement vertex, then edges',
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd frontend && node --test src/lib/drawingSnap.test.js`
 Expected: FAIL — `Cannot find module './drawingSnap.js'`.
 
-- [ ] **Step 3: Write the module**
+- [x] **Step 3: Write the module**
 
 ```js
 /**
@@ -375,12 +375,12 @@ export function pickSnap(raw, { drawing = [], measurements = [] }, tol) {
 
 If the 90° test fails, read `frontend/src/lib/viewerEngine/pageRotation.js` for `inverseRotatePctPoint`'s exact convention and fix the TEST's expected mapping to that convention (the adapter uses the same function, so the module is right by construction).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && node --test src/lib/drawingSnap.test.js`
 Expected: 4 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/lib/drawingSnap.js frontend/src/lib/drawingSnap.test.js
@@ -397,7 +397,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `frontend/src/lib/pageGeometryApi.js`
 - Create: `frontend/src/hooks/usePageGeometry.js`
 
-- [ ] **Step 1: Write the API module**
+- [x] **Step 1: Write the API module**
 
 ```js
 /**
@@ -436,7 +436,7 @@ export function clearPageGeometryCache(projectId) {
 }
 ```
 
-- [ ] **Step 2: Write the hook**
+- [x] **Step 2: Write the hook**
 
 ```js
 /**
@@ -464,12 +464,12 @@ export function usePageGeometry(projectId, page, enabled) {
 }
 ```
 
-- [ ] **Step 3: Lint**
+- [x] **Step 3: Lint**
 
 Run: `cd frontend && npx eslint src/lib/pageGeometryApi.js src/hooks/usePageGeometry.js --quiet`
 Expected: no output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/lib/pageGeometryApi.js frontend/src/hooks/usePageGeometry.js
@@ -487,7 +487,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `frontend/src/components/viewer/PageOverlayHost.jsx` (props ~line 60–95; body after `adapter` useMemo ~line 118; `<MeasureLayer …>` ~line 185)
 - Modify: `frontend/src/components/viewer/TakeoffViewer.jsx` (`<PageOverlayHost …>` ~line 950: add `projectId={projectId}`)
 
-- [ ] **Step 1: MeasureLayer — new prop and drawing-first snapping**
+- [x] **Step 1: MeasureLayer — new prop and drawing-first snapping**
 
 Add the import:
 ```js
@@ -547,7 +547,7 @@ function SnapDot({ p, kind = null }) {
 }
 ```
 
-- [ ] **Step 2: PageOverlayHost — fetch geometry while a tool is armed, hand the polygons down**
+- [x] **Step 2: PageOverlayHost — fetch geometry while a tool is armed, hand the polygons down**
 
 Imports:
 ```js
@@ -567,20 +567,20 @@ Add prop `projectId = null,` (first in the list after `documentId`). After the `
 ```
 and delete the later duplicate `const measureActive = measureTool != null;`. Pass `drawingSnapPolygons={drawingSnapPolygons}` to `<MeasureLayer …>`.
 
-- [ ] **Step 3: TakeoffViewer — pass the project id**
+- [x] **Step 3: TakeoffViewer — pass the project id**
 
 In the `renderPage={(layout) => (<PageOverlayHost …` block add `projectId={projectId}` (the `ViewerInner` props already include `projectId`).
 
-- [ ] **Step 4: Lint + units**
+- [x] **Step 4: Lint + units**
 
 Run: `cd frontend && npx eslint src/components/viewer src/lib/drawingSnap.js --quiet && npm run test:units 2>&1 | tail -3`
 Expected: no lint output; units all pass.
 
-- [ ] **Step 5: Verify in the browser**
+- [x] **Step 5: Verify in the browser**
 
 Open http://localhost:5173/project/demo-objektas_h, arm **Atstumas**, move the pointer along a wall: an orange square appears on wall corners, an orange diamond on wall faces, and the readout chip follows the snapped point; a committed line between two wall corners reads a plausible length (status bar scale 1:115 on this sheet). Arm **Mastelis** and click two wall corners: the calibration points snap. Check the network panel: one `/pages/1/geometry` request for page 1, none repeated when re-arming the tool.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/viewer/MeasureLayer.jsx frontend/src/components/viewer/PageOverlayHost.jsx frontend/src/components/viewer/TakeoffViewer.jsx
@@ -598,7 +598,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `frontend/src/lib/scaleSuggestion.test.js`
 - Modify: `frontend/src/components/viewer/CalibrateDialog.jsx`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 import test from 'node:test';
@@ -641,12 +641,12 @@ test('the standard scale becomes a PageScale with its label', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd frontend && node --test src/lib/scaleSuggestion.test.js`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the module**
+- [x] **Step 3: Write the module**
 
 ```js
 /**
@@ -678,12 +678,12 @@ export function standardScalePageScale(ratio) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && node --test src/lib/scaleSuggestion.test.js`
 Expected: 4 pass.
 
-- [ ] **Step 5: CalibrateDialog — the checkbox**
+- [x] **Step 5: CalibrateDialog — the checkbox**
 
 Imports:
 ```js
@@ -730,12 +730,12 @@ Render, after the self-check echo and before the anisotropy tip:
           )}
 ```
 
-- [ ] **Step 6: Lint + verify in the browser**
+- [x] **Step 6: Lint + verify in the browser**
 
 Run: `cd frontend && npx eslint src/components/viewer/CalibrateDialog.jsx src/lib/scaleSuggestion.js --quiet`
 In the viewer, arm **Mastelis**, click two snapped wall corners of a room whose dimension string is visible, type that length: the dialog shows „≈ 1:114,8 · artimiausias 1:125 (skiriasi 8,2 %)" on objektas_h (its sheets are printed at 1:115, so the rounding is correctly NOT offered); on a 1:50 or 1:100 sheet (upload `backend/test_pdfs/vidaus_apdaila.pdf` into a new project if none is at hand) the checkbox appears and, confirmed, the status bar reads „Mastelis 1:50 (jūsų nustatytas)".
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/lib/scaleSuggestion.js frontend/src/lib/scaleSuggestion.test.js frontend/src/components/viewer/CalibrateDialog.jsx
@@ -753,7 +753,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `frontend/src/components/viewer/PageOverlayHost.jsx` (prop `wallsLayerVisible`, fetch condition, mount)
 - Modify: `frontend/src/components/viewer/TakeoffViewer.jsx` (`Toolbar` props + button ~line 155–215; `ViewerInner` state ~line 624; pass-through ~line 919 and ~line 961)
 
-- [ ] **Step 1: The layer**
+- [x] **Step 1: The layer**
 
 ```jsx
 /**
@@ -815,7 +815,7 @@ export default function DrawingGeometryLayer({ geometry, rooms = [], page, rende
 ```
 If `ltNumber` is not exported from `@/lib/ledger`, use `formatNumberLT` from `@/lib/measureGeometry` instead (both format with a decimal comma).
 
-- [ ] **Step 2: PageOverlayHost — prop, fetch condition, mount**
+- [x] **Step 2: PageOverlayHost — prop, fetch condition, mount**
 
 Import: `import DrawingGeometryLayer from './DrawingGeometryLayer';`. Add prop `wallsLayerVisible = false,` after `zoneFillsVisible`. Change the hook call to `usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible)`. Mount it BELOW the room zones and above the page content, inside the `!checkMode` branch, before the `RoomZoneLayer` wrapper:
 ```jsx
@@ -826,7 +826,7 @@ Import: `import DrawingGeometryLayer from './DrawingGeometryLayer';`. Add prop `
       )}
 ```
 
-- [ ] **Step 3: TakeoffViewer — toggle**
+- [x] **Step 3: TakeoffViewer — toggle**
 
 Add `BrickWall` to the lucide import. In `ViewerInner`, next to `zoneFillsVisible`:
 ```js
@@ -856,12 +856,12 @@ Add `wallsLayerVisible` / `onToggleWallsLayer` to `Toolbar`'s props and render, 
 ```
 Pass `wallsLayerVisible={wallsLayerVisible} onToggleWallsLayer={() => setWallsLayerVisible(!wallsLayerVisible)}` to `<Toolbar>` and `wallsLayerVisible={wallsLayerVisible}` to `<PageOverlayHost>`.
 
-- [ ] **Step 4: Lint + browser**
+- [x] **Step 4: Lint + browser**
 
 Run: `cd frontend && npx eslint src/components/viewer --quiet`
 In the viewer press the wall icon: page 1 of objektas_h shows the grey wall solid, 8 dashed evergreen outlines (`vektoriniai_konturai`) and 3 solid ones (`corrected`), violet opening bars with widths (door bars prefixed D). Toggle off: clean drawing. Reload: the choice persists.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/viewer/DrawingGeometryLayer.jsx frontend/src/components/viewer/PageOverlayHost.jsx frontend/src/components/viewer/TakeoffViewer.jsx
@@ -878,7 +878,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `backend/api/room_outline.py` (new model after `SplitSpace`; new endpoint after `api_room_outline_at`)
 - Modify: `backend/tests/test_room_outline_api.py` (append)
 
-- [ ] **Step 1: Write the failing test** (append to the test file)
+- [x] **Step 1: Write the failing test** (append to the test file)
 
 ```python
 def _set(client, ring_m, nr="01", page=1, project_id="p1"):
@@ -913,12 +913,12 @@ def test_outline_set_rejects_a_degenerate_ring(tmp_path, monkeypatch):
     assert c.post("/api/projects/p1/rooms/99/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]]}).status_code == 404
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q tests/test_room_outline_api.py -k outline_set`
 Expected: FAIL with 404 (unknown route) on the first test.
 
-- [ ] **Step 3: Write the endpoint**
+- [x] **Step 3: Write the endpoint**
 
 Model (after `SplitSpace`):
 ```python
@@ -981,12 +981,12 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
 ```
 Add `import math` to the module imports. `_todays_reading` already raises 404 for an unknown room and 400 for a page the drawing does not have.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q tests/test_room_outline_api.py tests/test_geometry_lane.py`
 Expected: PASS. If `apply_geometry` does not honour a `corrected` outline for wall reading (the `_sienos` assertion fails), read `geometry_lane.KEEP_POLYGONS` — `corrected` must be in it (it is what `outline-at` relies on); do not loosen the assertion.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/api/room_outline.py backend/tests/test_room_outline_api.py
@@ -1006,7 +1006,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `frontend/src/components/viewer/TakeoffViewer.jsx` (state + toolbar button + save/cancel bar)
 - Modify: `frontend/src/components/project/InteriorWorkspace.jsx` (`handleRoomOutlineEdit`, pass `onRoomOutlineEdit`)
 
-- [ ] **Step 1: API function** (append to `roomOutlineApi.js`)
+- [x] **Step 1: API function** (append to `roomOutlineApi.js`)
 
 ```js
 /** `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16). */
@@ -1015,7 +1015,7 @@ export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct }, 
 }
 ```
 
-- [ ] **Step 2: The editor layer**
+- [x] **Step 2: The editor layer**
 
 ```jsx
 /**
@@ -1110,7 +1110,7 @@ export default function OutlineEditLayer({ points, onChange, geometry, renderedS
 }
 ```
 
-- [ ] **Step 3: PageOverlayHost — mount it for the page being edited**
+- [x] **Step 3: PageOverlayHost — mount it for the page being edited**
 
 Import `OutlineEditLayer`. Props: `outlineEdit = null,` (`{nr, page, points}`) and `onOutlineEditChange = null,`. Change the hook's enabled flag to `measureActive || wallsLayerVisible || (outlineEdit?.page === layout.pageNumber)`. Mount it LAST (above MeasureLayer), only on its page:
 ```jsx
@@ -1123,7 +1123,7 @@ Import `OutlineEditLayer`. Props: `outlineEdit = null,` (`{nr, page, points}`) a
 ```
 While `outlineEdit` is set, pass `interactive={!measureActive && !outlineEdit}` to `RoomZoneLayer` so zone clicks do not fight the editor.
 
-- [ ] **Step 4: TakeoffViewer — mode, button, save/cancel**
+- [x] **Step 4: TakeoffViewer — mode, button, save/cancel**
 
 `ViewerInner` gets a new prop `onRoomOutlineEdit` (`(nr, page, points) => Promise`). State:
 ```js
@@ -1152,7 +1152,7 @@ While `outlineEdit` is set, pass `interactive={!measureActive && !outlineEdit}` 
 ```
 `roomPageOf` is already imported from `@/lib/roomZones`. Toolbar: add props `outlineEditing`, `onStartOutlineEdit`, `onSaveOutlineEdit`, `onCancelOutlineEdit`, `outlineSaving`, and render next to the existing „Taisyti kontūrą" (`SquarePen`) button — when `focusedRoomNr` is set and not editing, a button with the lucide `Pentagon` icon, title „Redaguoti kontūrą: tempkite viršūnes, spustelėkite vidurio tašką — pridėti, dukart — pašalinti; prilimpa prie sienų"; when editing, two buttons „Išsaugoti kontūrą" (primary, disabled while `outlineSaving`) and „Atšaukti". Pass `outlineEdit={outlineEdit}` and `onOutlineEditChange={(points) => setOutlineEdit((cur) => (cur ? { ...cur, points } : cur))}` to `<PageOverlayHost>`. Esc while editing cancels: add `if (outlineEdit) { setOutlineEdit(null); return true; }` at the top of `measureEscape`.
 
-- [ ] **Step 5: InteriorWorkspace — save through outline-set, recompute on the existing path**
+- [x] **Step 5: InteriorWorkspace — save through outline-set, recompute on the existing path**
 
 Imports: `import { fetchOutlineSet } from '@/lib/roomOutlineApi';` and `import { roomsWithOutline } from '@/lib/roomOutline';`. Handler (next to `handleRoomPolygonFill`):
 ```js
@@ -1174,17 +1174,17 @@ Imports: `import { fetchOutlineSet } from '@/lib/roomOutlineApi';` and `import {
 ```
 Pass `onRoomOutlineEdit={handleRoomOutlineEdit}` to `<TakeoffViewer>`. If the project keeps `v8_rooms` as well as `patalpos` (see `markRoomVerified` in `projectStore.js`), patch both arrays the same way.
 
-- [ ] **Step 6: Lint, units, browser**
+- [x] **Step 6: Lint, units, browser**
 
 Run: `cd frontend && npx eslint src --quiet && npm run test:units 2>&1 | tail -3`
 Browser: focus room 03 on objektas_h, press „Redaguoti kontūrą", drag a corner onto a wall corner (orange square), add a vertex from a midpoint, double-click it away, „Išsaugoti": a success toast, the outline redraws solid (corrected), the Patikra check sheet for the room shows `_konturas.saltinis` „nubrezta" as its outline source and the walls re-read; the Sąmata rows recompute (watch the backend log for `/recompute-interior`). Esc cancels without a save.
 
-- [ ] **Step 7: Backend regression + eval gate (honesty check)**
+- [x] **Step 7: Backend regression + eval gate (honesty check)**
 
 Run: `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q tests/test_room_outline_api.py tests/test_page_geometry_api.py tests/test_geometry_lane.py tests/test_recompute_interior_parity.py`
 Expected: PASS. No billed formula changed in this plan, so `eval_harness.py --gate` is not required; if any file under `backend/extractor/` was touched after all, run `venv/bin/python eval_harness.py --totals-only --recompute --gate` from the repo root and report WORSE lines verbatim.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/src/components/viewer/OutlineEditLayer.jsx frontend/src/components/viewer/PageOverlayHost.jsx frontend/src/components/viewer/TakeoffViewer.jsx frontend/src/lib/roomOutlineApi.js frontend/src/components/project/InteriorWorkspace.jsx
@@ -1201,7 +1201,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `docs/ARCHITECTURE.md` § "The viewer stack" (add two bullets)
 - Modify: `CLAUDE.md` § "What we built" (one bullet)
 
-- [ ] **Step 1: ARCHITECTURE.md**
+- [x] **Step 1: ARCHITECTURE.md**
 
 After the `MeasureLayer` bullet add:
 ```markdown
@@ -1209,14 +1209,14 @@ After the `MeasureLayer` bullet add:
 - **CalibrateDialog** offers the nearest standard drawing scale when a two-point calibration measures within 3 % of one (`lib/scaleSuggestion.js`); outside that it says the sheet is likely printed at another size and keeps the measured ratio.
 ```
 
-- [ ] **Step 2: CLAUDE.md**
+- [x] **Step 2: CLAUDE.md**
 
 Under "What we built" append:
 ```markdown
 - **Viewer drawing geometry (2026-10-16)** — snap to the drawing's wall corners/faces while measuring and calibrating, standard-scale suggestion in calibration, a walls/outlines/openings layer, and vertex editing of a room's outline that re-reads its walls server side (`docs/superpowers/plans/2026-10-16-viewer-drawing-geometry.md`). From the Togal analysis in `docs/superpowers/research/2026-10-16-togal-pipeline-analysis.md`.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/ARCHITECTURE.md CLAUDE.md
