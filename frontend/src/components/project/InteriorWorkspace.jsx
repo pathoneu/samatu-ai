@@ -449,7 +449,7 @@ export default function InteriorWorkspace({
       >
         {detectRun.run && (
           <div className="pointer-events-none absolute right-3 top-11 z-30">
-            <DetectRunProgress run={detectRun.run} view={detectRun.view} onDismiss={detectRun.dismiss} />
+            <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} />
           </div>
         )}
         {detecting && (

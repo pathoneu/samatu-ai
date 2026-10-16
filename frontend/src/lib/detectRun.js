@@ -119,14 +119,42 @@ export function statusMark(status) {
   return { done: '✓', running: '●', skipped: '–', failed: '✕' }[status] || '○';
 }
 
-/** The pill's headline. */
-export function headline(view, pages) {
-  const where = pages === 'all' ? 'visi lapai' : `pritaikoma lapui ${Array.isArray(pages) ? pages.join(', ') : pages}`;
+/** „1–7" for a consecutive run of sheets, „1, 3, 5" otherwise. */
+function sheetList(nums) {
+  const s = [...new Set(nums.map(Number).filter((n) => n >= 1))].sort((a, b) => a - b);
+  if (s.length > 2 && s[s.length - 1] - s[0] === s.length - 1) return `${s[0]}–${s[s.length - 1]}`;
+  return s.join(', ');
+}
+
+/**
+ * What a run lands on, in words (dative, after „pritaikyta"): the whole drawing; the chosen sheet when it is a plan
+ * of its own; or the whole PLAN its sheets belong to — the lane aligns the sheets of one plan and a run on any of
+ * them changes the rooms of all (`_meta.geometrija.grupes`). Never „lapui 3" for a change to sheets 1–7.
+ */
+export function appliedTo(pages, groups) {
+  if (pages === 'all') return 'visam brėžiniui';
+  const chosen = (Array.isArray(pages) ? pages : [pages]).map(Number).filter((n) => n >= 1);
+  const touched = new Set(chosen);
+  let plan = false;
+  for (const g of Array.isArray(groups) ? groups : []) {
+    const members = (Array.isArray(g) ? g : []).map(Number);
+    if (members.length > 1 && members.some((p) => chosen.includes(p))) {
+      members.forEach((p) => touched.add(p));
+      plan = true;
+    }
+  }
+  if (!plan) return `${chosen.length > 1 ? 'lapams' : 'lapui'} ${sheetList(chosen)}`;
+  return `planui (lapai ${sheetList([...touched])})`;
+}
+
+/** The pill's headline. `groups` = the project's `_meta.geometrija.grupes`. */
+export function headline(view, pages, groups = null) {
+  const where = `pritaikoma ${appliedTo(pages, groups)}`;
   if (!view) return '';
-  if (view.failed) return `Nepavyko: ${view.failedStage.label} (${where})`;
-  if (view.done) return `Perskaityta (${where})`;
+  if (view.failed) return `Nepavyko: ${view.failedStage.label} · ${where}`;
+  if (view.done) return `Perskaityta · ${where}`;
   const i = view.current ? view.stages.findIndex((s) => s.id === view.current.id) + 1 : 0;
-  return `${view.current?.label || 'Pradedama'}… ${i}/${view.stages.length} (${where})`;
+  return `${view.current?.label || 'Pradedama'}… ${i}/${view.stages.length} · ${where}`;
 }
 
 const WALL_OUTLINES = new Set(['vektoriniai_konturai', 'sienu_konturas', 'corrected', 'manual']);

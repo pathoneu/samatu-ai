@@ -20,7 +20,7 @@ const MARK_CLASS = {
   pending: 'text-muted-foreground/60',
 };
 
-export default function DetectRunProgress({ run, view, onDismiss, className = '' }) {
+export default function DetectRunProgress({ run, view, groups = null, onDismiss, className = '' }) {
   const [open, setOpen] = useState(true);
   if (!run) return null;
   if (run.startError) {
@@ -48,7 +48,7 @@ export default function DetectRunProgress({ run, view, onDismiss, className = ''
         <span className={MARK_CLASS[failed ? 'failed' : done ? 'done' : 'running']} aria-hidden="true">
           {failed ? '✕' : done ? '✓' : '●'}
         </span>
-        <span className="flex-1 truncate font-semibold text-foreground" data-testid="detect-run-headline">{headline(view, run.pages)}</span>
+        <span className="flex-1 truncate font-semibold text-foreground" data-testid="detect-run-headline">{headline(view, run.pages, run.snapshot?.result?._meta?.geometrija?.grupes || groups)}</span>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

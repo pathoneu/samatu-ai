@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { fetchDetectRun, startDetectRun } from '@/lib/detectRunApi';
 import { landFreeRereadResult } from '@/lib/freeRereadApi';
 import { flushProjectSaves, getProject, updateProject } from '@/lib/projectStore';
-import { needsPolling, requestBody, scopeCounts, summaryText, viewOf } from '@/lib/detectRun';
+import { appliedTo, needsPolling, requestBody, scopeCounts, summaryText, viewOf } from '@/lib/detectRun';
 
 const POLL_MS = 400;
 
@@ -36,7 +36,8 @@ export function useDetectRun(project, onProjectChange) {
       latest.current.onProjectChange?.(merged);
       const note = summaryText(scopeCounts(merged, snapshot.result?.taikymas?.patalpos), features);
       if (alive.current) setRun((r) => r && { ...r, client: { status: 'done', note } });
-      toast.success(`${pages === 'all' ? 'Perskaitytas visas brėžinys' : `Perskaitytas visas brėžinys, pritaikyta lapui ${pages.join(', ')}`}: ${note}`);
+      const where = pages === 'all' ? '' : `, pritaikyta ${appliedTo(pages, merged?._meta?.geometrija?.grupes)}`;
+      toast.success(`Perskaitytas visas brėžinys${where}: ${note}`);
     } catch (err) {
       console.error('[detectRun] landing failed:', err);
       const note = err?.code === 'lane_failed'

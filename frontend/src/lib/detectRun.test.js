@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   STAGE_IDS, FEATURES, allFeatures, toggleFeature, canStart, requestBody, viewOf, needsPolling,
-  statusMark, headline, scopeCounts, summaryText, buttonLabel,
+  statusMark, headline, scopeCounts, summaryText, buttonLabel, appliedTo,
 } from './detectRun.js';
 
 const stages = (statuses) => STAGE_IDS.map((id, i) => ({
@@ -44,7 +44,8 @@ test('a running snapshot: the current stage, its education text, the progress', 
   assert.equal(v.current.about, 'apie konturai');
   assert.equal(v.progress, 3 / 8);
   assert.equal(v.terminal, false);
-  assert.equal(headline(v, [1]), 'Konturai… 4/8 (pritaikoma lapui 1)');
+  assert.equal(headline(v, [1]), 'Konturai… 4/8 · pritaikoma lapui 1');
+  assert.equal(headline(v, [3], [[1, 2, 3, 4, 5, 6, 7], [8]]), 'Konturai… 4/8 · pritaikoma planui (lapai 1–7)');
   assert.equal(needsPolling({ job: 'j', result_ready: false, failed: false }), true);
 });
 
@@ -63,14 +64,14 @@ test('the server leaves „kiekiai" running; the browser\'s landing finishes it'
   assert.equal(landed.terminal, true);
   assert.equal(landed.progress, 1);
   assert.equal(landed.stages.at(-1).note, '8 kontūrai');
-  assert.equal(headline(landed, 'all'), 'Perskaityta (visi lapai)');
+  assert.equal(headline(landed, 'all'), 'Perskaityta · pritaikoma visam brėžiniui');
 });
 
 test('a failure is named by its stage, never a generic error', () => {
   const v = viewOf({ job: 'j', failed: true, stages: stages(['done', 'done', 'done', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']) });
   assert.equal(v.failed, true);
   assert.equal(v.failedStage.id, 'konturai');
-  assert.equal(headline(v, [1]), 'Nepavyko: Konturai (pritaikoma lapui 1)');
+  assert.equal(headline(v, [1]), 'Nepavyko: Konturai · pritaikoma lapui 1');
   // the browser's own step can fail too — after the server finished
   const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'running']) };
   const v2 = viewOf(snap, { status: 'failed', note: 'Kiekių perskaičiuoti nepavyko' });
@@ -110,6 +111,10 @@ test('the toast says the numbers in Lithuanian, only for what was read', () => {
   assert.equal(summaryText({ ...c, konturai: 1, angos: 11, perimetrai: 21, jusu: 0 }, { konturai: true, angos: true, sienos: true }),
     '1 kontūras, 11 angų, 21 perimetras iš matmenų.');
   assert.equal(summaryText({ patalpos: 0 }), 'Šiame lape eksplikacijos patalpų nerasta — niekas nepakeista.');
+  // a floors-only run says floors only
+  const floorsOnly = summaryText(c, { plotai: true, grindys: true });
+  assert.equal(floorsOnly, 'danga 11 iš 11.');
+  assert.doesNotMatch(floorsOnly, /kontūr|\bang|perimetr/);
 });
 
 test('the button reads „iš naujo" once the sheet\'s plan has been read', () => {
@@ -118,4 +123,16 @@ test('the button reads „iš naujo" once the sheet\'s plan has been read', () =
   assert.equal(buttonLabel(p, 5), 'Perskaityti lapą');
   assert.equal(buttonLabel({}, 1), 'Perskaityti lapą');
   assert.equal(FEATURES.length, 5);
+});
+
+test('a run lands on the whole plan its sheet belongs to, and says so', () => {
+  const groups = [[1, 2, 3, 4, 5, 6, 7], [8]];
+  assert.equal(appliedTo('all', groups), 'visam brėžiniui');
+  assert.equal(appliedTo([3], groups), 'planui (lapai 1–7)');
+  assert.equal(appliedTo([8], groups), 'lapui 8', 'a plan of one sheet is that sheet');
+  assert.equal(appliedTo([9], groups), 'lapui 9', 'a sheet in no plan');
+  assert.equal(appliedTo([2], null), 'lapui 2', 'no record yet: the chosen sheet');
+  assert.equal(appliedTo([1], [[1, 3, 5]]), 'planui (lapai 1, 3, 5)');
+  assert.equal(appliedTo([2, 9], [[1, 2], [4, 5]]), 'planui (lapai 1, 2, 9)');
+  assert.equal(appliedTo([8, 9], [[8]]), 'lapams 8, 9');
 });
