@@ -84,3 +84,36 @@ def test_the_rows_move_by_the_column_and_a_rebuild_does_not_add_it_twice(client)
     assert sum(terms.values()) == pytest.approx(kampai["contributions"][0]["value"], abs=0.02)
     plain_terms = next(r for r in plain["darbu_sarasas"] if r["aprasymas"] == "Dažymo kampų montavimas")["contributions"][0]["terms"]
     assert "kolonų / šachtų kampai" not in plain_terms
+
+
+# ── follow-up (2): the splash zone and the cornice see a column's faces too ──
+
+def _derived(room):
+    from extractor.vision_call import _elementai_to_counts, derive_room_extras
+    out = {**room, **calc_room_quantities(room)}
+    derive_room_extras(out, _elementai_to_counts(out.get("elementai") or []), None)
+    return out
+
+
+def test_a_column_in_a_wet_room_adds_its_faces_to_the_splash_zone():
+    def bath(sienos):
+        return {**_room(sienos), "nr": "02", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0}
+    plain, col, floor_hole = _derived(bath(None)), _derived(bath(True)), _derived(bath(False))
+    assert col["hidroizoliacija_m2"] - plain["hidroizoliacija_m2"] == pytest.approx(2 * (A + B) * 0.30, abs=0.01)
+    assert floor_hole["hidroizoliacija_m2"] == plain["hidroizoliacija_m2"]
+
+
+def test_a_column_adds_its_faces_to_the_cornice_when_the_drawing_has_one():
+    from extractor.universal_rules import KARNIZAS_KEY
+    def living(sienos):
+        return {**_room(sienos), KARNIZAS_KEY: True}
+    plain, col = _derived(living(None)), _derived(living(True))
+    assert plain["lubu_karnizo_m"] > 0
+    assert col["lubu_karnizo_m"] - plain["lubu_karnizo_m"] == pytest.approx(2 * (A + B) * 1.05, abs=0.01)   # + 5 % waste
+    assert _derived({**_room(True), KARNIZAS_KEY: False})["lubu_karnizo_m"] == 0.0                          # no evidence, none
+
+
+def test_a_room_without_holes_derives_exactly_what_it_did():
+    plain = _derived(_room())
+    assert plain["hidroizoliacija_m2"] == 0.0 and plain["_skyliu_sienos_m"] == 0.0
+    assert plain["calculation_trace"].startswith("perim(14.00)")

@@ -1893,6 +1893,13 @@ def derive_room_extras(room: dict, counts: dict, rules_override: dict | None,
     materials did not. Guarded in tests/test_recompute_interior_parity.py.
     """
     perim = float(room.get("perimetras_m") or 0)
+    # „Atimti" (2026-10-16): the faces of a column / shaft he said has walls (`_skyliu_sienos_m`, from
+    # calc_room_quantities) get the splash zone and the cornice too. The hole faces ONLY — never
+    # `_walls_perimetras_m`, which also carries the perimeter floor and would move stored projects.
+    try:
+        perim += max(0.0, float(room.get("_skyliu_sienos_m") or 0))
+    except (TypeError, ValueError):
+        pass
     # 4. Hidroizoliacija (not in calc_room_quantities; CLAUDE.md §1.12)
     room["hidroizoliacija_m2"] = _calc_hidroizoliacija_m2(room, perim)
 
@@ -3850,6 +3857,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "pusiniai kampai": r.get("kampai_pusiniai_m"),
                     "perimetras": r.get("kampai_perimetras_m"),
                     "kolonų / šachtų kampai": r.get("kampai_skyliu_m") or None,   # only a room with a column
+                    "išoriniai kampai": r.get("kampai_isoriniai_m") or None,       # only a room whose outline has them
                 }))
         pozicijos.append(_ledger.attach(
             _kampai_row, _k_contribs, _k_excluded,
