@@ -31,7 +31,8 @@ export function useDetectRun(project, onProjectChange) {
     try {
       const base = getProject(id) || latest.current.project;
       const { project: merged } = await landFreeRereadResult(base, snapshot.result);
-      updateProject(id, merged);
+      // the whole drawing read again → „perskaityta“; one sheet's landing → „lapas“ (Istorija)
+      updateProject(id, merged, { versionSource: pages === 'all' ? 'perskaityta' : 'lapas' });
       await flushProjectSaves();
       latest.current.onProjectChange?.(merged);
       const note = summaryText(scopeCounts(merged, snapshot.result?.taikymas?.patalpos), features);

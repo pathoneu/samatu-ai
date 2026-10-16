@@ -134,7 +134,7 @@ export default function PatikraQuestions() {
   const {
     busy, run, land, undoLastFix, lastFix,
   } = useProjectFixes({
-    project, setProject, t, afterLand: loadQuestions,
+    project, setProject, t, afterLand: loadQuestions, versionSource: 'klausimas',
     onUndo: (fix) => {
       pilot('question_undo', { kind: 'question', id: fix.factKey });
       standAfter.current = { id: fix.factKey, index: 0 };      // the undone question is asked again — stand on it

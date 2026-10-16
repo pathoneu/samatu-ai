@@ -9,6 +9,7 @@ Schema:
 - extractions: id, project_id, pdf_sha256, pdf_size, page_count, raw_response (JSON), tokens, cost, elapsed_s
 - corrections: project_id, room_nr, field_path, old_value, new_value, source, occurred_at — audit log
                 for future learning-loop / prompt iteration
+- project_versions: every saved state of a project (zlib JSON), see versions_to_keep
 
 No auth yet — single-tenant. When auth lands, add user_id to projects.
 """
@@ -151,6 +152,21 @@ def init_schema() -> None:
             CREATE INDEX IF NOT EXISTS idx_corr_project ON corrections(project_id);
             CREATE INDEX IF NOT EXISTS idx_corr_field ON corrections(field_path);
             CREATE INDEX IF NOT EXISTS idx_corr_occurred ON corrections(occurred_at);
+
+            -- project_versions (togal-v2 W10, 2026-10-16): every saved state of a
+            -- project, zlib-compressed JSON. See the block above `versions_to_keep`.
+            CREATE TABLE IF NOT EXISTS project_versions (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                created_at  TEXT NOT NULL,
+                saltinis    TEXT NOT NULL,      -- one of VERSION_SOURCES
+                pavadinimas TEXT,
+                data        BLOB NOT NULL,      -- zlib(JSON, level 6)
+                dydis       INTEGER NOT NULL,   -- uncompressed bytes
+                sha         TEXT NOT NULL       -- version_sha of the JSON
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_versions_project
+                ON project_versions(project_id, id DESC);
         """)
 
 
@@ -350,7 +366,9 @@ class ProjectConflictError(Exception):
 
 
 def upsert_project(project_id: str, payload: dict, user_id: str | None = None,
-                   base_updated_at: str | None = None) -> dict:
+                   base_updated_at: str | None = None, *,
+                   version_source: str = "issaugota", version_name: str | None = None,
+                   now: float | None = None) -> dict:
     """Insert or full-replace. user_id stored on create; on update, ownership
     is checked first (raises if mismatch).
 
@@ -361,14 +379,21 @@ def upsert_project(project_id: str, payload: dict, user_id: str | None = None,
     is skipped entirely, so legacy clients, scripts and restore flows behave
     exactly as before. The comparison happens INSIDE the _conn() block, which
     holds the global _DB_LOCK, so check-and-write is atomic.
+
+    A changed state is also kept as a project version (`version_source`, one of
+    VERSION_SOURCES; `version_name` an optional label) — see the block above
+    `versions_to_keep`. `now` (epoch seconds) is for tests.
     """
-    now = _now_iso()
+    if version_source not in VERSION_SOURCES:
+        version_source = "kita"
+    clock = now
+    now = _iso_at(clock)
     name = payload.get("name") or "Naujas projektas"
     tipas = payload.get("tipas") or "interjeras"
     blob = json.dumps(payload, ensure_ascii=False)
     with _conn() as c:
         existing = c.execute(
-            "SELECT created_at, user_id, updated_at FROM projects WHERE id = ?",
+            "SELECT * FROM projects WHERE id = ?",
             (project_id,),
         ).fetchone()
         if existing:
@@ -424,6 +449,9 @@ def upsert_project(project_id: str, payload: dict, user_id: str | None = None,
             payload.get("bendras_plotas_m2"), payload.get("vat_rate", 21),
             blob, created_at, now,
         ))
+        # After the row exists (the version references it); `existing` still
+        # holds the state this write replaced.
+        _record_version(c, project_id, existing, blob, version_source, version_name, clock)
     return get_project(project_id) or {}
 
 
@@ -1446,6 +1474,268 @@ def _migrate_schema() -> None:
 
 EXTRACTION_JOB_STATUSES = ("running", "done", "failed", "interrupted")
 HELD_RESULT_DAYS = 3
+
+
+# ── Project versions (togal-v2 W10, 2026-10-16) ─────────────────────────────
+#
+# Every state `upsert_project` writes is kept as a row here, zlib-compressed,
+# so it can be seen, compared with the current one and restored. Written in the
+# save path itself (same lock), so every writer is versioned: the PUT, the
+# material specs, the stream-disconnect save and the revalidate refresh.
+#
+#  * only when the data actually changed (sha of the JSON without the keys that
+#    move on every save, see `_VOLATILE_KEYS`);
+#  * a project with no versions yet first gets its stored state as 'kita'
+#    „Pradinė būsena", so the first edit after this shipped can be undone;
+#  * a plain save ('issaugota', no name) within VERSION_COALESCE_S of a plain
+#    save overwrites that row: the 400 ms debounce turns typing or dragging into
+#    a burst of PUTs, and 30 of those would be the whole history;
+#  * retention on write: the newest VERSION_KEEP_LAST, plus the newest of each
+#    UTC day for VERSION_DAILY_DAYS; the rest is deleted;
+#  * a restore writes the state it replaces as 'grazinta' first — a restore
+#    never loses anything.
+# Rows go with the project (ON DELETE CASCADE; `_conn` turns foreign_keys on).
+# Archiving is a flag on the blob and drops nothing.
+
+VERSION_SOURCES = ("issaugota", "perskaityta", "lapas", "klausimas", "grazinta", "kita")
+VERSION_KEEP_LAST = 30
+VERSION_DAILY_DAYS = 90
+VERSION_COALESCE_S = 90
+VERSION_ZLIB_LEVEL = 6
+# Blob keys that describe the project's lifecycle, not its content: a restore
+# carries them from the current state (togal-v2 W10 review).
+RESTORE_KEEPS_CURRENT = ("_archived", "_archived_at", "is_demo")
+# Keys that change on every save without the project changing: the client's
+# optimistic stamp and the row columns `get_project` folds back into the blob.
+_VOLATILE_KEYS = frozenset({"updated_at", "base_updated_at", "share_view_count",
+                            "share_last_viewed_at"})
+
+
+def version_sha(payload: dict) -> str:
+    import hashlib
+    stable = {k: v for k, v in payload.items() if k not in _VOLATILE_KEYS}
+    text = json.dumps(stable, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _iso_at(now: float | None) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() if now is None else now))
+
+
+def _parse_iso(s: str) -> float:
+    import calendar
+    return float(calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ")))
+
+
+def versions_to_keep(rows: list[tuple[int, str]], now: float,
+                     keep_last: int = VERSION_KEEP_LAST,
+                     daily_days: int = VERSION_DAILY_DAYS) -> set[int]:
+    """Pure retention rule over (id, created_at) rows: the newest `keep_last`
+    by id, plus the newest version of each UTC day not older than `daily_days`."""
+    ordered = sorted(rows, key=lambda r: r[0], reverse=True)
+    keep = {vid for vid, _ in ordered[:keep_last]}
+    cutoff = now - daily_days * 86400
+    seen_days: set[str] = set()
+    for vid, created in ordered:
+        try:
+            t = _parse_iso(created)
+        except (TypeError, ValueError):
+            continue
+        if t < cutoff:
+            continue
+        day = created[:10]
+        if day not in seen_days:
+            seen_days.add(day)
+            keep.add(vid)
+    return keep
+
+
+def _insert_version(c, project_id: str, blob_text: str, sha: str, saltinis: str,
+                    pavadinimas: str | None, created_at: str) -> int:
+    import zlib
+    raw = blob_text.encode("utf-8")
+    cur = c.execute(
+        "INSERT INTO project_versions (project_id, created_at, saltinis, pavadinimas, "
+        "data, dydis, sha) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (project_id, created_at, saltinis, pavadinimas,
+         zlib.compress(raw, VERSION_ZLIB_LEVEL), len(raw), sha))
+    return int(cur.lastrowid)
+
+
+def _prune_versions(c, project_id: str, now: float) -> int:
+    rows = [(r["id"], r["created_at"]) for r in c.execute(
+        "SELECT id, created_at FROM project_versions WHERE project_id = ?", (project_id,))]
+    keep = versions_to_keep(rows, now, VERSION_KEEP_LAST, VERSION_DAILY_DAYS)
+    drop = [vid for vid, _ in rows if vid not in keep]
+    for vid in drop:
+        c.execute("DELETE FROM project_versions WHERE id = ?", (vid,))
+    return len(drop)
+
+
+def _served(data: dict, row) -> dict:
+    """The project as `get_project` serves it: the blob with the row's columns on
+    top. Versions are compared in this form, so a load-and-save that only adds
+    the columns back into the blob is not a change."""
+    cols = {k: row[k] for k in row.keys() if k != "data" and row[k] is not None}
+    return {**data, **cols}
+
+
+def _served_sha(row) -> str | None:
+    try:
+        data = json.loads(row["data"] or "{}")
+    except (TypeError, ValueError):
+        return None
+    return version_sha(_served(data, row)) if isinstance(data, dict) else None
+
+
+def _record_version(c, project_id: str, old_row, new_text: str, saltinis: str,
+                    pavadinimas: str | None, now: float | None) -> None:
+    """Inside upsert_project's connection, right after the row was written.
+    `old_row` is the row as it was before (None for a new project)."""
+    t = time.time() if now is None else now
+    created = _iso_at(t)
+    new_row = c.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    new_sha = _served_sha(new_row) or ""
+    old_sha = _served_sha(old_row) if old_row is not None else None
+    if old_sha is not None and old_sha == new_sha:
+        return                                       # nothing changed
+    last = c.execute(
+        "SELECT id, created_at, saltinis, pavadinimas FROM project_versions "
+        "WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()
+    if last is None and old_sha is not None:
+        _insert_version(c, project_id, old_row["data"], old_sha, "kita",
+                        "Pradinė būsena", created)
+    elif (last is not None and saltinis == "issaugota" and not pavadinimas
+          and last["saltinis"] == "issaugota" and not last["pavadinimas"]):
+        try:
+            age = t - _parse_iso(last["created_at"])
+        except (TypeError, ValueError):
+            age = None
+        if age is not None and 0 <= age < VERSION_COALESCE_S:
+            import zlib
+            raw = new_text.encode("utf-8")
+            c.execute("UPDATE project_versions SET created_at = ?, data = ?, dydis = ?, "
+                      "sha = ? WHERE id = ?",
+                      (created, zlib.compress(raw, VERSION_ZLIB_LEVEL), len(raw),
+                       new_sha, last["id"]))
+            return
+    _insert_version(c, project_id, new_text, new_sha, saltinis, pavadinimas, created)
+    _prune_versions(c, project_id, t)
+
+
+def _owned_project_row(c, project_id: str, user_id: str | None):
+    if user_id:
+        return c.execute("SELECT * FROM projects WHERE id = ? AND user_id = ?",
+                         (project_id, user_id)).fetchone()
+    return c.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+
+
+def list_project_versions(project_id: str, user_id: str | None = None) -> list[dict] | None:
+    """Newest first, without data. None when the project is not the caller's."""
+    with _conn() as c:
+        row = _owned_project_row(c, project_id, user_id)
+        if row is None:
+            return None
+        current_sha = _served_sha(row)
+        out = []
+        for r in c.execute(
+                "SELECT id, created_at, saltinis, pavadinimas, dydis, length(data) AS suspausta, "
+                "sha FROM project_versions WHERE project_id = ? ORDER BY id DESC",
+                (project_id,)):
+            d = dict(r)
+            d["dabartine"] = bool(current_sha) and d.pop("sha") == current_sha
+            out.append(d)
+        return out
+
+
+def _load_version(c, project_id: str, version_id) -> dict | None:
+    import zlib
+    try:
+        vid = int(version_id)
+    except (TypeError, ValueError):
+        return None
+    r = c.execute("SELECT * FROM project_versions WHERE id = ? AND project_id = ?",
+                  (vid, project_id)).fetchone()
+    if r is None:
+        return None
+    d = dict(r)
+    d["data"] = json.loads(zlib.decompress(d["data"]).decode("utf-8"))
+    return d
+
+
+def get_project_version(project_id: str, version_id, user_id: str | None = None) -> dict | None:
+    """{id, created_at, saltinis, pavadinimas, dydis, data} or None (not the
+    caller's project, or no such version on it)."""
+    with _conn() as c:
+        if _owned_project_row(c, project_id, user_id) is None:
+            return None
+        v = _load_version(c, project_id, version_id)
+        if v is not None:
+            v.pop("sha", None)
+        return v
+
+
+def project_version_owner_ok(project_id: str, user_id: str | None = None) -> bool:
+    with _conn() as c:
+        return _owned_project_row(c, project_id, user_id) is not None
+
+
+def restore_project_version(project_id: str, version_id, user_id: str | None = None,
+                            now: float | None = None) -> dict | None:
+    """The current state is written as a 'grazinta' version, then the project
+    becomes the chosen version. Returns the saved project (as get_project), or
+    None when the project or the version is not the caller's."""
+    t = time.time() if now is None else now
+    stamp = _iso_at(t)
+    with _conn() as c:
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            row = _owned_project_row(c, project_id, user_id)
+            v = _load_version(c, project_id, version_id) if row is not None else None
+            if v is None:
+                c.execute("ROLLBACK")
+                return None
+            old_text = row["data"] or "{}"
+            _insert_version(c, project_id, old_text, _served_sha(row) or "", "grazinta",
+                            f"Prieš grąžinant versiją nuo {_lt_stamp(v['created_at'])}", stamp)
+            # The project's lifecycle is not content: a restore keeps the CURRENT
+            # archive state (and demo flag), whatever the version was saved with.
+            # Share token / expiry / views are row columns this UPDATE leaves alone.
+            try:
+                current = json.loads(old_text)
+            except (TypeError, ValueError):
+                current = {}
+            current = current if isinstance(current, dict) else {}
+            payload = {k: val for k, val in v["data"].items() if k not in RESTORE_KEEPS_CURRENT}
+            payload.update({k: current[k] for k in RESTORE_KEEPS_CURRENT if k in current})
+            c.execute(
+                "UPDATE projects SET name = ?, company_name = ?, tipas = ?, archetipas = ?, "
+                "status = ?, bendras_plotas_m2 = ?, vat_rate = ?, data = ?, updated_at = ? "
+                "WHERE id = ?",
+                (payload.get("name") or "Naujas projektas", payload.get("company_name"),
+                 payload.get("tipas") or "interjeras", payload.get("archetipas"),
+                 payload.get("status", "ready"), payload.get("bendras_plotas_m2"),
+                 payload.get("vat_rate", 21), json.dumps(payload, ensure_ascii=False),
+                 stamp, project_id))
+            _prune_versions(c, project_id, t)
+            c.execute("COMMIT")
+        except BaseException:
+            if c.in_transaction:
+                c.execute("ROLLBACK")
+            raise
+    return get_project(project_id)
+
+
+def _lt_stamp(iso: str) -> str:
+    """'2026-10-16T11:02:09Z' → '2026-10-16 14:02' in Vilnius time (the label is
+    read by him); UTC with the zone named when the zone database is missing."""
+    try:
+        from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
+        dt = datetime.fromtimestamp(_parse_iso(iso), tz=timezone.utc)
+        return dt.astimezone(ZoneInfo("Europe/Vilnius")).strftime("%Y-%m-%d %H:%M")
+    except Exception:  # noqa: BLE001 — no tzdata, or an odd stamp
+        return (iso or "")[:16].replace("T", " ") + " UTC"
 
 
 def create_extraction_job(job_id: str, user_id: str | None, boot_id: str, *,

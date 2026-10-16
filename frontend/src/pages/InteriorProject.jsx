@@ -10,7 +10,7 @@ import {
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
   Map as MapIcon, ListChecks, Sliders, ArrowLeft, Trash2, Pencil,
-  ArrowRight, ClipboardCheck, Send, Phone,
+  ArrowRight, ClipboardCheck, Send, Phone, History,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
@@ -21,6 +21,7 @@ import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ReextractButton from '@/components/project/ReextractButton';
+import ProjectHistoryPanel from '@/components/project/ProjectHistoryPanel';
 import useHeldReread from '@/hooks/useHeldReread';
 import { pilotSession, releasePilotSession } from '@/lib/telemetry';
 import SanitySeverityPill from '@/components/project/SanitySeverityPill';
@@ -115,7 +116,7 @@ export function SupportPhoneLink({ compact = false }) {
 // Always visible above tab bar — which is why the sanity pill lives here:
 // the project lands on Brėžinys and the full banner is on Kiekiai.
 
-function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onDelete, onRename, renameLocked = false, onShowSanity }) {
+function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPrielaidos, onIstorija, onDelete, onRename, renameLocked = false, onShowSanity }) {
   const { t } = useTranslation();
   // Inline rename (pre-prod QA 2026-07-15: the name was only settable at
   // creation — no rename control existed anywhere in the UI).
@@ -241,6 +242,22 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
       >
         <Sliders className="w-4 h-4" /> {t('project.interior.prielaidos')}
       </button>
+      {onIstorija && (
+        <button
+          onClick={onIstorija}
+          title={t('project.interior.istorijaTitle')}
+          className="flex items-center gap-1.5 rounded transition-colors hover:bg-muted/50"
+          style={{
+            minHeight: 44, padding: '0 14px',
+            border: '1px solid hsl(var(--border-strong))',
+            background: 'hsl(var(--card))',
+            fontSize: 14, fontWeight: 500,
+            color: 'hsl(var(--foreground) / 0.85)',
+          }}
+        >
+          <History className="w-4 h-4" /> {t('project.interior.istorija')}
+        </button>
+      )}
       {/* „Pagalba: paskambinti" is on EVERY project screen, top right — the one
           affordance that works when nothing else is understood. */}
       <SupportPhoneLink />
@@ -780,6 +797,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Esc closes the drawer, as its ✕ does — unless something inside already
   // handled it or it was typed in a field (lib/escapeToClose.js). On `document`,
   // so the panel's own key handlers have run before this one decides.
@@ -1084,6 +1102,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         totalGross={totalGross}
         reverseVat={reverseVat}
         onPrielaidos={() => openAssumptions()}
+        onIstorija={() => setHistoryOpen(true)}
         onShowSanity={showSanity}
         onDelete={onDelete}
         onRename={(newName) => {
@@ -1283,6 +1302,15 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           </div>
           </div>
         </div>
+      )}
+
+      {/* „Versijos" — the project's saved versions (togal-v2 W10): compare, restore. */}
+      {historyOpen && (
+        <ProjectHistoryPanel
+          project={project}
+          onClose={() => setHistoryOpen(false)}
+          onRestored={(saved) => setProject(saved)}
+        />
       )}
 
       {/* ── STEP 4 · SIŲSTI — three actions and one sentence before sending ─ */}
