@@ -50,7 +50,7 @@ __all__ = [
     "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
-    "excluded_quantity", "EXCLUDED_QUANTITIES_KEY",
+    "excluded_quantity", "EXCLUDED_QUANTITIES_KEY", "MERGED_INTO_KEY", "MERGED_BECAUSE",
     "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
@@ -203,6 +203,10 @@ def is_room_excluded(apimtis: dict | None, nr: Any) -> bool:
 # room by the time the builder runs, because `mark_rooms` runs after the
 # per-room math. Cleared together with the marks (2026-09-13).
 EXCLUDED_QUANTITIES_KEY = "_neskaiciuoti_kiekiai"
+# A room merged into another carries the kept room's number here (api/room_outline.py „Sujungti"); its
+# `_neskaiciuoti_kodel` is MERGED_BECAUSE, so the sheet says „sujungta į …", never „neskaičiuojama".
+MERGED_INTO_KEY = "_sujungta_i"
+MERGED_BECAUSE = "sujungta"
 
 
 def _zero(r: dict, fields: Iterable[str], prev: dict | None = None) -> None:
@@ -260,6 +264,17 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
         r.pop("_neskaiciuoti_sritys", None)
         prev = r.pop(EXCLUDED_QUANTITIES_KEY, None)
         prev = prev if isinstance(prev, dict) else None
+        if r.get(MERGED_INTO_KEY):
+            # „Sujungti" (2026-10-16): the room's table row is billed INSIDE the room it was merged into (that
+            # room carries a + b and its openings). Out of every row, and zeroed WITHOUT the stash: no anchor
+            # may subtract a share the kept room still bills. A scope choice on this room changes nothing.
+            r["_neskaiciuoti"] = True
+            r["_neskaiciuoti_kodel"] = MERGED_BECAUSE
+            for f in COMPUTED_ROOM_FIELDS:
+                if f in r:
+                    r[f] = 0.0
+            marked.append(_nr(r.get("nr")))
+            continue
         if is_room_excluded(apimtis, r.get("nr")):
             r["_neskaiciuoti"] = True
             r["_neskaiciuoti_kodel"] = "pasirinkimas"

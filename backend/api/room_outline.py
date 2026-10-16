@@ -334,14 +334,28 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     }
 
 
+# „Sujungti" writes these room keys besides the geometry ones (2026-10-16, follow-up (a)): the kept room bills BOTH
+# table rows and holds both rooms' openings; the absorbed one is marked structurally and lists nothing of its own.
+MERGE_ROOM_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_pries_sujungima", "_sujungimas", "elementai",
+                   "_sujungta_i", "_elementai_pries_sujungima", "_perimetras_pries_sujungima")
+MERGED_AREA = "eksplikacija_sujungta"     # `plotas_saltinis` of a room that bills two eksplikacija rows
+
+
+def _lt(v: float) -> str:
+    return f"{v:.2f}".replace(".", ",")
+
+
 @router.post("/{project_id}/rooms/{room_nr}/outline-merge")
 def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body: OutlineMerge):
     """„Sujungti" (2026-10-16): room `room_nr` is merged INTO `kept_nr`. The kept room takes the union the
     viewer drew — exactly as `outline-set` writes a drawn ring, its drawn area compared with BOTH printed
-    areas — and the absorbed one keeps no outline: `_konturas = {saltinis: "sujungta", i: kept_nr,
-    plotas_m2: 0}`. It must not keep billing its own area, so the answer names it in `neskaiciuoti` and the
-    sheet takes it out the way every excluded room is taken out (`_apimtis.patalpos_ne`, extractor/scope.py:
-    kept on the sheet, out of every row, put back with one switch). Saves nothing."""
+    areas — and bills both: `plotas_m2 = a + b` (`plotas_saltinis = "eksplikacija_sujungta"`, the table's
+    own figure kept in `_plotas_pries_sujungima`, the sentence in `_sujungimas.sakinys`). A window or a door
+    in the absorbed half is still there: the absorbed room's `elementai` move into the kept room (each
+    carried record says where from, `_is_patalpos`). The kept room's finishes cover the whole area. The
+    absorbed room keeps its table row and is marked STRUCTURALLY — `_sujungta_i: kept_nr`, no outline, no
+    openings of its own — so the engine bills it inside the kept room and nowhere else. Saves nothing: the
+    sheet applies `rooms` (geometry keys) and `sujungimas` (MERGE_ROOM_KEYS, null = remove)."""
     _project_for(request, project_id)
     ring, holes = _drawn_rings(body)
     kept_nr, gone_nr = str(body.kept_nr).strip(), str(room_nr).strip()
@@ -351,14 +365,45 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     gone = next((r for r in rooms if _nr(r) == gone_nr), None)
     if gone is None:
         raise HTTPException(status_code=404, detail="Patalpa nerasta")
+    if gone.get("_sujungta_i") or kept.get("_sujungta_i"):
+        raise HTTPException(status_code=400, detail="Ši patalpa jau sujungta su kita")
 
     def printed(r):
         v = r.get("plotas_m2")
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and float(v) > 0 else None
 
-    both = (printed(kept) or 0.0) + (printed(gone) or 0.0)
+    a, b = printed(kept) or 0.0, printed(gone) or 0.0
+    both = round(a + b, 2)
+
+    def outline_perimeter(r):
+        """The walls its outline counts (the lane's / the person's figure, imaginary edges left out), or None."""
+        k = r.get("_konturas") if isinstance(r.get("_konturas"), dict) else {}
+        v = k.get("perimetras_m")
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+    def number(v):
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else None
+
+    k_a, k_b = outline_perimeter(kept), outline_perimeter(gone)
+    p_a, p_b = number(kept.get("perimetras_m")), number(gone.get("perimetras_m"))
     perimetras = _set_outline(kept, ring, holes, body.page, (W, H), scale, table_m2=both or None,
-                              extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": round(both, 2) if both else None})
+                              extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": both or None})
+
+    # ── what the kept room bills: both table rows, both rooms' openings ──
+    before = kept.get("_sujungimas") if isinstance(kept.get("_sujungimas"), dict) else None
+    parts = list((before or {}).get("plotai") or [{"nr": kept_nr, "plotas_m2": a}]) + [{"nr": gone_nr, "plotas_m2": b}]
+    if both > 0:
+        kept["_plotas_pries_sujungima"] = kept.get("_plotas_pries_sujungima", printed(kept))
+        kept["plotas_m2"] = both
+        kept["plotas_saltinis"] = MERGED_AREA
+    kept["_sujungimas"] = {
+        "su": [p["nr"] for p in parts if p["nr"] != kept_nr],
+        "plotai": parts,
+        "sakinys": "Plotas: " + " + ".join(_lt(p["plotas_m2"]) for p in parts) + " m² iš eksplikacijos — patalpos sujungtos",
+        "apdaila": "Visam plotui taikoma patalpos " + kept_nr + " apdaila",
+    }
+    carried = [{**e, "_is_patalpos": gone_nr} for e in (gone.get("elementai") or []) if isinstance(e, dict)]
+    kept["elementai"] = [e for e in (kept.get("elementai") or []) if isinstance(e, dict)] + carried
 
     def absorb(r):
         for k in GEOMETRY_ROOM_KEYS:
@@ -366,17 +411,35 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
                 r.pop(k, None)
         r["_konturas"] = {"page": body.page, "saltinis": MERGED, "i": kept_nr, "plotas_m2": 0.0, "perimetras_m": 0.0,
                           "plotas_uzrasas_m2": printed(r)}
+        r["_sujungta_i"] = kept_nr
 
+    gone["_elementai_pries_sujungima"] = gone.get("elementai") or []
+    gone["elementai"] = []
     absorb(gone)
     apply_geometry(parsed, pdf_bytes, dims)
     absorb(gone)            # whatever the lane made of a room with no outline today is not its geometry: it is merged
     _drawn_perimeter_if_unread(kept, perimetras)
+    if str(kept.get("perimetras_saltinis") or "") in ("user_override", "manual") and p_a and p_b:
+        # A perimeter he typed is never re-read — but it described ONE room. The merged room's walls are both
+        # rooms' walls less the run they shared, counted once on each side: (outline A + outline B − union).
+        # A boundary drawn between two rooms of one open space is no wall and is in neither outline (→ 0).
+        shared2 = max(0.0, k_a + k_b - perimetras) if (k_a and k_b) else None
+        if shared2 is not None:
+            kept["_perimetras_pries_sujungima"] = kept.get("_perimetras_pries_sujungima", p_a)
+            kept["perimetras_m"] = round(p_a + p_b - shared2, 2)
+            kept["_sujungimas"]["perimetras"] = (
+                f"Perimetras: {_lt(p_a)} + {_lt(p_b)}" + (f" − {_lt(shared2)}" if shared2 >= 0.01 else "")
+                + f" = {_lt(kept['perimetras_m'])} m — jūsų įrašyti perimetrai"
+                + (", be bendros sienos abiejų pusių" if shared2 >= 0.01 else ""))
+        else:
+            kept["_sujungimas"]["perimetras"] = (f"Perimetras lieka {_lt(p_a)} m (įrašytas jūsų) — patalpos {gone_nr} "
+                                                 "sienų prie jo pridėti negalima, nes vienas kontūras neturi perimetro")
     return {
         "status": "ok",
         "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
+        "sujungimas": {nr: {k: r.get(k) for k in MERGE_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
-        "neskaiciuoti": [gone_nr],
     }
 
 

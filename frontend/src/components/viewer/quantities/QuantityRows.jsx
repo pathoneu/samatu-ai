@@ -175,7 +175,8 @@ export function FamilyFooter({ family, onOpenAssumptions }) {
       )}
       {family.excluded.length > 0 && (
         <p title={family.excluded.map((e) => `${e.nr} ${e.name}${e.because ? `: ${cleanUserText(e.because)}` : ''}`).join('\n')}>
-          Neįtraukta: {family.excluded.map((e) => `${e.nr} ${e.name}`).join(', ')}
+          {family.excluded.some((e) => !e.mergedInto) && <>Neįtraukta: {family.excluded.filter((e) => !e.mergedInto).map((e) => `${e.nr} ${e.name}`).join(', ')} </>}
+          {family.excluded.some((e) => e.mergedInto) && <>Sujungta: {family.excluded.filter((e) => e.mergedInto).map((e) => `${e.nr} → ${e.mergedInto}`).join(', ')}</>}
         </p>
       )}
       {!family.manual && (

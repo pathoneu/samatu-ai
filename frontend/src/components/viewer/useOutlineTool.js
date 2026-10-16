@@ -110,7 +110,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
       await onSave(op);
       const what = {
         split: op.kind === 'split' ? `Patalpa ${op.nr} padalyta — kita dalis priskirta patalpai ${op.other.nr}` : `Patalpa ${op.nr} padalyta — kita dalis neįtraukta`,
-        merge: `Patalpa ${op.goneNr} prijungta prie ${op.keptNr} — ${op.goneNr} nebeskaičiuojama`,
+        merge: `Patalpa ${op.goneNr} prijungta prie ${op.keptNr} — abiejų plotai ir angos skaičiuojami patalpoje ${op.keptNr}`,
         subtract: `Patalpos ${op.nr} kontūras išsaugotas su ${op.holes.length} išpjov${op.holes.length === 1 ? 'a' : 'omis'}`,
       }[t.mode];
       toast.success(what, { description: 'Sienos perskaitytos iš naujo, kiekiai perskaičiuojami.' });

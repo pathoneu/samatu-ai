@@ -88,7 +88,13 @@ test('room entries carry the server value, unit, geometry source, hidden flag an
     ['02', 31.88, 'm²', 'walls', false], ['03', 49.92, 'm²', 'approx', true],
   ]);
   assert.equal(walls.rooms[0].room, ROOMS[1]);
-  assert.deepEqual(walls.excluded, [{ nr: '01', name: 'Tambūras', because: 'Sienos neapdailinamos' }]);
+  assert.deepEqual(walls.excluded, [{ nr: '01', name: 'Tambūras', because: 'Sienos neapdailinamos', mergedInto: null }]);
+});
+
+test('a room merged into another is listed as merged, not as left out', () => {
+  const rooms = ROOMS.map((r) => (r.nr === '01' ? { ...r, _sujungta_i: '02' } : r));
+  const walls = buildQuantitiesTree(ROWS, rooms).families.find((f) => f.id === 'walls');
+  assert.deepEqual(walls.excluded, [{ nr: '01', name: 'Tambūras', because: 'sujungta į 02', mergedInto: '02' }]);
 });
 
 test('a hand-typed quantity is flagged and keeps the program\'s own number for the explanation', () => {

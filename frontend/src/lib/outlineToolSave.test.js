@@ -60,7 +60,7 @@ test('split: a refused second half refuses the whole operation', async () => {
   );
 });
 
-test('merge: the kept room takes the union, the absorbed one is taken out through the scope', async () => {
+test('merge: the kept room bills both rows and holds both rooms\' openings; the scope is not touched', async () => {
   const api = {
     outlineMerge: async (gone, body) => {
       assert.equal(gone, '02');
@@ -71,16 +71,27 @@ test('merge: the kept room takes the union, the absorbed one is taken out throug
           '01': { polygon_pct: body.polygon_pct, _konturas: { prijungta: ['02'] } },
           '02': { polygon_pct: null, _konturas: { saltinis: 'sujungta', i: '01', plotas_m2: 0 } },
         },
+        sujungimas: {
+          '01': { plotas_m2: 21, plotas_saltinis: 'eksplikacija_sujungta', _plotas_pries_sujungima: 12,
+            _sujungimas: { su: ['02'] }, elementai: [{ tipas: 'langas', kiekis: 1, _is_patalpos: '02' }], _sujungta_i: null },
+          '02': { plotas_m2: 9, elementai: [], _sujungta_i: '01', _elementai_pries_sujungima: [{ tipas: 'langas', kiekis: 1 }] },
+        },
         kitu_angos: {},
-        neskaiciuoti: ['02'],
       };
     },
   };
   const patch = await saveOutlineTool({ kind: 'merge', keptNr: '01', goneNr: '02', page: 1, polygon: ring }, { api, getFresh: project });
-  assert.deepEqual(patch._apimtis.patalpos_ne, ['02']);
-  assert.equal('polygon_pct' in patch.patalpos[1], false);
-  assert.equal(patch.patalpos[1]._konturas.saltinis, 'sujungta');
-  assert.equal(patch.patalpos[1].plotas_m2, 9);                 // the table's area is not touched — the scope takes it out
+  assert.equal(patch._apimtis, undefined);
+  const [kept, gone] = patch.patalpos;
+  assert.equal(kept.plotas_m2, 21);
+  assert.equal(kept.plotas_saltinis, 'eksplikacija_sujungta');
+  assert.equal(kept.pavadinimas, 'A');
+  assert.equal(kept.elementai[0]._is_patalpos, '02');
+  assert.equal('polygon_pct' in gone, false);
+  assert.equal(gone._sujungta_i, '01');
+  assert.deepEqual(gone.elementai, []);
+  assert.equal(gone.plotas_m2, 9);                 // its table row stays — the engine bills it inside 01
+  assert.equal(patch.v8_rooms[1]._sujungta_i, '01');
 });
 
 test('unknown operations and refused answers throw with the server sentence', async () => {

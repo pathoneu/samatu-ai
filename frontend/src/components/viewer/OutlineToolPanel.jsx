@@ -10,6 +10,7 @@ import { formatNumberLT, shoelaceAreaM2 } from '@/lib/measureGeometry';
 import { displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
 import { roomPageOf } from '@/lib/roomZones';
 import { displaySizePt, pctRingToPts } from '@/lib/outlineTools';
+import { openingCounts } from '@/lib/mergeReextract';
 import { MERGE_REFUSED } from './OutlineToolLayer';
 
 // A perimeter the person typed is never replaced by a re-read (api/room_outline.py keeps `user_override`):
@@ -114,6 +115,8 @@ export default function OutlineToolPanel({
   } else if (tool.mode === 'merge') {
     if (tool.union && tool.targetNr) {
       const sum = (table(tool.nr) || 0) + (table(tool.targetNr) || 0);
+      const target = byNr.get(String(tool.targetNr));
+      const carried = openingCounts(target?.elementai);
       body = (
         <div className="space-y-1.5">
           <p>
@@ -121,10 +124,14 @@ export default function OutlineToolPanel({
             {sum > 0 && <span className="text-muted-foreground"> · lentelėje {formatNumberLT(table(tool.nr) || 0, 2)} + {formatNumberLT(table(tool.targetNr) || 0, 2)} = {formatNumberLT(sum, 2)} m²</span>}
           </p>
           <p className="text-muted-foreground">
-            Patalpa {tool.targetNr} bus <b className="text-foreground">neįtraukta į skaičiavimus</b> (kaip „Nustatymuose" išjungta patalpa — ten ją ir grąžinsite):
-            jos eilutės iš sąmatos išimamos. {tool.nr} sąmatoje lieka su savo lentelės plotu
-            {table(tool.nr) != null ? ` (${formatNumberLT(table(tool.nr), 2)} m²)` : ''} — {tool.targetNr} grindų ir lubų plotas prie jo nepridedamas.
-            {' '}{wallsSentence(room)}
+            Sąmatoje {tool.nr} skaičiuos <b className="text-foreground">abiejų patalpų plotą</b>
+            {sum > 0 ? ` (${formatNumberLT(table(tool.nr) || 0, 2)} + ${formatNumberLT(table(tool.targetNr) || 0, 2)} m² iš eksplikacijos)` : ''}
+            {carried.langai || carried.durys ? ` ir ${tool.targetNr} angas (${[carried.langai ? `langai: ${carried.langai}` : null, carried.durys ? `durys: ${carried.durys}` : null].filter(Boolean).join(', ')})` : ''}.
+            {' '}Visam plotui taikoma {tool.nr} apdaila{target?.paskirtis && room?.paskirtis && target.paskirtis !== room.paskirtis ? ` (${tool.targetNr} paskirtis „${target.paskirtis}" nebetaikoma)` : ''}.
+            {' '}{tool.targetNr} lieka sąraše kaip „sujungta į {tool.nr}" — atskirų eilučių neturės.
+            {' '}{TYPED_PERIMETER.has(String(room?.perimetras_saltinis || ''))
+              ? `Sienos: jūsų įrašyti perimetrai sudedami (${formatNumberLT(Number(room?.perimetras_m) || 0, 2)} + ${formatNumberLT(Number(target?.perimetras_m) || 0, 2)} m), bendros sienos atkarpa — jei ji buvo siena — atimama iš abiejų pusių.`
+              : `Sienos ${tool.nr} perskaitomos iš brėžinio pagal sujungtą kontūrą.`}
           </p>
         </div>
       );

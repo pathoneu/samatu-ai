@@ -1,0 +1,108 @@
+"""„Sujungti" bills both rooms (2026-10-16, togal-v2 W5 follow-up (a)).
+
+Room 02 merged into room 01: 01 carries both table rows (`plotas_m2 = a + b`) and both rooms' openings, 02
+keeps its table row and is marked `_sujungta_i: "01"`. `scope.mark_rooms` — which every compute path runs
+AFTER the per-room math — takes 02 out of every row and zeroes its computed fields WITHOUT the excluded-share
+stash, so no anchor subtracts a share 01 still bills. The full path (calc → mark_rooms) through
+/recompute-interior must then bill what the two rooms billed before, less exactly what a wall that is no
+longer there carried: its two faces (walls, putty, primer, paint, levelling), its two skirting runs, its run
+and its four inner corners in the corner bead — and the one threshold between the two rooms.
+"""
+from __future__ import annotations
+
+import copy
+
+import pytest
+from fastapi.testclient import TestClient
+
+import main
+from extractor import scope
+
+H = 2.7          # ceiling height
+SHARED = 3.0     # the wall between 01 (4 × 3 m) and 02 (3 × 3 m)
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(main, "_billable_user", lambda request: {"id": "dev"})
+    return TestClient(main.app)
+
+
+def _rooms():
+    a = {"nr": "01", "pavadinimas": "Virtuvė", "paskirtis": "gyvenamoji", "plotas_m2": 12.0, "plotas_saltinis": "eksplikacija",
+         "perimetras_m": 14.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H,
+         "elementai": [{"tipas": "langas", "plotis_mm": 1200, "aukstis_mm": 1500, "kiekis": 1},
+                       {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100, "kiekis": 1}]}
+    b = {"nr": "02", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 9.0, "plotas_saltinis": "eksplikacija",
+         "perimetras_m": 12.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H,
+         "elementai": [{"tipas": "langas", "plotis_mm": 1500, "aukstis_mm": 1500, "kiekis": 1}]}
+    return a, b
+
+
+def _merged():
+    """What api/room_outline.py's outline-merge leaves on the two rooms (the perimeter here is one he typed,
+    so the test owns it: 14 + 12 − 2 × 3)."""
+    a, b = _rooms()
+    a2 = {**a, "plotas_m2": 21.0, "plotas_saltinis": "eksplikacija_sujungta", "_plotas_pries_sujungima": 12.0,
+          "perimetras_m": 14.0 + 12.0 - 2 * SHARED,
+          "elementai": a["elementai"] + [{**e, "_is_patalpos": "02"} for e in b["elementai"]]}
+    b2 = {**b, "_sujungta_i": "01", "elementai": [], "_elementai_pries_sujungima": b["elementai"]}
+    return a2, b2
+
+
+def _run(client, rooms):
+    r = client.post("/recompute-interior", json={"patalpos": copy.deepcopy(list(rooms))})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    return out, {row["aprasymas"]: row.get("kiekis") for row in out["darbu_sarasas"]}
+
+
+def _row(rows, *needles):
+    hits = [k for k in rows if all(n.lower() in k.lower() for n in needles)]
+    assert len(hits) == 1, (needles, hits)
+    return rows[hits[0]] or 0.0
+
+
+def test_a_merge_bills_what_the_two_rooms_billed_less_only_the_wall_between_them(client):
+    _, before = _run(client, _rooms())
+    _, after = _run(client, _merged())
+    # the wall that is no longer there: its two faces
+    assert _row(before, "Sienų glaistymas/dažymas") - _row(after, "Sienų glaistymas/dažymas") == pytest.approx(2 * SHARED * H, abs=0.02)
+    # its two skirting runs (the row carries 10 % waste on the base)
+    assert _row(before, "Grindjuosčių sumontavimas") - _row(after, "Grindjuosčių sumontavimas") == pytest.approx(2 * SHARED * 1.1, abs=0.02)
+    # its run along the ceiling line and its four inner corners in the corner bead
+    assert _row(before, "Dažymo kampų montavimas") - _row(after, "Dažymo kampų montavimas") == pytest.approx(2 * SHARED + 4 * H, abs=0.02)
+    # one room, no threshold between two
+    assert _row(before, "Slenksniai") == 1 and not any("Slenksniai" in k and after[k] for k in after)
+    wall_rows = ("Sien", "sienoms", "Grindjuos", "kampų", "kampuotės", "Rotband", "Slenksniai")
+    unchanged = {k: v for k, v in before.items() if not any(w.lower() in k.lower() for w in wall_rows)}
+    assert unchanged, "the corpus of untouched rows is not empty"
+    for k, v in unchanged.items():            # floors, ceilings, reveals, windows, doors, materials of those
+        assert after.get(k) == pytest.approx(v, abs=0.011), k
+
+
+def test_the_absorbed_room_is_out_of_every_row_with_no_share_for_any_anchor_and_its_table_row_visible(client):
+    out, _ = _run(client, _merged())
+    b = next(r for r in out["patalpos"] if r["nr"] == "02")
+    assert b["_neskaiciuoti"] is True and b["_neskaiciuoti_kodel"] == "sujungta"
+    assert b["plotas_m2"] == 9.0                            # only computed fields are zeroed
+    assert scope.EXCLUDED_QUANTITIES_KEY not in b
+    for f in scope.COMPUTED_ROOM_FIELDS:
+        assert scope.excluded_quantity(b, f) == 0.0, f
+    a = next(r for r in out["patalpos"] if r["nr"] == "01")
+    assert not a.get("_neskaiciuoti") and a["plotas_m2"] == 21.0
+
+
+def test_a_second_rebuild_changes_nothing(client):
+    out, rows = _run(client, _merged())
+    _, again = _run(client, out["patalpos"])
+    assert again == rows
+
+
+def test_a_scope_choice_on_the_absorbed_room_changes_nothing_and_on_the_kept_room_keeps_the_stash():
+    a, b = _merged()
+    a["walls_paintable_m2"], b["walls_paintable_m2"] = 40.0, 25.0
+    scope.mark_rooms([a, b], {"patalpos_ne": ["01", "02"]})
+    assert b["_neskaiciuoti_kodel"] == "sujungta" and scope.excluded_quantity(b, "walls_paintable_m2") == 0.0
+    # a kept room he excluded himself is excluded the normal way: its share (a + b) is remembered
+    assert a["_neskaiciuoti_kodel"] == "pasirinkimas" and scope.excluded_quantity(a, "walls_paintable_m2") == 40.0

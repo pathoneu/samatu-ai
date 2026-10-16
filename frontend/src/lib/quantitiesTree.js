@@ -114,11 +114,17 @@ function familyEntry(row, index, roomsByNr, roomOrder, hidden) {
     rollUpNote: authoritative ? (anchorNote(rollUp) || rollUp.find((s) => s?.note)?.note || null) : null,
     sourceLabel: sourceLabel(row?.saltinis),
     rooms: contributions.map((c) => roomEntry(c, roomsByNr, roomOrder, unit, hidden)),
-    excluded: excludedOf(row).map((e) => ({
-      nr: e?.room_nr != null ? String(e.room_nr) : '',
-      name: e?.room_name || '',
-      because: e?.excluded_because || null,
-    })),
+    excluded: excludedOf(row).map((e) => {
+      const nr = e?.room_nr != null ? String(e.room_nr) : '';
+      // „Sujungti" (2026-10-16): a merged room is billed inside the room it joined — not a room left out
+      const into = roomsByNr.get(nr)?._sujungta_i || null;
+      return {
+        nr,
+        name: e?.room_name || '',
+        because: into ? `sujungta į ${into}` : (e?.excluded_because || null),
+        mergedInto: into ? String(into) : null,
+      };
+    }),
     row,
   };
 }

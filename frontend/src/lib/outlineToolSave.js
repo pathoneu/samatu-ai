@@ -11,12 +11,33 @@
  *   {kind: 'split', nr, page, polygon, holes, other: {nr, polygon, holes}}
  *   {kind: 'merge', keptNr, goneNr, page, polygon, holes}
  *
- * A merged-away room must stop billing its own area: it is taken out the way every excluded room is
- * (`_apimtis.patalpos_ne`, enforced server side by extractor/scope.py on every compute path) — kept on
- * the sheet, named in the settings, put back with one switch.
+ * A merge bills BOTH table rows in the kept room (`plotas_m2 = a + b`, its openings carried over) and
+ * marks the absorbed room structurally (`_sujungta_i`): the answer's `sujungimas` names exactly those
+ * room keys, and they land here beside the geometry ones. Nothing goes through the scope — a merged room
+ * is not a room he chose not to count.
  */
 import { roomsWithOutline, roomsWithSplit } from './roomOutline.js';
-import { withRoomIncluded } from './scope.js';
+
+/** The room keys a merge writes besides the geometry (mirror of backend MERGE_ROOM_KEYS). */
+export const MERGE_ROOM_KEYS = [
+  'plotas_m2', 'plotas_saltinis', '_plotas_pries_sujungima', '_sujungimas', 'elementai',
+  '_sujungta_i', '_elementai_pries_sujungima', '_perimetras_pries_sujungima',
+];
+
+function withMergeKeys(rooms, sujungimas) {
+  if (!sujungimas || typeof sujungimas !== 'object') return rooms;
+  return rooms.map((r) => {
+    const keys = sujungimas[String(r?.nr ?? '')];
+    if (!keys || typeof keys !== 'object') return r;
+    const next = { ...r };
+    for (const k of MERGE_ROOM_KEYS) {
+      if (!(k in keys)) continue;
+      if (keys[k] == null) delete next[k];
+      else next[k] = keys[k];
+    }
+    return next;
+  });
+}
 
 function failure(answer) {
   return new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
@@ -70,9 +91,7 @@ export async function saveOutlineTool(op, { api, getFresh }) {
     const fresh = getFresh();
     const rooms = roomsWithSplit(fresh, answer);
     if (!rooms) throw failure(answer);
-    let scope = fresh?._apimtis;
-    for (const nr of answer.neskaiciuoti || [op.goneNr]) scope = withRoomIncluded(scope, nr, false);
-    return { ...withV8(fresh, rooms), _apimtis: scope };
+    return withV8(fresh, withMergeKeys(rooms, answer.sujungimas));
   }
   throw new Error(`Nežinomas kontūro veiksmas: ${op?.kind}`);
 }

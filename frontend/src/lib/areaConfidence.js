@@ -127,7 +127,8 @@ export function inferPlotasSource(room) {
   // eksplikacija rooms. saltinis comes from the deterministic eksplikacija
   // reader and never lies.
   const saltinis = (room.plotas_saltinis || '').trim();
-  if (saltinis === 'eksplikacija') return 'eksplikacija';
+  // 2026-10-16 „Sujungti": two eksplikacija rows billed in one room — still read from the table
+  if (saltinis === 'eksplikacija' || saltinis === 'eksplikacija_sujungta') return 'eksplikacija';
   // 2026-09-06: the designer's area label read from the PDF text (no table on
   // the drawing) — deterministic like the eksplikacija, shown as its own chip.
   if (saltinis === 'plano_uzrasas') return 'plano_uzrasas';
