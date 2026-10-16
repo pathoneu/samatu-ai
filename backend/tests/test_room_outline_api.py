@@ -243,3 +243,38 @@ def test_nubresiu_pats_after_such_a_click_cuts_the_joined_space_along_his_line(t
     out2 = TestClient(app).post("/api/projects/p1/rooms/01/split-space",
                                 json={"page": 1, "a": {"x_pct": ax, "y_pct": ay}, "b": {"x_pct": bx, "y_pct": by}}).json()
     assert out2["status"] == "not_shared"
+
+
+# ── outline-set (2026-10-16): a ring a person drew or edited vertex by vertex ──────────────────────
+
+def _set(client, ring_m, nr="01", page=1, project_id="p1"):
+    ring = [list(_pct(x, y)) for x, y in ring_m]
+    return client.post(f"/api/projects/{project_id}/rooms/{nr}/outline-set", json={"page": page, "polygon_pct": ring})
+
+
+def test_a_drawn_ring_becomes_the_corrected_outline_and_the_walls_are_read(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    r = _set(TestClient(app), [(t, t), (4 + t, t), (4 + t, 3 + t), (t, 3 + t)])   # room 1's inner faces
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["status"] == "ok"
+    room = out["room"]
+    assert room["polygon_source"] == "corrected" and len(room["polygon_pct"]) == 4
+    assert room["_konturas"]["saltinis"] == "nubrezta" and room["_konturas"]["page"] == 1
+    assert abs(room["_konturas"]["plotas_m2"] - 12.0) < 0.2
+    assert abs(room["_konturas"]["perimetras_m"] - 14.0) < 0.2
+    # its walls were read again from the drawing — dimension strings along the drawn ring
+    assert room.get("_sienos")
+    assert room["perimetras_saltinis"] in ("matmenu_eilutes", "sienu_konturas", "konturo_ivertis")
+    assert "_angos_sienose" in room
+
+
+def test_outline_set_rejects_a_degenerate_ring(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    c = TestClient(app)
+    assert c.post("/api/projects/p1/rooms/01/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.2]]}).status_code == 422
+    assert c.post("/api/projects/p1/rooms/01/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.1, 0.1], [0.1, 0.1]]}).status_code == 400
+    assert c.post("/api/projects/p1/rooms/99/outline-set", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]]}).status_code == 404

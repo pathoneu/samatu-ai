@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
@@ -72,6 +73,15 @@ class SplitSpace(BaseModel):
     a: PagePoint
     b: PagePoint
     su: str | None = Field(default=None, max_length=8)   # the neighbour whose face this room's pocket joins (2026-09-23)
+
+
+class OutlineSet(BaseModel):
+    """A ring a PERSON drew or edited in the viewer (2026-10-16): display-frame page fractions, ≥ 3 points."""
+    page: int = Field(ge=1)
+    polygon_pct: list[list[float]] = Field(min_length=3, max_length=500)
+
+
+DRAWN = "nubrezta"               # `_konturas.saltinis` of an outline a person drew or edited vertex by vertex
 
 
 def _nr(room: dict) -> str:
@@ -190,6 +200,57 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             room.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
 
+    return {
+        "status": "ok",
+        "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
+        "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
+                       if r is not room and isinstance(r.get("_angos_sienose"), dict)},
+    }
+
+
+@router.post("/{project_id}/rooms/{room_nr}/outline-set")
+def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: OutlineSet):
+    """The ring the person drew IS the room's outline (2026-10-16, Togal analysis §10): marked `corrected`
+    (the lane never re-traces it), its area and perimeter measured at the sheet's scale, its walls and
+    openings read again — exactly what a click (`outline-at`) does, with the person's geometry instead of
+    the wall solid's face. The printed area stays the room's area; the drawn one is shown beside it
+    (`_konturas.plotas_m2`, `paklaida`). Saves nothing — the sheet patches the room and recomputes."""
+    ring: list[tuple[float, float]] = []
+    for pt in body.polygon_pct:
+        if len(pt) != 2 or not all(0.0 <= float(v) <= 1.0 for v in pt):
+            raise HTTPException(status_code=400, detail="Kontūro taškai turi būti lapo dalys 0–1")
+        ring.append((float(pt[0]), float(pt[1])))
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    pts = [(x * W, y * H) for x, y in ring]
+    n = len(pts)
+    area_pt2 = abs(sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))) / 2
+    if area_pt2 < 1.0:
+        raise HTTPException(status_code=400, detail="Kontūras per mažas arba išsigimęs")
+    perim_pt = sum(math.dist(pts[i], pts[(i + 1) % n]) for i in range(n))
+    plotas = round(area_pt2 * scale * scale, 2)
+    perimetras = round(perim_pt * scale, 2)
+    table = room.get("plotas_m2")
+    has_table = isinstance(table, (int, float)) and not isinstance(table, bool) and float(table) > 0
+    paklaida = round((plotas - float(table)) / float(table), 4) if has_table else None
+
+    room["polygon_pct"] = [[round(x, 5), round(y, 5)] for x, y in ring]
+    room["polygon_source"] = "corrected"
+    room["polygon_corrected_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    room["_konturas"] = {"page": body.page, "plotas_m2": plotas, "perimetras_m": perimetras,
+                         "plotas_uzrasas_m2": table if has_table else None, "paklaida": paklaida,
+                         "plotas_nesutampa": False, "saltinis": DRAWN}
+    for stale in ("_konturo_priezastis", "_konturo_siulymas", "_atvira_erdve", "_angos_sienose"):
+        room.pop(stale, None)
+    if str(room.get("perimetras_saltinis") or "") in ("konturo_ivertis", "atviros_erdves_ivertis", "sienu_konturas"):
+        # a perimeter that rested on the OLD outline — the walls are read afresh along the new one
+        for stale in _ESTIMATE_KEYS:
+            room.pop(stale, None)
+    apply_geometry(parsed, pdf_bytes, dims)
+    if str(room.get("perimetras_saltinis") or "") in ("", "vision"):
+        # no dimension strings along the drawn walls: the drawn perimeter is the room's, named as such
+        room["_perimetras_pries_geometrija"] = room.get("perimetras_m")
+        room["perimetras_m"] = perimetras
+        room["perimetras_saltinis"] = "sienu_konturas"
     return {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
