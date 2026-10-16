@@ -18,8 +18,8 @@ import auth  # noqa: E402
 import db  # noqa: E402
 import storage  # noqa: E402
 from api.export_overlay_pdf import (
-    OverlayBody, display_fraction, lt_number, measurement_divisor, normalize_rotation, path_length_m,
-    render_sheets, rotate_pct_point, scale_in_force,
+    OverlayBody, display_fraction, lt_number, normalize_rotation, path_length_m, render_sheets,
+    rotate_pct_point, scale_in_force,
 )
 
 W, H = 400.0, 200.0                 # mediabox, unrotated
@@ -63,30 +63,24 @@ def _blue_centroid(image) -> tuple[float, float]:
     return xs / n / image.width, ys / n / image.height
 
 
-@pytest.mark.parametrize("frame", [None, "mediabox"])
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
-def test_measurement_points_land_where_pdfium_draws_them(rotation, frame):
+def test_measurement_points_land_where_pdfium_draws_them(rotation):
     """A click on the blue square, stored the way the viewer stores it, maps back onto the displayed sheet
-    exactly where PDFium renders the square — on every /Rotate, in both stored frames.
+    exactly where PDFium renders the square — on every /Rotate.
 
-    Before 2026-10-16 the viewer (embedPdfAdapter.toPdf) stored an unrotated-frame fraction × EmbedPDF's
-    `page.size`, which is PDFium's FPDF_GetPageSizeByIndexF — checked against EmbedPDF's own wasm build on this
-    very fixture at /Rotate 90: 200 × 400, the displayed size (the mediabox is 400 × 200). Since then it stores
-    the fraction × the mediabox (pageRotation.mediaboxSizeFrom) and the project says
-    `measurementsFrame: 'mediabox'`."""
+    The viewer (embedPdfAdapter.toPdf) stores an unrotated-frame fraction × EmbedPDF's `page.size`, and in
+    the browser that size is the UNROTATED page: this very fixture at /Rotate 90 reports 400 × 200,
+    rotation 1 (Playwright, 2026-10-16). pypdfium2's get_size() is the displayed 200 × 400 — not the divisor."""
     sheet = render_sheets(_sheet_pdf(rotation), [1], dpi=72, side_cap=2000)[0]
     swapped = rotation in (90, 270)
     assert sheet["rotation"] == rotation
     assert (sheet["Wm"], sheet["Hm"]) == (W, H)
     assert (sheet["Wd"], sheet["Hd"]) == ((H, W) if swapped else (W, H))
-    assert (sheet["Ws"], sheet["Hs"]) == ((H, W) if swapped else (W, H))          # EmbedPDF's page.size
+    assert (sheet["Ws"], sheet["Hs"]) == ((H, W) if swapped else (W, H))          # pypdfium2: displayed
     assert sheet["image"].width / sheet["image"].height == pytest.approx(sheet["Wd"] / sheet["Hd"], rel=0.02)
-    assert (sheet["Wu"], sheet["Hu"]) == (W, H)                                   # mediaboxSizeFrom(page.size)
-    project = {"measurementsFrame": frame} if frame else {}
-    size_w, size_h = (W, H) if frame else (sheet["Ws"], sheet["Hs"])              # what the viewer divided by
-    assert measurement_divisor(sheet, project) == (size_w, size_h)
-    stored = {"x": MARK[0] / W * size_w, "y": MARK[1] / H * size_h}   # toPdf(click on the square)
-    fx, fy = display_fraction(stored, *measurement_divisor(sheet, project), rotation)
+    assert (sheet["Wu"], sheet["Hu"]) == (W, H)                                   # EmbedPDF's page.size
+    stored = {"x": MARK[0], "y": MARK[1]}                                         # toPdf(click on the square)
+    fx, fy = display_fraction(stored, sheet["Wu"], sheet["Hu"], rotation)
     bx, by = _blue_centroid(sheet["image"])
     assert fx == pytest.approx(bx, abs=0.01) and fy == pytest.approx(by, abs=0.01), (rotation, (fx, fy), (bx, by))
 
@@ -177,11 +171,11 @@ def test_overlay_pdf_has_every_sheet_with_marks_and_a_legend(tmp_path, monkeypat
     assert "Šiame lape žymėjimų nėra" in _text(r.content, 1)
 
 
-def test_a_4_m_wall_on_a_rotated_sheet_prints_4_m_once_migrated(tmp_path, monkeypatch):
-    """A 4,00 m wall drawn on a /Rotate 90 sheet with the fixed viewer (mediabox-frame points) prints 4,00 m."""
+def test_a_4_m_wall_on_a_rotated_sheet_prints_4_m(tmp_path, monkeypatch):
+    """A 4,00 m wall the viewer stored on a /Rotate 90 sheet (mediabox points) prints 4,00 m."""
     _isolate(tmp_path, monkeypatch)
     run = 4.0 / (50 * 0.0254 / 72)                                     # 4 m at 1:50, in points
-    _store(_sheet_pdf(90), {"measurementsFrame": "mediabox", "measurements": [
+    _store(_sheet_pdf(90), {"measurements": [
         {"kind": "distance", "page": 1, "points": [{"x": 20, "y": 100}, {"x": 20 + run, "y": 100}],
          "color": "#2a6fb5", "classification": "Siena"}]})
     r = TestClient(app).post("/api/projects/p1/export-overlay-pdf", json={})
