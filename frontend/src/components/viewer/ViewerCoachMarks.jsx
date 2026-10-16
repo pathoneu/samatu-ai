@@ -1,0 +1,118 @@
+/**
+ * ViewerCoachMarks — the viewer's first-run walkthrough (lib/viewerCoachMarks):
+ * Mastelis → Atstumas → Redaguoti kontūrą, each card under its toolbar button
+ * (`data-coach="…"` inside `rootRef`), a ring around the button, shown once per
+ * browser. „Praleisti", the X, Esc and finishing all mark it done.
+ *
+ * Not the project-level OnboardingTooltips pattern: that one is a centred
+ * balloon behind a backdrop; these cards must point at a button and leave the
+ * drawing usable underneath.
+ */
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import { COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition } from '@/lib/viewerCoachMarks';
+
+const CARD_W = 320;
+
+export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 900 }) {
+  const [visible, setVisible] = useState(false);
+  const [step, setStep] = useState(0);
+  const [rect, setRect] = useState(null);
+  const [barRect, setBarRect] = useState(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || coachMarksDone()) return undefined;
+    const t = setTimeout(() => setVisible(true), delayMs);
+    return () => clearTimeout(t);
+  }, [enabled, delayMs]);
+
+  const current = COACH_STEPS[step];
+  // Follow the anchor: the toolbar scrolls sideways on narrow screens and buttons come and go.
+  useLayoutEffect(() => {
+    if (!visible) return undefined;
+    const measure = () => {
+      const el = rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`);
+      const r = el?.getBoundingClientRect();
+      setRect(r && r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } : null);
+      // No button (e.g. „Redaguoti kontūrą" before a room is chosen): sit under the toolbar instead.
+      const bar = rootRef?.current?.firstElementChild?.getBoundingClientRect();
+      setBarRect(bar && bar.width > 0 ? { left: bar.left, width: bar.width, bottom: bar.bottom } : null);
+      setTick((n) => n + 1);
+    };
+    // The toolbar scrolls sideways when the window is narrow — bring this step's button into view once.
+    rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    measure();
+    const id = setInterval(measure, 400);
+    window.addEventListener('resize', measure);
+    return () => { clearInterval(id); window.removeEventListener('resize', measure); };
+  }, [visible, current, rootRef]);
+
+  const finish = () => { markCoachMarksDone(); setVisible(false); };
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [visible]);
+
+  if (!visible || !current) return null;
+  const pos = rect
+    ? coachCardPosition(rect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W })
+    : { ...coachCardPosition(barRect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W }), arrowLeft: null };
+  const last = step === COACH_STEPS.length - 1;
+  return (
+    <>
+      {rect && (
+        <div
+          aria-hidden
+          className="fixed z-[60] pointer-events-none rounded-[3px] ring-2 ring-primary ring-offset-2 ring-offset-background"
+          style={{ left: rect.left - 2, top: rect.top - 2, width: rect.width + 4, height: rect.height + 4 }}
+        />
+      )}
+      <div
+        role="dialog"
+        aria-label={`Įvadas: ${current.title}`}
+        className="fixed z-[61] rounded-[2px] border border-border bg-card text-card-foreground shadow-xl p-4"
+        style={{ left: pos.left, top: pos.top, width: CARD_W }}
+        data-testid="viewer-coach-mark"
+        data-coach-step={current.id}
+      >
+        {pos.arrowLeft != null && (
+          <span
+            aria-hidden
+            className="absolute -top-[6px] w-[10px] h-[10px] rotate-45 bg-card border-l border-t border-border"
+            style={{ left: pos.arrowLeft - 5 }}
+          />
+        )}
+        <div className="flex items-start justify-between mb-1.5">
+          <span className="mono tabular text-[10px] font-semibold uppercase tracking-wide text-primary">
+            Žingsnis {step + 1} iš {COACH_STEPS.length}
+          </span>
+          <button type="button" onClick={finish} title="Praleisti įvadą (Esc)" aria-label="Praleisti įvadą" className="p-0.5 -m-0.5 rounded-[2px] text-muted-foreground hover:bg-muted">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <h3 className="text-[14px] font-semibold text-foreground mb-1">{current.title}</h3>
+        <p className="text-[12.5px] text-muted-foreground leading-relaxed">{current.body}</p>
+        {!rect && current.missingAnchorNote && (
+          <p className="mt-1.5 text-[12px] text-foreground">{current.missingAnchorNote}</p>
+        )}
+        <div className="mt-3 flex items-center justify-between">
+          <button type="button" onClick={finish} className="text-[12px] text-muted-foreground hover:text-foreground hover:underline">Praleisti</button>
+          <div className="flex items-center gap-1.5">
+            {step > 0 && (
+              <button type="button" onClick={() => setStep((s) => s - 1)} className="px-2.5 py-1 rounded-[2px] border border-border text-[12px] hover:bg-muted">Atgal</button>
+            )}
+            <button
+              type="button"
+              onClick={() => (last ? finish() : setStep((s) => s + 1))}
+              className="px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-[12px] hover:bg-primary/90"
+              data-testid="viewer-coach-next"
+            >{last ? 'Supratau' : 'Toliau'}</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
