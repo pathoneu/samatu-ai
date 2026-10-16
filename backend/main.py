@@ -412,6 +412,7 @@ from api.detect_run import router as detect_run_router
 from api.room_outline import router as room_outline_router
 from api.page_geometry import router as page_geometry_router
 from api.sheet_links import router as sheet_links_router
+from api.export_overlay_pdf import router as export_overlay_pdf_router
 from api.project_questions import router as project_questions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
 
@@ -761,6 +762,7 @@ app.include_router(detect_run_router)
 app.include_router(room_outline_router)
 app.include_router(page_geometry_router)
 app.include_router(sheet_links_router)
+app.include_router(export_overlay_pdf_router)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
 app.include_router(account_router)
@@ -5066,6 +5068,13 @@ def generate_excel(request: Request, data: dict):
     prielaidos   = data.get("prielaidos") or {}
     patalpos     = data.get("patalpos") or []
     perspejimani = data.get("perspejimani") or []
+    # „Grupuoti pagal" (togal-v2 W8) — absent = today's layout. His own layout has his own sections.
+    from api import export_grouping as _export_grouping
+    try:
+        _grouping = (_export_grouping.DEFAULT_GROUPING if _his_layout
+                     else _export_grouping.normalize_grouping(data.get("grupavimas")))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     today_str    = _date.today().strftime("%Y-%m-%d")
 
     # Branding + client fields (2026-06-19). Folded into the banner subtitle so
@@ -5138,8 +5147,11 @@ def generate_excel(request: Request, data: dict):
     # Rows already reported as non-numeric — this helper runs once per sheet.
     _numeric_warned: set = set()
 
+    # `row_hook(ws, r, row)` / `subtotal_label` (togal-v2 W8): a grouped sheet writes its extra columns
+    # (api/export_grouping.extra_columns) and names its subtotal after the group.
     def _write_rows(ws, rows: list[dict], start_row: int = 4,
-                    section_subtotals: bool = False) -> int:
+                    section_subtotals: bool = False, row_hook=None,
+                    subtotal_label: str = "Skyriaus suma:") -> int:
         # Section subtotals only make sense with >=2 sections, else the one
         # "Skyriaus suma" just duplicates the grand total. (export step 4.)
         _emit_sub = section_subtotals and len({
@@ -5155,7 +5167,7 @@ def generate_excel(request: Request, data: dict):
             nonlocal r
             ws.merge_cells(f"A{r}:E{r}")
             lc = ws[f"A{r}"]
-            lc.value     = "Skyriaus suma:"
+            lc.value     = subtotal_label
             lc.font      = Font(bold=True, size=9, color=C_MID)
             lc.fill      = PatternFill("solid", fgColor=C_SEC)
             lc.alignment = Alignment(horizontal="right", vertical="center")
@@ -5256,9 +5268,14 @@ def generate_excel(request: Request, data: dict):
                     # as „this work costs nothing" rather than „įrašykite".
                     # Blank in, blank out. SUBTOTAL(9,…) skips empty cells, so
                     # the section and grand totals are unaffected.
+                    # A grouped sheet's share of a split line carries its allocated
+                    # amount (`_suma`, api/export_grouping) so the shares add up to the
+                    # line's own ROUND(kiekis × kaina) to the cent.
                     fc.value        = (None if (_his_layout and kiekis in (None, ""))
                                        else round(_line_amount, 2)
                                        if _line_amount is not None
+                                       else round(float(e["_suma"]), 2)
+                                       if e.get("_suma") is not None
                                        else f"=ROUND(D{r}*E{r},2)")
                     fc.fill         = fill
                     fc.border       = border
@@ -5276,6 +5293,8 @@ def generate_excel(request: Request, data: dict):
                     c.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
                     if col in (4, 5) and isinstance(val, (int, float)):
                         c.number_format = "#,##0.00"
+            if row_hook is not None:
+                row_hook(ws, r, e)
             ws.row_dimensions[r].height = 18
             r += 1
             data_row_idx += 1
@@ -5347,8 +5366,29 @@ def generate_excel(request: Request, data: dict):
 
     ws_main = wb.active
     ws_main.title = "Sąmata"
-    _write_sheet_header(ws_main, "SĄMATA")
-    last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True)
+    if _grouping == _export_grouping.DEFAULT_GROUPING:
+        _write_sheet_header(ws_main, "SĄMATA")
+        last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True)
+    else:
+        # „Grupuoti pagal" (togal-v2 W8): the same lines, in another order with other subtotals —
+        # never another number (api/export_grouping.py; the sections' own sheets below stay as they are).
+        _grouped = _export_grouping.group_export_lines(
+            eilutes, _grouping, rooms=patalpos, sheets=data.get("lapai") or [])
+        _write_sheet_header(ws_main, f"SĄMATA · {_export_grouping.TITLE_SUFFIX[_grouping]}")
+
+        def _extra_style(c, header):
+            c.font = Font(bold=True, size=9, color="FFFFFF") if header else Font(size=9, color="444444")
+            if header:
+                c.fill = PatternFill("solid", fgColor=C_MID)
+            c.border = border
+            c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=not header)
+        _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")))
+        _hook = _export_grouping.make_row_hook(ws_main, _cols, header_row=3, first_col=7, style=_extra_style)
+        last_r = _write_rows(ws_main, _grouped, start_row=4, section_subtotals=True, row_hook=_hook,
+                             subtotal_label=_export_grouping.SUBTOTAL_LABELS.get(_grouping, "Skyriaus suma:"))
+        if _grouping == "be_grupavimo" and _grouped:
+            from openpyxl.utils import get_column_letter as _gcl
+            ws_main.auto_filter.ref = f"A3:{_gcl(6 + len(_cols))}{last_r - 1}"
     _write_totals(ws_main, eilutes, last_r)
 
     # ─────────────────────────────────────────────────────────────────────────
