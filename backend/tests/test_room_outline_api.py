@@ -301,11 +301,31 @@ def test_a_hole_comes_off_the_area_and_its_perimeter_is_kept_apart(tmp_path, mon
     k = room["_konturas"]
     assert abs(k["plotas_m2"] - (12.0 - 0.25)) < 0.2                    # outer − hole
     assert abs(k["perimetras_m"] - 14.0) < 0.2                          # the OUTER ring only
-    assert k["skyles"] == 1 and abs(k["skyliu_plotas_m2"] - 0.25) < 0.02 and abs(k["skyliu_perimetras_m"] - 2.0) < 0.05
+    assert abs(k["skyliu_plotas_m2"] - 0.25) < 0.02 and abs(k["skyliu_perimetras_m"] - 2.0) < 0.05
+    # one record per hole; with no answer to „Kas atimama?" a hole is a column — its faces are walls
+    assert len(k["skyles"]) == 1 and k["skyles"][0]["sienos"] is True and k["skyles"][0]["kampai"] == 4
+    assert abs(k["skyles"][0]["perimetras_m"] - 2.0) < 0.05 and abs(k["skyles"][0]["plotas_m2"] - 0.25) < 0.02
     assert len(room["polygon_holes_pct"]) == 1 and len(room["polygon_holes_pct"][0]) == 4
     # a ring without holes clears the ones it had
     plain = _set(TestClient(app), outer).json()["room"]
     assert plain["polygon_holes_pct"] is None and "skyles" not in plain["_konturas"]
+
+
+def test_each_hole_keeps_his_answer_whether_it_has_walls(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    outer = [(t, t), (4 + t, t), (4 + t, 3 + t), (t, 3 + t)]
+    column = [(1.0, 1.0), (1.5, 1.0), (1.5, 1.5), (1.0, 1.5)]
+    floor_hole = [(2.5, 1.0), (3.5, 1.0), (3.5, 2.0), (2.5, 2.0)]
+    ring = [list(_pct(x, y)) for x, y in outer]
+    holes = [[list(_pct(x, y)) for x, y in h] for h in (column, floor_hole)]
+    r = TestClient(app).post("/api/projects/p1/rooms/01/outline-set",
+                             json={"page": 1, "polygon_pct": ring, "holes": holes, "holes_walls": [True, False]})
+    assert r.status_code == 200, r.text
+    k = r.json()["room"]["_konturas"]
+    assert [h["sienos"] for h in k["skyles"]] == [True, False]
+    assert abs(k["skyliu_perimetras_m"] - 6.0) < 0.1                     # both holes' edges, as before
 
 
 def test_a_hole_outside_the_outline_or_overlapping_another_is_refused(tmp_path, monkeypatch):
@@ -333,28 +353,51 @@ def _merge(client, ring_m, *, gone="02", kept="01", page=1, project_id="p1"):
                        json={"page": page, "kept_nr": kept, "polygon_pct": ring})
 
 
-def test_merge_gives_the_kept_room_the_union_and_takes_the_other_out(tmp_path, monkeypatch):
+def test_merge_bills_both_rows_in_the_kept_room_and_marks_the_other_structurally(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
-    _store()
+    blob = _blob(elementai=[{"tipas": "duris", "kiekis": 1}])
+    blob["patalpos"][1]["elementai"] = [{"tipas": "langas", "kiekis": 2}, {"tipas": "duris", "kiekis": 1}]
+    _store(blob=blob)
     before = copy.deepcopy(db.get_project("p1"))
     t = 0.2
     union = [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]       # both rooms and the partition between them
     r = _merge(TestClient(app), union)
     assert r.status_code == 200, r.text
     out = r.json()
-    assert out["status"] == "ok" and out["neskaiciuoti"] == ["02"]
+    assert out["status"] == "ok" and "neskaiciuoti" not in out
     kept, gone = out["rooms"]["01"], out["rooms"]["02"]
     assert kept["polygon_source"] == "corrected" and kept["_konturas"]["saltinis"] == "nubrezta"
     assert kept["_konturas"]["prijungta"] == ["02"] and kept["_konturas"]["plotas_uzrasas_kartu_m2"] == 21.0
     # the drawn union is compared with BOTH printed areas, not with the kept room's alone
     assert abs(kept["_konturas"]["plotas_m2"] - 21.6) < 0.3 and abs(kept["_konturas"]["paklaida"]) < 0.05
-    # the absorbed room keeps no outline and bills no area of its own
+    # the kept room bills both table rows, and says so
+    k = out["sujungimas"]["01"]
+    assert k["plotas_m2"] == 21.0 and k["plotas_saltinis"] == "eksplikacija_sujungta" and k["_plotas_pries_sujungima"] == 12.0
+    assert k["_sujungimas"]["sakinys"] == "Plotas: 12,00 + 9,00 m² iš eksplikacijos — patalpos sujungtos"
+    assert k["_sujungimas"]["su"] == ["02"]
+    # a window in the absorbed half is still a window: its openings move into the kept room, marked where from
+    assert [(e["tipas"], e["kiekis"], e.get("_is_patalpos")) for e in k["elementai"]] == [
+        ("duris", 1, None), ("langas", 2, "02"), ("duris", 1, "02")]
+    # the absorbed room keeps its table row, no outline and no openings of its own — marked structurally
+    g = out["sujungimas"]["02"]
+    assert g["_sujungta_i"] == "01" and g["elementai"] == [] and len(g["_elementai_pries_sujungima"]) == 2
+    assert g["plotas_m2"] == 9.0
     assert gone["polygon_pct"] is None and gone["polygon_source"] is None
     assert gone["_konturas"] == {"page": 1, "saltinis": "sujungta", "i": "01", "plotas_m2": 0.0, "perimetras_m": 0.0,
                                  "plotas_uzrasas_m2": 9.0}
     assert gone["_sienos"] is None and gone["_angos_sienose"] is None
     # …and nothing was saved
     assert db.get_project("p1")["patalpos"] == before["patalpos"]
+
+
+def test_a_merged_room_cannot_be_merged_again(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob()
+    blob["patalpos"][1]["_sujungta_i"] = "01"
+    _store(blob=blob)
+    t = 0.2
+    r = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)])
+    assert r.status_code == 400 and "jau sujungta" in r.json()["detail"]
 
 
 def test_merge_bad_requests(tmp_path, monkeypatch):
@@ -368,3 +411,45 @@ def test_merge_bad_requests(tmp_path, monkeypatch):
     assert _merge(c, union, kept="77").status_code == 404
     assert _merge(c, union, project_id="nope").status_code == 404
     assert c.post("/api/projects/p1/rooms/02/outline-merge", json={"page": 1, "polygon_pct": [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]]}).status_code == 422
+
+
+@pytest.mark.parametrize("k_a, k_b, expected", [
+    (14.2, 12.2, 15.0 + 13.0 - 6.0),     # two drawn outlines meeting along a 3 m line: that run, once on each side, goes
+    (11.2, 9.2, 15.0 + 13.0),            # an open space divided by an imaginary line: neither outline counted it
+])
+def test_a_merge_of_typed_perimeters_keeps_both_rooms_walls_less_the_shared_run(tmp_path, monkeypatch, k_a, k_b, expected):
+    _isolate(tmp_path, monkeypatch)
+    ring = lambda x0, x1: [list(_pct(x, y)) for x, y in ((x0, 0.2), (x1, 0.2), (x1, 3.2), (x0, 3.2))]  # noqa: E731
+    blob = _blob(perimetras_m=15.0, perimetras_saltinis="user_override", polygon_pct=ring(0.2, 4.3), polygon_source="corrected",
+                 _konturas={"page": 1, "perimetras_m": k_a, "saltinis": "nubrezta"})
+    blob["patalpos"][1].update(perimetras_m=13.0, perimetras_saltinis="user_override", polygon_pct=ring(4.3, 7.4),
+                               polygon_source="corrected", _konturas={"page": 1, "perimetras_m": k_b, "saltinis": "nubrezta"})
+    _store(blob=blob)
+    union = [(0.2, 0.2), (7.4, 0.2), (7.4, 3.2), (0.2, 3.2)]                # 7,2 × 3 m: 20,4 m round
+    out = _merge(TestClient(app), union).json()
+    kept = out["rooms"]["01"]
+    assert kept["perimetras_saltinis"] == "user_override"
+    assert kept["perimetras_m"] == pytest.approx(expected, abs=0.05)
+    k = out["sujungimas"]["01"]
+    assert k["_perimetras_pries_sujungima"] == 15.0 and k["_sujungimas"]["perimetras"].startswith("Perimetras: 15,00 + 13,00")
+
+
+def test_a_merge_of_rooms_with_different_floors_says_what_moves_before_and_after(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob(grindu_danga="plyteles", plyteles_grindys_m2=12.0)
+    blob["patalpos"][1].update(grindu_danga="minksta", pvc_grindys_m2=9.0)
+    _store(blob=blob)
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    want = ("Patalpų apdaila skiriasi: 02 grindys parketas arba laminatas, 01 plytelės — sujungus visam plotui "
+            "(21,00 m²) bus taikoma 01 apdaila; 9,00 m² pereis iš parketo arba laminato į plyteles.")
+    assert out["ispejimas"] == want
+    assert out["sujungimas"]["01"]["_sujungimas"]["apdaila_skiriasi"] == want
+
+
+def test_a_merge_of_rooms_with_the_same_finish_warns_nothing(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    assert out["ispejimas"] is None and "apdaila_skiriasi" not in out["sujungimas"]["01"]["_sujungimas"]

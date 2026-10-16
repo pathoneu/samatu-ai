@@ -7165,10 +7165,17 @@ def recompute_interior(payload: RecomputePayload, request: Request):
 
     # The project's area follows the rooms he counts: a room switched off
     # („Neskaičiuoju") leaves the header figure as well as the rows (2026-09-10).
+    # A room merged into another („Sujungti") leaves it too — the kept room's
+    # area already carries it, and the sheet's own Σ (`payload.bendras_plotas_m2`,
+    # every room) would count it twice. The sum keeps the convention of the figure
+    # it replaces (2026-10-16): the sheet's Σ counts every room; the fallback
+    # above leaves the garage / tambour out, and so does this one then.
     if any(isinstance(r, dict) and r.get("_neskaiciuoti") for r in out_rooms):
+        _all_kinds = bool(payload.bendras_plotas_m2)
         parsed["bendras_plotas_m2"] = round(sum(
             float(r.get("plotas_m2") or 0) for r in out_rooms
             if isinstance(r, dict) and not r.get("_neskaiciuoti")
+            and (_all_kinds or normalize_paskirtis(r.get("paskirtis") or "") not in ("garazas", "tamburas"))
             and isinstance(r.get("plotas_m2"), (int, float))), 2)
 
     # Reuse extractor's post-processing helpers

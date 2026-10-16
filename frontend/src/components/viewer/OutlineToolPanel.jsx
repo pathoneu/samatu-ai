@@ -6,11 +6,14 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { Scissors, Combine, SquareDashed, Undo2, X, Check } from 'lucide-react';
-import { formatNumberLT, shoelaceAreaM2 } from '@/lib/measureGeometry';
+import { formatNumberLT, realPathLengthM, shoelaceAreaM2 } from '@/lib/measureGeometry';
 import { displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
 import { roomPageOf } from '@/lib/roomZones';
-import { displaySizePt, pctRingToPts } from '@/lib/outlineTools';
+import { displaySizePt, holeHasWalls, pctRingToPts, sameHole } from '@/lib/outlineTools';
+import { openingCounts } from '@/lib/mergeReextract';
 import { MERGE_REFUSED } from './OutlineToolLayer';
+import { mergeFinishWarning } from '@/lib/outlineToolSave';
+
 
 // A perimeter the person typed is never replaced by a re-read (api/room_outline.py keeps `user_override`):
 // say so, instead of promising that the walls follow the new outline.
@@ -114,6 +117,9 @@ export default function OutlineToolPanel({
   } else if (tool.mode === 'merge') {
     if (tool.union && tool.targetNr) {
       const sum = (table(tool.nr) || 0) + (table(tool.targetNr) || 0);
+      const target = byNr.get(String(tool.targetNr));
+      const carried = openingCounts(target?.elementai);
+      const finishWarning = mergeFinishWarning(room, target, tool.nr, tool.targetNr);
       body = (
         <div className="space-y-1.5">
           <p>
@@ -121,11 +127,18 @@ export default function OutlineToolPanel({
             {sum > 0 && <span className="text-muted-foreground"> · lentelėje {formatNumberLT(table(tool.nr) || 0, 2)} + {formatNumberLT(table(tool.targetNr) || 0, 2)} = {formatNumberLT(sum, 2)} m²</span>}
           </p>
           <p className="text-muted-foreground">
-            Patalpa {tool.targetNr} bus <b className="text-foreground">neįtraukta į skaičiavimus</b> (kaip „Nustatymuose" išjungta patalpa — ten ją ir grąžinsite):
-            jos eilutės iš sąmatos išimamos. {tool.nr} sąmatoje lieka su savo lentelės plotu
-            {table(tool.nr) != null ? ` (${formatNumberLT(table(tool.nr), 2)} m²)` : ''} — {tool.targetNr} grindų ir lubų plotas prie jo nepridedamas.
-            {' '}{wallsSentence(room)}
+            Sąmatoje {tool.nr} skaičiuos <b className="text-foreground">abiejų patalpų plotą</b>
+            {sum > 0 ? ` (${formatNumberLT(table(tool.nr) || 0, 2)} + ${formatNumberLT(table(tool.targetNr) || 0, 2)} m² iš eksplikacijos)` : ''}
+            {carried.langai || carried.durys ? ` ir ${tool.targetNr} angas (${[carried.langai ? `langai: ${carried.langai}` : null, carried.durys ? `durys: ${carried.durys}` : null].filter(Boolean).join(', ')})` : ''}.
+            {' '}Visam plotui taikoma {tool.nr} apdaila{target?.paskirtis && room?.paskirtis && target.paskirtis !== room.paskirtis ? ` (${tool.targetNr} paskirtis „${target.paskirtis}" nebetaikoma)` : ''}.
+            {' '}{tool.targetNr} lieka sąraše kaip „sujungta į {tool.nr}" — atskirų eilučių neturės.
+            {' '}{TYPED_PERIMETER.has(String(room?.perimetras_saltinis || ''))
+              ? `Sienos: jūsų įrašyti perimetrai sudedami (${formatNumberLT(Number(room?.perimetras_m) || 0, 2)} + ${formatNumberLT(Number(target?.perimetras_m) || 0, 2)} m), bendros sienos atkarpa — jei ji buvo siena — atimama iš abiejų pusių.`
+              : `Sienos ${tool.nr} perskaitomos iš brėžinio pagal sujungtą kontūrą.`}
           </p>
+          {finishWarning && (
+            <p className="text-foreground border-l-2 border-primary pl-2" data-testid="merge-finish-warning">{finishWarning}</p>
+          )}
         </div>
       );
     } else {
@@ -140,6 +153,15 @@ export default function OutlineToolPanel({
     const holes = tool.holes || [];
     const gross = m2(tool.ring);
     const cut = holes.reduce((s, h) => s + (m2(h) || 0), 0);
+    const walled = holes.filter((h) => holeHasWalls(h, tool.holeWalls));
+    const edgeM = (h) => (scale?.calibrated && size ? realPathLengthM(pctRingToPts(h, size), scale, true) : null);
+    const walledM = walled.reduce((s, h) => (s == null || edgeM(h) == null ? null : s + edgeM(h)), 0);
+    // „Kas atimama?" — one answer per hole, remembered by where the hole is (a split or a merge carries it)
+    const answer = (h, sienos) => onChange((cur) => ({
+      ...cur,
+      holeWalls: [...(cur.holeWalls || []).filter((a) => !sameHole(a.ring, h)), { ring: h, sienos }],
+      dirty: true,
+    }));
     body = (
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -160,6 +182,19 @@ export default function OutlineToolPanel({
             {holes.map((h, i) => (
               <li key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[2px] border border-border bg-muted/50">
                 <span className="mono tabular">{i + 1}. {fmt(m2(h))}</span>
+                <label className="inline-flex items-center gap-1">
+                  <span className="text-muted-foreground">Kas atimama?</span>
+                  <select
+                    className="h-6 rounded-[2px] border border-border bg-card px-1 text-[12px]"
+                    value={holeHasWalls(h, tool.holeWalls) ? 'sienos' : 'be'}
+                    onChange={(e) => answer(h, e.target.value === 'sienos')}
+                    aria-label={`Kas atimama: ${i + 1} išpjova`}
+                    data-testid="subtract-hole-kind"
+                  >
+                    <option value="sienos">kolona / šachta — sienos dažomos</option>
+                    <option value="be">anga grindyse / kita — sienų nėra</option>
+                  </select>
+                </label>
                 <button type="button" title="Pašalinti išpjovą" aria-label={`Pašalinti ${i + 1} išpjovą`}
                   className="hover:text-destructive"
                   onClick={() => onChange((cur) => ({ ...cur, holes: cur.holes.filter((_, k) => k !== i), dirty: true }))}
@@ -172,7 +207,10 @@ export default function OutlineToolPanel({
           {tool.shape === 'poly'
             ? 'Spustelėkite kampus; uždarykite spustelėję pirmą tašką arba dukart. '
             : 'Tempkite stačiakampį patalpos viduje (kolona, įmontuota spinta, šachta). '}
-          Kontūro perimetras nekinta — išpjovų kraštai saugomi atskirai. Sąmatoje grindų ir lubų plotas lieka iš lentelės: išpjova keičia nubrėžtą plotą, rodomą šalia.
+          Sąmatoje grindų ir lubų plotas lieka iš lentelės: išpjova keičia nubrėžtą plotą, rodomą šalia.
+          {' '}{walled.length > 0
+            ? `Kolonos / šachtos (${walled.length}) sienos pridedamos prie dažomų sienų ir grindjuosčių${walledM != null ? ` (+${formatNumberLT(walledM, 2)} m sienų ilgio)` : ''}, jų išoriniai kampai — prie kampų.`
+            : (holes.length > 0 ? 'Išpjovos be sienų sienų ir kampų nekeičia.' : '')}
         </p>
       </div>
     );

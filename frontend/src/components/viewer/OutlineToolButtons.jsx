@@ -6,7 +6,7 @@ import { Scissors, Combine, SquareDashed } from 'lucide-react';
 
 const TOOLS = [
   { id: 'split', Icon: Scissors, label: 'Padalyti', title: (nr) => `Padalyti patalpos ${nr} kontūrą linija: dvi vietos linijai, tada spustelėkite dalį, kuri lieka; kitą dalį priskirkite kitai patalpai arba neįtraukite` },
-  { id: 'merge', Icon: Combine, label: 'Sujungti', title: (nr) => `Sujungti patalpą ${nr} su gretima: spustelėkite besiliečiantį kitos patalpos kontūrą šiame lape — ta patalpa bus neįtraukta į skaičiavimus` },
+  { id: 'merge', Icon: Combine, label: 'Sujungti', title: (nr) => `Sujungti patalpą ${nr} su gretima: spustelėkite besiliečiantį kitos patalpos kontūrą šiame lape — abiejų plotai ir angos skaičiuojami vienoje patalpoje` },
   { id: 'subtract', Icon: SquareDashed, label: 'Atimti', title: (nr) => `Atimti iš patalpos ${nr} kontūro koloną, spintą ar šachtą: nubrėžkite stačiakampį arba daugiakampį jo viduje` },
 ];
 

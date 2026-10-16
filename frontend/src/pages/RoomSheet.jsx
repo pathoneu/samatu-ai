@@ -538,6 +538,7 @@ export default function RoomSheet() {
             <>
               <RoomScopeSwitch
                 included={isRoomIncluded(project?._apimtis, roomNr)}
+                mergedInto={(project?.patalpos || []).find((r) => String(r?.nr) === String(roomNr))?._sujungta_i || null}
                 familiesOff={roomFamiliesOff(project?._apimtis, roomNr)}
                 busy={busy}
                 onChange={(on) => saveScope(withRoomIncluded(project?._apimtis, roomNr, on))}

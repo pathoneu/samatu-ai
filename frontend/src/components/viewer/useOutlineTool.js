@@ -15,6 +15,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { roomPageOf } from '@/lib/roomZones';
+import { holeHasWalls, roomHoleWalls } from '@/lib/outlineTools';
+
+export { holeHasWalls, roomHoleWalls };
 
 export const OUTLINE_TOOL_MODES = ['split', 'merge', 'subtract'];
 
@@ -38,6 +41,15 @@ export function roomHoles(r) {
 
 /** The operation the save sends (lib/outlineToolSave), or null while the tool has nothing to save yet. */
 export function outlineToolOperation(tool) {
+  const op = operationOf(tool);
+  if (!op) return null;
+  const walls = (holes) => (holes || []).map((h) => holeHasWalls(h, tool.holeWalls));
+  return op.other
+    ? { ...op, holesWalls: walls(op.holes), other: { ...op.other, holesWalls: walls(op.other.holes) } }
+    : { ...op, holesWalls: walls(op.holes) };
+}
+
+function operationOf(tool) {
   if (!tool) return null;
   if (tool.mode === 'split') {
     if (!tool.parts || tool.keep == null) return null;
@@ -77,6 +89,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
       page: roomPageOf(r),
       ring,
       holes: roomHoles(r),
+      holeWalls: roomHoleWalls(r),
       tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
       history: [],
       ...(mode === 'subtract' ? { shape: 'rect', draft: [], dirty: false } : {}),
@@ -110,7 +123,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
       await onSave(op);
       const what = {
         split: op.kind === 'split' ? `Patalpa ${op.nr} padalyta — kita dalis priskirta patalpai ${op.other.nr}` : `Patalpa ${op.nr} padalyta — kita dalis neįtraukta`,
-        merge: `Patalpa ${op.goneNr} prijungta prie ${op.keptNr} — ${op.goneNr} nebeskaičiuojama`,
+        merge: `Patalpa ${op.goneNr} prijungta prie ${op.keptNr} — abiejų plotai ir angos skaičiuojami patalpoje ${op.keptNr}`,
         subtract: `Patalpos ${op.nr} kontūras išsaugotas su ${op.holes.length} išpjov${op.holes.length === 1 ? 'a' : 'omis'}`,
       }[t.mode];
       toast.success(what, { description: 'Sienos perskaitytos iš naujo, kiekiai perskaičiuojami.' });

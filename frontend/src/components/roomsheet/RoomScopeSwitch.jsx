@@ -13,8 +13,19 @@
 import { useTranslation } from 'react-i18next';
 import { ROOM_FAMILIES } from '@/lib/scope';
 
-export default function RoomScopeSwitch({ included, familiesOff = [], busy = false, onChange, onFamily }) {
+export default function RoomScopeSwitch({ included, familiesOff = [], busy = false, onChange, onFamily, mergedInto = null }) {
   const { t } = useTranslation();
+  if (mergedInto) {
+    // „Sujungti" (2026-10-16): not a room he chose not to count — its table row is billed inside another room
+    return (
+      <div className="border-b border-border px-4 pb-3 pt-3" data-testid="room-scope-merged">
+        <span className="text-[15px] font-semibold">Ši patalpa sujungta į {mergedInto}</span>
+        <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">
+          Jos plotas iš eksplikacijos ir jos langai bei durys skaičiuojami patalpoje {mergedInto}; atskirų eilučių ji neturi.
+        </p>
+      </div>
+    );
+  }
   const btn = (on, label, active) => (
     <button
       type="button"

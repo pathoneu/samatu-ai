@@ -591,6 +591,19 @@ export default function WorkspacePanel({
                   />
                 )}
                 <span className="text-foreground/90 truncate">{r.pavadinimas}</span>
+                {/* „Sujungti" (2026-10-16): the absorbed room is billed inside the kept one — say where, never „neskaičiuojama" */}
+                {(r._sujungta_i || r._sujungimas) && (
+                  <span
+                    className="shrink-0 px-1 py-0 rounded font-medium tracking-wide text-muted-foreground"
+                    style={{ fontSize: 9, lineHeight: '14px', border: '1px solid hsl(var(--border))' }}
+                    title={r._sujungta_i
+                      ? `Patalpa sujungta su ${r._sujungta_i}: jos plotas ir angos skaičiuojami patalpoje ${r._sujungta_i}`
+                      : [r._sujungimas?.sakinys, r._sujungimas?.apdaila_skiriasi].filter(Boolean).join('. ')}
+                    data-testid="room-merge-badge"
+                  >
+                    {r._sujungta_i ? `sujungta į ${r._sujungta_i}` : `+ ${(r._sujungimas?.su || []).join(', ')}`}
+                  </span>
+                )}
                 {isWet && (
                   <span
                     className="px-1 py-0 rounded font-medium uppercase tracking-wide"

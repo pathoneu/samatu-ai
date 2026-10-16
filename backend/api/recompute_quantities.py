@@ -107,12 +107,12 @@ _VALID_FIELDS = _ASSUMPTION_FIELDS | _GESTURE_FIELDS
 # SUPPLIED but unparseable one is recorded in _degradations (audit fix 3).
 _MISSING = object()
 
-# The four addends behind `kampu_metrai` (restored 2026-09-02 for the
+# The five addends behind `kampu_metrai` (the fifth, a column's corners, 2026-10-16) (restored 2026-09-02 for the
 # contribution ledger). They travel with the parent total through every
 # carry-forward below: a room whose corner metres were recomputed but whose
 # terms were not would render an equation that contradicts its own result.
 _KAMPAI_TERMS = ("kampai_inner_m", "kampai_opening_reveals_m",
-                 "kampai_pusiniai_m", "kampai_perimetras_m")
+                 "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_skyliu_m")
 
 
 def _num(v, default: float) -> float:

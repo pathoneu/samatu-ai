@@ -2413,6 +2413,26 @@ FLOOR_COVERINGS: dict[str, tuple[str, bool]] = {
 }
 
 
+def holes_with_walls(room: dict) -> tuple[float, int]:
+    """The holes in a room's drawn outline („Atimti", `_konturas.skyles`) whose faces are walls (`sienos`
+    true — a column, a shaft): their summed perimeter (m) and convex corner count. A hole marked
+    `sienos: false` (a floor opening) adds nothing; an outline without per-hole records adds nothing."""
+    k = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
+    holes = k.get("skyles")
+    if not isinstance(holes, list):
+        return 0.0, 0
+    perim, corners = 0.0, 0
+    for h in holes:
+        if not isinstance(h, dict) or h.get("sienos") is not True:
+            continue
+        p, c = h.get("perimetras_m"), h.get("kampai")
+        if isinstance(p, (int, float)) and not isinstance(p, bool) and p > 0:
+            perim += float(p)
+            if isinstance(c, int) and not isinstance(c, bool) and c > 0:
+                corners += c
+    return perim, corners
+
+
 def calc_room_quantities(room: dict,
                           ceiling_height_m: float = 2.82,
                           rules: dict | None = None) -> dict:
@@ -2490,6 +2510,16 @@ def calc_room_quantities(room: dict,
                 perim_walls = least
                 perimetras_floor_applied = True
                 perimetras_floor_reason = "geometrinis_minimumas"
+
+    # „Atimti" (2026-10-16): a hole he cut out of the outline and said HAS walls (a column, a shaft — „Kas
+    # atimama?") adds its faces to the walls: its perimeter to the wall length (paint, putty, plaster,
+    # skirting) and its corners — outer ones, they stick into the room — to kampai. A floor opening adds
+    # nothing. Added AFTER the perimeter floor above, so a hole never hides an impossible perimeter; the
+    # room's own `perimetras_m` in the result stays its own (a rebuild never adds the hole twice).
+    hole_walls_m, hole_corners = holes_with_walls(room)
+    if hole_walls_m > 0:
+        perim += hole_walls_m
+        perim_walls += hole_walls_m
 
     # Sienos bruto plotas. Sprint §2A.3: stairwell uses
     # max_height − Σ(stair triangles), not flat perim × H.
@@ -3129,11 +3159,16 @@ def calc_room_quantities(room: dict,
         # so we don't regress projects where n_walls_estimate is still
         # defaulted to 4. Once room-adjacency wiring lands across the board
         # this can be removed.
-        kampai += perim
+        kampai += perim - hole_walls_m
+        # a column's / shaft's outer corners, full height (its faces' run along the ceiling is not a
+        # wall-ceiling line of the room — the brief bills the corners only)
+        hole_corners_m = hole_corners * H
+        kampai += hole_corners_m
     else:
         inner_corners_m = 0.0
         opening_reveals_m = 0.0
         pusiniai_m = 0.0
+        hole_corners_m = 0.0
         kampai = 0.0
 
     # Angokraščiai (atkosai = reveal length around openings). Per CLAUDE.md
@@ -3262,8 +3297,10 @@ def calc_room_quantities(room: dict,
         "paskirtis": paskirtis,
         "puslapio_nr": room.get("puslapio_nr"),
         "plotas_m2": round(plotas, 2),
-        "perimetras_m": round(perim, 2),
+        "perimetras_m": round(perim - hole_walls_m, 2),
         "_walls_perimetras_saltinis": walls_perim_src,
+        # „Atimti": the faces of the holes he said have walls, inside `_walls_perimetras_m` (2026-10-16)
+        "_skyliu_sienos_m": round(hole_walls_m, 2),
         # Wall geometry MODELED (not measured) when the floor fired — disclosed,
         # not hidden, per CLAUDE.md. _walls_perimetras_m is the length actually
         # used for walls_gross; perimetras_m above stays the measured value.
@@ -3327,7 +3364,8 @@ def calc_room_quantities(room: dict,
         # does not contain must not be shown as if it did.
         "kampai_pusiniai_m": round(
             pusiniai_m if count_partition_corners else 0.0, 2),
-        "kampai_perimetras_m": round(perim if walls_paint_factor > 0 else 0.0, 2),
+        "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0 else 0.0, 2),
+        "kampai_skyliu_m": round(hole_corners_m, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
         "pasleptu_duru_staktu_m": round(pasleptu_duru_staktu_m, 2),
         "pasleptu_duru_kompl": pasleptu_duru_n,

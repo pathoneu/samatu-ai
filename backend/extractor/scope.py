@@ -50,7 +50,8 @@ __all__ = [
     "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
-    "excluded_quantity", "EXCLUDED_QUANTITIES_KEY",
+    "excluded_quantity", "EXCLUDED_QUANTITIES_KEY", "MERGED_INTO_KEY", "MERGED_BECAUSE",
+    "is_absorbed", "is_excluded_by_choice", "excluded_because",
     "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
@@ -90,7 +91,7 @@ _SECTION_PATTERNS: dict[str, tuple[str, ...]] = {
 FAMILY_ROOM_FIELDS: dict[str, tuple[str, ...]] = {
     "apdaila": (
         "walls_paintable_m2", "ceiling_paintable_m2", "dazymo_plotas_m2", "dazai_l",
-        "kampu_metrai", "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_opening_reveals_m",
+        "kampu_metrai", "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_opening_reveals_m", "kampai_skyliu_m",
         "kampai_inner_m", "angokrasciu_gkp_m", "nisu_metrai", "lubu_karnizo_m", "molio_tinko_m2",
         "glaistas_kg", "gruntas_l", "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2",
     ),
@@ -203,6 +204,10 @@ def is_room_excluded(apimtis: dict | None, nr: Any) -> bool:
 # room by the time the builder runs, because `mark_rooms` runs after the
 # per-room math. Cleared together with the marks (2026-09-13).
 EXCLUDED_QUANTITIES_KEY = "_neskaiciuoti_kiekiai"
+# A room merged into another carries the kept room's number here (api/room_outline.py „Sujungti"); its
+# `_neskaiciuoti_kodel` is MERGED_BECAUSE, so the sheet says „sujungta į …", never „neskaičiuojama".
+MERGED_INTO_KEY = "_sujungta_i"
+MERGED_BECAUSE = "sujungta"
 
 
 def _zero(r: dict, fields: Iterable[str], prev: dict | None = None) -> None:
@@ -260,6 +265,17 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
         r.pop("_neskaiciuoti_sritys", None)
         prev = r.pop(EXCLUDED_QUANTITIES_KEY, None)
         prev = prev if isinstance(prev, dict) else None
+        if r.get(MERGED_INTO_KEY):
+            # „Sujungti" (2026-10-16): the room's table row is billed INSIDE the room it was merged into (that
+            # room carries a + b and its openings). Out of every row, and zeroed WITHOUT the stash: no anchor
+            # may subtract a share the kept room still bills. A scope choice on this room changes nothing.
+            r["_neskaiciuoti"] = True
+            r["_neskaiciuoti_kodel"] = MERGED_BECAUSE
+            for f in COMPUTED_ROOM_FIELDS:
+                if f in r:
+                    r[f] = 0.0
+            marked.append(_nr(r.get("nr")))
+            continue
         if is_room_excluded(apimtis, r.get("nr")):
             r["_neskaiciuoti"] = True
             r["_neskaiciuoti_kodel"] = "pasirinkimas"
@@ -278,6 +294,31 @@ def mark_rooms(rooms: Sequence[dict], apimtis: dict | None) -> list[str]:
         if "grindys" in off:
             r["_grindjuosciu_praleista"] = "pasirinkimas"
     return marked
+
+
+def is_absorbed(room: dict) -> bool:
+    """A room merged into another („Sujungti"): `mark_rooms` takes it out with MERGED_BECAUSE.
+
+    Its area and openings are billed through the room it was merged into, so an anchor that subtracts
+    excluded rooms from a drawing total (ceiling base, walls / skirting / floor anchors) must skip it —
+    the kept room still bills its share. It still emits no rows of its own (`_neskaiciuoti` stays True)."""
+    return isinstance(room, dict) and room.get("_neskaiciuoti_kodel") == MERGED_BECAUSE
+
+
+def is_excluded_by_choice(room: dict) -> bool:
+    """A room he chose not to count: out of every row AND subtracted from a drawing total, as before.
+
+    An absorbed room (`is_absorbed`) is out of every row too, but is NOT subtracted: its area and openings
+    are billed through the room it was merged into."""
+    return isinstance(room, dict) and bool(room.get("_neskaiciuoti")) and not is_absorbed(room)
+
+
+def excluded_because(room: dict) -> str:
+    """Why a line's ledger leaves this room out: an absorbed room is billed in the room it was merged into
+    (never „jūsų pasirinkimu"); every other excluded room, by his choice."""
+    if is_absorbed(room):
+        return f"Sujungta į {room.get(MERGED_INTO_KEY)} — plotas ir angos skaičiuojami ten"
+    return EXCLUDED_BECAUSE
 
 
 def rooms_in_scope(rooms: Iterable[dict] | None) -> list[dict]:

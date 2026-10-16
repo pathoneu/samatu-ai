@@ -4,7 +4,7 @@
  * outline comes back as a normal answer with its `status`, not as an error.
  */
 
-import { API_BASE } from '@/lib/apiBase';
+import { API_BASE } from './apiBase.js';
 
 async function post(projectId, roomNr, action, payload, signal) {
   const res = await fetch(
@@ -54,14 +54,20 @@ export async function fetchSplitProposal(projectId, roomNr, { signal } = {}) {
  * `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16).
  * `holes`: rings cut out of it („Atimti"); absent or empty clears the ones it had.
  */
-export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct, holes = null }, { signal } = {}) {
-  return post(projectId, roomNr, 'outline-set', { page, polygon_pct, ...(holes?.length ? { holes } : {}) }, signal);
+export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct, holes = null, holes_walls = null }, { signal } = {}) {
+  return post(projectId, roomNr, 'outline-set', { page, polygon_pct, ...holesBody(holes, holes_walls) }, signal);
+}
+
+/** `holes` and, per hole, his answer to „Kas atimama?" (`holes_walls`; absent → the server's default, walls). */
+function holesBody(holes, holesWalls) {
+  if (!holes?.length) return {};
+  return { holes, ...(Array.isArray(holesWalls) && holesWalls.length ? { holes_walls: holesWalls } : {}) };
 }
 
 /**
  * „Sujungti" (2026-10-16): room `goneNr` merged INTO `keptNr`, whose outline becomes the drawn union.
- * `{status: 'ok', rooms: {kept, gone}, kitu_angos, neskaiciuoti: [goneNr]}`.
+ * `{status: 'ok', rooms: {kept, gone}, sujungimas, ispejimas, kitu_angos}`.
  */
-export async function fetchOutlineMerge(projectId, goneNr, { page, kept_nr, polygon_pct, holes = null }, { signal } = {}) {
-  return post(projectId, goneNr, 'outline-merge', { page, kept_nr, polygon_pct, ...(holes?.length ? { holes } : {}) }, signal);
+export async function fetchOutlineMerge(projectId, goneNr, { page, kept_nr, polygon_pct, holes = null, holes_walls = null }, { signal } = {}) {
+  return post(projectId, goneNr, 'outline-merge', { page, kept_nr, polygon_pct, ...holesBody(holes, holes_walls) }, signal);
 }
