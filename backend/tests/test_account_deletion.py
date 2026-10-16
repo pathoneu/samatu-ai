@@ -100,6 +100,10 @@ def env(tmp_path, monkeypatch):
     db.upsert_price_list("pl-own", {"name": "Mano kainynas", "items": []}, owner["id"])
     db.upsert_price_list("pl-oth", {"name": "Kito kainynas", "items": []}, other["id"])
     db.upsert_samata_template("tpl-own", {"name": "Mano šablonas"}, owner["id"])
+    db.upsert_assembly("as-own", {"name": "Mano rinkinys", "taikoma": {"aprasymas": "Darbas"},
+                                  "komponentai": []}, owner["id"])
+    db.upsert_assembly("as-oth", {"name": "Kito rinkinys", "taikoma": {"aprasymas": "Darbas"},
+                                  "komponentai": []}, other["id"])
     db.create_extraction_job("run-own", owner["id"], "boot-1", kind="reread",
                              project_id="own-1", filename="pirmas.pdf")
     assert db.finish_extraction_job("run-own", "done", result=_READ)
@@ -546,7 +550,7 @@ def test_delete_account_helper_runs_once(env):
     uid = env.owner["id"]
     first = db.delete_account(uid)
     assert first == {"user_settings": 1, "extraction_jobs": 1, "price_lists": 1,
-                     "samata_templates": 1}
+                     "samata_templates": 1, "assemblies": 1}
     tomb = db.get_user_by_id(uid)
     assert db.delete_account(uid) is None
     assert db.get_user_by_id(uid) == tomb
