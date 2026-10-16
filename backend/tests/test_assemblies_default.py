@@ -32,7 +32,7 @@ _EXPECTED = [
     ("rotband", "Rotband", vc.ROTBAND_KG_PER_M2, 1.0),
     ("dazymo-kampai", "PVC kampuotės", vc.CORNER_BEAD_M_PER_M, 1.0),
     ("grindjuostes", "Grindjuostės", 1.0, vc.SKIRTING_WASTE),
-    ("karnizas", "Karnizas", 1.0, vc.CORNICE_WASTE),
+    ("karnizas", "Karnizas", 1.0, 1.0),          # waste already in the work length
     ("gkp-lubos", "GKP lapai luboms", 1.0 / UNIVERSAL_RULES["drywall_sheet_area_m2"], GKP_SHEET_WASTE),
     ("gkp-lubos", "GKP karkaso CD", vc.GKP_CD_PROFILE_M_PER_M2, 1.0),
     ("gkp-lubos", "GKP karkaso UW", vc.GKP_UW_PROFILE_M_PER_M2, 1.0),

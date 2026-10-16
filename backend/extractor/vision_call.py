@@ -1277,7 +1277,6 @@ PRIMER_COVERAGE_M2_PER_L = 7.0        # gruntas: 1 coat, m² per litre
 ROTBAND_KG_PER_M2 = 10.0              # Rotband at ~5 mm
 CORNER_BEAD_M_PER_M = 0.3             # PVC kampuotės per metre of „Dažymo kampų montavimas"
 # SKIRTING_WASTE (grindjuostės + 10 % atliekų) is owned by universal_rules, imported above.
-CORNICE_WASTE = 1.05                  # karnizas + 5 % atliekų
 NICHE_PROFILE_M_PER_M = 2.5           # GKP profiliai per metre of niche
 GKP_CD_PROFILE_M_PER_M2 = 1.6         # CD (laikantieji) per m² of GKP ceiling
 GKP_UW_PROFILE_M_PER_M2 = 0.4         # UW (pakraščio) per m² of GKP ceiling
@@ -4070,7 +4069,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GD, "aprasymas": "Lubų karnizo sumontavimas",
              "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL,
              "medziagos_aprasymas": "Karnizas (m + 5% atliekų)",
-             "medziagos_kiekis": round(karnizas_total * CORNICE_WASTE, 2),
+             # The work length already carries the one +5 % (CORNICE_LENGTH_WASTE,
+             # CLAUDE.md §1.4) — multiplying again billed +10,25 % (2026-10-16).
+             "medziagos_kiekis": round(karnizas_total, 2),
              "medziagos_vnt": "m"},
             {"skyrius": SK_GD, "aprasymas": "Lubų karnizo dažymas",
              "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL},

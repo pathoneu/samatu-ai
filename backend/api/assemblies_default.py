@@ -145,8 +145,10 @@ def build_default_assemblies(q_level: str = "Q2",
                   atliekos=_waste_proc(_vc.SKIRTING_WASTE), saltinis="SKIRTING_WASTE")]),
         _a("karnizas", "Lubų karnizo sumontavimas", "Lubų glaistymas dažymas", "paint", 6,
            "Lubų karnizo sumontavimas", "m", [
+               # The +5 % is already in the work length (CORNICE_LENGTH_WASTE):
+               # one metre of cornice bought per metre of the row.
                _m("Karnizas (m + 5% atliekų)", 1.0, "m",
-                  atliekos=_waste_proc(_vc.CORNICE_WASTE), saltinis="CORNICE_WASTE")]),
+                  saltinis="CORNICE_LENGTH_WASTE (jau eilutės ilgyje)")]),
         _a("gkp-lubos", "GKP lubų montavimas", "GKP montavimas", "gkp", 1,
            "GKP lubų montavimas{vieta}", "m2", [
                _m(f"GKP lapai luboms ({UNIVERSAL_RULES['drywall_thickness_ceilings_mm']} mm)",
