@@ -152,7 +152,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, onDownload }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, outlineSaving = false, onDownload }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -245,6 +245,43 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       {canFill && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
+          {/* Outline editing (2026-10-16): the focused room's outline vertex by vertex, snapping to the
+              drawing's walls; „Išsaugoti" re-reads its walls server side (api outline-set). */}
+          {outlineEdit ? (
+            <span className="inline-flex items-center gap-1 mr-1">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white disabled:opacity-60"
+                title="Išsaugoti pakeistą kontūrą — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti"
+                disabled={outlineSaving}
+                onClick={onSaveOutlineEdit}
+                data-testid="outline-edit-save"
+              >
+                <Pentagon className="w-3.5 h-3.5" />
+                <span>{outlineSaving ? 'Saugoma…' : `Išsaugoti kontūrą (${outlineEdit.nr})`}</span>
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
+                title="Atšaukti kontūro redagavimą (Esc) — niekas neišsaugoma"
+                onClick={onCancelOutlineEdit}
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Atšaukti</span>
+              </button>
+            </span>
+          ) : (onStartOutlineEdit && fillFor == null) ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] mr-1"
+              title={`Redaguoti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
+              onClick={onStartOutlineEdit}
+              data-testid="outline-edit-start"
+            >
+              <Pentagon className="w-3.5 h-3.5" />
+              <span>Redaguoti kontūrą</span>
+            </button>
+          ) : null}
           {fillFor == null ? (
             <button
               className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
@@ -624,7 +661,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null }) {
+function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null }) {
   const { activeDocumentId } = useActiveDocument();
   const focusedRoomNr = focusedRoom?.nr ?? null;
   // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
@@ -646,6 +683,36 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     try { localStorage.setItem('samatu_viewer_walls', next ? '1' : '0'); } catch { /* private mode */ }
     setWallsLayerVisibleState(next);
   };
+  // Outline editing (2026-10-16): the focused room's polygon_pct, vertex by vertex. {nr, page, points} | null.
+  // Saving goes through onRoomOutlineEdit → api outline-set (the ring is measured and its walls re-read
+  // server side) → the usual samatu:project-recompute path. Nothing is saved until „Išsaugoti".
+  const [outlineEdit, setOutlineEdit] = useState(null);
+  const [outlineSaving, setOutlineSaving] = useState(false);
+  const startOutlineEdit = () => {
+    const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
+    if (!r || !Array.isArray(r.polygon_pct) || r.polygon_pct.length < 3) {
+      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
+      return;
+    }
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null);
+    setOutlineEdit({ nr: String(r.nr), page: roomPageOf(r), points: r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]) });
+  };
+  const cancelOutlineEdit = () => setOutlineEdit(null);
+  const saveOutlineEdit = async () => {
+    if (!outlineEdit || !onRoomOutlineEdit) return;
+    setOutlineSaving(true);
+    try {
+      await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points);
+      toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`);
+      setOutlineEdit(null);
+    } catch (e) {
+      toast.error(e?.userMessage || e?.message || 'Nepavyko išsaugoti kontūro');
+    } finally {
+      setOutlineSaving(false);
+    }
+  };
+  // Focus moving to another room abandons an unsaved edit (the editor is bound to the focused room).
+  useEffect(() => { setOutlineEdit(null); }, [focusedRoomNr]);
 
   // ---- Measurement subsystem (Phase 3) ------------------------------------
   // Tool: null (idle) | 'select' | 'distance' | 'area' | 'count' | 'calibrate'.
@@ -743,6 +810,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // Esc chain, measure segment: close the calibration dialog first, then drop
   // the active tool (MeasureLayer resets its own draft when the tool changes).
   const measureEscape = () => {
+    if (outlineEdit) { setOutlineEdit(null); return true; }
     if (calibRequest) { setCalibRequest(null); return true; }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
     return false;
@@ -836,8 +904,10 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
       // Plain canvas click (no fill, no measure tool): clear the focused-room
       // chip — a room stays "selected" only while the user means it (audit P2
       // sticky chip) — and forward to any external consumer. While a measure
-      // tool owns the pointer, leave focus alone.
-      if (measureTool == null) {
+      // tool owns the pointer, leave focus alone. Same while an outline is being
+      // edited: a drag that starts a hair off a vertex must not drop the focus
+      // (which would abandon the edit, 2026-10-16).
+      if (measureTool == null && !outlineEdit) {
         onClearFocus?.();
         onPagePoint?.(pt);
       }
@@ -944,6 +1014,11 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             wallsLayerVisible={wallsLayerVisible}
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
+            outlineEdit={outlineEdit}
+            onStartOutlineEdit={check || !onRoomOutlineEdit ? null : startOutlineEdit}
+            onSaveOutlineEdit={saveOutlineEdit}
+            onCancelOutlineEdit={cancelOutlineEdit}
+            outlineSaving={outlineSaving}
             onDownload={handleDownload}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
@@ -987,6 +1062,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
                       zoneFillsVisible={zoneFillsVisible}
                       wallsLayerVisible={wallsLayerVisible}
+                      outlineEdit={outlineEdit}
+                      onOutlineEditChange={(points) => setOutlineEdit((cur) => (cur ? { ...cur, points } : cur))}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       measureTool={measureTool}
@@ -1100,6 +1177,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
 
 export default function TakeoffViewer({
   fileUrl,
+  // (nr, page, points_pct) => Promise — saves an outline edited vertex by vertex (2026-10-16).
+  onRoomOutlineEdit = null,
   rooms = [],
   focusedRoom = null,
   focusedPage = null,
@@ -1143,6 +1222,7 @@ export default function TakeoffViewer({
     <div className="h-full" data-takeoff-viewer>
       <EmbedPDF engine={engine} plugins={plugins}>
         <ViewerInner
+          onRoomOutlineEdit={onRoomOutlineEdit}
           check={check}
           focus={focus}
           rooms={rooms}

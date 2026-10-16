@@ -23,6 +23,7 @@ import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 import MeasureLayer from './MeasureLayer';
 import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
+import OutlineEditLayer from './OutlineEditLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -68,6 +69,9 @@ export default function PageOverlayHost({
   zoneFillsVisible = false,
   // Walls layer (2026-10-16): the wall solid, every outline and opening the program read on the sheet.
   wallsLayerVisible = false,
+  // Outline editing (2026-10-16): {nr, page, points} of the room whose polygon_pct is being edited.
+  outlineEdit = null,
+  onOutlineEditChange = null,
   onRoomZoneClick,
   onPagePoint,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
@@ -125,7 +129,8 @@ export default function PageOverlayHost({
   // (and when the walls layer is on). Cached per (project, page) in lib/pageGeometryApi, so the
   // scroll virtualization mounting and unmounting this host costs nothing after the first ask.
   const measureActive = measureTool != null;
-  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible);
+  const editingHere = !!outlineEdit && outlineEdit.page === layout.pageNumber;
+  const { geometry: pageGeometry } = usePageGeometry(projectId, layout.pageNumber, measureActive || wallsLayerVisible || editingHere);
   const drawingSnapPolygons = useMemo(
     () => snapPolygonsFromGeometry(pageGeometry, { pageWidthPt, pageHeightPt, pageRotation }),
     [pageGeometry, pageWidthPt, pageHeightPt, pageRotation],
@@ -199,7 +204,7 @@ export default function PageOverlayHost({
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           zoneFillsVisible={zoneFillsVisible}
-          interactive={!measureActive}
+          interactive={!measureActive && !outlineEdit}
           onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
@@ -242,6 +247,17 @@ export default function PageOverlayHost({
               <X className="w-3 h-3" />
             </button>
           )}
+        </div>
+      )}
+      {/* Outline editor (2026-10-16) — topmost on the page being edited; it owns the pointer. */}
+      {editingHere && (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <OutlineEditLayer
+            points={outlineEdit.points}
+            onChange={(pts) => onOutlineEditChange?.(pts)}
+            geometry={pageGeometry}
+            renderedSize={{ width, height }}
+          />
         </div>
       )}
     </PagePointerProvider>

@@ -47,3 +47,8 @@ export async function fetchSplitSpace(projectId, roomNr, request, { signal } = {
 export async function fetchSplitProposal(projectId, roomNr, { signal } = {}) {
   return post(projectId, roomNr, 'split-proposal', {}, signal);
 }
+
+/** `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16). */
+export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct }, { signal } = {}) {
+  return post(projectId, roomNr, 'outline-set', { page, polygon_pct }, signal);
+}

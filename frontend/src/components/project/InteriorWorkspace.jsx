@@ -34,6 +34,8 @@ import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
+import { fetchOutlineSet } from '@/lib/roomOutlineApi';
+import { roomsWithOutline } from '@/lib/roomOutline';
 
 // Outlines that must never be re-detected over. The last two are traced by the
 // BACKEND during extraction (wall_outline.py, vector_rooms.py): before
@@ -334,6 +336,30 @@ export default function InteriorWorkspace({
     if (updated) onProjectChange?.(updated);
   };
 
+  // Outline edited vertex by vertex in the viewer (2026-10-16): the server measures the ring, reads its
+  // walls and openings again (api/room_outline.py outline-set) and answers geometry keys only;
+  // roomsWithOutline applies them to the rooms and nothing else. Saving dispatches
+  // samatu:project-recompute, which InteriorProject routes through /recompute-interior — the one path
+  // every other room edit takes.
+  const handleRoomOutlineEdit = async (roomNr, page, points) => {
+    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points });
+    const fresh = getProject(project.id) || project;
+    const rooms = roomsWithOutline(fresh, roomNr, answer);
+    if (!rooms) throw new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
+    const patch = { patalpos: rooms };
+    if (Array.isArray(fresh.v8_rooms)) {
+      const byNr = new Map(rooms.map((r) => [String(r?.nr), r]));
+      patch.v8_rooms = fresh.v8_rooms.map((r) => byNr.get(String(r?.nr)) || r);
+    }
+    const updated = updateProject(project.id, patch);
+    if (updated) onProjectChange?.(updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
+        detail: { projectId: project.id, reason: 'outline-edited', roomNr },
+      }));
+    }
+  };
+
   // Persist measurements + per-page calibration scales from the viewer's local
   // state onto the project. New top-level keys (measurements / pageScalesDurable)
   // ride the existing project JSON — zero backend changes. The viewer debounces.
@@ -435,6 +461,7 @@ export default function InteriorWorkspace({
               pdfBlob={pdfBlob}
               onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
               onRoomPolygonFill={handleRoomPolygonFill}
+              onRoomOutlineEdit={handleRoomOutlineEdit}
               fillRequest={fillRequest}
               exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
               initialMeasurements={project?.measurements || []}
