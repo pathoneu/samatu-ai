@@ -243,3 +243,26 @@ def test_the_ledgers_name_the_absorbed_room_as_merged_never_as_his_choice(client
     assert seen, "the absorbed room is listed on the ledgers"
     assert all(e["excluded_because"] == "Sujungta į 01 — plotas ir angos skaičiuojami ten" for e in seen)
     assert scope.excluded_because({"_neskaiciuoti": True, "_neskaiciuoti_kodel": "pasirinkimas"}) == scope.EXCLUDED_BECAUSE
+
+
+def _header_sent(client, rooms, apimtis=None):
+    """What the sheet does: it sends its own Σ over every room (frontend roomSheetApi / InteriorProject)."""
+    body = {"patalpos": copy.deepcopy(rooms), "rules_override": {"apimtis": apimtis} if apimtis else {},
+            "bendras_plotas_m2": sum(float(r.get("plotas_m2") or 0) for r in rooms)}
+    r = client.post("/recompute-interior", json=body)
+    assert r.status_code == 200, r.text
+    return r.json()["bendras_plotas_m2"]
+
+
+def test_the_sheets_own_sum_never_counts_an_absorbed_room_twice(client):
+    rooms = _with_garage()                                                  # 12 + 9 + garage 20 + tambour 3
+    assert _header_sent(client, rooms) == pytest.approx(44.0)
+    a, b = _merged()
+    assert _header_sent(client, [a, b] + rooms[2:]) == pytest.approx(44.0)  # the sheet sent 53: 02 twice
+    assert _header_sent(client, rooms, {"patalpos_ne": ["02"]}) == pytest.approx(35.0)   # exactly 02's area
+
+
+def test_objektas_h_merge_through_the_sheet_keeps_143_27(client):
+    blob = _objektas_h()
+    assert _header_sent(client, blob["patalpos"]) == pytest.approx(143.27, abs=0.01)
+    assert _header_sent(client, _merge_h(copy.deepcopy(blob))["patalpos"]) == pytest.approx(143.27, abs=0.01)
