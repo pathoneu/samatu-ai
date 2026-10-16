@@ -983,6 +983,11 @@ export function logCorrection(projectId, payload) {
     });
 }
 
+/** The project's correction corpus as a CSV download (togal-v2 W11): laikas, patalpa, laukas, buvo, tapo, saltinis, pastaba. */
+export function correctionsCsvUrl(projectId) {
+  return projectId ? `${API}/api/projects/${encodeURIComponent(projectId)}/corrections.csv` : null;
+}
+
 /**
  * This project's correction log, newest first — the „Mokymosi žurnalas".
  *

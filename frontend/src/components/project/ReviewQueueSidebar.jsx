@@ -34,7 +34,7 @@ import {
   selectReviewQueue, trustMeter, unverifiedRisk,
 } from '@/lib/takeoffWorkflow';
 import { ltEur, ltNumber, ltQuantity } from '@/lib/ledger';
-import { LEARNING_EVENT, fetchCorrections } from '@/lib/projectStore';
+import { LEARNING_EVENT, correctionsCsvUrl, fetchCorrections } from '@/lib/projectStore';
 import {
   CONF_RAUDONA, normalizeConfidence, confidenceRank, confidenceLabel,
 } from '@/lib/confidence';
@@ -296,6 +296,17 @@ export default function ReviewQueueSidebar({
                       )}
                     </li>
                   ))}
+                  <li className="px-3 pt-1.5 pb-1" style={{ borderTop: '1px solid hsl(var(--border) / 0.3)' }}>
+                    <a
+                      href={correctionsCsvUrl(projectId)}
+                      download
+                      data-testid="learning-csv"
+                      className="text-[10.5px] underline underline-offset-2"
+                      style={{ color: 'hsl(var(--primary))' }}
+                    >
+                      {t('project.patikra.logCsv')}
+                    </a>
+                  </li>
                 </ul>
               )}
             </div>

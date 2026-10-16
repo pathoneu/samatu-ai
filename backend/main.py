@@ -1734,6 +1734,24 @@ async def api_list_corrections(request: Request, project_id: str, limit: int = 5
     return {"corrections": journal(project, db.list_corrections(project_id, limit=limit))}
 
 
+@app.get("/api/projects/{project_id}/corrections.csv")
+async def api_corrections_csv(request: Request, project_id: str):
+    """The project's correction corpus as CSV (togal-v2 W11): laikas, patalpa, laukas, buvo, tapo, saltinis,
+    pastaba — UTF-8 with a BOM. Same owner gate as the list."""
+    user = _auth.require_user(request)
+    user_filter = None if user.get("is_admin") else user["id"]
+    if not db.get_project(project_id, user_id=user_filter):
+        raise HTTPException(status_code=404, detail="Project not found")
+    from api.learning_journal import corrections_csv
+    body = corrections_csv(db.list_corrections(project_id, limit=100_000))
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", project_id)[:64] or "projektas"
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="mokymosi-zurnalas-{safe_id}.csv"'},
+    )
+
+
 @app.get("/api/projects/{project_id}/extractions")
 async def api_list_extractions(request: Request, project_id: str):
     user = _auth.require_user(request)

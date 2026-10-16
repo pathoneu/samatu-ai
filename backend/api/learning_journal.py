@@ -143,3 +143,38 @@ def journal(project: dict | None, corrections: list[dict]) -> list[dict]:
         sentence = _user_text.scrub_prose({"sentence": sentence_for(c, rows)})["sentence"]
         out.append({**c, "sentence": sentence})
     return out
+
+
+CSV_COLUMNS = ("laikas", "patalpa", "laukas", "buvo", "tapo", "saltinis", "pastaba")
+_FORMULA_LEADS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: Any) -> str:
+    """A value as one CSV cell: numbers and text as they are, anything else as JSON. A TEXT cell that a
+    spreadsheet would run as a formula gets a leading apostrophe (the export rule: user text is never a formula)."""
+    import json
+
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value) if isinstance(value, float) else str(value)
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return "'" + text if text.startswith(_FORMULA_LEADS) else text
+
+
+def corrections_csv(corrections: list[dict]) -> str:
+    """The correction corpus of one project as CSV text, oldest first, UTF-8 with a BOM so a spreadsheet reads
+    the Lithuanian letters; columns `CSV_COLUMNS`."""
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\r\n")
+    writer.writerow(CSV_COLUMNS)
+    for c in sorted(corrections or [], key=lambda r: (str(r.get("occurred_at") or ""), r.get("id") or 0)):
+        writer.writerow([_csv_cell(c.get("occurred_at")), _csv_cell(c.get("room_nr")), _csv_cell(c.get("field_path")),
+                         _csv_cell(c.get("old_value")), _csv_cell(c.get("new_value")), _csv_cell(c.get("source")),
+                         _csv_cell(c.get("note"))])
+    return "﻿" + buf.getvalue()

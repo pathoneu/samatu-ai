@@ -1375,6 +1375,7 @@
       "learned": "Recorded for training — correction no. {{count}} in this project",
       "log": "Learning log ({{count}})",
       "remembered": "Remembered: {{count}} · Learning log",
+      "logCsv": "Download the whole log (CSV)",
       "logTitle": "This project’s corrections, newest first. Stored with you.",
       "rippleTitle": "Fixed: {{label}}",
       "rippleRows_one": "Recalculated: {{count}} row",

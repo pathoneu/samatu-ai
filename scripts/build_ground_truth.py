@@ -12,7 +12,13 @@ Two signals (both already in the blob):
   • QUANTITY truth — rows the user edited or verified (manual_override /
     user_verified) → an (ai_value, human_value) pair → per-class bias bands.
 
-Run:  python scripts/build_ground_truth.py [--db PATH] [--out corpus.json]
+A third signal on request (togal-v2 W11, `--with-corrections`): the `corrections`
+table — every accept, reject or edit a person made of an AI result, one row each
+(source eilute_teisinga, eilute_kiekis, patalpa_patvirtinta, klausimas_*, konturas,
+simbolis, pokalbis_*, prielaidos) — added under a `corrections` key; the other keys
+keep their shape.
+
+Run:  python scripts/build_ground_truth.py [--db PATH] [--out corpus.json] [--with-corrections]
 """
 from __future__ import annotations
 
@@ -63,7 +69,32 @@ def _iter_projects(db_path: Path):
         con.close()
 
 
-def build_corpus(db_path: Path) -> dict:
+def _corrections(db_path: Path) -> list[dict]:
+    """Every row of the `corrections` table, oldest first, values parsed back from their JSON text.
+    An older database without the table gives an empty list."""
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    try:
+        try:
+            rows = con.execute("SELECT * FROM corrections ORDER BY occurred_at, id").fetchall()
+        except sqlite3.OperationalError:
+            return []
+        out = []
+        for r in rows:
+            d = dict(r)
+            for k in ("old_value", "new_value"):
+                if d.get(k) is not None:
+                    try:
+                        d[k] = json.loads(d[k])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            out.append(d)
+        return out
+    finally:
+        con.close()
+
+
+def build_corpus(db_path: Path, with_corrections: bool = False) -> dict:
     polygon_truth: list[dict] = []
     quantity_truth: list[dict] = []
     for pid, proj in _iter_projects(db_path):
@@ -103,7 +134,7 @@ def build_corpus(db_path: Path) -> dict:
             "min": round(min(v), 4), "max": round(max(v), 4)}
         for k, v in by_class.items()
     }
-    return {
+    corpus = {
         "polygon_truth": polygon_truth,
         "quantity_truth": quantity_truth,
         "class_bias": class_bias,
@@ -113,19 +144,30 @@ def build_corpus(db_path: Path) -> dict:
             "classes": sorted(class_bias),
         },
     }
+    if with_corrections:
+        corpus["corrections"] = _corrections(db_path)
+        by_source: dict[str, int] = {}
+        for c in corpus["corrections"]:
+            by_source[str(c.get("source") or "")] = by_source.get(str(c.get("source") or ""), 0) + 1
+        corpus["stats"]["corrections"] = len(corpus["corrections"])
+        corpus["stats"]["corrections_by_source"] = dict(sorted(by_source.items()))
+    return corpus
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=str(DEFAULT_DB))
     ap.add_argument("--out", default=None)
+    ap.add_argument("--with-corrections", action="store_true",
+                    help="add the corrections table (every accept/reject/edit) under a `corrections` key")
     args = ap.parse_args()
-    corpus = build_corpus(Path(args.db))
+    corpus = build_corpus(Path(args.db), with_corrections=args.with_corrections)
     if args.out:
         Path(args.out).write_text(json.dumps(corpus, ensure_ascii=False, indent=2), encoding="utf-8")
     s = corpus["stats"]
     print(f"ground truth: {s['polygon_confirmed']} confirmed polygons, "
-          f"{s['quantity_confirmed']} confirmed quantities; classes: {s['classes']}")
+          f"{s['quantity_confirmed']} confirmed quantities; classes: {s['classes']}"
+          + (f"; {s['corrections']} corrections {s['corrections_by_source']}" if "corrections" in s else ""))
 
 
 if __name__ == "__main__":
