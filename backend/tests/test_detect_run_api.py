@@ -125,6 +125,8 @@ def test_the_stages_arrive_in_the_lanes_order_and_end_in_the_browser(tmp_path, m
     assert r1["polygon_source"] == "vektoriniai_konturai" and r1["perimetras_m"] == 14.0 and r2["perimetras_m"] == 12.0
     assert res["taikymas"] == {"puslapiai": [1], "funkcijos": list(dr.FEATURES), "patalpos": ["01", "02"]}
     assert out["per_page"]["1"]["patalpos"] == ["01", "02"] and out["per_page"]["1"]["konturai"] == 2
+    # the sheet's plan holds every room: this is the whole read, and the project takes the lane's version
+    assert res["_meta"]["geometrija"]["versija"] == gl.LANE_VERSION
 
 
 def test_the_result_has_the_free_rereads_shape_and_the_server_saves_nothing(tmp_path, monkeypatch):
@@ -150,7 +152,7 @@ def test_rereading_keeps_the_outline_he_corrected(tmp_path, monkeypatch):
         out = _run(client, {"pages": [1]})
         r1 = next(r for r in out["result"]["patalpos"] if r["nr"] == "01")
         assert r1["polygon_source"] == "corrected" and r1["polygon_pct"] == CORRECTED
-        assert "1 jūsų pataisyti palikti" in _status(out, "konturai")["note"]
+        assert _status(out, "konturai")["note"] == "1 kontūras iš sienų, jūsų pataisytų palikta: 1."
 
 
 def test_a_sheet_that_is_not_the_rooms_plan_changes_no_room(tmp_path, monkeypatch):

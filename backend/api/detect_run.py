@@ -285,7 +285,7 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
     geo = ((result.get("_meta") or {}).get("geometrija") or {}) if isinstance(result.get("_meta"), dict) else {}
     scope_pages = _plan_pages(pages, geo.get("grupes"))
     before = {_nr(r): r for r in (project.get("patalpos") or []) if isinstance(r, dict) and _nr(r)}
-    rooms, in_scope = [], []
+    rooms, in_scope, left_out = [], [], 0
     for r in result.get("patalpos") or []:
         if not isinstance(r, dict):
             rooms.append(r)
@@ -295,6 +295,7 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
         inside = scope_pages is None or (page is not None and page in scope_pages)
         if not inside and old is not None:
             rooms.append(copy.deepcopy(old))
+            left_out += 1
             continue
         room = copy.deepcopy(r)
         if old is not None:
@@ -307,7 +308,8 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
     out["patalpos"] = rooms
     if "angos" not in features:
         out.pop("_duru_ziniarastis", None)
-    narrowed = scope_pages is not None or set(features) != set(FEATURES)
+    # a sheet whose plan holds every room is the whole read: only a room left out, or a feature not chosen, narrows it
+    narrowed = left_out > 0 or set(features) != set(FEATURES)
     if narrowed and isinstance(out.get("_meta"), dict) and isinstance(out["_meta"].get("geometrija"), dict):
         stored = ((project.get("_meta") or {}).get("geometrija") or {}).get("versija") if isinstance(project.get("_meta"), dict) else None
         meta = dict(out["_meta"])
@@ -345,6 +347,18 @@ def _lt_list(nums: list[int]) -> str:
     return ", ".join(str(n) for n in nums)
 
 
+def _lt(n: int, one: str, few: str, many: str) -> str:
+    """„1 kontūras", „3 kontūrai", „11 kontūrų" (lib/ltPlural.js)."""
+    last, last_two = n % 10, n % 100
+    word = many if (10 <= last_two <= 19 or last == 0) else one if last == 1 else few
+    return f"{n} {word}"
+
+
+def _of_rooms(n: int) -> str:
+    """„iš 1 patalpos", „iš 11 patalpų" — the genitive after „iš"."""
+    return f"iš {n} " + ("patalpos" if n % 10 == 1 and n % 100 != 11 else "patalpų")
+
+
 def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     geo = ((result.get("_meta") or {}).get("geometrija") or {}) if isinstance(result.get("_meta"), dict) else {}
     rooms = [r for r in result.get("patalpos") or [] if isinstance(r, dict) and _nr(r) in set(in_scope)]
@@ -359,7 +373,7 @@ def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     else:
         notes["mastelis"] = "Šiame lape matmenų užrašų nerasta — mastelis neperskaitytas; jį galite nustatyti matavimo įrankiu."
     located = [r for r in rooms if isinstance(r.get("_vieta"), dict)]
-    notes["tekstas"] = (f"Rasta {len(located)} iš {n} patalpų pagal numerį ar plotą lape." if n
+    notes["tekstas"] = (f"Rasta {len(located)} {_of_rooms(n)} pagal numerį ar plotą lape." if n
                         else "Šiame lape eksplikacijos patalpų nerasta.")
     groups = [sorted(int(p) for p in g) for g in geo.get("grupes") or []]
     if pages != "all":
@@ -375,19 +389,21 @@ def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     traced = [r for r in rooms if str(r.get("polygon_source") or "") == "vektoriniai_konturai"]
     his = [r for r in rooms if str(r.get("polygon_source") or "") in HIS_OUTLINES]
     without = [r for r in rooms if str(r.get("polygon_source") or "") not in WALL_OUTLINES]
-    parts = [f"{len(traced)} kontūrai iš sienų"]
+    parts = [_lt(len(traced), "kontūras", "kontūrai", "kontūrų") + " iš sienų"]
     if his:
-        parts.append(f"{len(his)} jūsų pataisyti palikti")
+        parts.append(f"jūsų pataisytų palikta: {len(his)}")
     if without:
-        parts.append(f"{len(without)} be kontūro")
+        parts.append(f"be kontūro: {len(without)}")
     notes["konturai"] = ", ".join(parts) + "."
     oc = openings_count(rooms)
-    notes["angos"] = f"{oc['angos']} angos: {oc['langai']} langai, {oc['durys']} durys." if oc["angos"] else "Sienose angų nerasta."
+    notes["angos"] = (_lt(oc["angos"], "anga", "angos", "angų") + f" (langų: {oc['langai']}, durų: {oc['durys']})."
+                      if oc["angos"] else "Sienose angų nerasta.")
     dims = [r for r in rooms if str(r.get("perimetras_saltinis") or "") in FROM_DIMENSIONS]
     est = [r for r in rooms if str(r.get("perimetras_saltinis") or "") in _gl.ESTIMATES]
-    notes["sienos"] = f"{len(dims)} perimetrai iš matmenų" + (f", {len(est)} įvertinti iš kontūro" if est else "") + "."
+    notes["sienos"] = (_lt(len(dims), "perimetras", "perimetrai", "perimetrų") + " iš matmenų"
+                      + (f", įvertinta iš kontūro: {len(est)}" if est else "") + ".")
     floors = [r for r in rooms if str(r.get("grindu_danga_saltinis") or "") == _gl.FLOOR_PLAN_SOURCE]
-    notes["grindys"] = (f"Danga perskaityta {len(floors)} patalpose." if floors
+    notes["grindys"] = (f"Danga perskaityta {len(floors)} {_of_rooms(n)}." if floors
                         else "Grindų plane dangų neperskaityta.")
     return notes
 
