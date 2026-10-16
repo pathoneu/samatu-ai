@@ -175,7 +175,11 @@ def api_list_assemblies(request: Request) -> dict[str, Any]:
     _rate_limit_user(user, "read")
     try:
         own = _db.list_assemblies(user_id=user["id"])
-        return {"assemblies": own + _defaults()}
+        from api.assemblies_default import SKYRIUS_KODAI
+        # `kodai`: the section codes (skyrius_enum → kodas) a row falls back to,
+        # so the browser and the exports share ONE table.
+        return {"assemblies": own + _defaults(),
+                "kodai": {k: v[0] for k, v in SKYRIUS_KODAI.items()}}
     except Exception as exc:  # noqa: BLE001
         log.error("assemblies read failed user=%s: %r", user.get("id"), exc)
         raise HTTPException(status_code=500, detail="Nepavyko nuskaityti rinkinių") from exc

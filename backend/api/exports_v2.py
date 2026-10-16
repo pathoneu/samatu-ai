@@ -133,7 +133,29 @@ def _load_project_lines(project_id: str) -> list[dict]:
                 f"a manual line list at data/projects/{project_id}/lines.json."
             ),
         )
-    return [_pozicija_to_line(p, i) for i, p in enumerate(pozicijos)]
+    # togal-v2 W9: the „Kodas" column prints the row's cost code — his typed
+    # one (it lives on darbu_sarasas), else the rinkinys / family / section
+    # code — instead of the row's internal id. A legacy row with nothing to
+    # go on keeps the old id fallback.
+    from api.sudetis import effective_kodas
+    by_id = {str(r.get("id")): r for r in (project.get("darbu_sarasas") or [])
+             if isinstance(r, dict) and r.get("id")}
+    lines = []
+    for i, p in enumerate(pozicijos):
+        src = {**p, **{k: by_id[str(p.get("id"))][k]
+                       for k in ("kodas", "rinkinys_id", "skyrius_enum")
+                       if str(p.get("id")) in by_id and by_id[str(p.get("id"))].get(k) is not None}}
+        kodas = None if p.get("code") else effective_kodas(src, _own_assemblies(project))
+        lines.append(_pozicija_to_line({**p, "kodas": kodas} if kodas else p, i))
+    return lines
+
+
+def _own_assemblies(project: dict) -> list[dict]:
+    try:
+        uid = project.get("user_id")
+        return db.list_assemblies(user_id=uid) if uid else []
+    except Exception:  # noqa: BLE001 — his own codes are an extra
+        return []
 
 
 def _audit_rows(project_id: str) -> list[dict]:

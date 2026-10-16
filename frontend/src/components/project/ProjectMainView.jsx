@@ -46,6 +46,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
 import RowDetailPanel from './RowDetailPanel';
+import { ApplyAssembliesButton, KodasChip, priceSplitTitle, useAssemblies } from './RinkiniaiControls';
+import { effectiveKodas } from '@/lib/kodas';
+import { materialPriceNotes } from '@/lib/assemblyPricing';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
@@ -91,7 +94,7 @@ function groupByCategory(darbu_sarasas, otherLabel) {
 
 function WorkRow({
   item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger,
-  focusPriceNonce = 0, onPriceFocused,
+  focusPriceNonce = 0, onPriceFocused, kodas = null, materialNote = null,
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -299,6 +302,7 @@ function WorkRow({
       <td className="px-3 py-2 text-foreground">
         <div className="flex items-center gap-2 min-w-0">
           {sourceDot}
+          <KodasChip item={item} kodas={kodas} onChange={onChange} />
           {/* The description is the row's handle: clicking it opens „Kaip
               suskaičiuota". The price and quantity cells stay separate <td>s,
               so this cannot swallow an edit click. (2026-09-02, Patikra) */}
@@ -323,6 +327,9 @@ function WorkRow({
                title={item.susijes_darbas}>
             {t('project.mainView.materialFor', { work: item.susijes_darbas })}
           </div>
+        )}
+        {materialNote && (
+          <div className="text-[11px] text-muted-foreground mt-0.5">{materialNote}</div>
         )}
         {/* A row the last recompute could not reproduce is CARRIED, not deleted
             — its quantity is the old one. The flag existed since 2026-07-28 and
@@ -441,9 +448,13 @@ function WorkRow({
           />
         ) : item.kaina ? (
           <span className="inline-flex items-center justify-end gap-1">
-            <span className="underline decoration-dotted decoration-transparent hover:decoration-current underline-offset-2">
+            <span className="underline decoration-dotted decoration-transparent hover:decoration-current underline-offset-2"
+                  title={priceSplitTitle(item) || undefined}>
               {fmtEur(item.kaina)}
             </span>
+            {priceSplitTitle(item) && (
+              <span className="sr-only">{priceSplitTitle(item)}</span>
+            )}
             {/* WHERE the price came from. `kaina_source` has been written since
                 the kainynas shipped and nothing read it — so a price the
                 matcher guessed at from a merely SIMILAR row looked exactly like
@@ -526,6 +537,13 @@ export default function ProjectMainView({
 }) {
   const { t } = useTranslation();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
+  // togal-v2 W9: rinkiniai + section codes for the „Kodas" chip, and why a
+  // „Medžiagos" row carries no price of its own.
+  const { assemblies, kodai } = useAssemblies();
+  const materialNotes = useMemo(() => {
+    const byIndex = materialPriceNotes(darbai);
+    return new Map([...byIndex].map(([i, note]) => [darbai[i], note]));
+  }, [darbai]);
   // The contractor's OWN layout (2026-09-05, week 2 of the contractor-trust
   // plan): his sections and row labels, rendered by the backend from a template
   // derived from his sąmatas. Offered only when the account has a template — an
@@ -925,6 +943,7 @@ export default function ProjectMainView({
         </p>
         <div className="mt-3 flex items-center gap-3 flex-wrap">
           <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
+          <ApplyAssembliesButton project={project} onProjectChange={onProjectChange} assemblies={assemblies} />
           <span className="text-muted-foreground" style={{ fontSize: 14 }}>
             {t('project.mainView.pricesManual')}
           </span>
@@ -1089,6 +1108,8 @@ export default function ProjectMainView({
                             onOpenLedger={setDetailRow}
                             focusPriceNonce={item === priceTarget ? pendingPriceFocus?.nonce : 0}
                             onPriceFocused={() => setPendingPriceFocus(null)}
+                            kodas={effectiveKodas(item, assemblies, kodai)}
+                            materialNote={materialNotes.get(item) || null}
                           />
                         );
                       })}

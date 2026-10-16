@@ -5381,7 +5381,7 @@ def generate_excel(request: Request, data: dict):
         _write_sheet_header(ws_main, "SĄMATA")
         # His internal copy may carry the darbo + medžiagų split (togal-v2 W9); none → today's sheet.
         _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")),
-                                               lines=eilutes)
+                                               lines=eilutes, kodas=data.get("su_kodu") is True)
         _hook = (_export_grouping.make_row_hook(ws_main, _cols, header_row=3, first_col=7, style=_extra_style)
                  if _cols else None)
         last_r = _write_rows(ws_main, eilutes, start_row=4, section_subtotals=True, row_hook=_hook)
@@ -5392,7 +5392,7 @@ def generate_excel(request: Request, data: dict):
             eilutes, _grouping, rooms=patalpos, sheets=data.get("lapai") or [])
         _write_sheet_header(ws_main, f"SĄMATA · {_export_grouping.TITLE_SUFFIX[_grouping]}")
         _cols = _export_grouping.extra_columns(_grouping, internal_copy=bool(data.get("vidine_kopija")),
-                                               lines=eilutes)
+                                               lines=eilutes, kodas=data.get("su_kodu") is True)
         _hook = _export_grouping.make_row_hook(ws_main, _cols, header_row=3, first_col=7, style=_extra_style)
         last_r = _write_rows(ws_main, _grouped, start_row=4, section_subtotals=True, row_hook=_hook,
                              subtotal_label=_export_grouping.SUBTOTAL_LABELS.get(_grouping, "Skyriaus suma:"))

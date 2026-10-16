@@ -19,6 +19,8 @@ import { fetchSamataTemplates, renderSamata, roomsForRender } from '@/lib/samata
 import { exportRows as templateExportRows, scaleExportRow } from '@/lib/samataTemplate';
 import { resolveStaleRows } from '@/lib/mergeDarbuSarasas';
 import { asksAboutPricesAfterDialog, exportLines, linesForExport } from '@/lib/exportLines';
+import { listAssemblies } from '@/lib/assembliesApi';
+import { effectiveKodas } from '@/lib/kodas';
 import { DEFAULT_GROUPING, exportLinesWithParts, exportSheets } from '@/lib/exportGrouping';
 import OverlayPdfDialog from './OverlayPdfDialog';
 
@@ -61,7 +63,7 @@ function collectWarnings(project) {
 
 // `grupavimas` (togal-v2 W8): another „Grupuoti pagal" than today's skyriai sends each line's room parts
 // and the sheet names; the server groups them (api/export_grouping.py).
-function buildPayload(project, allowedSkyriai = null, grupavimas = DEFAULT_GROUPING) {
+function buildPayload(project, allowedSkyriai = null, grupavimas = DEFAULT_GROUPING, kodasOf = null) {
   // allowedSkyriai: Set<string> | null. If null = include everything.
   // SM02: daugiabučiams kiekiai padauginti × aukštų skaičiaus.
   const floorCount = getFloorCount(project);
@@ -69,7 +71,9 @@ function buildPayload(project, allowedSkyriai = null, grupavimas = DEFAULT_GROUP
   // before sending — the Siųsti step, this dialog, the client link — count
   // exactly the rows this payload carries.
   const grouped = grupavimas && grupavimas !== DEFAULT_GROUPING;
-  const eilutes = grouped ? exportLinesWithParts(project, allowedSkyriai) : exportLines(project, allowedSkyriai);
+  const lineOpts = { kodasOf };
+  const eilutes = grouped
+    ? exportLinesWithParts(project, allowedSkyriai, lineOpts) : exportLines(project, allowedSkyriai, lineOpts);
   const grouping = grouped ? { grupavimas, lapai: exportSheets(project) } : {};
 
   // V8 darbu_sarasas — primary source
@@ -127,7 +131,14 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
   // „Vidinė kopija" (audit exports-money-5, 2026-09-30): the notes are for him;
   // unless he ticked the option they are not even sent, so no server version
   // can put them into the file his client gets.
-  const base = payloadOverride || buildPayload(project, allowedSkyriai, extra.grupavimas);
+  // „Kodas" (togal-v2 W9): the row's effective code, only when he ticked the column.
+  const suKodu = extra.su_kodu === true;
+  let kodasOf = null;
+  if (suKodu) {
+    const { assemblies, kodai } = await listAssemblies().catch(() => ({ assemblies: [], kodai: {} }));
+    kodasOf = (row) => effectiveKodas(row, assemblies, kodai);
+  }
+  const base = payloadOverride || buildPayload(project, allowedSkyriai, extra.grupavimas, kodasOf);
   const internalCopy = extra.vidine_kopija === true;
   const payload = {
     ...base,
@@ -135,6 +146,7 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     ...branding,
     vat_mode: extra.vat_mode || project.vat_mode || '',
     vidine_kopija: internalCopy,
+    ...(suKodu ? { su_kodu: true } : {}),
   };
   const res = await fetch(`${API}/${endpoint}`, {
     method: 'POST',
@@ -232,7 +244,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     });
   };
 
-  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, grupavimas }) => {
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, su_kodu, grupavimas }) => {
     // Prices (2026-10-06 walkthrough): the dialog he just confirmed already says
     // „N eilučių be kainos — klientas jas matys su 0,00 € suma", counted on these
     // very lines (lib/exportLines.js), so the two confirms that followed it —
@@ -253,7 +265,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     setLoading(format);
     try {
       const safeName = sanitizeExportFilename(project.name);
-      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, grupavimas };
+      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, su_kodu, grupavimas };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'excel-template') {

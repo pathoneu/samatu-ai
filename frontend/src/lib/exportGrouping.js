@@ -43,11 +43,11 @@ export function rowOrigin(row) {
  * order (both walk the darbu_sarasas rows that carry a quantity). A KŽ project (no darbu_sarasas) has no
  * room parts: its lines come back as they are.
  */
-export function exportLinesWithParts(project, allowedSkyriai = null) {
+export function exportLinesWithParts(project, allowedSkyriai = null, opts = {}) {
   const rows = Array.isArray(project?.darbu_sarasas) ? project.darbu_sarasas : [];
-  if (rows.length === 0) return exportLines(project, allowedSkyriai);
+  if (rows.length === 0) return exportLines(project, allowedSkyriai, opts);
   const source = rows.filter((it) => (it?.kiekis || 0) > 0);
-  const lines = exportLines(project, null);
+  const lines = exportLines(project, null, opts);
   const floors = getFloorCount(project);
   const keep = (skyrius) => !allowedSkyriai || allowedSkyriai.has(skyrius);
   const out = [];

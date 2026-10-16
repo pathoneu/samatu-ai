@@ -332,7 +332,8 @@ def _has_price_split(lines) -> bool:
                for ln in (lines or []))
 
 
-def extra_columns(grouping: str, internal_copy: bool = False, *, lines=None) -> list[tuple[str, str, int]]:
+def extra_columns(grouping: str, internal_copy: bool = False, *, lines=None,
+                  kodas: bool = False) -> list[tuple[str, str, int]]:
     """(header, row key, width) of the columns after „Suma €". For a grouped sheet: provenance always; the
     flat export also names the line's skyrius, room and sheet (so Excel's filter does the grouping); the
     assumption text only in his internal copy (it is his note, not the client's). In every layout, his
@@ -346,6 +347,9 @@ def extra_columns(grouping: str, internal_copy: bool = False, *, lines=None) -> 
             cols = [("Skyrius", "_skyrius", 26), ("Patalpa", "_patalpa", 22), ("Lapas", "_lapas", 26)] + cols
         if internal_copy:
             cols.append(("Prielaida", "prielaida", 50))
+    if kodas:
+        # „Kodas" (togal-v2 W9): his optional cost-code column, first after „Suma €", off by default.
+        cols.insert(0, ("Kodas", "kodas", 11))
     if internal_copy and _has_price_split(lines):
         cols += [("Darbo kaina €", "kaina_darbo", 13), ("Medžiagų kaina €", "kaina_medziagu", 15)]
     return cols

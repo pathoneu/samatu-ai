@@ -128,6 +128,44 @@ def find_assembly(row: dict, project: dict, own: list[dict]) -> tuple[dict | Non
     return None, ""
 
 
+def effective_kodas(row: dict, own: list[dict] | tuple = ()) -> str | None:
+    """The cost code a row prints („kodas"). His typed code first; then the
+    code of the rinkinys he bound it to; then the default family matching the
+    engine's label; then the section's code (SKYRIUS_KODAI). Twin of
+    frontend lib/kodas.js `effectiveKodas` — same cases tested on both sides."""
+    typed = row.get("kodas")
+    if isinstance(typed, str) and typed.strip():
+        return typed.strip()
+    label = str(row.get("aprasymas") or row.get("pavadinimas") or "")
+    is_material = bool(row.get("_medziaga")) or row.get("skyrius") == SK_MEDZIAGOS
+    rid = row.get("rinkinys_id")
+    if isinstance(rid, str) and rid and not is_material:
+        a = (default_by_id(rid) if rid.startswith(DEFAULT_PREFIX)
+             else next((x for x in own if isinstance(x, dict) and x.get("id") == rid), None))
+        if a and a.get("kodas"):
+            return a["kodas"]
+    if not is_material:
+        for a in _defaults_cached():
+            if match_template(a["taikoma"]["aprasymas"], label) is not None:
+                return a["kodas"]
+    enum = row.get("skyrius_enum")
+    if not enum:
+        from extractor.vision_call import _SKYRIUS_ENUM
+        enum = _SKYRIUS_ENUM.get(str(row.get("skyrius") or ""), "extras")
+    return kodas_for_enum(enum)
+
+
+_DEFAULTS_CACHE: list[dict] | None = None
+
+
+def _defaults_cached() -> list[dict]:
+    """Codes and labels do not depend on the project's Q-level / paint class."""
+    global _DEFAULTS_CACHE
+    if _DEFAULTS_CACHE is None:
+        _DEFAULTS_CACHE = build_default_assemblies()
+    return _DEFAULTS_CACHE
+
+
 def _material_rows_for(label: str, rows: list[dict]) -> list[dict]:
     return [r for r in rows if isinstance(r, dict)
             and (r.get("_medziaga") or r.get("skyrius") == SK_MEDZIAGOS)
@@ -213,7 +251,7 @@ def build_sudetis(project: dict, row_id: str, own: list[dict] | None = None) -> 
                     "is_eilutes": False, "kiekis": kiekis,
                     "sakinys": (f"{lt_num(kiekis)} {vnt} — eilutės kiekis" if kiekis is not None
                                 else "Eilutės kiekis dar neįvestas")})
-    kodas = row.get("kodas") or (assembly or {}).get("kodas") or kodas_for_enum(row.get("skyrius_enum"))
+    kodas = effective_kodas(row, own or [])
     return {
         "eilute": {"id": row.get("id"), "aprasymas": label, "vnt": vnt, "kiekis": kiekis,
                    "kodas": kodas},

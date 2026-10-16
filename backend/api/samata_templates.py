@@ -265,6 +265,24 @@ def render_summary(rows: list[dict]) -> dict[str, int]:
     }
 
 
+def _attach_kodai(rows: list[dict], rows_in: list[dict], user: dict) -> None:
+    """togal-v2 W9: a rendered row carries the cost code its source rows share
+    (`_saltinio_id`); rows whose sources disagree, or that have none, get none.
+    A view like the rest of the render — nothing is written."""
+    try:
+        from api.sudetis import effective_kodas
+        own = _db.list_assemblies(user_id=user["id"])
+        by_id = {str(r.get("id")): r for r in rows_in if isinstance(r, dict) and r.get("id")}
+        for row in rows:
+            codes = {effective_kodas(by_id[i], own) for i in (row.get("_saltinio_id") or [])
+                     if i in by_id}
+            codes.discard(None)
+            if len(codes) == 1:
+                row["kodas"] = codes.pop()
+    except Exception as exc:  # noqa: BLE001 — a code is an extra, never the render
+        log.warning("samata render: kodai skipped: %r", exc)
+
+
 @router.post("/api/projects/{project_id}/samata-render")
 async def api_render_project(request: Request, project_id: str) -> dict[str, Any]:
     """Render one project in the contractor's layout. NO persistence.
@@ -336,6 +354,7 @@ async def api_render_project(request: Request, project_id: str) -> dict[str, Any
         raise HTTPException(status_code=500,
                             detail="Nepavyko sudaryti sąmatos pagal šabloną") from exc
 
+    _attach_kodai(rows, rows_in, user)
     return {
         "eilutes": rows,
         "santrauka": render_summary(rows),
