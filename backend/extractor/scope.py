@@ -51,7 +51,7 @@ __all__ = [
     "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
     "excluded_quantity", "EXCLUDED_QUANTITIES_KEY", "MERGED_INTO_KEY", "MERGED_BECAUSE",
-    "is_absorbed", "is_excluded_by_choice",
+    "is_absorbed", "is_excluded_by_choice", "excluded_because",
     "filter_rows_by_families", "apply_ceiling_choice", "rotband_share",
 ]
 
@@ -311,6 +311,14 @@ def is_excluded_by_choice(room: dict) -> bool:
     An absorbed room (`is_absorbed`) is out of every row too, but is NOT subtracted: its area and openings
     are billed through the room it was merged into."""
     return isinstance(room, dict) and bool(room.get("_neskaiciuoti")) and not is_absorbed(room)
+
+
+def excluded_because(room: dict) -> str:
+    """Why a line's ledger leaves this room out: an absorbed room is billed in the room it was merged into
+    (never „jūsų pasirinkimu"); every other excluded room, by his choice."""
+    if is_absorbed(room):
+        return f"Sujungta į {room.get(MERGED_INTO_KEY)} — plotas ir angos skaičiuojami ten"
+    return EXCLUDED_BECAUSE
 
 
 def rooms_in_scope(rooms: Iterable[dict] | None) -> list[dict]:

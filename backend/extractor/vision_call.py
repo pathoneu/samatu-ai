@@ -3041,7 +3041,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
             contribs.append(_ledger.contribution(r, value, "m2", why))
         for r in (parsed.get("patalpos") or []):
             if isinstance(r, dict) and r.get("_neskaiciuoti"):
-                skipped.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
+                skipped.append(_ledger.excluded(r, _scope.excluded_because(r)))
         return contribs, skipped
 
     def _paint_roll_up(surf: str, tier: str, kiekis: float,
@@ -3461,7 +3461,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             if keep is not None and not keep(r):
                 continue
             if r.get("_neskaiciuoti") or family in (r.get("_neskaiciuoti_sritys") or []):
-                out.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
+                out.append(_ledger.excluded(r, _scope.excluded_because(r)))
         return out
 
     def _floor_rule_is_tile(r: dict) -> bool:
@@ -3976,7 +3976,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # The ledger: every room's own metres, then one sum step.
         _g_contribs, _g_excluded = [], []
         for r in _excluded_rooms:
-            _g_excluded.append(_ledger.excluded(r, _scope.EXCLUDED_BECAUSE))
+            _g_excluded.append(_ledger.excluded(r, _scope.excluded_because(r)))
         for r in rooms:
             _gm = round(float(r.get("grindjuosciu_m") or 0), 2)
             if _gm <= 0:
