@@ -39,6 +39,9 @@
  * pricing has no such excuse.
  */
 
+// Explicit .js extension so this module also resolves under plain `node --test`.
+import { SPLIT_CLEARED, hasSplit, isMaterialRow, round2 } from './priceSplit.js';
+
 const MIN_SCORE = 0.78;        // tuned for LT construction terminology
 const TOKEN_MIN_LEN = 3;       // ignore Lithuanian articles / 1-2 char noise
 // Two candidates this close are indistinguishable to the matcher. 0.05 keeps
@@ -319,8 +322,11 @@ export function manualPricePatch(prevItem, nextKaina) {
   const prev = Number(prevItem?.kaina) || 0;
   const next = Number(nextKaina) || 0;
   if (next === prev) return {};
-  if (next === 0) return { kaina_source: undefined, kaina_match_score: undefined };
-  return { kaina_source: 'manual', kaina_match_score: undefined };
+  // A split (darbo + medžiagų, from a rinkinys or a kainynas material column)
+  // describes the price it was applied with — a typed price ends it.
+  const split = hasSplit(prevItem) ? SPLIT_CLEARED : {};
+  if (next === 0) return { kaina_source: undefined, kaina_match_score: undefined, ...split };
+  return { kaina_source: 'manual', kaina_match_score: undefined, ...split };
 }
 
 /**
@@ -344,7 +350,10 @@ export function applyPriceListToPositions(positions, priceItems, options = {}) {
   let exact = 0;
   let similar = 0;
   const ambiguous = [];
-  const next = (positions || []).map((poz) => {
+  // Rows whose kainynas line also quotes a MATERIAL price (his sąmata's
+  // „Medžiagų kaina" column, parsed as `medziagu_kaina`) — split below.
+  const withMaterial = [];
+  const next = (positions || []).map((poz, i) => {
     if (poz.kaina_source === 'manual' && !overwriteManual) {
       skipped += 1;
       return poz;
@@ -366,14 +375,68 @@ export function applyPriceListToPositions(positions, priceItems, options = {}) {
     }
     applied += 1;
     if (m.tier === 'exact') exact += 1; else similar += 1;
-    return {
+    if ((Number(m.item.medziagu_kaina) || 0) > 0 && !isMaterialRow(poz)) withMaterial.push([i, m.item]);
+    const priced = {
       ...poz,
       kaina: Number(m.item.kaina) || 0,
       kaina_source: 'kainynas',
       kaina_match_score: Math.round(m.score * 100) / 100,
     };
+    // A split left by an earlier rinkinys must not describe this price.
+    return hasSplit(poz) ? { ...priced, ...SPLIT_CLEARED } : priced;
   });
-  return { items: next, applied, skipped, exact, similar, ambiguous };
+  const materials = splitMaterialPrices(next, withMaterial);
+  return { items: next, applied, skipped, exact, similar, ambiguous, ...materials };
+}
+
+/**
+ * The material part of a kainynas line (2026-10-16, W9; backend manager's
+ * rule). `medziagu_kaina` is quoted per unit of the WORK. Never billed twice:
+ *   - no „Medžiagos" row for this work → the work row carries it:
+ *     kaina_darbo = kainyno kaina, kaina_medziagu = medžiagų kaina,
+ *     kaina = their sum;
+ *   - exactly one Medžiagos row → that row is priced per ITS unit
+ *     (medžiagų kaina × darbo kiekis ÷ medžiagos kiekis), only if unpriced; a
+ *     priced one is left and reported („palikta jūsų kaina");
+ *   - several Medžiagos rows → one per-work price cannot be split between
+ *     them honestly: nothing is applied, the work is reported.
+ * In the last two cases the work row keeps kaina = kainyno kaina (as before).
+ * Mutates `rows` (the fresh array built above) in place.
+ */
+function splitMaterialPrices(rows, withMaterial) {
+  let materialsInRow = 0;
+  let materialsPriced = 0;
+  const kept = [];
+  const notSplit = [];
+  for (const [i, item] of withMaterial) {
+    const work = rows[i];
+    const label = String(work.aprasymas || work.pavadinimas || '').trim();
+    const darbo = round2(item.kaina);
+    const medz = round2(item.medziagu_kaina);
+    const mats = [];
+    rows.forEach((r, j) => {
+      if (isMaterialRow(r) && String(r.susijes_darbas || '').trim() === label) mats.push(j);
+    });
+    if (mats.length === 0) {
+      const kaina = round2(darbo + medz);
+      rows[i] = { ...work, kaina, kaina_darbo: darbo, kaina_medziagu: medz,
+        rinkinys_medziagos: undefined };
+      materialsInRow += 1;
+      continue;
+    }
+    rows[i] = { ...work, kaina_darbo: darbo, kaina_medziagu: 0, rinkinys_medziagos: undefined };
+    if (mats.length > 1) { notSplit.push(label); continue; }
+    const j = mats[0];
+    const m = rows[j];
+    const mk = Number(m.kiekis) || 0;
+    const wk = Number(work.kiekis) || 0;
+    if ((Number(m.kaina) || 0) > 0) { kept.push({ aprasymas: m.aprasymas, kaina: Number(m.kaina) }); continue; }
+    if (!(mk > 0) || !(wk > 0)) { notSplit.push(label); continue; }
+    const k = round2((medz * wk) / mk);
+    rows[j] = { ...m, kaina: k, suma: mk * k, kaina_source: 'kainynas', kaina_match_score: undefined };
+    materialsPriced += 1;
+  }
+  return { materialsInRow, materialsPriced, kept, notSplit };
 }
 
 /**
@@ -388,6 +451,21 @@ export function applyPriceListToPositions(positions, priceItems, options = {}) {
  * name, which is what a toast's `description` expects. (2026-09-02)
  */
 export const AMBIGUOUS_ROWS_SHOWN = 5;
+
+/**
+ * What happened to the MATERIAL prices of an apply (a kainynas material column
+ * or a rinkinys) — named, not hidden in a count: „12 „Medžiagos" eilučių
+ * įkainota · 5 paliktos jūsų kainos". undefined when nothing material moved.
+ */
+export function describeMaterialPrices(result, t) {
+  const parts = [];
+  const add = (key, n) => { if (n > 0) parts.push(t(`project.mainView.${key}`, { count: n })); };
+  add('materialsInRow', result?.materialsInRow || 0);
+  add('materialsPriced', result?.materialsPriced || 0);
+  add('materialsKept', result?.kept?.length || 0);
+  add('materialsNotSplit', result?.notSplit?.length || 0);
+  return parts.length ? parts.join(' · ') : undefined;
+}
 
 export function describeAmbiguous(ambiguous, t) {
   const rows = (ambiguous || [])

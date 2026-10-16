@@ -29,7 +29,7 @@ import {
   Edit2, Check, X, Trash2, AlertCircle, Search, Sliders, Star, Sigma,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
-import { applyPriceListToPositions, manualPricePatch, describeAmbiguous } from '@/lib/applyPriceList';
+import { applyPriceListToPositions, manualPricePatch, describeAmbiguous, describeMaterialPrices } from '@/lib/applyPriceList';
 import { insertRowInSection, manualRowId, nextEilNr } from '@/lib/darbuRows';
 import { findRowById } from '@/lib/ledger';
 import { rowNeedsPrice } from '@/lib/exportLines';
@@ -1231,7 +1231,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
       skipped: primary.skipped,
       exact: primary.exact,
       similar: primary.similar,
-    }));
+    }), { description: describeMaterialPrices(primary, t) });
     // Rows the matcher refused to guess at are the ones the user must price by
     // hand — a silent skip inside "praleista" would never get looked at.
     if (primary.ambiguous?.length) {

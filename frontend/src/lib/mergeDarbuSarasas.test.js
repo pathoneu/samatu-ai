@@ -774,3 +774,34 @@ test('export: no price carry when it is not clear where the price belongs', () =
     { aprasymas: WALLS_LOW, mato_vnt: 'm²', kiekis: 250, _orphaned_after_rebuild: true },
   ]).size, 0);
 });
+
+// ── togal-v2 W9: the darbo + medžiagų split, rinkinys and kodas ride along ──
+// Twin of backend/tests/test_merge_carries_price_split.py.
+
+test('W9: split and choices survive a rebuild by id; suma follows the new quantity', () => {
+  const base = { id: 'r1', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas', vnt: 'm2' };
+  const old = [{ ...base, kiekis: 100, kaina: 5.3, suma: 530, kaina_source: 'rinkinys', kaina_darbo: 4.2,
+    kaina_medziagu: 1.1, rinkinys_medziagos: ['Klijai'], rinkinys_id: 'a1', kodas: '01.01' }];
+  const [r] = mergeDarbuSarasasEdits([{ ...base, kiekis: 120 }], old);
+  assert.deepEqual([r.kaina, r.kaina_darbo, r.kaina_medziagu], [5.3, 4.2, 1.1]);
+  assert.equal(r.kaina_source, 'rinkinys');
+  assert.equal(r.rinkinys_id, 'a1');
+  assert.deepEqual(r.rinkinys_medziagos, ['Klijai']);
+  assert.equal(r.kodas, '01.01');
+  assert.equal(r.suma, 636);
+});
+
+test('W9: a typed code survives on an unpriced row', () => {
+  const base = { id: 'r1', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas', vnt: 'm2', kiekis: 100 };
+  const [r] = mergeDarbuSarasasEdits([{ ...base }], [{ ...base, kodas: 'X-7' }]);
+  assert.equal(r.kodas, 'X-7');
+});
+
+test('W9: by label when the rebuild has no id', () => {
+  const base = { skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas', vnt: 'm2', kiekis: 100 };
+  const [r] = mergeDarbuSarasasEdits([{ ...base }],
+    [{ ...base, kaina: 4.2, kaina_source: 'kainynas', kaina_darbo: 4.2, kaina_medziagu: 0, kodas: '01.01' }]);
+  assert.equal(r.kaina_darbo, 4.2);
+  assert.equal(r.kaina_medziagu, 0);
+  assert.equal(r.kodas, '01.01');
+});

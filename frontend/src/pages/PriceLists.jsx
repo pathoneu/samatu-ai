@@ -268,6 +268,15 @@ export default function PriceLists() {
                       </React.Fragment>
                     ))}
                   </div>
+                  {/* togal-v2 W9: say BEFORE he applies it that a material
+                      column is added to the work price (or prices the
+                      „Medžiagos" rows) — it used to be read and dropped. */}
+                  {(pl.items || []).some(it => (Number(it?.medziagu_kaina) || 0) > 0) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Šiame kainyne yra medžiagų kainų stulpelis — jos pridedamos prie darbo kainos
+                      (arba įkainoja tos darbo eilutės „Medžiagos“, jei jos jau yra).
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">

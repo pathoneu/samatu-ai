@@ -326,18 +326,28 @@ TITLE_SUFFIX = {
 }
 
 
-def extra_columns(grouping: str, internal_copy: bool = False) -> list[tuple[str, str, int]]:
-    """(header, row key, width) of the columns after „Suma €" for a grouped sheet. Provenance always; the
+def _has_price_split(lines) -> bool:
+    return any(isinstance(ln, dict) and (ln.get("kaina_darbo") is not None
+                                         or ln.get("kaina_medziagu") is not None)
+               for ln in (lines or []))
+
+
+def extra_columns(grouping: str, internal_copy: bool = False, *, lines=None) -> list[tuple[str, str, int]]:
+    """(header, row key, width) of the columns after „Suma €". For a grouped sheet: provenance always; the
     flat export also names the line's skyrius, room and sheet (so Excel's filter does the grouping); the
-    assumption text only in his internal copy (it is his note, not the client's)."""
+    assumption text only in his internal copy (it is his note, not the client's). In every layout, his
+    internal copy also shows the darbo + medžiagų split of a price when any line carries one (togal-v2 W9,
+    from a rinkinys or a kainynas material column) — the client's copy never does."""
     mode = normalize_grouping(grouping)
-    if mode == DEFAULT_GROUPING:
-        return []
-    cols = [("Kaip gauta", "_kaip_gauta", 26)]
-    if mode == "be_grupavimo":
-        cols = [("Skyrius", "_skyrius", 26), ("Patalpa", "_patalpa", 22), ("Lapas", "_lapas", 26)] + cols
-    if internal_copy:
-        cols.append(("Prielaida", "prielaida", 50))
+    cols: list[tuple[str, str, int]] = []
+    if mode != DEFAULT_GROUPING:
+        cols = [("Kaip gauta", "_kaip_gauta", 26)]
+        if mode == "be_grupavimo":
+            cols = [("Skyrius", "_skyrius", 26), ("Patalpa", "_patalpa", 22), ("Lapas", "_lapas", 26)] + cols
+        if internal_copy:
+            cols.append(("Prielaida", "prielaida", 50))
+    if internal_copy and _has_price_split(lines):
+        cols += [("Darbo kaina €", "kaina_darbo", 13), ("Medžiagų kaina €", "kaina_medziagu", 15)]
     return cols
 
 
@@ -357,6 +367,12 @@ def make_row_hook(ws, columns: list[tuple[str, str, int]], *, header_row: int, f
     def hook(sheet, r, row):
         for i, (_label, key, _w) in enumerate(columns):
             value = row.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                # Money stays a number his Excel can sum (the price split).
+                c = sheet.cell(row=r, column=first_col + i, value=float(value))
+                style(c, False)
+                c.number_format = "#,##0.00"
+                continue
             c = sheet.cell(row=r, column=first_col + i, value=_safe(str(value)) if value not in (None, "") else None)
             style(c, False)
     return hook

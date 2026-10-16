@@ -69,6 +69,10 @@ export function exportLines(project, allowedSkyriai = null) {
           suma: kiekis * (it.kaina || 0),
           skyrius: exportSectionOf(it),
           confidence: it.confidence || 'medium',
+          // The darbo + medžiagų split (togal-v2 W9) — printed only in his
+          // internal copy; absent keys keep the payload as it always was.
+          ...(it.kaina_darbo != null ? { kaina_darbo: it.kaina_darbo } : {}),
+          ...(it.kaina_medziagu != null ? { kaina_medziagu: it.kaina_medziagu } : {}),
         };
       })
       .filter(it => keep(it.skyrius));
