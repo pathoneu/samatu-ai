@@ -411,7 +411,9 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
 
 // Hit-test committed measurements (this page) for select mode. Area → point in
 // polygon; line → nearest edge within tolerance. Returns id or null.
-function hitTest(raw, measurements, pageNr, tol) {
+// Exported for the right-click menu (PageOverlayHost), which hit-tests while no tool is armed.
+export const MEASURE_HIT_TOL_PX = SNAP_TOL_PX;
+export function hitTest(raw, measurements, pageNr, tol) {
   const page = measurements.filter((m) => m.page === pageNr);
   // Count markers: hit within tol of the point.
   for (const m of page) {

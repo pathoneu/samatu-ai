@@ -8,7 +8,7 @@
  * Deferred (Phase 3): measurement/symbol/click-to-fill re-home, thumbnail rail,
  *           layer toggles, then flip to default + delete PlanViewer.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -35,6 +35,12 @@ import { usePageGeometry } from '@/hooks/usePageGeometry';
 import PageOverlayHost from './PageOverlayHost';
 import CalibrateDialog from './CalibrateDialog';
 import CountLegendPanel from './CountLegendPanel';
+import ShortcutsGuide from './ShortcutsGuide';
+import HistoryPanel from './HistoryPanel';
+import ViewerCoachMarks from './ViewerCoachMarks';
+import MeasureContextMenu from './MeasureContextMenu';
+import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
+import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -42,10 +48,10 @@ import CountLegendPanel from './CountLegendPanel';
 // same thing". label renders next to the icon; title keeps the hotkey hint.
 const MEASURE_TOOLS = [
   { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Pažymėti jau nubrėžtą matavimą — po to Delete jį ištrina' },
-  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: 'Matuoti atstumą tarp dviejų taškų, rezultatas metrais (2)' },
-  { id: 'area', Icon: Pentagon, label: 'Plotas', title: 'Matuoti plotą apvedant kontūrą, rezultatas m² (3)' },
-  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: 'Matuoti kontūro ilgį, rezultatas metrais (4)' },
-  { id: 'count', Icon: Hash, label: 'Kiekis', title: 'Skaičiuoti vienetus (rozetes, šviestuvus) spustelint kiekvieną (6)' },
+  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: withKey('Matuoti atstumą tarp dviejų taškų, rezultatas metrais', 'toolDistance') },
+  { id: 'area', Icon: Pentagon, label: 'Plotas', title: withKey('Matuoti plotą apvedant kontūrą, rezultatas m²', 'toolArea') },
+  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: withKey('Matuoti kontūro ilgį, rezultatas metrais', 'toolPerimeter') },
+  { id: 'count', Icon: Hash, label: 'Kiekis', title: withKey('Skaičiuoti vienetus (rozetes, šviestuvus) spustelint kiekvieną', 'toolCount') },
   { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Nustatyti brėžinio mastelį: pažymėkite atkarpą, kurios tikrą ilgį žinote, ir jį įrašykite' },
 ];
 
@@ -59,7 +65,7 @@ const EMPTY_DRAFT = { points: [], committed: false };
 // so the visible exit was the one nobody was told about. Multi-step flows
 // (kalibravimas, kiekis) now number their steps.
 const MEASURE_HINTS = {
-  select: 'Spustelėkite matavimą jam pažymėti · Delete — ištrinti pažymėtą',
+  select: `Spustelėkite matavimą jam pažymėti · ${hintText(['deleteSelected'])} · dešinysis klavišas — meniu`,
   distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
   area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
@@ -67,7 +73,8 @@ const MEASURE_HINTS = {
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
 };
 // Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
-const OUTLINE_HINT = 'Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · Z — atgal · Enter — išsaugoti · Esc — atšaukti';
+// Key names come from lib/viewerShortcuts, the table the „?" guide prints.
+const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · ${hintText(['outlineUndo', 'outlineSave', 'outlineCancel'])}`;
 // What the status bar adds to a measure hint about snapping, by the sheet's wall geometry status.
 const SNAP_NOTE = {
   ok: ' · prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)',
@@ -161,7 +168,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -182,7 +189,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
     <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
       <button
         className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
-        title="Puslapių juosta (T)"
+        title={withKey('Puslapių juosta', 'toggleThumbs')}
         onClick={onToggleThumbs}
       ><PanelLeft className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
@@ -190,16 +197,16 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           scrollToNext/PreviousPage steps from its own (stale) currentPage —
           under wheel scrolling that no-ops or bounces (founder: "page changer
           does not work"). */}
-      <button className={btn} title="Ankstesnis puslapis (PgUp)" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Ankstesnis puslapis', 'prevPage')} disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
       <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
-      <button className={btn} title="Kitas puslapis (PgDn)" disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Kitas puslapis', 'nextPage')} disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Tolinti (−)" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Tolinti', 'zoomOut')} onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
       <span className="mono tabular w-11 text-center">{pct}%</span>
-      <button className={btn} title="Artinti (+)" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Artinti', 'zoomIn')} onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title="Sutalpinti per visą plotį (1)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
-      <button className={btn} title="Sutalpinti visą puslapį (0)" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
+      <button className={btn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
       {onToggleZoneFills && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
@@ -240,6 +247,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           {MEASURE_TOOLS.map(({ id, Icon, label, title }) => (
             <button
               key={id}
+              data-coach={id}
               className={(measureTool === id ? pressed : btn) + ' inline-flex items-center gap-1'}
               title={title}
               aria-pressed={measureTool === id}
@@ -274,7 +282,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               <button
                 type="button"
                 className={btn}
-                title="Atšaukti paskutinį viršūnės pakeitimą (Z)"
+                title={withKey('Atšaukti paskutinį viršūnės pakeitimą', 'outlineUndo')}
                 aria-label="Atgal"
                 disabled={!outlineCanUndo}
                 onClick={onUndoOutlineEdit}
@@ -297,6 +305,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               title={`Redaguoti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
               onClick={onStartOutlineEdit}
               data-testid="outline-edit-start"
+              data-coach="outline-edit"
             >
               <Pentagon className="w-3.5 h-3.5" />
               <span>Redaguoti kontūrą</span>
@@ -335,15 +344,39 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       )}
       {/* Right group: search + print + download. */}
       <div className="ml-auto flex items-center gap-1">
+        {onToggleHistory && (
+          <button
+            type="button"
+            className={(historyOpen ? pressed : btn) + ' inline-flex items-center gap-1'}
+            title={`Istorija: paskutiniai veiksmai su matavimais ir žymėmis, grįžimas į bet kurį žingsnį (${keyText('undo')} — atšaukti)`}
+            aria-pressed={!!historyOpen}
+            onClick={onToggleHistory}
+            data-testid="viewer-history-toggle"
+          >
+            <History className="w-4 h-4" />
+            <span className="text-[11px] leading-none hidden xl:inline">Istorija</span>
+          </button>
+        )}
+        {onOpenGuide && (
+          <button
+            type="button"
+            className={btn + ' w-6 h-6 inline-flex items-center justify-center font-semibold'}
+            title={withKey('Spartieji klavišai', 'openGuide')}
+            aria-label="Spartieji klavišai"
+            onClick={onOpenGuide}
+            data-testid="viewer-shortcuts-open"
+          >?</button>
+        )}
+        <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
         {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
         <button
           className={searchOpen ? pressed : btn}
-          title="Paieška (Ctrl+F)"
+          title={withKey('Paieška', 'openSearch')}
           aria-pressed={!!searchOpen}
           onClick={onToggleSearch}
         ><Search className="w-4 h-4" /></button>
         <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-        <button className={btn} title="Spausdinti brėžinį (Ctrl+P)" disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
+        <button className={btn} title={withKey('Spausdinti brėžinį', 'print')} disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
         {/* Honest title: this hands back the ORIGINAL uploaded PDF — the
             measurements and zones are not burned into it. (2026-07-28.) */}
         <button className={btn} title="Atsisiųsti originalų PDF (be matavimų ir kontūrų)" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
@@ -466,21 +499,18 @@ function ThumbnailRail({ documentId }) {
 }
 
 /**
- * ViewerHotkeys — the viewer keyboard contract (Task 2.2 + 3.3), one window
- * keydown listener. Guarded: typing surfaces (input/textarea/select/content-
- * Editable) and browser combos (meta/ctrl) are never intercepted.
- *   +/= zoom in · − zoom out · 0 fit page · 1 fit width ·
- *   ]/PageDown next page · [/PageUp prev page · T thumbnail rail ·
- *   2 distance · 3 area · 4 perimeter · 6 count (measure tools; ignored while fill armed) ·
- *   Delete/Backspace delete the selected measurement (select mode only, so it
- *   can never collide with MeasureLayer's Backspace = remove-last-vertex) ·
- *   Ctrl/Cmd+F, / or F open search · Ctrl/Cmd+P print · Esc chain: close search
- *   → measure (close calibration dialog / drop tool) → cancel fill-mode →
- *   clear focused room. (When focus is IN the search input, its own onKeyDown
- *   handles Esc — the input guard below keeps this listener out of typing
- *   surfaces.)
+ * ViewerHotkeys — the viewer keyboard contract, one window keydown listener.
+ * WHICH key does WHAT lives in lib/viewerShortcuts (the table the „?" guide
+ * prints); this component only maps a matched entry id to its action. Guarded:
+ * typing surfaces (input/textarea/select/contentEditable) are never intercepted,
+ * and meta/ctrl combos the table does not list stay with the browser.
+ * Notes kept from the hand-written switch: measure-tool keys are ignored while
+ * fill is armed; Delete/Backspace only act in select mode with a selection (so
+ * they never collide with MeasureLayer's Backspace = remove-last-vertex); Esc
+ * chain: close search → measure (outline edit / calibration dialog / tool) →
+ * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape }) {
+function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -495,53 +525,53 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       if (vp !== (scrollRef.current?.currentPage ?? vp)) scrollApi?.scrollToPage({ pageNumber: vp });
       zoomApi?.requestZoom(mode);
     };
+    const tool = (id) => (fillArmed || !onMeasureToolKey ? false : (onMeasureToolKey(id), true));
+    const step = (d) => {
+      const vp = visiblePageOf(scrollRef.current);
+      const last = scrollRef.current?.totalPages ?? vp + 1;
+      scrollApi?.scrollToPage({ pageNumber: Math.max(1, Math.min(last, vp + d)) });
+      return true;
+    };
+    // Each handler returns true when it acted (→ preventDefault). One key per table id.
+    const handlers = {
+      // HOTKEY-HANDLERS:start
+      zoomIn: () => { zoomApi?.zoomIn(); return true; },
+      zoomOut: () => { zoomApi?.zoomOut(); return true; },
+      fitPage: () => { fitTo(ZoomMode.FitPage); return true; },
+      fitWidth: () => { fitTo(ZoomMode.FitWidth); return true; },
+      nextPage: () => step(1),
+      prevPage: () => step(-1),
+      toggleThumbs: () => { onToggleThumbs?.(); return true; },
+      openSearch: () => (onOpenSearch ? (onOpenSearch(), true) : false),
+      print: () => (printApi ? (printApi.print(), true) : false),
+      openGuide: () => (onOpenGuide ? (onOpenGuide(), true) : false),
+      toolDistance: () => tool('distance'),
+      toolArea: () => tool('area'),
+      toolPerimeter: () => tool('perimeter'),
+      toolCount: () => tool('count'),
+      deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
+      undo: () => (onUndo ? (onUndo(), true) : false),
+      redo: () => (onRedo ? (onRedo(), true) : false),
+      escape: () => {
+        if (onSearchEscape?.()) return true;
+        if (onMeasureEscape?.()) return true;
+        if (fillArmed) { onCancelFill?.(); return true; }
+        onClearFocus?.();
+        return false;
+      },
+      toggleZoneFills: () => (onToggleZoneFills ? (onToggleZoneFills(), true) : false),
+      toggleWallsLayer: () => (onToggleWallsLayer ? (onToggleWallsLayer(), true) : false),
+      // HOTKEY-HANDLERS:end
+    };
     const onKeyDown = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      if (e.metaKey || e.ctrlKey) {
-        // Our explicit combos; everything else stays with the browser.
-        if (!e.altKey && (e.key === 'f' || e.key === 'F') && onOpenSearch) { e.preventDefault(); onOpenSearch(); }
-        else if (!e.altKey && (e.key === 'p' || e.key === 'P') && printApi) { e.preventDefault(); printApi.print(); }
-        return;
-      }
-      switch (e.key) {
-        case '+': case '=': e.preventDefault(); zoomApi?.zoomIn(); break;
-        case '-': e.preventDefault(); zoomApi?.zoomOut(); break;
-        case '0': e.preventDefault(); fitTo(ZoomMode.FitPage); break;
-        case '1': e.preventDefault(); fitTo(ZoomMode.FitWidth); break;
-        case '2': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('distance'); } break;
-        case '3': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('area'); } break;
-        case '4': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('perimeter'); } break;
-        case '6': if (!fillArmed && onMeasureToolKey) { e.preventDefault(); onMeasureToolKey('count'); } break;
-        case ']': case 'PageDown': {
-          e.preventDefault();
-          const vp = visiblePageOf(scrollRef.current);
-          scrollApi?.scrollToPage({ pageNumber: Math.min(scrollRef.current?.totalPages ?? vp + 1, vp + 1) });
-          break;
-        }
-        case '[': case 'PageUp': {
-          e.preventDefault();
-          const vp = visiblePageOf(scrollRef.current);
-          scrollApi?.scrollToPage({ pageNumber: Math.max(1, vp - 1) });
-          break;
-        }
-        case 't': case 'T': e.preventDefault(); onToggleThumbs?.(); break;
-        case '/': case 'f': case 'F': if (onOpenSearch) { e.preventDefault(); onOpenSearch(); } break;
-        case 'Delete': case 'Backspace':
-          if (canDeleteSelected) { e.preventDefault(); onDeleteSelected?.(); }
-          break;
-        case 'Escape':
-          if (onSearchEscape?.()) e.preventDefault();
-          else if (onMeasureEscape?.()) e.preventDefault();
-          else if (fillArmed) { e.preventDefault(); onCancelFill?.(); }
-          else onClearFocus?.();
-          break;
-        default: break;
-      }
+      const id = matchViewerHotkey(e);
+      if (id && handlers[id]?.()) e.preventDefault();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer]);
   return null;
 }
 
@@ -773,7 +803,10 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   // Measurements + per-page scales in PDF-point space (see MeasureLayer);
   // hydrated from the project, persisted back via onMeasureDataChange.
   const [measureTool, setMeasureTool] = useState(null);
-  const [measurements, setMeasurements] = useState(() => initialMeasurements || []);
+  // Committed measurements + count marks live in a history (lib/measureHistory, 2026-10-16): every
+  // change goes through setMeasurements(update) and becomes one undoable entry in „Istorija".
+  const [measureHist, dispatchMeasureHist] = useReducer(historyReducer, initialMeasurements || [], initHistory);
+  const measurements = measureHist.present;
   const [measureScales, setMeasureScales] = useState(() => initialMeasureScales || {});
   // Auto-calibration: pages whose traced rooms carry eksplikacija areas get a
   // derived meters-per-point — measurements read real meters with no manual
@@ -792,6 +825,60 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
     initialCountTypes?.length ? initialCountTypes : countTypesFromMeasurements(initialMeasurements || [])
   ));
   const [activeCountTypeId, setActiveCountTypeId] = useState(() => countTypes[0]?.id ?? null);
+  // History labels read the latest scales and type names through a ref — the reducer stays pure.
+  const describeCtxRef = useRef(null);
+  describeCtxRef.current = {
+    countTypeLabel: (id) => countTypes.find((t) => t.id === id)?.label || null,
+    formatValue: (m) => {
+      const sc = effectiveScales[m.page];
+      if (!sc?.calibrated || m.kind === 'count') return null;
+      const v = measurementValue(m, sc).value;
+      return `${v.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${m.kind === 'area' ? 'm²' : 'm'}`;
+    },
+  };
+  const setMeasurements = useCallback((update) => dispatchMeasureHist({
+    type: 'apply',
+    update,
+    describe: (before, after) => describeChange(before, after, describeCtxRef.current),
+    at: Date.now(),
+  }), []);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const tvRootRef = useRef(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  // Right-click on a committed mark: { id, clientX, clientY } | null (MeasureContextMenu).
+  const [measureMenu, setMeasureMenu] = useState(null);
+  const menuMeasurement = measureMenu ? measurements.find((m) => m.id === measureMenu.id) || null : null;
+  const renameMeasurement = (id, name) => setMeasurements((prev) => prev.map((m) => {
+    if (m.id !== id) return m;
+    const next = { ...m };
+    if (name) next.name = name; else delete next.name;
+    return next;
+  }));
+  const changeCountType = (id, typeId) => {
+    const t = countTypes.find((x) => x.id === typeId);
+    setMeasurements((prev) => prev.map((m) => (m.id === id ? { ...m, typeId, color: t?.color || m.color } : m)));
+  };
+  // „Rodyti sąraše": the Matavimai list (WorkspacePanel) opens its section and scrolls to the row.
+  const revealMeasurement = (m) => {
+    window.dispatchEvent(new CustomEvent('samatu:measure-reveal', { detail: { id: m.id, kind: m.kind, typeId: m.typeId ?? null } }));
+  };
+  // Global undo / redo. A drawing in progress or an outline being edited owns the step first — the
+  // same thing plain Z does there — so Ctrl+Z never jumps over the work under the cursor.
+  const undoMeasure = () => {
+    if (outlineEdit) { undoOutline(); return; }
+    if (draftPoints > 0) { dispatchDraft(draftSlot.pageNr, { type: 'undo' }); return; }
+    const last = measureHist.past[measureHist.past.length - 1];
+    if (!last) { toast.info('Nėra ką atšaukti'); return; }
+    dispatchMeasureHist({ type: 'undo' });
+    toast(`Atšaukta: ${last.label}`, { description: `${keyText('redo')} — grąžinti` });
+  };
+  const redoMeasure = () => {
+    if (outlineEdit || draftPoints > 0) return;
+    const next = measureHist.future[measureHist.future.length - 1];
+    if (!next) { toast.info('Nėra ką grąžinti'); return; }
+    dispatchMeasureHist({ type: 'redo' });
+    toast(`Grąžinta: ${next.label}`);
+  };
   const addCountType = (label) => {
     const t = makeCountType(label, countTypes);
     setCountTypes((prev) => [...prev, t]);
@@ -1049,7 +1136,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
         const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         return (
-        <div className="flex flex-col h-full" data-tv-root>
+        <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
             documentId={activeDocumentId}
             totalPages={totalPages}
@@ -1077,6 +1164,9 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             outlineInvalid={outlineInvalid}
             outlineSaving={outlineSaving}
             onDownload={handleDownload}
+            historyOpen={historyOpen}
+            onToggleHistory={check ? null : () => setHistoryOpen((v) => !v)}
+            onOpenGuide={() => setGuideOpen(true)}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
@@ -1092,6 +1182,11 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onDeleteSelected={() => deleteMeasurement(selectedMeasureId)}
             onOpenSearch={() => setSearchOpen(true)}
             onSearchEscape={searchEscape}
+            onUndo={check ? null : undoMeasure}
+            onRedo={check ? null : redoMeasure}
+            onOpenGuide={() => setGuideOpen((v) => !v)}
+            onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
+            onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
           />
           <div className="relative flex flex-1 min-h-0">
             {railOpen && <ThumbnailRail documentId={activeDocumentId} />}
@@ -1157,6 +1252,7 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       })}
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureDelete={deleteMeasurement}
+                      onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}
                       onMeasureDraftAction={(action) => dispatchDraft(layout.pageNumber, action)}
                       measureCalibA={calibSlot.pageNr === layout.pageNumber ? calibSlot.point : null}
@@ -1181,6 +1277,17 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>
+              </div>
+            )}
+            {historyOpen && !check && (
+              <div className="absolute top-2 right-2 z-30">
+                <HistoryPanel
+                  history={measureHist}
+                  onUndo={undoMeasure}
+                  onRedo={redoMeasure}
+                  onRevertTo={(entryId) => dispatchMeasureHist({ type: 'revertTo', entryId })}
+                  onClose={() => setHistoryOpen(false)}
+                />
               </div>
             )}
             {/* Floating count-type legend while the count tool is armed. */}
@@ -1242,6 +1349,20 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             }}
             onClose={() => setCalibRequest(null)}
           />
+          <ShortcutsGuide open={guideOpen} onOpenChange={setGuideOpen} />
+          {!check && (
+            <MeasureContextMenu
+              target={measureMenu}
+              measurement={menuMeasurement}
+              countTypes={countTypes}
+              onClose={() => setMeasureMenu(null)}
+              onRename={renameMeasurement}
+              onChangeType={changeCountType}
+              onDelete={deleteMeasurement}
+              onReveal={revealMeasurement}
+            />
+          )}
+          <ViewerCoachMarks rootRef={tvRootRef} enabled={!check} />
         </div>
         );
       }}
