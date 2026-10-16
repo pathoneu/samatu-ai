@@ -1,5 +1,5 @@
 /**
- * projectVersions.js — the project's saved versions (togal-v2 W10): what the „Istorija" drawer lists,
+ * projectVersions.js — the project's saved versions (togal-v2 W10): what the „Versijos" drawer lists,
  * compares and restores.
  *
  * The server keeps every saved state of a project (backend/db.py, `project_versions`); this module only

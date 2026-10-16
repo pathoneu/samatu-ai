@@ -1,5 +1,5 @@
 /**
- * ProjectHistoryPanel — „Istorija": every saved state of the project, newest first (togal-v2 W10).
+ * ProjectHistoryPanel — „Versijos" (drawer „Projekto versijos"): every saved state of the project, newest first (togal-v2 W10).
  *
  * Each row says when and how the state came about (išsaugota, brėžinys perskaitytas, atsakytas klausimas,
  * prieš grąžinant…). „Palyginti su dabartine" prints what changed since that version in his words (the
@@ -38,7 +38,7 @@ export default function ProjectHistoryPanel({ project, onClose, onRestored }) {
       await flushProjectSaves();
       setVersions(await fetchVersions(id));
     } catch {
-      setError('Nepavyko gauti istorijos. Patikrinkite ryšį ir bandykite dar kartą.');
+      setError('Nepavyko gauti versijų. Patikrinkite ryšį ir bandykite dar kartą.');
       setVersions([]);
     }
   }, [id]);
@@ -75,7 +75,7 @@ export default function ProjectHistoryPanel({ project, onClose, onRestored }) {
     const ok = await confirm({
       title: 'Grąžinti šią versiją?',
       description: `Projektas taps toks, koks buvo ${row.when}. Dabartinė būsena neprarandama: ji lieka `
-        + 'istorijoje kaip „Prieš grąžinant“, ir ją galėsite grąžinti atgal.',
+        + 'versijų sąraše kaip „Prieš grąžinant“, ir ją galėsite grąžinti atgal.',
       confirmText: 'Grąžinti',
       cancelText: 'Atšaukti',
     });
@@ -98,7 +98,7 @@ export default function ProjectHistoryPanel({ project, onClose, onRestored }) {
               setVersions(await fetchVersions(id));
               toast.success('Grąžinta būsena prieš grąžinimą.');
             } catch {
-              toast.error('Nepavyko atšaukti. Būseną rasite istorijoje kaip „Prieš grąžinant“.');
+              toast.error('Nepavyko atšaukti. Būseną rasite versijų sąraše kaip „Prieš grąžinant“.');
             }
           },
         } : undefined,
@@ -120,16 +120,16 @@ export default function ProjectHistoryPanel({ project, onClose, onRestored }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Projekto istorija"
+        aria-label="Projekto versijos"
         data-testid="project-history-panel"
         className="relative h-full overflow-y-auto bg-background border-l border-border shadow-xl w-full sm:w-[520px] p-4 space-y-4"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-foreground flex items-center gap-2" style={{ fontSize: 17 }}>
-            <History className="w-4 h-4" aria-hidden /> Projekto istorija
+            <History className="w-4 h-4" aria-hidden /> Projekto versijos
           </h2>
           <button
-            type="button" onClick={onClose} title="Uždaryti" aria-label="Uždaryti istoriją"
+            type="button" onClick={onClose} title="Uždaryti" aria-label="Uždaryti versijas"
             className="inline-flex items-center justify-center rounded border border-border-strong bg-card text-foreground/80 hover:bg-muted/50"
             style={{ minHeight: 44, minWidth: 44 }}
           >
@@ -143,8 +143,8 @@ export default function ProjectHistoryPanel({ project, onClose, onRestored }) {
             Ji laikoma serveryje: paskutinės 30 versijų ir po vieną kiekvienai dienai 90 dienų.
           </p>
           <p className="text-muted-foreground">
-            Matavimų ir žymių brėžinyje veiksmus atšaukite brėžinio įrankių juostos mygtuku „Istorija“ —
-            jie laikomi tik šiame lange ir dingsta perkrovus puslapį.
+            Matavimų ir žymių brėžinyje veiksmus atšaukiate ne čia, o brėžinio įrankių juostos mygtuku
+            „Istorija“ — jie laikomi tik šiame lange ir dingsta perkrovus puslapį.
           </p>
         </div>
 

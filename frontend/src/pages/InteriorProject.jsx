@@ -1304,7 +1304,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         </div>
       )}
 
-      {/* „Istorija" — the project's saved versions (togal-v2 W10): compare, restore. */}
+      {/* „Versijos" — the project's saved versions (togal-v2 W10): compare, restore. */}
       {historyOpen && (
         <ProjectHistoryPanel
           project={project}
