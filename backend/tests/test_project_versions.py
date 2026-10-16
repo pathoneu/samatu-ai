@@ -273,3 +273,22 @@ def test_restored_project_is_the_version_data_with_the_row_columns_on_top(env):
         ("Senas", "UAB A", "butas", 55.5, 9)
     assert row["updated_at"] == db._iso_at(T0 + 1200)
     assert row["created_at"] == db._iso_at(T0)          # creation date is not rewritten
+
+
+def test_restore_keeps_the_current_archive_state_and_share_link(env):
+    db.upsert_project("p1", _blob(10), now=T0)
+    db.upsert_project("p1", {**_blob(11), "_archived": True, "_archived_at": "2026-09-21T15:00:00Z"},
+                      now=T0 + 600)                                   # saved while archived
+    archived_vid = _rows()[-1]["id"]
+    db.upsert_project("p1", _blob(12), now=T0 + 1200)               # un-archived again
+    db.set_share_token("p1", "tok-1")
+    restored = db.restore_project_version("p1", archived_vid, now=T0 + 1800)
+    assert "_archived" not in restored and "_archived_at" not in restored
+    assert restored["darbu_sarasas"][0]["kiekis"] == 11              # the content is the version's
+    assert db.get_share_status("p1") is not None and restored.get("share_token") == "tok-1"
+
+    # and the other way round: archived now, restoring a version saved while active
+    db.upsert_project("p1", {**db.get_project("p1"), "_archived": True, "_archived_at": "x"}, now=T0 + 2400)
+    active_vid = _rows()[0]["id"]
+    again = db.restore_project_version("p1", active_vid, now=T0 + 3000)
+    assert again["_archived"] is True and again["_archived_at"] == "x"

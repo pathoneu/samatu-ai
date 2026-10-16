@@ -1502,6 +1502,9 @@ VERSION_KEEP_LAST = 30
 VERSION_DAILY_DAYS = 90
 VERSION_COALESCE_S = 90
 VERSION_ZLIB_LEVEL = 6
+# Blob keys that describe the project's lifecycle, not its content: a restore
+# carries them from the current state (togal-v2 W10 review).
+RESTORE_KEEPS_CURRENT = ("_archived", "_archived_at", "is_demo")
 # Keys that change on every save without the project changing: the client's
 # optimistic stamp and the row columns `get_project` folds back into the blob.
 _VOLATILE_KEYS = frozenset({"updated_at", "base_updated_at", "share_view_count",
@@ -1695,7 +1698,16 @@ def restore_project_version(project_id: str, version_id, user_id: str | None = N
             old_text = row["data"] or "{}"
             _insert_version(c, project_id, old_text, _served_sha(row) or "", "grazinta",
                             f"Prieš grąžinant versiją nuo {_lt_stamp(v['created_at'])}", stamp)
-            payload = v["data"]
+            # The project's lifecycle is not content: a restore keeps the CURRENT
+            # archive state (and demo flag), whatever the version was saved with.
+            # Share token / expiry / views are row columns this UPDATE leaves alone.
+            try:
+                current = json.loads(old_text)
+            except (TypeError, ValueError):
+                current = {}
+            current = current if isinstance(current, dict) else {}
+            payload = {k: val for k, val in v["data"].items() if k not in RESTORE_KEEPS_CURRENT}
+            payload.update({k: current[k] for k in RESTORE_KEEPS_CURRENT if k in current})
             c.execute(
                 "UPDATE projects SET name = ?, company_name = ?, tipas = ?, archetipas = ?, "
                 "status = ?, bendras_plotas_m2 = ?, vat_rate = ?, data = ?, updated_at = ? "
