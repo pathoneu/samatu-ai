@@ -33,6 +33,8 @@ import {
   AXIS_SPAN_MIN_SHARE,
 } from '@/lib/measureGeometry';
 import { displayRotationFor } from '@/lib/viewerEngine/pageRotation';
+import { Checkbox } from '@/components/ui/checkbox';
+import { suggestStandardScale, standardScalePageScale } from '@/lib/scaleSuggestion';
 
 const UNITS = [
   { value: 'mm', label: 'mm' },
@@ -63,6 +65,9 @@ export default function CalibrateDialog({
   const [unit, setUnit] = useState('m');
   const [axis, setAxis] = useState('uniform');
   const [applyTo, setApplyTo] = useState('page'); // 'page' | 'all'
+  // Togal's „Snap to standard scales" (2026-10-16): when the two clicks measure within 3 % of a drawing
+  // scale (1:50, 1:100 …), the dialog offers to take that scale instead of the measured ratio.
+  const [roundToStandard, setRoundToStandard] = useState(true);
 
   // Reset the form each time a fresh calibration request arrives.
   useEffect(() => {
@@ -71,6 +76,7 @@ export default function CalibrateDialog({
       setUnit('m');
       setAxis('uniform');
       setApplyTo('page');
+      setRoundToStandard(true);
     }
   }, [request]);
 
@@ -86,6 +92,13 @@ export default function CalibrateDialog({
 
   const canConfirm = parsedLength !== null && parsedLength > 0;
 
+  // What the two clicks MEASURE as a drawing scale, and the standard scale next to it (uniform axis only).
+  const suggestion = useMemo(
+    () => (axis === 'uniform' && parsedLength ? suggestStandardScale(pdfLen, parsedLength, unit) : null),
+    [axis, parsedLength, pdfLen, unit],
+  );
+  const offerRounding = !!suggestion?.within;
+
   if (!request) return null;
 
   const handleConfirm = () => {
@@ -93,7 +106,9 @@ export default function CalibrateDialog({
     let scale;
     try {
       if (axis === 'uniform') {
-        scale = calibrateUniform(request.a, request.b, parsedLength, unit);
+        scale = offerRounding && roundToStandard
+          ? standardScalePageScale(suggestion.nearest)
+          : calibrateUniform(request.a, request.b, parsedLength, unit);
       } else {
         // 'x' = what the user sees as horizontal → the STORED axis it maps to.
         const storedAxis = storedAxisForDisplayAxis(axis, displayRotationFor(pageRotation));
@@ -247,6 +262,32 @@ export default function CalibrateDialog({
           {selfCheck !== null && (
             <div className="text-xs text-muted-foreground">
               Patikra: pagal esamą mastelį ši linija = {formatNumberLT(selfCheck, 2)} m
+            </div>
+          )}
+
+          {/* Measured drawing scale + the nearest standard one (2026-10-16) */}
+          {suggestion && (
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground space-y-1.5" data-testid="calib-suggestion">
+              <div>
+                Pagal šią atkarpą mastelis ≈ <span className="font-mono">1:{formatNumberLT(suggestion.measured, 1)}</span>
+                {' '}· artimiausias standartinis <span className="font-mono">1:{suggestion.nearest}</span>
+                {' '}(skiriasi {formatNumberLT(suggestion.diffPct, 1)} %)
+              </div>
+              {offerRounding ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={roundToStandard}
+                    onCheckedChange={(v) => setRoundToStandard(v === true)}
+                    data-testid="calib-round-standard"
+                    aria-label={`Suapvalinti iki standartinio mastelio 1:${suggestion.nearest}`}
+                  />
+                  <span>Suapvalinti iki standartinio mastelio 1:{suggestion.nearest}</span>
+                </label>
+              ) : (
+                <div className="text-muted-foreground">
+                  Skirtumas per didelis standartiniam masteliui — lapas greičiausiai atspausdintas kitu dydžiu nei brėžtas; paliekamas išmatuotas.
+                </div>
+              )}
             </div>
           )}
 
