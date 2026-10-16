@@ -391,52 +391,36 @@ export function applyPriceListToPositions(positions, priceItems, options = {}) {
 
 /**
  * The material part of a kainynas line (2026-10-16, W9; backend manager's
- * rule). `medziagu_kaina` is quoted per unit of the WORK. Never billed twice:
- *   - no „Medžiagos" row for this work → the work row carries it:
- *     kaina_darbo = kainyno kaina, kaina_medziagu = medžiagų kaina,
- *     kaina = their sum;
- *   - exactly one Medžiagos row → that row is priced per ITS unit
- *     (medžiagų kaina × darbo kiekis ÷ medžiagos kiekis), only if unpriced; a
- *     priced one is left and reported („palikta jūsų kaina");
- *   - several Medžiagos rows → one per-work price cannot be split between
- *     them honestly: nothing is applied, the work is reported.
- * In the last two cases the work row keeps kaina = kainyno kaina (as before).
+ * rule). `medziagu_kaina` is quoted PER UNIT OF WORK — his layout is one line,
+ * darbo + medžiagų — so it always goes on the WORK row: kaina_darbo = kainyno
+ * kaina, kaina_medziagu = medžiagų kaina, kaina = their sum. That work's
+ * „Medžiagos" rows, however many, stay unpriced and say why
+ * (`materialPriceNotes`: „medžiagų kaina įskaičiuota į … darbo eilutę");
+ * dividing one per-work price between them would invent numbers he never gave.
+ * A Medžiagos row that already carries his or a kainynas price is left alone
+ * and reported („palikta jūsų kaina") — the export guard
+ * (`doubleBilledMaterials`) then warns that it is billed twice.
  * Mutates `rows` (the fresh array built above) in place.
  */
 function splitMaterialPrices(rows, withMaterial) {
   let materialsInRow = 0;
-  let materialsPriced = 0;
   const kept = [];
-  const notSplit = [];
   for (const [i, item] of withMaterial) {
     const work = rows[i];
     const label = String(work.aprasymas || work.pavadinimas || '').trim();
     const darbo = round2(item.kaina);
     const medz = round2(item.medziagu_kaina);
-    const mats = [];
-    rows.forEach((r, j) => {
-      if (isMaterialRow(r) && String(r.susijes_darbas || '').trim() === label) mats.push(j);
+    const names = [];
+    rows.forEach((r) => {
+      if (!isMaterialRow(r) || String(r.susijes_darbas || '').trim() !== label) return;
+      names.push(String(r.aprasymas || '').trim());
+      if ((Number(r.kaina) || 0) > 0) kept.push({ aprasymas: r.aprasymas, kaina: Number(r.kaina) });
     });
-    if (mats.length === 0) {
-      const kaina = round2(darbo + medz);
-      rows[i] = { ...work, kaina, kaina_darbo: darbo, kaina_medziagu: medz,
-        rinkinys_medziagos: undefined };
-      materialsInRow += 1;
-      continue;
-    }
-    rows[i] = { ...work, kaina_darbo: darbo, kaina_medziagu: 0, rinkinys_medziagos: undefined };
-    if (mats.length > 1) { notSplit.push(label); continue; }
-    const j = mats[0];
-    const m = rows[j];
-    const mk = Number(m.kiekis) || 0;
-    const wk = Number(work.kiekis) || 0;
-    if ((Number(m.kaina) || 0) > 0) { kept.push({ aprasymas: m.aprasymas, kaina: Number(m.kaina) }); continue; }
-    if (!(mk > 0) || !(wk > 0)) { notSplit.push(label); continue; }
-    const k = round2((medz * wk) / mk);
-    rows[j] = { ...m, kaina: k, suma: mk * k, kaina_source: 'kainynas', kaina_match_score: undefined };
-    materialsPriced += 1;
+    rows[i] = { ...work, kaina: round2(darbo + medz), kaina_darbo: darbo, kaina_medziagu: medz,
+      medziagos_kainoje: names.length ? names : undefined };
+    materialsInRow += 1;
   }
-  return { materialsInRow, materialsPriced, kept, notSplit };
+  return { materialsInRow, materialsPriced: 0, kept };
 }
 
 /**
@@ -463,7 +447,6 @@ export function describeMaterialPrices(result, t) {
   add('materialsInRow', result?.materialsInRow || 0);
   add('materialsPriced', result?.materialsPriced || 0);
   add('materialsKept', result?.kept?.length || 0);
-  add('materialsNotSplit', result?.notSplit?.length || 0);
   return parts.length ? parts.join(' · ') : undefined;
 }
 

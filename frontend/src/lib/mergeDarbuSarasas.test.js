@@ -781,12 +781,12 @@ test('export: no price carry when it is not clear where the price belongs', () =
 test('W9: split and choices survive a rebuild by id; suma follows the new quantity', () => {
   const base = { id: 'r1', skyrius: 'Sienų glaistymas dažymas', aprasymas: 'Sienų glaistymas/dažymas', vnt: 'm2' };
   const old = [{ ...base, kiekis: 100, kaina: 5.3, suma: 530, kaina_source: 'rinkinys', kaina_darbo: 4.2,
-    kaina_medziagu: 1.1, rinkinys_medziagos: ['Klijai'], rinkinys_id: 'a1', kodas: '01.01' }];
+    kaina_medziagu: 1.1, medziagos_kainoje: ['Klijai'], rinkinys_id: 'a1', kodas: '01.01' }];
   const [r] = mergeDarbuSarasasEdits([{ ...base, kiekis: 120 }], old);
   assert.deepEqual([r.kaina, r.kaina_darbo, r.kaina_medziagu], [5.3, 4.2, 1.1]);
   assert.equal(r.kaina_source, 'rinkinys');
   assert.equal(r.rinkinys_id, 'a1');
-  assert.deepEqual(r.rinkinys_medziagos, ['Klijai']);
+  assert.deepEqual(r.medziagos_kainoje, ['Klijai']);
   assert.equal(r.kodas, '01.01');
   assert.equal(r.suma, 636);
 });

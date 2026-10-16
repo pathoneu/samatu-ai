@@ -1066,7 +1066,6 @@
       "materialsInRow": "{{count}} material prices added to the work price",
       "materialsPriced": "{{count}} „Medžiagos“ rows priced",
       "materialsKept": "{{count}} of your prices kept",
-      "materialsNotSplit": "{{count}} works: material price not applied — the materials are on several rows, price them separately",
       "toastAmbiguousRows": "Enter these prices manually: {{rows}}",
       "priceFromKainynas": "Price from the price list",
       "priceFromKainynasTitle": "Filled in from your price list on an exact row match. Click to change it.",

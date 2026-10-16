@@ -17,13 +17,13 @@ def _row(**over):
 
 def test_split_and_choices_survive_a_rebuild_by_id_and_suma_follows_the_new_quantity():
     prior = [_row(kaina=5.3, suma=530.0, kaina_source="rinkinys", kaina_darbo=4.2,
-                  kaina_medziagu=1.1, rinkinys_medziagos=["Klijai"], rinkinys_id="a1",
+                  kaina_medziagu=1.1, medziagos_kainoje=["Klijai"], rinkinys_id="a1",
                   kodas="01.01")]
     out = _merge_user_edits([_row(kiekis=120.0)], prior)
     r = out[0]
     assert (r["kaina"], r["kaina_darbo"], r["kaina_medziagu"]) == (5.3, 4.2, 1.1)
     assert r["kaina_source"] == "rinkinys" and r["rinkinys_id"] == "a1"
-    assert r["rinkinys_medziagos"] == ["Klijai"] and r["kodas"] == "01.01"
+    assert r["medziagos_kainoje"] == ["Klijai"] and r["kodas"] == "01.01"
     assert r["suma"] == 636.0
 
 

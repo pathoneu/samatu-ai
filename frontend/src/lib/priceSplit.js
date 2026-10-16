@@ -20,10 +20,10 @@ export function round2(v) {
 export const SPLIT_CLEARED = Object.freeze({
   kaina_darbo: undefined,
   kaina_medziagu: undefined,
-  rinkinys_medziagos: undefined,
+  medziagos_kainoje: undefined,
 });
 
 export function hasSplit(row) {
   return !!row && (row.kaina_darbo !== undefined || row.kaina_medziagu !== undefined
-    || row.rinkinys_medziagos !== undefined);
+    || row.medziagos_kainoje !== undefined);
 }

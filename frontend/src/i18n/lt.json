@@ -1081,7 +1081,6 @@
       "materialsInRow": "{{count}} medžiagų kainų pridėta prie darbo kainos",
       "materialsPriced": "{{count}} „Medžiagos“ eilučių įkainota",
       "materialsKept": "{{count}} paliktos jūsų kainos",
-      "materialsNotSplit": "{{count}} darbų medžiagų kaina nepritaikyta — medžiagos skaičiuojamos keliomis eilutėmis, įkainokite jas atskirai",
       "toastAmbiguousRows": "Įveskite kainą rankomis: {{rows}}",
       "priceFromKainynas": "Kaina iš kainyno",
       "priceFromKainynasTitle": "Kainą įrašė kainynas — eilutė sutapo tiksliai. Spustelėkite, jei norite pakeisti.",

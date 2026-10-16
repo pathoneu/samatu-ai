@@ -13,7 +13,7 @@
  *     component's price per material unit — the row's quantity is never
  *     touched;
  *   - only a material component with NO Medžiagos row goes into the work row's
- *     `kaina_medziagu` (and its name into `rinkinys_medziagos`, so the export
+ *     `kaina_medziagu` (and its name into `medziagos_kainoje`, so the export
  *     can warn if such a row appears and gets priced later);
  *   - never both for one component, and nothing is ever zeroed: a Medžiagos
  *     row that already carries his own or a kainynas price is left alone and
@@ -185,7 +185,7 @@ export function applyAssembliesToPositions(rows, assemblies, options = {}) {
       suma: num(row.kiekis) * kaina,
       kaina_darbo,
       kaina_medziagu,
-      rinkinys_medziagos: inRow.length ? inRow : undefined,
+      medziagos_kainoje: inRow.length ? inRow : undefined,
       kaina_source: RINKINYS_SOURCE,
       kaina_match_score: undefined,
       rinkinys_id: assembly.id,
@@ -193,6 +193,27 @@ export function applyAssembliesToPositions(rows, assemblies, options = {}) {
     applied += 1;
   });
   return { items: out, applied, materialsPriced, kept, ambiguous, skipped };
+}
+
+/**
+ * Why a „Medžiagos" row carries no price of its own: its work row's price
+ * already includes it (a kainynas material column, or a rinkinys material with
+ * no row of its own at the time). `Map<materialRowIndex, note>` — derived from
+ * the work rows on every render, never stored, so it cannot go stale.
+ */
+export function materialPriceNotes(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const notes = new Map();
+  for (const w of list) {
+    if (isMaterialRow(w) || !Array.isArray(w?.medziagos_kainoje) || !(num(w.kaina_medziagu) > 0)) continue;
+    const label = labelOf(w);
+    list.forEach((m, j) => {
+      if (!isMaterialRow(m) || String(m?.susijes_darbas || '').trim() !== label) return;
+      if (!w.medziagos_kainoje.some((name) => materialNameMatches(name, labelOf(m)))) return;
+      notes.set(j, `Medžiagų kaina įskaičiuota į „${label}“ darbo eilutę`);
+    });
+  }
+  return notes;
 }
 
 /**
@@ -205,9 +226,9 @@ export function doubleBilledMaterials(rows) {
   const list = Array.isArray(rows) ? rows : [];
   const out = [];
   for (const w of list) {
-    if (isMaterialRow(w) || !Array.isArray(w?.rinkinys_medziagos) || !(num(w.kaina_medziagu) > 0)) continue;
+    if (isMaterialRow(w) || !Array.isArray(w?.medziagos_kainoje) || !(num(w.kaina_medziagu) > 0)) continue;
     const label = labelOf(w);
-    for (const name of w.rinkinys_medziagos) {
+    for (const name of w.medziagos_kainoje) {
       const m = list.find((x) => isMaterialRow(x)
         && String(x?.susijes_darbas || '').trim() === label
         && materialNameMatches(name, labelOf(x)) && num(x.kaina) > 0);

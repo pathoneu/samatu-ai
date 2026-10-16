@@ -63,7 +63,7 @@ test('case 2 — no Medžiagos row: the material goes into kaina_medziagu, named
   assert.equal(w.kaina_medziagu, 1.1);
   assert.equal(w.kaina, 5.3);
   assert.equal(w.kaina, Math.round((w.kaina_darbo + w.kaina_medziagu) * 100) / 100);
-  assert.deepEqual(w.rinkinys_medziagos, ['Klijai']);
+  assert.deepEqual(w.medziagos_kainoje, ['Klijai']);
   // the guard: a priced Medžiagos row for the same component appearing later
   const later = [...out.items, mat('Klijai', 220, { kaina: 0.6, kaina_source: 'manual' })];
   assert.deepEqual(doubleBilledMaterials(later), [{ darbas: 'Sienų glaistymas/dažymas', medziaga: 'Klijai' }]);
@@ -136,41 +136,38 @@ test('a list WITHOUT a material column behaves exactly as before', () => {
   assert.equal(out.materialsPriced, 0);
 });
 
-test('material column, no Medžiagos row: work row = darbo + medžiagų', () => {
-  const out = applyPriceListToPositions([work()], kainynas(1.8));
-  const [w] = out.items;
-  assert.equal(w.kaina_darbo, 4.2);
-  assert.equal(w.kaina_medziagu, 1.8);
-  assert.equal(w.kaina, 6);
-  assert.equal(w.kaina_source, 'kainynas');
-  assert.equal(out.materialsInRow, 1);
-});
+for (const [title, mats] of [
+  ['no Medžiagos row', []],
+  ['one Medžiagos row', [mat('Glaistas sienoms (pradinis + baigiamasis)', 125)]],
+  ['several Medžiagos rows', [mat('Glaistas sienoms (pradinis + baigiamasis)', 125), mat('Gruntas sienoms', 14, { vnt: 'l' })]],
+]) {
+  test(`material column, ${title}: the work row carries darbo + medžiagų, material rows stay unpriced with a note`, async () => {
+    const { materialPriceNotes } = await import('./assemblyPricing.js');
+    const out = applyPriceListToPositions([work(), ...mats], kainynas(1.8));
+    const [w, ...ms] = out.items;
+    assert.equal(w.kaina_darbo, 4.2);
+    assert.equal(w.kaina_medziagu, 1.8);
+    assert.equal(w.kaina, 6);
+    assert.equal(w.kaina_source, 'kainynas');
+    assert.equal(out.materialsInRow, 1);
+    for (const m of ms) assert.equal(m.kaina, undefined);
+    const notes = materialPriceNotes(out.items);
+    assert.equal(notes.size, ms.length);
+    for (const note of notes.values()) {
+      assert.equal(note, 'Medžiagų kaina įskaičiuota į „Sienų glaistymas/dažymas“ darbo eilutę');
+    }
+    assert.deepEqual(doubleBilledMaterials(out.items), []);
+  });
+}
 
-test('material column, one Medžiagos row: that row is priced per ITS unit, work keeps the work price', () => {
-  const out = applyPriceListToPositions([work(), mat('Glaistas sienoms (pradinis + baigiamasis)', 125)], kainynas(1.8));
-  const [w, m] = out.items;
-  assert.equal(w.kaina, 4.2);
-  assert.equal(w.kaina_medziagu, 0);
-  assert.equal(m.kaina, 1.44);              // 1,8 €/m² × 100 m² ÷ 125 kg
-  assert.equal(m.kiekis, 125);
-  assert.equal(out.materialsPriced, 1);
-});
-
-test('material column, Medžiagos row already priced: left and reported', () => {
+test('material column, Medžiagos row already priced: left, reported, and the guard warns', () => {
   const out = applyPriceListToPositions(
     [work(), mat('Glaistas sienoms (pradinis + baigiamasis)', 125, { kaina: 1, kaina_source: 'manual' })], kainynas(1.8));
   assert.equal(out.items[1].kaina, 1);
   assert.equal(out.kept.length, 1);
-  assert.equal(out.items[0].kaina, 4.2);
-});
-
-test('material column, several Medžiagos rows: nothing split, the work is named', () => {
-  const out = applyPriceListToPositions(
-    [work(), mat('Glaistas sienoms (pradinis + baigiamasis)', 125), mat('Gruntas sienoms', 14, { vnt: 'l' })],
-    kainynas(1.8));
-  assert.equal(out.items[0].kaina, 4.2);
-  assert.equal(out.items[1].kaina, undefined);
-  assert.deepEqual(out.notSplit, ['Sienų glaistymas/dažymas']);
+  assert.equal(out.items[0].kaina, 6);
+  assert.deepEqual(doubleBilledMaterials(out.items),
+    [{ darbas: 'Sienų glaistymas/dažymas', medziaga: 'Glaistas sienoms (pradinis + baigiamasis)' }]);
 });
 
 test('a kainynas price replacing a rinkinys split clears it', () => {
@@ -184,7 +181,7 @@ test('a kainynas price replacing a rinkinys split clears it', () => {
 test('the apply result names what happened to the material prices', async () => {
   const { describeMaterialPrices } = await import('./applyPriceList.js');
   const t = (k, o) => `${k.split('.').pop()}:${o.count}`;
-  assert.equal(describeMaterialPrices({ materialsInRow: 0, materialsPriced: 0, kept: [], notSplit: [] }, t), undefined);
-  assert.equal(describeMaterialPrices({ materialsInRow: 2, materialsPriced: 12, kept: [{}, {}], notSplit: ['x'] }, t),
-    'materialsInRow:2 · materialsPriced:12 · materialsKept:2 · materialsNotSplit:1');
+  assert.equal(describeMaterialPrices({ materialsInRow: 0, materialsPriced: 0, kept: [] }, t), undefined);
+  assert.equal(describeMaterialPrices({ materialsInRow: 2, materialsPriced: 12, kept: [{}, {}] }, t),
+    'materialsInRow:2 · materialsPriced:12 · materialsKept:2');
 });

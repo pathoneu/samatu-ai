@@ -779,7 +779,7 @@ def _hydrate_prices_from_darbu_sarasas(prior: list[dict],
 _PRICE_PROVENANCE_KEYS = ("kaina_source", "kaina_match_score",
                           # the darbo + medžiagų split (togal-v2 W9): it describes
                           # THIS price, so it travels exactly where the price does
-                          "kaina_darbo", "kaina_medziagu", "rinkinys_medziagos")
+                          "kaina_darbo", "kaina_medziagu", "medziagos_kainoje")
 # His choices on a row that are not money: the cost code he typed and the
 # rinkinys he bound it to. Carried with the row whatever happens to its price.
 # Mirror of mergeDarbuSarasas.js `ROW_CHOICE_KEYS`.
