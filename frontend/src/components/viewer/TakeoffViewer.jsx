@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Lasso, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -51,6 +51,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 // same thing". label renders next to the icon; title keeps the hotkey hint.
 const MEASURE_TOOLS = [
   { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Pažymėti jau nubrėžtą matavimą — po to Delete jį ištrina' },
+  { id: 'lasso', Icon: Lasso, label: 'Laso', title: withKey('Apvesti kelis matavimus ir žymes — visi apvesti pažymimi; Shift — pridėti; dešinysis klavišas — veiksmai su visais', 'toolLasso') },
   { id: 'distance', Icon: Ruler, label: 'Atstumas', title: withKey('Matuoti atstumą tarp dviejų taškų, rezultatas metrais', 'toolDistance') },
   { id: 'area', Icon: Pentagon, label: 'Plotas', title: withKey('Matuoti plotą apvedant kontūrą, rezultatas m²', 'toolArea') },
   { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: withKey('Matuoti kontūro ilgį, rezultatas metrais', 'toolPerimeter') },
@@ -69,6 +70,7 @@ const EMPTY_DRAFT = { points: [], committed: false };
 // (kalibravimas, kiekis) now number their steps.
 const MEASURE_HINTS = {
   select: `Spustelėkite matavimą jam pažymėti · ${hintText(['deleteSelected'])} · dešinysis klavišas — meniu`,
+  lasso: `Laso: apveskite matavimus ir žymes (Shift — pridėti) · dešinysis klavišas — veiksmai su visais · ${hintText(['deleteSelected'])}`,
   distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
   area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
@@ -553,6 +555,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       toolArea: () => tool('area'),
       toolPerimeter: () => tool('perimeter'),
       toolCount: () => tool('count'),
+      toolLasso: () => tool('lasso'),
       deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
       undo: () => (onUndo ? (onUndo(), true) : false),
       redo: () => (onRedo ? (onRedo(), true) : false),
@@ -905,7 +908,13 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   };
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
-  const [selectedMeasureId, setSelectedMeasureId] = useState(null);
+  // The selection: one mark („Žymėti") or several („Laso", 2026-10-16) — ONE list either way.
+  const [selectedMeasureIds, setSelectedMeasureIds] = useState([]);
+  const setSelectedMeasureId = useCallback((id) => setSelectedMeasureIds(id == null ? [] : (Array.isArray(id) ? id : [id])), []);
+  // Right-click inside a multi-mark selection (or beside it with „Laso" armed) acts on the whole selection.
+  const menuSelection = measureMenu && selectedMeasureIds.length > 1
+    && (measureMenu.id == null || selectedMeasureIds.includes(measureMenu.id))
+    ? measurements.filter((m) => selectedMeasureIds.includes(m.id)) : null;
   // Pending 2-point calibration pick: { pageNr, a, b, rotation } | null → CalibrateDialog.
   const [calibRequest, setCalibRequest] = useState(null);
 
@@ -958,10 +967,22 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
   useEffect(() => {
     if (fillRequest?.nr != null) startFill(fillRequest.nr);
   }, [fillRequest]);
-  const deleteMeasurement = (id) => {
-    if (id == null) return;
-    setMeasurements((prev) => prev.filter((m) => m.id !== id));
-    setSelectedMeasureId((cur) => (cur === id ? null : cur));
+  const deleteMeasurement = (idOrIds) => {
+    const gone = new Set((Array.isArray(idOrIds) ? idOrIds : [idOrIds]).filter((x) => x != null));
+    if (!gone.size) return;
+    setMeasurements((prev) => prev.filter((m) => !gone.has(m.id)));
+    setSelectedMeasureIds((cur) => cur.filter((x) => !gone.has(x)));
+  };
+  // Batch actions on a lasso selection (one history entry each).
+  const changeCountTypeMany = (ids, typeId) => {
+    const t = countTypes.find((x) => x.id === typeId);
+    const set = new Set(ids);
+    setMeasurements((prev) => prev.map((m) => (set.has(m.id) && m.kind === 'count' && m.typeId !== typeId
+      ? { ...m, typeId, color: t?.color || m.color } : m)));
+  };
+  const recolorMany = (ids, color) => {
+    const set = new Set(ids);
+    setMeasurements((prev) => prev.map((m) => (set.has(m.id) && m.kind !== 'count' && m.color !== color ? { ...m, color } : m)));
   };
   // Esc chain, measure segment: close the calibration dialog first, then drop
   // the active tool (MeasureLayer resets its own draft when the tool changes).
@@ -1202,8 +1223,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             onToggleThumbs={() => setRailOpen(!railOpen)}
             onMeasureToolKey={armMeasureTool}
             onMeasureEscape={measureEscape}
-            canDeleteSelected={measureTool === 'select' && selectedMeasureId != null}
-            onDeleteSelected={() => deleteMeasurement(selectedMeasureId)}
+            canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
+            onDeleteSelected={() => deleteMeasurement(selectedMeasureIds)}
             onOpenSearch={() => setSearchOpen(true)}
             onSearchEscape={searchEscape}
             onUndo={check ? null : undoMeasure}
@@ -1252,7 +1273,8 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
                       orthoEnabled={orthoEnabled}
                       countTypes={countTypes}
                       activeCountTypeId={activeCountTypeId}
-                      selectedMeasureId={selectedMeasureId}
+                      selectedMeasureIds={selectedMeasureIds}
+                      selectionMenuOnMiss={measureTool === 'lasso' && selectedMeasureIds.length > 1}
                       onMeasureCommit={(m) => {
                         setMeasurements((prev) => [...prev, m]);
                         // Founder 2026-07-25 ("no way to get measurements"):
@@ -1393,6 +1415,11 @@ function ViewerInner({ check = null, focus = null, rooms, focusedRoom, focusedPa
             <MeasureContextMenu
               target={measureMenu}
               measurement={menuMeasurement}
+              selection={menuSelection}
+              onDeleteMany={deleteMeasurement}
+              onChangeTypeMany={changeCountTypeMany}
+              onRecolorMany={recolorMany}
+              onDeselect={() => setSelectedMeasureIds([])}
               countTypes={countTypes}
               onClose={() => setMeasureMenu(null)}
               onRename={renameMeasurement}

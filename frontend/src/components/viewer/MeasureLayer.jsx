@@ -12,6 +12,7 @@ import {
   polygonCentroid,
 } from '@/lib/polygonGeometry.js';
 import { pickSnap } from '@/lib/drawingSnap.js';
+import { lassoSelect } from '@/lib/outlineTools.js';
 
 // Tools that build a multi-vertex draft (polyline for line tools, polygon for area).
 const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
@@ -54,6 +55,8 @@ export default function MeasureLayer({
   onSelect,
   onDelete,
   selectedId = null,
+  // Lasso (2026-10-16): the selection can hold several marks — `selectedIds` wins over `selectedId`.
+  selectedIds = null,
   display = { decimals: 2 },
   // Controlled draft / calibration-A (lifted to TakeoffViewer, see above).
   draft: draftProp = null,
@@ -74,6 +77,11 @@ export default function MeasureLayer({
   const [cursor, setCursor] = useState(null);   // snapped PDF point under the pointer
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
   const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
+  const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
+  const selectedSet = useMemo(
+    () => new Set(Array.isArray(selectedIds) ? selectedIds : (selectedId != null ? [selectedId] : [])),
+    [selectedIds, selectedId],
+  );
 
   // Reset the draft whenever the active tool changes. In controlled mode the
   // OWNER resets (this component re-mounts on every scroll-back, and resetting
@@ -149,7 +157,19 @@ export default function MeasureLayer({
     setSnapPt(null); setSnapKind(null);
   }, [onCommit, tool, pageNr, dispatch]);
 
+  const localPx = useCallback((e) => {
+    const rect = svgRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
+
   const handlePointerMove = useCallback((e) => {
+    if (tool === 'lasso') {
+      if (!lasso) return;
+      const p = localPx(e);
+      const last = lasso.px[lasso.px.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) setLasso((cur) => (cur ? { ...cur, px: [...cur.px, p] } : cur));
+      return;
+    }
     if (tool === 'pan' || tool === 'select') {
       setCursor(null);
       return;
@@ -158,10 +178,19 @@ export default function MeasureLayer({
     setCursor(point);
     setSnapPt(snapped ? point : null);
     setSnapKind(snapped ? kind : null);
-  }, [tool, applySnap, eventToPdf]);
+  }, [tool, applySnap, eventToPdf, lasso, localPx]);
 
   const handlePointerDown = useCallback((e) => {
     if (tool === 'pan') return;
+
+    if (tool === 'lasso') {
+      if (e.button !== 0) return;     // a right-click opens the menu for the selection, it starts no loop
+      // Freehand loop: everything wholly inside it is selected (Shift adds to the selection). A click
+      // without a drag picks the one mark under it, like „Žymėti".
+      try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ }
+      setLasso({ px: [localPx(e)], add: e.shiftKey });
+      return;
+    }
 
     if (tool === 'select') {
       const raw = eventToPdf(e);
@@ -222,7 +251,22 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx]);
+
+  const handlePointerUp = useCallback((e) => {
+    if (tool !== 'lasso' || !lasso) return;
+    const loop = lasso.px;
+    const prev = [...selectedSet];
+    setLasso(null);
+    let ids;
+    if (loop.length < 3) {
+      const hit = hitTest(eventToPdf(e), measurements, pageNr, SNAP_TOL_PX / adapter.scale);
+      ids = hit ? [hit] : [];
+    } else {
+      ids = lassoSelect(measurements, pageNr, loop.map((p) => adapter.toPdf(p)));
+    }
+    onSelect?.(lasso.add ? [...new Set([...prev, ...ids])] : ids);
+  }, [tool, lasso, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;
@@ -313,6 +357,8 @@ export default function MeasureLayer({
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => setLasso(null)}
       onPointerLeave={() => setCursor(null)}
       onDoubleClick={handleDoubleClick}
     >
@@ -323,7 +369,7 @@ export default function MeasureLayer({
           adapter={adapter}
           scale={scale}
           countTypes={countTypes}
-          selected={m.id === selectedId}
+          selected={selectedSet.has(m.id)}
           decimals={decimals}
         />
       ))}
@@ -347,6 +393,14 @@ export default function MeasureLayer({
           finishable={draftFinishable}
           onFinish={finishDraft}
           onCancel={cancelDraft}
+        />
+      )}
+
+      {lasso && lasso.px.length > 1 && (
+        <polygon
+          points={lasso.px.map((p) => `${p.x},${p.y}`).join(' ')}
+          fill="#1d4ed8" fillOpacity={0.06} stroke="#1d4ed8" strokeWidth={1.5} strokeDasharray="5 4"
+          pointerEvents="none" data-lasso
         />
       )}
 

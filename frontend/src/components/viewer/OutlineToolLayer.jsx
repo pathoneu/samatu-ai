@@ -180,7 +180,7 @@ export default function OutlineToolLayer({
     }
     if (tool.mode === 'subtract') {
       if (tool.shape === 'rect') {
-        e.currentTarget.setPointerCapture?.(e.pointerId);
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ }
         setDragFrom(p);
         setCursor(p);
         return;

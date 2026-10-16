@@ -62,8 +62,10 @@ export const VIEWER_SHORTCUTS = [
   { id: 'outlineCancel', group: 'outline', bound: 'outline', label: 'Atšaukti redagavimą (niekas neišsaugoma)', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
 
   // ── Žymėjimas ir istorija
-  { id: 'deleteSelected', group: 'selection', bound: 'hotkeys', label: 'Ištrinti pažymėtą matavimą („Žymėti" įrankiu)', hint: 'ištrinti pažymėtą', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
-  { id: 'contextMenu', group: 'selection', bound: 'mouse', label: 'Matavimo meniu: pervadinti, keisti tipą, ištrinti, rodyti sąraše', display: 'Dešinysis pelės klavišas ant matavimo' },
+  { id: 'deleteSelected', group: 'selection', bound: 'hotkeys', label: 'Ištrinti pažymėtus matavimus („Žymėti" arba „Laso" įrankiu)', hint: 'ištrinti pažymėtus', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
+  { id: 'toolLasso', group: 'selection', bound: 'hotkeys', label: 'Laso — apvesti kelis matavimus ir žymes', combos: [{ keys: ['l', 'L'] }] },
+  { id: 'lassoAdd', group: 'selection', bound: 'mouse', label: 'Laso — pridėti prie pažymėtų', display: 'Laikyti Shift apvedant' },
+  { id: 'contextMenu', group: 'selection', bound: 'mouse', label: 'Matavimo meniu: pervadinti, keisti tipą, ištrinti, rodyti sąraše; su laso — veiksmai su visais pažymėtais', display: 'Dešinysis pelės klavišas ant matavimo' },
   { id: 'undo', group: 'selection', bound: 'hotkeys', label: 'Atšaukti paskutinį veiksmą su matavimais ir žymėmis', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: false }] },
   { id: 'redo', group: 'selection', bound: 'hotkeys', label: 'Grąžinti atšauktą veiksmą', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: true }, { keys: ['y', 'Y'], mod: 'primary' }] },
   { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Uždaryti paiešką, išjungti įrankį, atsisakyti patalpos', combos: [{ keys: ['Escape'] }] },

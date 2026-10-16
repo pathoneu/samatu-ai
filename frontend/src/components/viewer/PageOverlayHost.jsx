@@ -87,7 +87,10 @@ export default function PageOverlayHost({
   orthoEnabled = false,
   countTypes = [],
   activeCountTypeId = null,
-  selectedMeasureId = null,
+  // The selection (one mark, or several from „Laso" — 2026-10-16).
+  selectedMeasureIds = [],
+  // With „Laso" armed and several marks selected, a right-click beside them opens the menu for all of them.
+  selectionMenuOnMiss = false,
   onMeasureCommit = null,
   onMeasureCalibrate = null,
   onMeasureSelect = null,
@@ -145,8 +148,8 @@ export default function PageOverlayHost({
   );
   if (!vp) return null;
 
-  const selectedMeasurement = (selectedMeasureId != null && adapter)
-    ? (measurements || []).find((m) => m.id === selectedMeasureId && m.page === layout.pageNumber)
+  const selectedMeasurement = (selectedMeasureIds.length === 1 && adapter)
+    ? (measurements || []).find((m) => m.id === selectedMeasureIds[0] && m.page === layout.pageNumber)
     : null;
   const deleteAt = selectedMeasurement ? deleteAnchorFor(selectedMeasurement, adapter) : null;
   // Right-click: hit-test the committed marks under the pointer (works with or without a tool armed —
@@ -156,9 +159,9 @@ export default function PageOverlayHost({
     const r = e.currentTarget.getBoundingClientRect();
     const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
     const id = hitTestMeasurement(raw, measurements || [], layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
-    if (!id) return;
+    if (!id && !selectionMenuOnMiss) return;
     e.preventDefault();
-    onMeasureContextMenu({ id, clientX: e.clientX, clientY: e.clientY });
+    onMeasureContextMenu({ id: id || null, clientX: e.clientX, clientY: e.clientY });
   } : undefined;
 
   return (
@@ -247,7 +250,7 @@ export default function PageOverlayHost({
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
             onDelete={onMeasureDelete}
-            selectedId={selectedMeasureId}
+            selectedIds={selectedMeasureIds}
             draft={measureDraft}
             onDraftAction={onMeasureDraftAction}
             calibA={measureCalibA}

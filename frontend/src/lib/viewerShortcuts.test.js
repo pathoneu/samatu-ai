@@ -68,6 +68,8 @@ test('matchViewerHotkey: plain keys, modifiers and shift', () => {
   assert.equal(matchViewerHotkey(ev('y', { ctrlKey: true })), 'redo');
   assert.equal(matchViewerHotkey(ev('f', { ctrlKey: true })), 'openSearch');
   assert.equal(matchViewerHotkey(ev('p', { metaKey: true })), 'print');
+  assert.equal(matchViewerHotkey(ev('l')), 'toolLasso');
+  assert.equal(matchViewerHotkey(ev('L', { shiftKey: true })), 'toolLasso');
   // plain Z is the draft / outline undo, not the global one
   assert.equal(matchViewerHotkey(ev('z')), null);
   // browser combos stay with the browser
