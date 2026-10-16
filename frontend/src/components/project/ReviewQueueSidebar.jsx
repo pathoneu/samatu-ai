@@ -34,7 +34,7 @@ import {
   selectReviewQueue, trustMeter, unverifiedRisk,
 } from '@/lib/takeoffWorkflow';
 import { ltEur, ltNumber, ltQuantity } from '@/lib/ledger';
-import { fetchCorrections } from '@/lib/projectStore';
+import { LEARNING_EVENT, fetchCorrections } from '@/lib/projectStore';
 import {
   CONF_RAUDONA, normalizeConfidence, confidenceRank, confidenceLabel,
 } from '@/lib/confidence';
@@ -81,12 +81,20 @@ export default function ReviewQueueSidebar({
   // re-read whenever a fix lands (lastRipple changes), so the number the user
   // sees is the number the backend actually stored.
   const rippleStamp = lastRipple?.at || null;
+  // …and whenever any surface stores one (togal-v2 W11: rows, rooms, questions, chat thumbs).
+  const [logged, setLogged] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !projectId) return undefined;
+    const onLogged = (e) => { if (e?.detail?.projectId === projectId) setLogged((n) => n + 1); };
+    window.addEventListener(LEARNING_EVENT, onLogged);
+    return () => window.removeEventListener(LEARNING_EVENT, onLogged);
+  }, [projectId]);
   useEffect(() => {
     let alive = true;
     if (!projectId) return () => { alive = false; };
     fetchCorrections(projectId).then((list) => { if (alive) setCorrections(list); });
     return () => { alive = false; };
-  }, [projectId, rippleStamp]);
+  }, [projectId, rippleStamp, logged]);
 
   const { reviewRooms, queue, lockedRoomCount, lockedPositionCount } = useMemo(() => {
     const reviewRooms = rooms
@@ -267,20 +275,20 @@ export default function ReviewQueueSidebar({
                 title={t('project.patikra.logTitle')}
               >
                 <GraduationCap className="w-3 h-3 shrink-0" />
-                {t('project.patikra.log', { count: corrections.length })}
+                <span data-testid="learning-count">{t('project.patikra.remembered', { count: corrections.length })}</span>
                 {logOpen
                   ? <ChevronDown className="w-3 h-3 ml-auto" />
                   : <ChevronRight className="w-3 h-3 ml-auto" />}
               </button>
               {logOpen && (
                 <ul className="pb-1">
-                  {corrections.slice(0, 20).map((c, i) => (
+                  {corrections.slice(0, 50).map((c, i) => (
                     <li
                       key={`${c.id || c.field_path}-${i}`}
                       className="px-3 py-1 text-[10.5px] text-muted-foreground"
                       style={{ borderTop: '1px solid hsl(var(--border) / 0.3)' }}
                     >
-                      <span className="text-foreground/80">{correctionLabel(c)}</span>
+                      <span className="text-foreground/80">{c.sentence || correctionLabel(c)}</span>
                       {c.occurred_at && (
                         <span className="mono tabular">
                           {' · '}{String(c.occurred_at).slice(0, 16).replace('T', ' ')}

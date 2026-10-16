@@ -1726,9 +1726,12 @@ async def api_log_correction(request: Request, project_id: str, payload: Correct
 async def api_list_corrections(request: Request, project_id: str, limit: int = 500):
     user = _auth.require_user(request)
     user_filter = None if user.get("is_admin") else user["id"]
-    if not db.get_project(project_id, user_id=user_filter):
+    project = db.get_project(project_id, user_id=user_filter)
+    if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return {"corrections": db.list_corrections(project_id, limit=limit)}
+    # Each row with its journal sentence (togal-v2 W11): the „Mokymosi žurnalas" says what he did, in his words.
+    from api.learning_journal import journal
+    return {"corrections": journal(project, db.list_corrections(project_id, limit=limit))}
 
 
 @app.get("/api/projects/{project_id}/extractions")
