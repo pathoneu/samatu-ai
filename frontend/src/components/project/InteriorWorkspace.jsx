@@ -36,6 +36,7 @@ import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pa
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 import { fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
+import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 
 // Outlines that must never be re-detected over. The last two are traced by the
 // BACKEND during extraction (wall_outline.py, vector_rooms.py): before
@@ -172,6 +173,9 @@ export default function InteriorWorkspace({
   // brightens the matching zone (panel → canvas half of the hover sync).
   const [hiddenRoomNrs, setHiddenRoomNrs] = useState(() => new Set());
   const [hoveredRoomNr, setHoveredRoomNr] = useState(null);
+  // Right panel tab (Togal-v2 capability B): 'patalpos' = WorkspacePanel as before, 'kiekiai' = the
+  // Quantities Panel. Both stay mounted while hidden so their filters / folds survive a switch.
+  const [rightTab, setRightTab] = useState('patalpos');
   // Open on the first PLAN page. Page 1 of a real interior set is a marketing
   // render whose scale reads „nekalibruotas"; the plan on page 2 auto-seeds its
   // own scale. Landing on the cover asks the contractor to work out that the
@@ -399,6 +403,20 @@ export default function InteriorWorkspace({
         && others.every((n) => prev.has(n));
       return alreadyIsolated ? new Set() : new Set(others);
     });
+  };
+
+  // Quantities Panel: hide or show a whole line's rooms at once, and „show only these rooms".
+  const handleSetRoomsHidden = (nrs, hidden) => {
+    setHiddenRoomNrs((prev) => {
+      const next = new Set(prev);
+      nrs.forEach((nr) => (hidden ? next.add(String(nr)) : next.delete(String(nr))));
+      return next;
+    });
+  };
+  const handleIsolateRooms = (nrs) => {
+    const keep = new Set(nrs.map(String));
+    const allNrs = (project.v8_rooms || project.patalpos || []).map((r) => String(r.nr));
+    setHiddenRoomNrs(new Set(allNrs.filter((n) => !keep.has(n))));
   };
 
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
@@ -637,8 +655,43 @@ export default function InteriorWorkspace({
       {/* RIGHT (md+) / BOTTOM (mobile): Kompaktinė sąmatos panelė */}
       <div
         style={{ width: isMobile ? '100%' : `${100 - splitRatio}%`, height: isMobile ? '40%' : 'auto' }}
-        className="overflow-hidden"
+        className="overflow-hidden flex flex-col"
       >
+        <div role="tablist" aria-label="Dešinysis skydelis" className="shrink-0 flex border-b border-border bg-card">
+          {[['patalpos', 'Patalpos ir eilutės'], ['kiekiai', 'Kiekiai']].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={rightTab === key}
+              onClick={() => setRightTab(key)}
+              className={`px-3 py-1.5 text-xs border-b-2 -mb-px transition-colors ${rightTab === key
+                ? 'border-primary text-foreground font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className={rightTab === 'kiekiai' ? 'flex-1 min-h-0' : 'hidden'}>
+            <QuantitiesPanel
+              project={project}
+              rooms={project.v8_rooms || project.patalpos || []}
+              focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+              hiddenRoomNrs={hiddenRoomNrs}
+              onFocusRoom={(room) => {
+                setLocalFocusedPage(room.puslapio_nr ?? null);
+                setLocalFocusedRoom(room);
+                onJumpToPage?.(room.puslapio_nr, room);
+              }}
+              onToggleRoomVisibility={handleToggleRoomVisibility}
+              onSetRoomsHidden={handleSetRoomsHidden}
+              onIsolateRooms={handleIsolateRooms}
+              onRoomRowHover={setHoveredRoomNr}
+              onOpenAssumptions={onOpenAssumptions ? () => onOpenAssumptions() : null}
+            />
+        </div>
+        <div className={rightTab === 'patalpos' ? 'flex-1 min-h-0' : 'hidden'}>
         <WorkspacePanel
           project={project}
           mode={mode}
@@ -671,6 +724,7 @@ export default function InteriorWorkspace({
           }}
           onProjectChange={onProjectChange}
         />
+        </div>
       </div>
     </div>
   );
