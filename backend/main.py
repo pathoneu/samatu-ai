@@ -407,6 +407,8 @@ from api.user_settings import router as user_settings_router
 from api.room_facts import router as room_facts_router
 from api.evidence import router as evidence_router
 from api.free_reread import router as free_reread_router
+# „Perskaityti lapą" (2026-10-16): the same €0 reading as a job with named stages, per sheet.
+from api.detect_run import router as detect_run_router
 from api.room_outline import router as room_outline_router
 from api.page_geometry import router as page_geometry_router
 from api.project_questions import router as project_questions_router
@@ -754,6 +756,7 @@ app.include_router(user_settings_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
 app.include_router(free_reread_router)
+app.include_router(detect_run_router)
 app.include_router(room_outline_router)
 app.include_router(page_geometry_router)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
