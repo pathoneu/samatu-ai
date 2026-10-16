@@ -288,3 +288,31 @@ Not worth copying: confidence-free display (Pathon's per-fact dots are better), 
 (Pathon reads height markers), classification-centric quantities (Pathon's sąmata rows with
 ledgers are the product), rasterizing before geometry (Pathon's vector lanes are the stronger path
 where the PDF is vector).
+
+## 11. Usability and comfort of the Togal.AI editor (added 2026-10-16, afternoon)
+
+**What could be observed.** No account, so the editor itself was not driven. Evidence: REA passive capture of the live login page (`ev_7d74f51e2b94b7abc76c9e34020b6e9250d6bc5937ebc495be62ca0d7ccfdf48`, 58 accessibility nodes), the shipped bundle's UI strings and interaction code, the public `keyboard-shortcuts.pdf`, the help center's navigation and Quantities Panel articles, and public reviews (G2/Capterra pages block fetching; their summaries and the 2026-09-17 research quotes are used).
+
+**Entry.** Login page is minimal: email, password, `Login`, `Sign In with Microsoft`, `Login with SSO`, `Forgot Password?`. Three sign-in paths signal enterprise buyers (Microsoft tenants, SSO), not solo contractors. Console warnings show the app persists project data in IndexedDB and falls back silently when it is unavailable.
+
+**Learnability (strong).**
+- One obvious call to action: the green **Togal** button, with a first-run modal („Will Togal wash my car?") that says what the AI can do (architectural plans) and cannot (structural, elevation, site plans) before the first click.
+- A complete one-page **Shortcut Guide** (Pan = Space+drag, Select = Esc, undo/redo, R/C/A draw modes, Shift = disable snapping, S = snapping switch, Z = undo node, Enter/double-click = close, C/S/M = subtract/split/merge, Ctrl+F text search, Ctrl+E history mode, Ctrl+Shift+G chat) and an in-app shortcuts panel. Power users can stay on the keyboard; novices can ignore it.
+- Guided onboarding exists in the code: `ONBOARDING_CREATE_ASSIGN_*`, `ONBOARDING_SHAPE_EDIT_*`, `ONBOARDING_PROCESSING_EDUCATION_*` (video during processing), Appcues tours, an Intercom widget, a "Learn hub" with Academy and daily training webinars, and Amplitude guides/surveys. The product invests in teaching rather than in simplifying.
+- Every tool carries a one-line tooltip (164 `Tooltip` uses, 146 `aria-label`s); snap options explain themselves („Snaps to nearest point · Ctrl+click to snap to the point").
+
+**Comfort while working (strong, with caveats).**
+- deck.gl WebGL canvas: smooth pan/zoom on large sheets; zoom centres on the cursor; Space or middle-mouse pans from any tool.
+- Rich editing vocabulary: vertex drag, add on hover, double-click delete, Split, Merge, Cut/Subtract, Merge Lines, arcs, rotate/flip/group, Smart Paste, Repeating Groups, lasso. 76 undo / 26 redo references and a **History mode** with „restore selected history" — mistakes are cheap.
+- Right-click is a first-class surface (238 `ContextMenu` references): reclassify, rename, duplicate, delete from the Quantities Panel; two-way highlight between panel and drawing.
+- Settings expose density controls: image opacity, "Clear background", desaturate, polygon opacity, line width, crosshair, snap distance, legend, dimension labels — the drawing can be made quiet or loud at will.
+- Processing is asynchronous with a progress bar fed by named stages; you can keep working on other pages while a sheet is being Togaled.
+
+**Where comfort breaks (what reviewers and the code say).**
+- **No uncertainty signal.** Nothing marks a doubtful polygon or count; everything arrives with the same confidence. Reviewers: "automatic take-offs sometimes capture more items or items that were not intended to be captured, causing rework" (G2), "still figuring out when to trust it". The user must inspect everything.
+- **Classification-centric mental model.** Quantities live under classifications and folders; a room is not an object you open. Getting from "this room looks wrong" to the number it affects is several clicks, and nothing shows what changed downstream after an edit (confirmed in the 09-17 research for both Togal and Kreo).
+- **Feature breadth is the learning curve.** Breakdowns, assemblies with formulas and cost codes, repeating groups, comparison overlays, Chat, Labs (dark mode, tool belt, material lists), API credentials, Procore/ServiceTitan integrations — the editor is a professional estimating environment. G2's summary rates ease of use highly, but also notes glitches and limits on large files; a first-time contractor is carried by onboarding, not by a simple surface.
+- **Scale is a separate chore.** The scale control sits bottom-left; the help center tells users to verify every sheet with the Measure Tool and warns the OCR "does NOT test the correctness". The app will refuse the Togal button until a scale exists, which is the right gate but an extra step on every page.
+- **English only** (no i18n catalogue in the bundle beyond date locales), imperial-first scale presets with metric as a mode.
+
+**Read-across to Pathon.** Togal is more *comfortable for a trained estimator* (keyboard vocabulary, undo/history, right-click everywhere, WebGL smoothness) and *less comfortable for a first-time contractor* (no per-item confidence, classification tree instead of rooms, breadth). Pathon's room-centric check sheet with 🟢🟡🔴 and evidence crops is the stronger first-hour experience; what it lacked and now has on this branch is the geometry comfort (snap to walls, vertex editing). Still worth copying from Togal: a printable shortcut guide and in-app shortcuts panel, history mode with restore, right-click reclassify on the drawing, and processing-time education.
