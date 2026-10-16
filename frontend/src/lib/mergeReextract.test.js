@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  carryUserFacts, factDiff, mergeReextract, mergeReextractRooms, openingCounts,
+  carryUserFacts, factDiff, graftWallEvidence, mergeReextract, mergeReextractRooms, openingCounts,
   rereadDiffIsEmpty, rereadEntriesFor, roomTouched,
 } from './mergeReextract.js';
 
@@ -197,4 +197,61 @@ test('a floor covering he chose survives a fresh read, and the difference is rep
   // a covering the floor plan gave is simply replaced by the new read
   const planOnly = carryUserFacts({ nr: '09', grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' }, fresh);
   assert.equal(planOnly.room.grindu_danga, 'minksta');
+});
+
+
+// ── wall evidence (2026-10-16): `ilgis_pt` rides from the fresh read onto kept walls ─────────────
+const eil = (text, page, line, extra = {}) => ({ text, value_m: Number(text) / 1000, page, line_pct: line, ...extra });
+const L1 = [[0.39002, 0.40998], [0.4165, 0.40998]];
+const L2 = [[0.1, 0.2], [0.1, 0.3]];
+const storedWalls = () => ([
+  { edge_pct: [[0, 0], [1, 0]], ilgis_m: 0.9, saltinis: 'eilute', kontrole_m: 0.91, istriza: false,
+    eilutes: [eil('900', 1, L1)] },
+  { edge_pct: [[1, 0], [1, 1]], ilgis_m: 1.384, saltinis: 'eilute', kontrole_m: 1.38, istriza: false,
+    eilutes: [eil('1384', 1, L2), eil('1000', 1, [[0.5, 0.5], [0.6, 0.5]])] },
+]);
+const freshWalls = () => ([
+  { edge_pct: [[0, 0], [1, 0]], ilgis_m: 0.9, saltinis: 'eilute', kontrole_m: 0.91, istriza: false,
+    eilutes: [eil('900', 1, [[0.39052, 0.40948], [0.4162, 0.41]], { ilgis_pt: 22.14 })] },   // ends moved < 0.002
+  { edge_pct: [[1, 0], [1, 1]], ilgis_m: 1.384, saltinis: 'eilute', kontrole_m: 1.38, istriza: false,
+    eilutes: [eil('1384', 1, [...L2].reverse(), { ilgis_pt: 34.05 }),                        // drawn the other way
+      eil('1001', 1, [[0.5, 0.5], [0.6, 0.5]], { ilgis_pt: 24.6 })] },                         // text no longer matches
+]);
+
+test('a verified room takes only the fresh strings\' ilgis_pt; every other key stays byte-identical', () => {
+  const old = { nr: '05', pavadinimas: 'Svetainė', plotas_m2: 35.5, perimetras_m: 20.87,
+    perimetras_saltinis: 'user_override', user_verified_at: T, _sienos: storedWalls(),
+    _perimetras_suma: { suma_m: 20.87, sutampa: true } };
+  const fresh = { nr: '05', pavadinimas: 'Svetainė', plotas_m2: 35.5, perimetras_m: 19.0,
+    perimetras_saltinis: 'matmenu_eilutes', _sienos: freshWalls() };
+  const before = JSON.stringify(old);
+  const { rooms, diff } = mergeReextractRooms([old], [fresh], T);
+  const r = rooms[0];
+  assert.equal(JSON.stringify(old), before, 'the stored room object is not mutated');
+  const strip = (x) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'ilgis_pt' || k === '_reread_seen_at' ? undefined : v)));
+  assert.deepEqual(strip(r), strip(old));
+  const [[a], [b, c]] = r._sienos.map((w) => w.eilutes);
+  assert.equal(a.ilgis_pt, 22.14);
+  assert.equal(b.ilgis_pt, 34.05);
+  assert.equal('ilgis_pt' in c, false, 'a string whose text no longer matches gets nothing');
+  assert.deepEqual(a.line_pct, L1, 'the stored line stays the stored line');
+  // the diff speaks of facts only — the graft is not a change
+  assert.deepEqual(diff.changed, []);
+  assert.deepEqual(diff.kept[0].fields.map((f) => f.key), ['perimetras_m']);
+});
+
+test('an unverified room behaves exactly as before (its walls come from the fresh read)', () => {
+  const old = { nr: '01', plotas_m2: 6.0, perimetras_m: 6.85, perimetras_saltinis: 'matmenu_eilutes', _sienos: storedWalls() };
+  const fresh = { nr: '01', plotas_m2: 6.0, perimetras_m: 6.85, perimetras_saltinis: 'matmenu_eilutes', _sienos: freshWalls() };
+  const { rooms } = mergeReextractRooms([old], [fresh], T);
+  assert.deepEqual(rooms[0], carryUserFacts(old, fresh).room);
+  assert.deepEqual(rooms[0]._sienos, freshWalls());
+});
+
+test('graftWallEvidence returns the very same room when there is nothing to graft', () => {
+  const kept = { nr: '1', _sienos: storedWalls() };
+  assert.equal(graftWallEvidence(kept, { nr: '1' }), kept);
+  assert.equal(graftWallEvidence({ nr: '1' }, { nr: '1', _sienos: freshWalls() }).nr, '1');
+  const once = graftWallEvidence(kept, { _sienos: freshWalls() });
+  assert.equal(graftWallEvidence(once, { _sienos: freshWalls() }), once, 'a second graft changes nothing');
 });

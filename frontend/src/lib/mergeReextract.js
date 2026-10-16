@@ -11,7 +11,8 @@
  *
  * Rules (pure, no I/O):
  *   • a room he verified keeps its old facts entirely — he confirmed them; the
- *     diff says what the new read would have made of it;
+ *     diff says what the new read would have made of it. Only the EVIDENCE of
+ *     its walls may be refreshed (`graftWallEvidence`: a string's `ilgis_pt`);
  *   • an unverified room takes the new read, except the facts he set himself
  *     (`plotas_saltinis` / `perimetras_saltinis` / `lubu_aukstis_saltinis` =
  *     user_override or manual, `plotas_source` = manual_polygon, `polygon_source`
@@ -175,6 +176,48 @@ export function carryUserFacts(oldRoom, freshRoom) {
 
 const summary = (r) => ({ nr: nrKey(r), pavadinimas: roomName(r), plotas_m2: num(r?.plotas_m2) });
 
+// Line ends of one string agree within this page fraction (backend dimension_sum.EVIDENCE_MATCH).
+const EVIDENCE_MATCH = 0.002;
+const sameLine = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === 2 && b.length === 2
+  && [0, 1].every((i) => [0, 1].every((j) => Math.abs(Number(a[i]?.[j]) - Number(b[i]?.[j])) <= EVIDENCE_MATCH));
+
+/**
+ * The kept room with the fresh read's EVIDENCE grafted on — never a fact. Each stored
+ * `_sienos[].eilutes[]` entry takes `ilgis_pt` (the drawn length its string's scale used; the
+ * viewer's scale check reads it) from the fresh room's string on the same page with the same text
+ * and the same line (both ends within EVIDENCE_MATCH, either order). No match → the entry stays as
+ * it is. Walls, lengths, sources and perimeters are untouched; a room with nothing to graft is
+ * returned as it was (same object).
+ */
+export function graftWallEvidence(kept, fresh) {
+  const walls = kept?._sienos;
+  if (!Array.isArray(walls)) return kept;
+  const pool = [];
+  for (const w of Array.isArray(fresh?._sienos) ? fresh._sienos : []) {
+    for (const e of Array.isArray(w?.eilutes) ? w.eilutes : []) {
+      if (isObj(e) && e.ilgis_pt != null && Array.isArray(e.line_pct)) pool.push(e);
+    }
+  }
+  if (!pool.length) return kept;
+  let touched = false;
+  const nextWalls = walls.map((w) => {
+    if (!isObj(w) || !Array.isArray(w.eilutes)) return w;
+    let wallTouched = false;
+    const eilutes = w.eilutes.map((e) => {
+      if (!isObj(e) || !Array.isArray(e.line_pct)) return e;
+      const hit = pool.find((f) => Number(f.page) === Number(e.page) && String(f.text) === String(e.text)
+        && (sameLine(e.line_pct, f.line_pct) || sameLine(e.line_pct, [...f.line_pct].reverse())));
+      if (!hit || e.ilgis_pt === hit.ilgis_pt) return e;
+      wallTouched = true;
+      return { ...e, ilgis_pt: hit.ilgis_pt };
+    });
+    if (!wallTouched) return w;
+    touched = true;
+    return { ...w, eilutes };
+  });
+  return touched ? { ...kept, _sienos: nextWalls } : kept;
+}
+
 /**
  * Merge the rooms of a fresh read into the stored ones.
  * Returns `{ rooms, diff }` where diff = `{ at, changed, kept, added, removed }`.
@@ -204,7 +247,8 @@ export function mergeReextractRooms(oldRooms, newRooms, now = new Date().toISOSt
     if (isRoomVerified(old)) {
       // He confirmed these facts; the new read does not get to move them.
       const wouldChange = factDiff(old, fresh);
-      rooms.push({ ...old, _reread_seen_at: now });
+      // ...but the evidence of its walls may learn what the fresh read stores about the same strings.
+      rooms.push({ ...graftWallEvidence(old, fresh), _reread_seen_at: now });
       if (wouldChange.length) {
         kept.push({
           nr: key, pavadinimas: roomName(old), why: 'verified',
@@ -214,7 +258,7 @@ export function mergeReextractRooms(oldRooms, newRooms, now = new Date().toISOSt
       continue;
     }
     const { room, carried } = carryUserFacts(old, fresh);
-    rooms.push(room);
+    rooms.push(graftWallEvidence(room, fresh));
     if (carried.length) kept.push({ nr: key, pavadinimas: roomName(old), why: 'user', fields: carried });
     const diffs = factDiff(old, room);
     if (diffs.length) changed.push({ nr: key, pavadinimas: roomName(room) || roomName(old), fields: diffs });
