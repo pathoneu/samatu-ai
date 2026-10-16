@@ -71,7 +71,7 @@ Full bake-off: `detector_bench/README.md` + `results/2026-05-03-bakeoff.md`.
 
 `docs/superpowers/research/` (21 files, all kept):
 - **PDF feasibility & vision:** `2026-04-28-pdf-spike-findings`, `2026-04-29-phase-c-{libraries,opencv-feasibility,competitor-tech}`, `vision-prompting-techniques`
-- **Competitor UX:** `2026-05-02-competitor-viewer-ui-deep-dive`, `auto-count-{ux-patterns,clickcount-ux}`, `industry-takeoff-tools`
+- **Competitor UX:** `2026-05-02-competitor-viewer-ui-deep-dive`, `auto-count-{ux-patterns,clickcount-ux}`, `industry-takeoff-tools`, `2026-09-17-tyrimas-togal-kreo`, `2026-10-16-togal-pipeline-analysis` (Togal end to end from its shipped client + patents: what is PDF parsing, what is a model, what is rules, where it breaks, and the three gaps worth building)
 - **LT specifics:** `lt-drawing-conventions`, `2026-04-28-takeoff-standards-and-pdf-ux`, `rangovo-p1-position-analysis`, `2026-04-2{8,9}-rangovas-*`
 - **Polygon UX:** `2026-04-29-phase-c-polygon-ux`, `2026-04-29-isklotines-quality`
 - **Validation / formulas:** `formula-validation`, `2026-04-28-accuracy-priorities`
