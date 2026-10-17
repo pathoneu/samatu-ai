@@ -510,7 +510,7 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
         kampai_vidiniai=vi, kampai_isoriniai=isr, pertvaru_galai=kept["n_partition_walls"],
         pertvaru_galai_dalys=parts_ends,
         kampai=(f"Kampai iš sujungto kontūro: {vi} vidiniai, {isr} išoriniai; pertvarų galai: "
-                + " + ".join(str(p) for p in parts_ends) + " iš sujungtų patalpų"))
+                + " + ".join(str(p) for p in parts_ends) + " iš sujungtų patalpų — pataisykite patalpos lape"))
     carried = [{**e, "_is_patalpos": gone_nr} for e in (gone.get("elementai") or []) if isinstance(e, dict)]
     kept["elementai"] = [e for e in (kept.get("elementai") or []) if isinstance(e, dict)] + carried
 
