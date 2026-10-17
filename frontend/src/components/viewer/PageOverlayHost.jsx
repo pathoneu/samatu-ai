@@ -23,6 +23,7 @@ import RoomZoneLayer from '@/components/project/RoomZoneLayer';
 import MeasureLayer, { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from './MeasureLayer';
 import CheckLayer from './CheckLayer';
 import DrawingGeometryLayer from './DrawingGeometryLayer';
+import RevisionOverlayLayer from './RevisionOverlayLayer';
 import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
 import OutlineToolLayer from './OutlineToolLayer';
@@ -115,6 +116,8 @@ export default function PageOverlayHost({
   // Sheet links (Togal-v2 W7): { sheets, version } — references on this sheet to other sheets,
   // underlined; `sheets` is the rail's model so the hover names a sheet the way the rail does.
   sheetLinks = null,
+  // A later edition of the drawing over this sheet (togal-v2 W10): {rid, record, mode, opacity} or null.
+  revisionOverlay = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -221,6 +224,11 @@ export default function PageOverlayHost({
       {!checkMode && wallsLayerVisible && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <DrawingGeometryLayer geometry={pageGeometry} rooms={displayRooms} page={layout.pageNumber} renderedSize={{ width, height }} />
+        </div>
+      )}
+      {!checkMode && revisionOverlay && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <RevisionOverlayLayer projectId={projectId} page={layout.pageNumber} overlay={revisionOverlay} renderedSize={{ width, height }} pageSizePt={pageSizePt} pageRotation={pageRotation} />
         </div>
       )}
       {!checkMode && (

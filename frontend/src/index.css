@@ -83,6 +83,12 @@
     --source-computed: 262 45% 52%;      /* violet: Python computed */
     --source-ai: 201 20% 23%;            /* slate: AI inferred (was clay) */
 
+    /* ──── Drawing-revision overlay (togal-v2 W10): the server paints these into the
+            „skirtumas" picture (api/pdf_revisions.py NAUJA_RGB / ISBRAUKTA_RGB — a test
+            holds them equal). New lines evergreen, removed lines muted clay. ──── */
+    --revision-new: 165 24% 32%;
+    --revision-removed: 12 38% 48%;
+
     /* ──── Confidence dots (žalia / geltona / raudona — matches landing) ──── */
     --conf-high: 150 60% 30%;            /* green — read directly */
     --conf-med:  40 90% 32%;             /* amber — derived (su prielaida) */

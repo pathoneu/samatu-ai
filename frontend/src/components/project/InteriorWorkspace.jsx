@@ -27,6 +27,7 @@ import { Layers, Upload } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import DetectRunButton from '@/components/viewer/DetectRunButton';
+import RevisionCompareControl from '@/components/viewer/RevisionCompareControl';
 import DetectRunProgress from '@/components/viewer/DetectRunProgress';
 import { useDetectRun } from '@/lib/useDetectRun';
 import WorkspacePanel from './WorkspacePanel';
@@ -160,6 +161,8 @@ export default function InteriorWorkspace({
   const { t } = useTranslation();
   // „Perskaityti lapą" (2026-10-16): the €0 reading per sheet with named stages (api/detect_run.py)
   const detectRun = useDetectRun(project, onProjectChange);
+  // „Palyginti leidimus“ (togal-v2 W10): a later edition laid over the sheets — on screen only, never saved
+  const [revisionOverlay, setRevisionOverlay] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfBlob, setPdfBlob] = useState(null);  // Diena 6: V9 click-to-count'ui
   // Sprint H7 (2026-04-29): default 70/30 — PDF gets more central space.
@@ -522,8 +525,12 @@ export default function InteriorWorkspace({
               projectId={project.id}
               pdfBlob={pdfBlob}
               renderToolbarAddon={(page, total) => (
-                <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+                <>
+                  <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+                  <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} />
+                </>
               )}
+              revisionOverlay={revisionOverlay}
               onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
               onRoomPolygonFill={handleRoomPolygonFill}
               onRoomOutlineEdit={handleRoomOutlineEdit}
