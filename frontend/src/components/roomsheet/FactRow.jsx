@@ -102,7 +102,7 @@ export default function FactRow({
   const field = fact?.editable?.field;
 
   const value = fact?.unit
-    ? `${ltNumber(fact.value, fact.key === 'angos' ? 0 : 2)} ${fact.unit}`
+    ? `${ltNumber(fact.value, fact.key === 'angos' || fact.key === 'pertvaros' ? 0 : 2)} ${fact.unit}`
     : String(fact?.value ?? '—');
 
   const commitNumber = () => {
@@ -313,12 +313,12 @@ export default function FactRow({
           </div>
         )}
 
-        {/* Number editor — aukštis, plotas, perimetras. */}
+        {/* Number editor — aukštis, plotas, perimetras, pertvaros. */}
         {editing && kind === 'number' && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`f-${fact.key}`}>
               {t(`project.roomSheet.edit${fact.key === 'aukstis' ? 'Aukstis'
-                : fact.key === 'plotas' ? 'Plotas' : 'Perimetras'}`)}
+                : fact.key === 'plotas' ? 'Plotas' : fact.key === 'pertvaros' ? 'Pertvaros' : 'Perimetras'}`)}
             </label>
             <input
               id={`f-${fact.key}`}

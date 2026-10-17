@@ -47,7 +47,9 @@ test('the sample fixture carries every key the renderer reads', () => {
 
 test('orderFacts puts the six in sheet order regardless of payload order', () => {
   const shuffled = [...SAMPLE.facts].reverse();
-  assert.deepEqual(orderFacts(shuffled).map((f) => f.key), [...FACT_ORDER]);
+  // „pertvaros" (2026-10-17) is on the sheet only for a merged room or a count he typed — not in SAMPLE
+  assert.deepEqual(orderFacts(shuffled).map((f) => f.key), FACT_ORDER.filter((k) => k !== 'pertvaros'));
+  assert.deepEqual(orderFacts([{ key: 'pertvaros' }, ...shuffled]).map((f) => f.key), [...FACT_ORDER]);
 });
 
 test('orderFacts keeps an unknown fact key, last and in payload order', () => {

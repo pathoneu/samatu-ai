@@ -1808,6 +1808,32 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
     return payload
 
 
+# ── pertvaros (2026-10-17) ──────────────────────────────────────────────────
+
+def _fact_pertvaros(project: dict, room: dict, region: list[float] | None) -> dict | None:
+    """„Pertvarų sienos atviroje erdvėje": the partition ends the corner bead counts (`n_partition_walls`
+    × height, kampai „pusiniai"). On the sheet only where it is a question: a merged room — its partitions
+    still stand, rooms are merged because no wall separates them, so both rooms' ends were kept — or a room
+    whose count he typed. Every other room keeps today's sheet."""
+    merged = room.get("_sujungimas") if isinstance(room.get("_sujungimas"), dict) else {}
+    parts = [int(p) for p in (merged.get("pertvaru_galai_dalys") or []) if isinstance(p, (int, float)) and not isinstance(p, bool)]
+    his = str(room.get("n_partition_walls_saltinis") or "").strip().lower() in _HIS_SOURCES
+    if not parts and not his:
+        return None
+    v = room.get("n_partition_walls")
+    value = int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 else 0
+    page = room.get("puslapio_nr")
+    rect = region_on_page(room, page, region)
+    editable = {"field": "n_partition_walls", "kind": "number"}
+    if his:
+        return _fact("pertvaros", value, "vnt.", "read", "prielaida", page, rect,
+                     f"Pertvarų sienų skaičių įrašėte patys: {value}.", editable)
+    sentence = (" + ".join(str(p) for p in parts) + f" = {sum(parts)} — patalpos sujungtos. "
+                "Atviros erdvės pertvaros lieka, todėl jų galai skaičiuojami kampuose. "
+                "Jei pertvara dingo, įrašykite tikrą skaičių.")
+    return _fact("pertvaros", value, "vnt.", "assumed", "prielaida", page, rect, sentence, editable)
+
+
 _HIS_SOURCES = ("user_override", "manual")
 
 
@@ -1838,6 +1864,8 @@ def _is_yours(project: dict, room: dict, key: str) -> bool:
             isinstance(e, dict) and e.get("_dydis_user") for e in (room.get("elementai") or []))
     if key == "grindys":
         return src(room.get("grindu_danga_saltinis")) == "user_override" and bool(room.get("grindu_danga"))
+    if key == "pertvaros":
+        return src(room.get("n_partition_walls_saltinis")) in _HIS_SOURCES
     return False
 
 
@@ -1855,6 +1883,9 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
         _fact_angos(project, room, region),
         _fact_grindys(project, room, region),
     ]
+    pertvaros = _fact_pertvaros(project, room, region)
+    if pertvaros is not None:
+        facts.append(pertvaros)
     for fact in facts:
         fact["yours"] = _is_yours(project, room, fact["key"])
     quantities, excluded = room_quantities(project, room_nr)

@@ -78,6 +78,7 @@ export function roomTouched(room) {
     || USER_SOURCES.includes(src(room.plotas_saltinis))
     || USER_SOURCES.includes(src(room.perimetras_saltinis))
     || USER_SOURCES.includes(src(room.lubu_aukstis_saltinis))
+    || USER_SOURCES.includes(src(room.n_partition_walls_saltinis))
     || USER_AREA_SOURCES.includes(src(room.plotas_source))
     || USER_POLYGON_SOURCES.includes(src(room.polygon_source))
     || !!room._angos_user_at
@@ -131,6 +132,13 @@ export function carryUserFacts(oldRoom, freshRoom) {
     keep('perimetras_m', oldRoom.perimetras_m, freshRoom.perimetras_m);
     room.perimetras_m = oldRoom.perimetras_m;
     room.perimetras_saltinis = oldRoom.perimetras_saltinis;
+  }
+  // „Pertvarų sienos atviroje erdvėje" he typed on the room sheet (2026-10-17): a fresh read keeps his count
+  if (USER_SOURCES.includes(src(oldRoom.n_partition_walls_saltinis)) && oldRoom.n_partition_walls != null) {
+    keep('n_partition_walls', oldRoom.n_partition_walls, freshRoom.n_partition_walls);
+    room.n_partition_walls = oldRoom.n_partition_walls;
+    room.n_partition_walls_saltinis = oldRoom.n_partition_walls_saltinis;
+    if (oldRoom._n_partition_walls_user_at) room._n_partition_walls_user_at = oldRoom._n_partition_walls_user_at;
   }
   if (USER_SOURCES.includes(src(oldRoom.lubu_aukstis_saltinis)) && oldRoom.lubu_aukstis_m != null) {
     keep('lubu_aukstis_m', oldRoom.lubu_aukstis_m, freshRoom.lubu_aukstis_m);

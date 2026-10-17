@@ -17,7 +17,7 @@
 
 export const LEARNING_SOURCES = Object.freeze([
   'eilute_teisinga', 'eilute_kiekis', 'patalpa_patvirtinta', 'klausimas_tinka', 'klausimas_netinka',
-  'konturas', 'simbolis', 'pokalbis_taip', 'pokalbis_ne', 'prielaidos',
+  'konturas', 'simbolis', 'pokalbis_taip', 'pokalbis_ne', 'prielaidos', 'patalpa_pertvaros',
 ]);
 
 /** The row's id in the app's own vocabulary: the stable hash first, then the legacy keys. */
@@ -70,6 +70,13 @@ export function learningEventsFromChange(prev, next) {
   if (Array.isArray(next.patalpos) || Array.isArray(next.v8_rooms)) {
     const before = roomsByNr(prev);
     for (const [nr, room] of roomsByNr(next)) {
+      // „Pertvarų sienos atviroje erdvėje" he typed on the room sheet (2026-10-17)
+      if (room._n_partition_walls_user_at && room._n_partition_walls_user_at !== before.get(nr)?._n_partition_walls_user_at) {
+        events.push({
+          field_path: `patalpa.${nr}.pertvaros`, source: 'patalpa_pertvaros',
+          old_value: num(before.get(nr)?.n_partition_walls) ?? 0, new_value: num(room.n_partition_walls), room_nr: nr, note: null,
+        });
+      }
       if (room.user_verified_at && room.user_verified_at !== before.get(nr)?.user_verified_at) {
         events.push({
           field_path: `patalpa.${nr}.patvirtinta`, source: 'patalpa_patvirtinta',

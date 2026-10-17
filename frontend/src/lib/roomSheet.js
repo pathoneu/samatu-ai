@@ -27,7 +27,7 @@ import { ltPlural } from './ltPlural.js';
 
 /** Drawing-order of the six facts, as the founder's sheet lists them. */
 export const FACT_ORDER = Object.freeze([
-  'plotas', 'perimetras', 'aukstis', 'apdaila', 'angos', 'grindys',
+  'plotas', 'perimetras', 'aukstis', 'apdaila', 'angos', 'grindys', 'pertvaros',
 ]);
 
 /** Seconds a contractor is assumed to spend on one unchecked room. */
@@ -41,6 +41,7 @@ export const FACT_LABEL_KEY = Object.freeze({
   apdaila: 'factApdaila',
   angos: 'factAngos',
   grindys: 'factGrindys',
+  pertvaros: 'factPertvaros',
 });
 
 /**
@@ -457,6 +458,11 @@ export function userEditPatch(field, value, now = new Date().toISOString()) {
   // The floor covering he chose (2026-09-20): the engine reads `grindu_danga`, and the
   // source keeps the floor-plan reader and a re-read of the drawing off it.
   if (field === 'grindu_danga') return { grindu_danga: value, grindu_danga_saltinis: 'user_override' };
+  // „Pertvarų sienos atviroje erdvėje" (2026-10-17): a whole count, his — the corner bead's partition ends.
+  if (field === 'n_partition_walls') {
+    return { n_partition_walls: Math.max(0, Math.round(Number(value) || 0)), n_partition_walls_saltinis: 'user_override',
+      _n_partition_walls_user_at: now };
+  }
   return { [field]: value };
 }
 
@@ -816,6 +822,7 @@ const FACT_OF_FIELD = {
   grindu_danga: 'grindys',
   paskirtis: 'grindys',
   elementai: 'angos',
+  n_partition_walls: 'pertvaros',
 };
 
 /** The fact a saved field belongs to — where the fix's consequence is shown. */

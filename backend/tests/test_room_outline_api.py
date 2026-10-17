@@ -465,4 +465,4 @@ def test_a_merge_counts_the_union_outlines_corners_and_keeps_both_rooms_partitio
     k = out["sujungimas"]["01"]
     assert (k["_sujungimas"]["kampai_vidiniai"], k["_sujungimas"]["kampai_isoriniai"]) == (4, 0)      # a rectangle
     assert k["n_partition_walls"] == 5 and k["_sujungimas"]["pertvaru_galai_dalys"] == [2, 3]
-    assert k["_sujungimas"]["kampai"] == "Kampai iš sujungto kontūro: 4 vidiniai, 0 išoriniai; pertvarų galai: 2 + 3 iš sujungtų patalpų"
+    assert k["_sujungimas"]["kampai"] == "Kampai iš sujungto kontūro: 4 vidiniai, 0 išoriniai; pertvarų galai: 2 + 3 iš sujungtų patalpų — pataisykite patalpos lape"

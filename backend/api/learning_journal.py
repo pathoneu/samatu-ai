@@ -109,6 +109,14 @@ def sentence_for(c: dict, rows: dict[str, dict] | None = None) -> str:
     if source == "patalpa_patvirtinta":
         area = lt_number(new)
         return f"{_room(c)}: plotą {area} m² patvirtinote" if area else f"{_room(c)}: patalpą patvirtinote"
+    if source == "patalpa_pertvaros":
+        def count(v):
+            try:
+                return str(int(round(float(v))))
+            except (TypeError, ValueError):
+                return "—"
+        change = f"{count(old)} → {count(new)}"
+        return f"{_room(c)}: pertvarų sienų atviroje erdvėje pakeitėte {change}"
     if source in ("klausimas_tinka", "klausimas_netinka"):
         qid = str(c.get("note") or ".".join(_path(c)[1:]) or "")
         topic = QUESTION_TOPICS.get(qid.split(":")[0])

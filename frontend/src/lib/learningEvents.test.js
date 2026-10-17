@@ -111,3 +111,19 @@ test('chat thumbs: one field per answer, his question kept, the selection named'
   assert.equal(chatFeedbackCorrection({ answer: '' }), null);
   assert.notEqual(textHash('a'), textHash('b'));
 });
+
+test('„Pertvarų sienos atviroje erdvėje" he typed on the room sheet is one patalpa_pertvaros row', async () => {
+  const { userEditPatch } = await import('./roomSheet.js');
+  const { LEARNING_SOURCES } = await import('./learningEvents.js');
+  const patch = userEditPatch('n_partition_walls', 3.4, '2026-10-17T10:00:00Z');
+  assert.deepEqual(patch, { n_partition_walls: 3, n_partition_walls_saltinis: 'user_override',
+    _n_partition_walls_user_at: '2026-10-17T10:00:00Z' });
+  const prev = { patalpos: [{ nr: '04', n_partition_walls: 5 }] };
+  const next = { patalpos: [{ nr: '04', ...patch }] };
+  assert.deepEqual(learningEventsFromChange(prev, next), [{
+    field_path: 'patalpa.04.pertvaros', source: 'patalpa_pertvaros', old_value: 5, new_value: 3, room_nr: '04', note: null,
+  }]);
+  // a recompute carrying the same stamp over is not a decision
+  assert.deepEqual(learningEventsFromChange(next, { patalpos: [{ ...next.patalpos[0] }] }), []);
+  assert.ok(LEARNING_SOURCES.includes('patalpa_pertvaros'));
+});
