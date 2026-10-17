@@ -1265,7 +1265,29 @@ def _apply_experiment_env(spec: str) -> str:
         return "mixed-vote_" + models.replace(",", "+").replace(" ", "")
     raise SystemExit(
         f"unknown --experiment {spec!r} — expected native-pdf | agentic-zoom "
-        f"| mixed-vote:<m1,m2,...>")
+        f"| mixed-vote:<m1,m2,...> | outline-corners (engine, with --recompute)")
+
+
+# Engine experiments (2026-10-16): an env flag the CALCULATOR reads, so a recompute of the stored extracts
+# measures it — no Vision call. Allowed with --recompute only, never gated and never accepted as the
+# baseline; the run dir carries the tag. The default path does not touch any of this.
+_RECOMPUTE_EXPERIMENTS = {
+    # every room with a wall outline counts its corners off the outline (universal_rules.room_outline_corners)
+    "outline-corners": "SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE",
+}
+RUN_TAG = ""                 # "__<experiment>" while a recompute experiment runs
+
+
+def _apply_recompute_experiment(args) -> None:
+    global RUN_TAG
+    spec = args.experiment
+    if not args.recompute:
+        raise SystemExit(f"--experiment {spec} is an engine experiment: it needs --recompute")
+    if args.gate or args.accept_baseline:
+        raise SystemExit(f"--experiment {spec} is never gated or accepted as the baseline — drop --gate / --accept-baseline")
+    os.environ[_RECOMPUTE_EXPERIMENTS[spec]] = "1"
+    RUN_TAG = f"__{spec}"
+    print(f"  EXPERIMENT {spec} (engine flag {_RECOMPUTE_EXPERIMENTS[spec]}=1, recompute only; not gated)")
 
 
 def run_one(project_id: str, mode: str, *, estimate_exterior: bool = False,
@@ -1545,7 +1567,7 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
     rows_excluded: list[tuple[str, Any, str]] = []
 
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only"
+    run_dir = EVAL_RUNS_ROOT / f"{ts}_multi_totals_only{RUN_TAG}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # NO OUT-OF-SAMPLE PROJECT (2026-10-05, audit testing-eval-1). objektas_g/h
@@ -3440,7 +3462,9 @@ def main() -> int:
               f"output → eval_runs/{args.model}/)")
 
     experiment_tag = None
-    if args.experiment:
+    if args.experiment in _RECOMPUTE_EXPERIMENTS:
+        _apply_recompute_experiment(args)
+    elif args.experiment:
         # Same guard as --model: a cached extract was produced WITHOUT the
         # experiment env, so scoring it under an experiment label would
         # corrupt the A/B. Fresh Vision reads only.
