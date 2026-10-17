@@ -751,7 +751,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0 }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -1415,6 +1415,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onMeasureCalibAChange={(point) => setCalibSlot(
                         point ? { pageNr: layout.pageNumber, point } : { pageNr: null, point: null })}
                       sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
+                      revisionOverlay={check ? null : revisionOverlay}
                     />
                   )}
                 />
@@ -1627,6 +1628,8 @@ export default function TakeoffViewer({
   sheetOverrides = null,
   onSheetOverridesChange = null,
   sheetLinksVersion = 0,
+  // A later edition of the drawing laid over the sheets ({rid, record, mode, opacity}; RevisionCompareControl).
+  revisionOverlay = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1667,6 +1670,7 @@ export default function TakeoffViewer({
           sheetOverrides={sheetOverrides}
           onSheetOverridesChange={onSheetOverridesChange}
           sheetLinksVersion={sheetLinksVersion}
+          revisionOverlay={revisionOverlay}
         />
       </EmbedPDF>
     </div>

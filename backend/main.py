@@ -417,6 +417,7 @@ from api.sheet_links import router as sheet_links_router
 from api.export_overlay_pdf import router as export_overlay_pdf_router
 from api.project_questions import router as project_questions_router
 from api.project_versions import router as project_versions_router
+from api.pdf_revisions import router as pdf_revisions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
 
 load_dotenv()
@@ -771,6 +772,7 @@ app.include_router(export_overlay_pdf_router)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
 app.include_router(project_versions_router)
+app.include_router(pdf_revisions_router)
 app.include_router(account_router)
 
 
