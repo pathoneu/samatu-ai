@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from api.free_reread import NO_PDF, _project_for
 from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry, geometry_dimension_strings
 from extractor.pdf_vectors import page_geometry
+from extractor.universal_rules import ring_corner_counts
 from extractor.vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, joined_space, outline_at, propose_split, split_space
 
 log = logging.getLogger("samatu.room_outline")
@@ -291,7 +292,7 @@ def _measured(ring, holes, size: tuple[float, float], scale: float) -> dict:
         cut.append(hole)
     perim_pt = outer.exterior.length
     holes_m = [{"perimetras_m": round(h.exterior.length * scale, 2), "plotas_m2": round(h.area * scale * scale, 2),
-                "kampai": _convex_corners(h)} for h in cut]
+                "kampai": _convex_corners(h, scale)} for h in cut]
     return {
         "skyles": holes_m,
         "plotas_m2": round((outer.area - sum(h.area for h in cut)) * scale * scale, 2),
@@ -301,18 +302,10 @@ def _measured(ring, holes, size: tuple[float, float], scale: float) -> dict:
     }
 
 
-def _convex_corners(hole) -> int:
-    """The hole's corners that stick INTO the room (a column's outer corners: corner bead), straight runs skipped."""
-    from shapely.geometry.polygon import orient
-    pts = list(orient(hole, sign=1.0).exterior.coords)[:-1]
-    n, out = len(pts), 0
-    for i in range(n):
-        (ax, ay), (bx, by), (cx, cy) = pts[i - 1], pts[i], pts[(i + 1) % n]
-        ux, uy, vx, vy = bx - ax, by - ay, cx - bx, cy - by
-        lu, lv = (ux * ux + uy * uy) ** 0.5, (vx * vx + vy * vy) ** 0.5
-        if lu and lv and (ux * vy - uy * vx) / (lu * lv) > 0.17:      # a left turn of more than ~10°
-            out += 1
-    return out
+def _convex_corners(hole, scale: float) -> int:
+    """The hole's corners that stick INTO the room (a column's outer corners: corner bead): the convex vertices
+    of the hole's own ring, straight runs and jogs under 0,10 m skipped (`ring_corner_counts`)."""
+    return ring_corner_counts(list(hole.exterior.coords), m_per_unit=scale)[0]
 
 
 def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], scale: float,
@@ -390,7 +383,7 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
 # „Sujungti" writes these room keys besides the geometry ones (2026-10-16, follow-up (a)): the kept room bills BOTH
 # table rows and holds both rooms' openings; the absorbed one is marked structurally and lists nothing of its own.
 MERGE_ROOM_KEYS = ("plotas_m2", "plotas_saltinis", "_plotas_pries_sujungima", "_sujungimas", "elementai",
-                   "_sujungta_i", "_elementai_pries_sujungima", "_perimetras_pries_sujungima")
+                   "_sujungta_i", "_elementai_pries_sujungima", "_perimetras_pries_sujungima", "n_partition_walls")
 MERGED_AREA = "eksplikacija_sujungta"     # `plotas_saltinis` of a room that bills two eksplikacija rows
 
 
@@ -503,6 +496,21 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     }
     if finish_warning:
         kept["_sujungimas"]["apdaila_skiriasi"] = finish_warning
+    # The merged room's corners come off the union outline (counted here, once: a rebuild reads the numbers),
+    # and the partitions of the space still stand — rooms are merged because no wall separates them — so
+    # both rooms' partition ends stay with the kept room (2026-10-16 follow-up (1)).
+    vi, isr = ring_corner_counts([(x * W, y * H) for x, y in ring], m_per_unit=scale)
+    def ends(r):
+        v = r.get("n_partition_walls")
+        return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 else 0
+    before_ends = (before or {}).get("pertvaru_galai_dalys") or [ends(kept)]
+    parts_ends = list(before_ends) + [ends(gone)]
+    kept["n_partition_walls"] = sum(parts_ends)
+    kept["_sujungimas"].update(
+        kampai_vidiniai=vi, kampai_isoriniai=isr, pertvaru_galai=kept["n_partition_walls"],
+        pertvaru_galai_dalys=parts_ends,
+        kampai=(f"Kampai iš sujungto kontūro: {vi} vidiniai, {isr} išoriniai; pertvarų galai: "
+                + " + ".join(str(p) for p in parts_ends) + " iš sujungtų patalpų"))
     carried = [{**e, "_is_patalpos": gone_nr} for e in (gone.get("elementai") or []) if isinstance(e, dict)]
     kept["elementai"] = [e for e in (kept.get("elementai") or []) if isinstance(e, dict)] + carried
 

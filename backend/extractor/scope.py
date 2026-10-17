@@ -92,6 +92,7 @@ FAMILY_ROOM_FIELDS: dict[str, tuple[str, ...]] = {
     "apdaila": (
         "walls_paintable_m2", "ceiling_paintable_m2", "dazymo_plotas_m2", "dazai_l",
         "kampu_metrai", "kampai_pusiniai_m", "kampai_perimetras_m", "kampai_opening_reveals_m", "kampai_skyliu_m",
+        "kampai_isoriniai_m",
         "kampai_inner_m", "angokrasciu_gkp_m", "nisu_metrai", "lubu_karnizo_m", "molio_tinko_m2",
         "glaistas_kg", "gruntas_l", "gkp_lubu_standart_m2", "gkp_lubu_virs_3m_m2",
     ),

@@ -347,3 +347,27 @@ def test_ablations_share_truth_but_never_enter_the_corpus_average(harness):
     src = inspect.getsource(harness.run_totals_only_multi)
     assert 'entry.get("ablation_of")' in src, "corpus loop must exclude ablations"
     assert "excluded_ablation" in src
+
+
+# ── engine experiments (2026-10-16): recompute only, never gated, never the baseline ──
+
+def test_the_outline_corners_experiment_is_recompute_only_and_never_gated(harness, monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.delenv("SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE", raising=False)
+    monkeypatch.setattr(harness, "RUN_TAG", "")
+    ns = lambda **k: SimpleNamespace(**{"experiment": "outline-corners", "recompute": True, "gate": False,  # noqa: E731
+                                        "accept_baseline": False, **k})
+    for bad in (ns(recompute=False), ns(gate=True), ns(accept_baseline=True)):
+        with pytest.raises(SystemExit):
+            harness._apply_recompute_experiment(bad)
+    import os
+    assert "SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE" not in os.environ and harness.RUN_TAG == ""
+    try:
+        harness._apply_recompute_experiment(ns())
+        assert os.environ["SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE"] == "1" and harness.RUN_TAG == "__outline-corners"
+    finally:
+        os.environ.pop("SAMATU_EXPERIMENT_CORNERS_FROM_OUTLINE", None)
+
+
+def test_the_default_run_has_no_experiment(harness):
+    assert _load_harness().RUN_TAG == ""
