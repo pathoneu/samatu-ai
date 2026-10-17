@@ -453,3 +453,16 @@ def test_a_merge_of_rooms_with_the_same_finish_warns_nothing(tmp_path, monkeypat
     t = 0.2
     out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
     assert out["ispejimas"] is None and "apdaila_skiriasi" not in out["sujungimas"]["01"]["_sujungimas"]
+
+
+def test_a_merge_counts_the_union_outlines_corners_and_keeps_both_rooms_partition_ends(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob(n_partition_walls=2)
+    blob["patalpos"][1]["n_partition_walls"] = 3
+    _store(blob=blob)
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    k = out["sujungimas"]["01"]
+    assert (k["_sujungimas"]["kampai_vidiniai"], k["_sujungimas"]["kampai_isoriniai"]) == (4, 0)      # a rectangle
+    assert k["n_partition_walls"] == 5 and k["_sujungimas"]["pertvaru_galai_dalys"] == [2, 3]
+    assert k["_sujungimas"]["kampai"] == "Kampai iš sujungto kontūro: 4 vidiniai, 0 išoriniai; pertvarų galai: 2 + 3 iš sujungtų patalpų"

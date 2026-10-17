@@ -2413,11 +2413,16 @@ FLOOR_COVERINGS: dict[str, tuple[str, bool]] = {
 }
 
 
-def ring_corner_counts(ring) -> tuple[int, int]:
+CORNER_MIN_EDGE_M = 0.10      # an edge shorter than this is a drawing artefact (a jog), not a wall
+
+
+def ring_corner_counts(ring, m_per_unit: float | None = None) -> tuple[int, int]:
     """(inner, outer) corners of a room's outline seen from INSIDE the room: a convex vertex is where two
     walls meet (vidinis kampas), a reflex one a wall edge sticking into the room (išorinis kampas). Straight
-    runs (a turn under ~10°) are no corner. A rectangle → (4, 0), an L → (5, 1). Any frame whose axes keep
-    their orientation (page points, page fractions) gives the same answer."""
+    runs (a turn under ~10°) are no corner. A rectangle → (4, 0), an L → (5, 1). The ring is in a frame
+    whose axes keep their orientation; `m_per_unit` turns its lengths into metres, and then a vertex counts
+    only when BOTH its edges are at least CORNER_MIN_EDGE_M long — two short jogs would otherwise mint two
+    corners. Without a scale no length guard can be applied (a caller that has none says so)."""
     pts = [(float(p[0]), float(p[1])) for p in (ring or []) if isinstance(p, (list, tuple)) and len(p) >= 2]
     if len(pts) > 1 and pts[0] == pts[-1]:
         pts = pts[:-1]
@@ -2432,6 +2437,8 @@ def ring_corner_counts(ring) -> tuple[int, int]:
         ux, uy, vx, vy = bx - ax, by - ay, cx - bx, cy - by
         lu, lv = math.hypot(ux, uy), math.hypot(vx, vy)
         if not lu or not lv:
+            continue
+        if m_per_unit and min(lu, lv) * m_per_unit < CORNER_MIN_EDGE_M:
             continue
         turn = sign * (ux * vy - uy * vx) / (lu * lv)
         if turn > 0.17:
@@ -2468,10 +2475,18 @@ def room_outline_corners(room: dict) -> tuple[int, int] | None:
     if experiment_corners_from_outline():
         from .dimension_sum import WALL_OUTLINES
         ring = room.get("polygon_pct")
-        if room.get("polygon_source") in WALL_OUTLINES and isinstance(ring, list) and len(ring) >= 3:
-            vi, isr = ring_corner_counts(ring)
-            if vi + isr >= 3:
-                return vi, isr
+        k = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
+        perim_m = k.get("perimetras_m")
+        if room.get("polygon_source") in WALL_OUTLINES and isinstance(ring, list) and len(ring) >= 3 \
+                and isinstance(perim_m, (int, float)) and not isinstance(perim_m, bool) and perim_m > 0:
+            # experiment only: the page-fraction ring is scaled by its outline's measured length (one factor
+            # for both axes — an approximation the experiment report states)
+            n = len(ring)
+            frac = sum(math.hypot(ring[(i + 1) % n][0] - ring[i][0], ring[(i + 1) % n][1] - ring[i][1]) for i in range(n))
+            if frac > 0:
+                vi, isr = ring_corner_counts(ring, m_per_unit=float(perim_m) / frac)
+                if vi + isr >= 3:
+                    return vi, isr
     return None
 
 
