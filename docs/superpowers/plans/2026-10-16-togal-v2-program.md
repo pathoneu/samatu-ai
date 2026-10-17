@@ -144,6 +144,7 @@ Servers from the main checkout: backend 8000, frontend 5173. Open **http://local
 - Every stored project will show the free re-read banner once (LANE_VERSION 12) — one click, €0, nothing billed moves; it brings the scale check to life.
 - The only engine change that alters a number: the cornice material row no longer carries the 5 % waste twice (CLAUDE.md §1.4). Zero change in the eval corpus; on a project with a cornice its material metres drop 4,8 %.
 - „Teisinga" on a row is reachable only in the „Mano šablonas" layout (seed a template per DEVELOPING.md). Chat history resets on reload.
+- „Palyginti leidimus" was verified only with a synthetic second edition (sheet 1 shifted 25/15 pt plus one added bar); no real designer revision exists in the demo set. Many-to-one sheets show the best match only.
 - Commit bad14b7 in history carries a denylisted term in a commit message; decide before any publication.
 
 **Not in this hand-over**: W5b-2 (merged-room corner rule and column faces in cornice/hidroizoliacija — WIP, ungated), and the follow-ups listed above (focus scrolls to page not room; a project opening on page 2 jumps back; coach mark above dialogs; Matavimai duplicates; keys S/U).
