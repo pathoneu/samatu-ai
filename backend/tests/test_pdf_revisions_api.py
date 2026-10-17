@@ -129,6 +129,16 @@ def test_compose_overlay_lays_the_new_sheet_by_the_transform():
     assert (out[..., 3] > 0).sum() == 0                         # laid right, nothing changed
 
 
+def test_old_lines_the_new_sheet_does_not_reach_are_not_removed():
+    old = np.full((100, 100), 255, np.uint8)
+    old[50:52, 10:90] = 0
+    old[10:90, 95:97] = 0                                       # a line near the right edge
+    new = np.full((100, 100), 255, np.uint8)
+    new[50:52, 30:110 - 20] = 0                                 # the same first line, sheet shifted 20 px left
+    out = rev.compose_overlay(old, new, {"k": 1.0, "dx": -20.0, "dy": 0.0}, 72, "skirtumas")
+    assert not (out[:, 80:, 3] > 0).any()                       # the strip the new sheet no longer covers: silent
+
+
 def test_render_cache_rate_limit_and_errors(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     client = TestClient(app)
@@ -172,3 +182,18 @@ def test_file_name_is_scrubbed_where_served(tmp_path, monkeypatch):
     rec = _upload(client, name="SLAPTA klientas.pdf").json()["leidimas"]
     assert rec["pavadinimas"] == "Naujas leidimas"
     assert client.get("/api/projects/p1/pdf-revisions").json()["leidimai"][0]["pavadinimas"] == "Naujas leidimas"
+
+
+def test_tints_are_the_theme_tokens():
+    """The picture is painted on the server; its two colours must be the screen's own tokens."""
+    import colorsys
+    import re
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[2] / "frontend" / "src" / "index.css").read_text()
+
+    def token(name):
+        h, s, l = (float(v) for v in re.search(rf"--{name}:\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%", css).groups())
+        return tuple(round(c * 255) for c in colorsys.hls_to_rgb(h / 360, l / 100, s / 100))
+
+    assert token("revision-new") == rev.NAUJA_RGB
+    assert token("revision-removed") == rev.ISBRAUKTA_RGB

@@ -48,8 +48,8 @@ MIN_DPI = 48
 MODES = ("skirtumas", "naujas")
 INK = 245                         # anything darker than paper is drawn: walls are often light grey fills (0,91)
 FORGIVE_PX = 2                    # a line moved less than this (anti-aliasing, rounding) is not a change
-NAUJA_RGB = (47, 107, 79)         # --primary evergreen (index.css), the „nauja" tint
-ISBRAUKTA_RGB = (176, 92, 70)     # muted clay, the „išbraukta" tint
+NAUJA_RGB = (62, 101, 91)         # --revision-new (index.css, = --accent-2 evergreen): „nauja"
+ISBRAUKTA_RGB = (169, 94, 76)     # --revision-removed (index.css, muted clay): „išbraukta"
 NO_PDF = "Projekto brėžinio saugykloje nėra — palyginti galima tik įkėlus pirmąjį brėžinį."
 NO_REVISION = "Tokio brėžinio leidimo nėra"
 NO_SHEET = "Šis lapas naujame leidime neturi atitikmens"
@@ -237,6 +237,9 @@ def compose_overlay(old_gray, new_gray, lapas: dict, dpi: int, mode: str):
     m = np.float32([[k, 0, float(lapas.get("dx") or 0.0) * s], [0, k, float(lapas.get("dy") or 0.0) * s]])
     laid = cv2.warpAffine(new_gray, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=255)
     new_ink = laid < INK
+    # where the new sheet does not reach (laid smaller, or shifted off the old sheet's edge) nothing is
+    # known about it — an old line there is not „removed"
+    covered = cv2.warpAffine(np.ones_like(new_gray), m, (w, h), flags=cv2.INTER_NEAREST, borderValue=0) > 0
     out = np.zeros((h, w, 4), dtype=np.uint8)
     if mode == "naujas":
         out[new_ink] = (*NAUJA_RGB, 255)
@@ -245,7 +248,7 @@ def compose_overlay(old_gray, new_gray, lapas: dict, dpi: int, mode: str):
     kernel = np.ones((2 * FORGIVE_PX + 1, 2 * FORGIVE_PX + 1), np.uint8)
     old_near = cv2.dilate(old_ink.astype(np.uint8), kernel) > 0
     new_near = cv2.dilate(new_ink.astype(np.uint8), kernel) > 0
-    out[old_ink & ~new_near] = (*ISBRAUKTA_RGB, 255)
+    out[old_ink & ~new_near & covered] = (*ISBRAUKTA_RGB, 255)
     out[new_ink & ~old_near] = (*NAUJA_RGB, 255)
     return out
 
