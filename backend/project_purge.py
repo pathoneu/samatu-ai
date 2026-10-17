@@ -14,7 +14,7 @@ DELETE /api/projects/{id} and the account deletion both call it (2026-10-05:
 they used to repeat the same two calls, each promising to stay in step with
 the other).
 
-Purged: the stored PDF, the in-memory PDF byte caches (CV tools and evidence
+Purged: the stored PDF and its later editions (api/pdf_revisions), the in-memory PDF byte caches (CV tools and evidence
 crops), the CV page renders of that PDF, annotations, calibrations, the symbol
 legend, the evidence crops on disk, the F2/F3 line override and any re-read
 the server holds for the project on its extraction job row (2026-10-03: it
@@ -66,6 +66,14 @@ def _purge_cv_renders(project_id: str, pdf_bytes: bytes | None, backend) -> None
         p.unlink(missing_ok=True)
 
 
+def _purge_revisions(project_id: str, backend) -> None:
+    """The later editions of the drawing (api/pdf_revisions), each under its own key."""
+    from api import pdf_revisions
+    for key, _size in list(backend.list_keys(pdf_revisions.revision_prefix(project_id))):
+        backend.delete(key)
+    pdf_revisions._forget(project_id)
+
+
 def purge_project_files(project_id: str) -> list[str]:
     """Delete everything stored under `project_id` besides its projects row
     (which the caller already deleted).
@@ -89,6 +97,7 @@ def purge_project_files(project_id: str) -> list[str]:
     # Before the PDF itself: the renders are named by the PDF's bytes.
     step("cv_cache", lambda: _purge_cv_renders(project_id, cached, backend))
     step("pdf", lambda: backend.delete(pdf_key(project_id)))
+    step("pdf_revisions", lambda: _purge_revisions(project_id, backend))
     from api import evidence
     step("evidence_memory", lambda: evidence.forget_project(project_id))
     # A parameterised UPDATE, so any id is safe here (no path is built).

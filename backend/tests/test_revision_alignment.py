@@ -79,3 +79,27 @@ def test_more_new_sheets_than_old_ones_still_get_an_old_sheet():
     out = match_revision(old, new)
     assert out[1]["budas"] == "sienos"
     assert out[2]["old_page"] == 1 and out[2]["budas"] == "lapo_krastai"
+
+
+def _rotated(pdf: bytes, degrees: int) -> bytes:
+    import io
+    import pypdfium2 as pdfium
+    doc = pdfium.PdfDocument(pdf)
+    for i in range(len(doc)):
+        doc[i].set_rotation(degrees)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def test_rotated_sheets_align_in_the_display_frame():
+    """Both editions printed on a /Rotate 90 sheet: the transform is in the frame he sees (landscape)."""
+    old = _rotated(build_plan([two_rooms()]), 90)
+    moved = two_rooms()
+    moved.offset_m = (1.0, 0.0)
+    new = _rotated(build_plan([moved]), 90)
+    lapas = match_revision(old, new)[1]
+    assert lapas["budas"] == "sienos" and lapas["k"] == pytest.approx(1.0)
+    # +1 m along the sheet's x is +1 m along the DISPLAYED y after a quarter turn clockwise
+    assert lapas["dx"] == pytest.approx(0.0, abs=1.0)
+    assert lapas["dy"] == pytest.approx(-PT_PER_M, abs=1.0)

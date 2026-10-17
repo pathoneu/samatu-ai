@@ -27,25 +27,22 @@ LOOKALIKE = 0.05
 
 
 def _page_sizes(pdf_bytes: bytes) -> dict[int, tuple[float, float]]:
-    """{page: (width, height)} in the display frame."""
+    """{page: (width, height)} in the display frame (pdf_vectors' reading, /Rotate applied)."""
     import pypdfium2 as pdfium
+    from .pdf_vectors import page_geometry
     from .pdfium_guard import PDFIUM_LOCK
 
-    out: dict[int, tuple[float, float]] = {}
     with PDFIUM_LOCK:
         doc = pdfium.PdfDocument(pdf_bytes)
         try:
-            for i in range(len(doc)):
-                page = doc[i]
-                try:
-                    w, h = (float(v) for v in page.get_size())
-                    if int(page.get_rotation() or 0) % 180 == 90:
-                        w, h = h, w
-                    out[i + 1] = (w, h)
-                finally:
-                    page.close()
+            n = len(doc)
         finally:
             doc.close()
+    out: dict[int, tuple[float, float]] = {}
+    for p in range(1, n + 1):
+        w, h, _ = page_geometry(pdf_bytes, p)
+        if w > 0 and h > 0:
+            out[p] = (float(w), float(h))
     return out
 
 
