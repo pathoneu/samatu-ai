@@ -255,3 +255,15 @@ test('graftWallEvidence returns the very same room when there is nothing to graf
   const once = graftWallEvidence(kept, { _sienos: freshWalls() });
   assert.equal(graftWallEvidence(once, { _sienos: freshWalls() }), once, 'a second graft changes nothing');
 });
+
+test('carryUserFacts keeps the partition count he typed against a fresh read', () => {
+  const old = { nr: '04', n_partition_walls: 3, n_partition_walls_saltinis: 'user_override', _n_partition_walls_user_at: '2026-10-17T10:00:00Z' };
+  const fresh = { nr: '04', n_partition_walls: 5 };
+  const { room, carried } = carryUserFacts(old, fresh);
+  assert.equal(room.n_partition_walls, 3);
+  assert.equal(room.n_partition_walls_saltinis, 'user_override');
+  assert.equal(room._n_partition_walls_user_at, '2026-10-17T10:00:00Z');
+  assert.deepEqual(carried.find((c) => c.key === 'n_partition_walls'), { key: 'n_partition_walls', kept: 3, read: 5 });
+  // a count the program gave (no user source) is the fresh read's
+  assert.equal(carryUserFacts({ nr: '04', n_partition_walls: 3 }, fresh).room.n_partition_walls, 5);
+});
