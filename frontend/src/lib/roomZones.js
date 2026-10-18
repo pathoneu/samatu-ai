@@ -174,9 +174,7 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
   return {
     nr: room.nr,
     label: room.pavadinimas || `#${room.nr}`,
-    areaLabel: area != null
-      ? `${area.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} m²`
-      : '',
+    areaLabel: area != null ? `${roomAreaText(area)} m²` : '',
     paskirtis: room.paskirtis || null,
     color: roomZoneColor(room.paskirtis),
     confidence,
@@ -421,6 +419,17 @@ export function buildPageRoomZones(rooms, { renderedWidth, renderedHeight, page 
     .filter((r) => !losers.has(String(r.nr)))
     .map((r) => buildRoomZone(r, { renderedWidth, renderedHeight }))
     .filter(Boolean);
+}
+
+/**
+ * A room's area as every room surface prints it — the drawing's chip and the panel's room list — with two
+ * decimals, the way the eksplikacija writes it („4,48", „6,90"). 2026-10-18 audit side finding F: the chip
+ * rounded to one decimal („4,5 m²") while the list said „4,48" for the same room. '—' when there is none.
+ */
+export function roomAreaText(m2) {
+  const v = Number(m2);
+  if (m2 == null || m2 === '' || !Number.isFinite(v)) return '—';
+  return v.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**

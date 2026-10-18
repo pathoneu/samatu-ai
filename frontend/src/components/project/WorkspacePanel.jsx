@@ -33,6 +33,7 @@ import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
+import { roomAreaText } from '@/lib/roomZones';
 import { cleanUserText } from '@/lib/userText';
 
 // A measurement on a sheet with no scale in force has no metres (the viewer's chip says why).
@@ -618,7 +619,7 @@ export default function WorkspacePanel({
                 )}
               </div>
               <span className="mono tabular text-foreground/90 whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
-                {fmt(r.plotas_m2)}
+                {roomAreaText(r.plotas_m2)}
                 <span className="text-muted-foreground/70" style={{ fontSize: 9 }}>m²</span>
                 {(() => {
                   const src = inferPlotasSource(r);
