@@ -186,17 +186,18 @@ def classify_table(table: dict) -> tuple[str | None, dict[str, int]]:
     roles = _assign(fold, OPENING_ROLES)
     if "kodas" in roles and ({"plotis", "aukstis"} & set(roles) or "dydis" in roles):
         codes = [c for c in (_code(_cell(r, roles["kodas"])) for r in table.get("rows") or []) if c]
-        if not codes:
-            return None, {}
         doors = sum(1 for c in codes if _DOOR_CODE.match(c))
         windows = sum(1 for c in codes if _WINDOW_CODE.match(c))
-        if _WINDOW_TITLE.search(title) and not _DOOR_TITLE.search(title):
-            return "langai", roles
-        if _DOOR_TITLE.search(title) and not _WINDOW_TITLE.search(title):
-            return "durys", roles
-        if doors or windows:
-            return ("durys" if doors >= windows else "langai"), roles
-        return None, {}
+        opening = None
+        if codes and _WINDOW_TITLE.search(title) and not _DOOR_TITLE.search(title):
+            opening = "langai"
+        elif codes and _DOOR_TITLE.search(title) and not _WINDOW_TITLE.search(title):
+            opening = "durys"
+        elif doors or windows:
+            opening = "durys" if doors >= windows else "langai"
+        if opening:
+            return opening, roles
+        # coded and sized, but no door or window: a tile or finish table with a code column — read on
     if _TILE_WORD.search(everything):
         roles = _assign(fold, TILE_ROLES)
         if ({"formatas", "gamintojas"} & set(roles)) and ({"vieta", "kodas"} & set(roles)):
@@ -333,7 +334,11 @@ def _add(sched: dict, rows: list[dict], totals: list[dict]) -> int:
         have.add(k)
         sched["rows"].append(r)
         n += 1
-    sched["totals"].extend(totals)
+    seen = {(t.get("value"), t.get("label")) for t in sched["totals"]}
+    for t in totals:
+        if (t.get("value"), t.get("label")) not in seen:      # the same table on every sheet sums once
+            seen.add((t.get("value"), t.get("label")))
+            sched["totals"].append(t)
     return n
 
 

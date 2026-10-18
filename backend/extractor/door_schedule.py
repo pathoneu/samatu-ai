@@ -173,8 +173,8 @@ def _ruled_rows(pdf_bytes: bytes, pg: int, page, heading_words: list[dict]) -> t
         best = None
         for t in read_tables(pdf_bytes, pg):
             kind, roles = classify_table(t)
-            if kind != "durys":
-                continue
+            if kind not in ("durys", "langai") or not schedule_rows(t, "durys", roles)[0]:
+                continue                                        # a table of doors and windows still gives its doors
             x0, y0, x1, _ = t["bbox_pct"]
             if not (head[1] - _RULED_ABOVE <= y0 <= head[3] + _RULED_BELOW):
                 continue

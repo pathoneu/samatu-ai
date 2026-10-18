@@ -48,8 +48,8 @@ import threading
 from typing import Iterable
 
 from .pdfplumber_eksplikacija import _fold_header, _split_multiline_row
-from .sheet_zones import (MIN_TEXT_CHARS, NO_TEXT, TABLE_MAX_OBJECTS, TABLE_MAX_PAGE_SHARE, TABLE_MIN_FILLED,
-                          display_frame)
+from .sheet_zones import (_TABLE_WORDS, MIN_TEXT_CHARS, NO_TEXT, TABLE_MAX_OBJECTS, TABLE_MAX_PAGE_SHARE,
+                          TABLE_MIN_FILLED, display_frame)
 
 log = logging.getLogger("samatu.table_reader")
 
@@ -64,6 +64,7 @@ TITLE_REACH_PT = 18.0        # a title line ends at most this far above the tabl
 TITLE_ROW_SHARE = 0.8        # one cell across this share of the width is a title row
 TITLE_MAX = 80
 CELL_MAX = 240
+_TITLE_WORDS = _TABLE_WORDS          # a line that names a table (sheet_zones: eksplikacija, žiniaraštis, …)
 SOUP_TOKENS = 3              # a cell holding this many number tokens is dimension strings caught in a ruled box…
 SOUP_SHARE = 0.4             # …and when this share of the filled cells are such, the „table" is a piece of drawing
 LINE_PT = 3.0                # words of one line start within this of each other (door_schedule._LINE_PT)
@@ -379,49 +380,81 @@ def _line_text(p: dict, line: list[dict]) -> str:
     return " ".join(_cell_text(line + spaces, band).split())
 
 
-def _title_row_header(p: dict, r: int) -> tuple[str, list[str] | None]:
-    """A title row drawn as one cell across the table: its first line is the title; a line under it whose words
-    stand over two or more of the table's columns is the header written in the same cell (objektas_h's room table:
-    „PATALPŲ EKSPLIKACIJA" over „Nr. PATALPA m2", no rule between them)."""
+def _title_row_header(p: dict, r: int) -> tuple[str | None, list[str] | None, list[dict]]:
+    """A first row drawn as ONE cell across the table, read line by line:
+      · a first line that names a table („PATALPŲ EKSPLIKACIJA", „DURŲ ŽINIARAŠTIS") or does not spread over the
+        columns is the title;
+      · lines whose words stand over two or more columns, none a value, are the header (objektas_h: „Nr. PATALPA
+        m2" under the title, no rule between them; objektas_b p1: the header itself is that first line);
+      · lines carrying values are data rows written in the same cell (objektas_b p1: rooms 01–05 under the header,
+        ruled off only from room 06 on) — each a row with the box of its own line.
+    Returns (title, header per column or None, data rows)."""
     row = p["rows"][r]
     whole = next(_clean(t) for t in row["texts"] if _clean(t))
     cell = next(c for c, t in zip(row["cells"], row["texts"]) if c is not None and _clean(t))
     lines = _lines_of(p["chars"], cell)
     if len(lines) < 2:
-        return whole, None
+        return whole, None, []
     ends = p["colx"][1:] + [p["bbox"][2]]
-    cols = [""] * len(p["colx"])
-    for ln in lines[1:]:
-        for i, (a, b) in enumerate(zip(p["colx"], ends)):
+
+    def parts(ln: list[dict]) -> list[str]:
+        out = []
+        for a, b in zip(p["colx"], ends):
             part = [c for c in ln if a <= (c["x0"] + c["x1"]) / 2 < b]
-            if part:
-                cols[i] = f"{cols[i]} {_line_text(p, part)}".strip()
-    if sum(1 for c in cols if c) >= 2:
-        return _line_text(p, lines[0]) or whole, cols
-    return whole, None
+            out.append(_line_text(p, part) if part else "")
+        return out
+
+    title = None
+    first = 0
+    p0 = parts(lines[0])
+    if _TITLE_WORDS.search(_fold_header(_line_text(p, lines[0]))) or sum(1 for x in p0 if x) < 2:
+        title = _line_text(p, lines[0]) or whole
+        first = 1
+    cols = [""] * len(p["colx"])
+    k = first
+    while k < len(lines):
+        ps = parts(lines[k])
+        if any(is_data_cell(x) for x in ps) or sum(1 for x in ps if x) < 2:
+            break
+        cols = [f"{a} {b}".strip() for a, b in zip(cols, ps)]
+        k += 1
+    header = cols if sum(1 for c in cols if c) >= 2 else None
+    data = []
+    for ln in lines[k:]:
+        ps = parts(ln)
+        if not any(ps):
+            continue
+        band = _band(ln)
+        y0, y1 = max(cell[1], band[1]), min(cell[3], band[3])
+        boxes = [(a, y0, b, y1) for a, b in zip(p["colx"], ends)]
+        data.append({"texts": ps, "bbox": (p["bbox"][0], y0, p["bbox"][2], y1), "cells": boxes, "split": True})
+    if header is None and not data:
+        return whole, None, []
+    return title, header, data
 
 
-def _header_split(p: dict) -> tuple[str | None, int, int, list[str] | None]:
+def _header_split(p: dict) -> tuple[str | None, int, int, list[str] | None, list[dict]]:
     """(title row text, index of the first header row, number of header rows, the header written inside the
-    title row or None)."""
+    title row or None, data rows written inside the title row)."""
     rows = p["rows"]
     start = 0
     while start < len(rows) and not any(_clean(t) for t in rows[start]["texts"]):
         start += 1
     title = None
     inline = None
+    extra: list[dict] = []
     if start < len(rows) and _is_title_row(p, start):
-        title, inline = _title_row_header(p, start)
+        title, inline, extra = _title_row_header(p, start)
         start += 1
     n = 0
-    for r in range(start, min(len(rows), start + MAX_HEADER_ROWS)):
+    for r in range(start, start if extra else min(len(rows), start + MAX_HEADER_ROWS)):
         texts = _row_texts(rows[r])
         if not any(texts) or any(is_data_cell(t) for t in texts):
             break
         if n >= 1 and not _merged(p, r - 1) and not _merged(p, r):
             break                                              # a second all-words row with no merged cell is data
         n += 1
-    return title, start, n, inline
+    return title, start, n, inline, extra
 
 
 def _header(p: dict, first: int, n: int) -> list[str]:
@@ -472,6 +505,12 @@ def _title_above(chars: list[dict], box) -> str | None:
     band = (min(c["x0"] for c in line) - 1, min(c["top"] for c in line) - 1,
             max(c["x1"] for c in line) + 1, max(c["bottom"] for c in line) + 1)
     text = " ".join(_cell_text(line, band).split())
+    letters = [ch for ch in text if ch.isalpha()]
+    upper = sum(ch.isupper() for ch in letters) / len(letters) if letters else 0.0
+    # a title names a table or is written in capitals — a drawing's note that happens to stand above the table
+    # („Mazgas iš viršaus", objektas_b p1) is not its title
+    if not (_TITLE_WORDS.search(_fold_header(text)) or (upper >= 0.8 and len(text.split()) <= 8)):
+        return None
     return text[:TITLE_MAX] or None
 
 
@@ -511,7 +550,7 @@ def _table(p: dict, page: int, k: int, words_of, chars: list[dict]) -> dict:
             reading_words.append([fr.word(w) for w in words_of()])
         return reading_words[0]
 
-    title_row, first, n, inline = _header_split(p)
+    title_row, first, n, inline, inline_rows = _header_split(p)
     header = _header(p, first, n) if n else []
     if inline:
         header = [" ".join(x for x in (a, b) if x) for a, b in zip(inline, header or [""] * len(inline))]
@@ -522,13 +561,17 @@ def _table(p: dict, page: int, k: int, words_of, chars: list[dict]) -> dict:
         row = p["rows"][r]
         header_cells.append({"cells": _row_texts(row), "bbox_pct": fr.pct(row["bbox"]),
                              "cell_bboxes": [None if c is None else fr.pct(c) for c in row["cells"]]})
-    for r in range(first + n, len(p["rows"])):
-        for sub in _split_rows(p, r, words):
-            if not any(sub["texts"]):
-                continue
-            rows.append({"row_idx": len(rows), "cells": sub["texts"], "bbox_pct": fr.pct(sub["bbox"]),
-                         "cell_bboxes": [None if c is None else fr.pct(c) for c in sub["cells"]],
-                         "split": sub["split"]})
+    def subs():
+        yield from inline_rows                       # rows written inside the title cell come first
+        for r in range(first + n, len(p["rows"])):
+            yield from _split_rows(p, r, words)
+
+    for sub in subs():
+        if not any(sub["texts"]):
+            continue
+        rows.append({"row_idx": len(rows), "cells": sub["texts"], "bbox_pct": fr.pct(sub["bbox"]),
+                     "cell_bboxes": [None if c is None else fr.pct(c) for c in sub["cells"]],
+                     "split": sub["split"]})
     return {"table_id": f"p{page}-t{k}", "page": int(page), "bbox_pct": fr.pct(p["bbox"]), "title": title,
             "header": header, "header_fold": [_fold_header(h) for h in header], "header_rows": n,
             "cols": len(p["colx"]), "pieces": p["pieces"], "text_direction": fr.direction, "rows": rows,
@@ -582,21 +625,22 @@ def _read(doc, pdf_bytes: bytes, page: int, cap: int) -> dict:
     return out
 
 
-def _key(pdf_bytes: bytes, page: int, cap: int) -> tuple:
-    return (hashlib.blake2b(pdf_bytes, digest_size=16).digest(), int(page), TABLES_VERSION, int(cap))
+def _key(digest: bytes, page: int, cap: int) -> tuple:
+    return (digest, int(page), TABLES_VERSION, int(cap))
 
 
 def read_pages_tables(pdf_bytes: bytes, pages: Iterable[int], *, max_objects: int | None = None) -> dict[int, dict]:
     """{page: read_page_tables(...)} for several 1-based pages, the PDF opened once. Never raises."""
     cap = TABLE_MAX_OBJECTS if max_objects is None else int(max_objects)
     want = sorted({int(p) for p in pages if int(p) >= 1})
+    digest = hashlib.blake2b(pdf_bytes, digest_size=16).digest()
     result: dict[int, dict] = {}
     todo = []
     for p in want:
         with _cache_lock:
-            hit = _cache.get(_key(pdf_bytes, p, cap))
+            hit = _cache.get(_key(digest, p, cap))
             if hit is not None:
-                _cache.move_to_end(_key(pdf_bytes, p, cap))
+                _cache.move_to_end(_key(digest, p, cap))
                 result[p] = copy.deepcopy(hit)
                 continue
         todo.append(p)
@@ -618,8 +662,8 @@ def read_pages_tables(pdf_bytes: bytes, pages: Iterable[int], *, max_objects: in
                     result[p] = res
                     continue
                 with _cache_lock:
-                    _cache[_key(pdf_bytes, p, cap)] = res
-                    _cache.move_to_end(_key(pdf_bytes, p, cap))
+                    _cache[_key(digest, p, cap)] = res
+                    _cache.move_to_end(_key(digest, p, cap))
                     while len(_cache) > _CACHE_MAX:
                         _cache.popitem(last=False)
                 result[p] = copy.deepcopy(res)

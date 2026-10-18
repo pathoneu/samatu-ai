@@ -257,3 +257,56 @@ def test_is_data_cell_tells_values_from_headings():
         assert tr.is_data_cell(v), v
     for v in ("Kodas", "Angos plotis, mm", "m²", "", "Durų tipas"):
         assert not tr.is_data_cell(v), v
+
+
+def _header_and_rows_in_one_cell(title: str | None) -> bytes:
+    """A room table whose header — and its first rooms — are written inside ONE ruled cell across the table,
+    ruled off only from the third room on (objektas_b p1's eksplikacija; objektas_h has the title there)."""
+    from reportlab.pdfgen import canvas
+
+    from synthetic_plan import LT_FONT
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    x, top, cols = 300.0, 400.0, (30.0, 90.0, 50.0)
+    xs = [x, x + cols[0], x + cols[0] + cols[1], x + sum(cols)]
+    lines = ([title] if title else []) + ["Nr.|Pavadinimas|Plotas", "01|Tambūras|7,36 m²", "02|Svetainė|62,42 m²"]
+    first_h = 4 + 9 * len(lines)
+    ys = [top, top + first_h, top + first_h + 14, top + first_h + 28]
+    c.setLineWidth(0.5)
+    c.rect(x, A4[1] - ys[-1], sum(cols), ys[-1] - top, stroke=1, fill=0)
+    for y in ys[1:-1]:
+        c.line(x, A4[1] - y, x + sum(cols), A4[1] - y)
+    for xx in xs[1:-1]:
+        c.line(xx, A4[1] - ys[1], xx, A4[1] - ys[-1])          # the column rules start under the first cell
+    c.setFont(LT_FONT, 5)
+    for i, line in enumerate(lines):
+        y = A4[1] - top - 8 - 9 * i
+        if "|" not in line:
+            c.drawString(x + 40, y, line)
+            continue
+        for xx, part in zip(xs, line.split("|")):
+            c.drawString(xx + 2, y, part)
+    for r, (nr, name, area) in enumerate((("03", "Koridorius", "15,25 m²"), ("04", "Kambarys", "12,14 m²"))):
+        for xx, part in zip(xs, (nr, name, area)):
+            c.drawString(xx + 2, A4[1] - ys[r + 1] - 9, part)
+    c.drawString(60, 60, "Lapas 1 — bandomasis brėžinys be jokių klientų duomenų")
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("title", [None, "PATALPŲ EKSPLIKACIJA"])
+def test_a_header_and_rows_written_inside_the_first_cell_are_a_header_and_rows(title):
+    t = _only(tr.read_tables(_header_and_rows_in_one_cell(title), 1))
+    assert t["header"] == ["Nr.", "Pavadinimas", "Plotas"] and t["title"] == title
+    assert [r["cells"] for r in t["rows"]] == [["01", "Tambūras", "7,36 m²"], ["02", "Svetainė", "62,42 m²"],
+                                               ["03", "Koridorius", "15,25 m²"], ["04", "Kambarys", "12,14 m²"]]
+    a, b = t["rows"][0]["bbox_pct"], t["rows"][1]["bbox_pct"]
+    assert a[3] <= b[1] + 1e-6 and t["rows"][0]["split"] is True       # each line its own box
+
+
+def test_a_note_above_a_table_is_not_its_title():
+    tbl = RuledTable(at=(60.0, 420.0), col_w=(40.0, 60.0, 40.0), title="Mazgas iš viršaus, žr. detalę",
+                     rows=(("Žymuo", "Dydis", "Kiekis"), ("D1", "900x2100", "3")))
+    t = _only(tr.read_tables(build_plan([_sheet(table_at=None, ruled_tables=[tbl])]), 1))
+    assert t["title"] is None

@@ -217,3 +217,28 @@ def test_a_schedule_written_without_rules_is_read_from_words_and_still_gets_row_
     for r in lent["eilutes"]:
         x0, y0, x1, y1 = r["bbox_pct"]
         assert 0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1 and x0 >= 838 / 1191 - 0.01
+
+
+def test_the_door_scanner_takes_the_doors_of_a_table_that_lists_more_windows():
+    mixed = RuledTable(at=(330.0, 300.0), col_w=(40.0, 60.0, 40.0), title="DURŲ IR LANGŲ ŽINIARAŠTIS",
+                       rows=(("Žymuo", "Dydis, mm", "Kiekis"), ("D-1", "900x2100", "2"), ("L-1", "1200x1500", "3"),
+                             ("L-2", "900x1500", "1")))
+    out = scan_door_schedule(build_plan([_sheet(mixed, notes_at=(60.0, 450.0))]))
+    assert out["lentele"]["saltinis"] == "lentele"
+    assert [(r["kodas"], r["kiekis"]) for r in out["lentele"]["eilutes"]] == [("D-1", 2)]
+
+
+def test_a_coded_tile_table_is_a_tile_table_not_an_opening_schedule():
+    t = RuledTable(at=(60.0, 520.0), col_w=(40.0, 60.0, 60.0), title="PLYTELIŲ SPECIFIKACIJA",
+                   rows=(("Kodas", "Dydis", "Vieta"), ("P-1", "600x600", "Vonios grindys"), ("P-2", "300x600", "Vonios sienos")))
+    z = _read(_sheet(t))["ziniarasciai"]
+    assert z["durys"] is None and z["langai"] is None
+    assert [(r["kodas"], r["formatas_mm"], r["vieta"]) for r in z["plyteles"]["rows"]] == [
+        ("P-1", [600, 600], "Vonios grindys"), ("P-2", [300, 600], "Vonios sienos")]
+
+
+def test_the_same_room_table_on_every_sheet_is_one_table_with_one_sum():
+    t = RuledTable(at=(60.0, 420.0), col_w=(30.0, 80.0, 40.0), title="PATALPŲ EKSPLIKACIJA",
+                   rows=(("Nr.", "Pavadinimas", "Plotas, m²"), ("01", "Koridorius", "6,20"), ("", "Iš viso", "6,20")))
+    e = _read(_sheet(t), _sheet(t), _sheet(t))["ziniarasciai"]["eksplikacija"]
+    assert len(e["rows"]) == 1 and [x["value"] for x in e["totals"]] == [6.2]
