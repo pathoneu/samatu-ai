@@ -12,7 +12,8 @@ const ROOMS = [
   { nr: '05', puslapio_nr: 1, plotas_m2: 35.5, polygon_source: 'corrected', polygon_pct: square(0.4, 0.1, 0.7, 0.4) },
   { nr: '03', puslapio_nr: 1, plotas_m2: 60, polygon_source: 'vektoriniai_konturai', polygon_pct: square(0.05, 0.05, 0.75, 0.6) },
   { nr: '07', puslapio_nr: 1, marker_pct: [0.85, 0.2], marker_source: 'plan_label', polygon_source: 'manual_needed' },
-  { nr: '09', puslapio_nr: 1, _vieta: { page: 1, cx: 0.85, cy: 0.7, W: 0.02, H: 0.01, saltinis: 'zenkliukas' } },
+  // the lane stores the SHEET's size in points beside the seat (objektas_h: W 595, H 842) — not a badge size
+  { nr: '09', puslapio_nr: 1, _vieta: { page: 1, cx: 0.85, cy: 0.7, W: 595, H: 842, saltinis: 'zenkliukas' } },
   { nr: '11', puslapio_nr: 2, polygon_source: 'vektoriniai_konturai', polygon_pct: square(0.1, 0.1, 0.4, 0.4) },
 ];
 
@@ -32,6 +33,8 @@ test('a room drawn only as its number is picked within the badge radius, not bey
 
 test('the badge the drawing lane located counts when the layer has nothing else for the room', () => {
   assert.deepEqual(roomAtPoint(ROOMS, { page: 1, x_pct: 0.852, y_pct: 0.7 }, SIZE), { nr: '09', how: 'seat' });
+  // …and only within the badge radius: empty paper far from it picks nothing (the W/H are not a reach)
+  assert.equal(roomAtPoint(ROOMS, { page: 1, x_pct: 0.85, y_pct: 0.9 }, SIZE), null);
   // a weak seat (a box guessed from the bbox) is not a place to click
   const weak = [{ nr: '09', puslapio_nr: 1, _vieta: { page: 1, cx: 0.85, cy: 0.7, saltinis: 'bbox' } }];
   assert.equal(roomAtPoint(weak, { page: 1, x_pct: 0.85, y_pct: 0.7 }, SIZE), null);

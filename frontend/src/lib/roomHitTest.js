@@ -73,10 +73,10 @@ export function roomAtPoint(rooms, point, { renderedWidth = 1000, renderedHeight
     .filter(({ v }) => v && Number(v.page) === page && STRONG_SEATS.has(v.saltinis)
       && Number.isFinite(Number(v.cx)) && Number.isFinite(Number(v.cy)))
     .map(({ r, v }) => {
-      const reach = Math.max(badgePx, (Number(v.W) > 0 ? Number(v.W) * W : 0) / 2);
+      // (`_vieta.W/H` are the SHEET's size in points, not the badge's — the reach is the badge radius alone)
       const cx = Number(v.cx) * W;
       const cy = Number(v.cy) * H;
-      return { nr: String(r.nr), d: Math.hypot(cx - x, cy - y), ok: near(cx, cy, reach) };
+      return { nr: String(r.nr), d: Math.hypot(cx - x, cy - y), ok: near(cx, cy, badgePx) };
     })
     .filter((s) => s.ok)
     .sort((a, b) => a.d - b.d);
