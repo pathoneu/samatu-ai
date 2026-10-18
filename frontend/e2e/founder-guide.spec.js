@@ -40,6 +40,9 @@ const ROOM_02 = [[0.39086, 0.25178], [0.4564, 0.25164], [0.4564, 0.38361], [0.39
 const LAMP_3 = [0.7165, 0.3962];
 const LAMP_HALF_PT = 4;
 const LAMP_THRESHOLD = 0.98;
+// The snap mark on a wall corner of the drawing: a 12 px square outline in the overlay's „editing" colour
+// (W1-C paints it through a style token, so it is found by shape, not by a colour attribute).
+const CORNER_MARK = 'svg rect[width="12"][height="12"][fill="none"][pointer-events="none"]';
 // Where the guide's column is drawn inside 04 (checked against 04's outline below) and its size.
 const COLUMN_CENTRE = [0.55, 0.56];
 const COLUMN_M2 = 2.06;
@@ -186,6 +189,7 @@ test('2 sheet rail: strip, groups, rename + undo, restore auto name, search LED'
 
 test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
   await openProject(page);
+  const startedAt = new Date();
   const before = await api(`/api/projects/${PROJECT}/versions`);
   await page.getByTestId('detect-run-button').click();
   await expect(page.getByTestId('detect-run-start-all')).toHaveText('Perskaityti visus lapus (8)');
@@ -198,7 +202,14 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
     '24 angos (langų: 9, durų: 9).', '6 perimetrai iš matmenų.', 'Danga perskaityta 11 iš 11 patalpų.']) {
     await expect(stages).toContainText(line);
   }
-  await expect(page.getByText('Skaičiai nepasikeitė — visos patalpos perskaitytos taip pat.')).toBeVisible();
+  // the one-line re-read chip (W1-C): nothing moved; „Rodyti" opens today's read (writes nothing)
+  const chipNotice = page.getByTestId('reread-diff-banner');
+  await expect(chipNotice).toContainText('Brėžinys perskaitytas iš naujo');
+  await expect(chipNotice).toContainText('skaičiai nepasikeitė');
+  await page.getByTestId('reread-diff-toggle').click();
+  await expect(chipNotice).toContainText('Skaičiai nepasikeitė — visos patalpos perskaitytos taip pat.');
+  await expect(chipNotice).toContainText(startedAt.toLocaleDateString('lt-LT', { timeZone: 'Europe/Vilnius' }));
+  await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => (await api(`/api/projects/${PROJECT}/versions`)).versions[0].id, { timeout: 30_000 })
     .toBeGreaterThan(before.versions[0].id);
   const after = await api(`/api/projects/${PROJECT}/versions`);
@@ -295,7 +306,7 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await page.mouse.move(corner.x, corner.y, { steps: 4 });
   await page.mouse.down();
   await page.mouse.move(other.x + 3, other.y + 3, { steps: 14 });
-  const snapMark = pg1.locator('rect[stroke="#ea580c"]');
+  const snapMark = pg1.locator(CORNER_MARK);
   await expect(snapMark).toHaveCount(1);
   const sb = await snapMark.boundingBox();
   expect(Math.abs(sb.x + sb.width / 2 - other.x), 'vertex snaps to the wall corner (x)').toBeLessThan(1.5);
@@ -354,7 +365,7 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   const pts = await sheetPoints(page, 1, ROOM_02);
   // hovering 3 px off a wall corner shows the orange corner marker exactly on the corner
   await page.mouse.move(pts[3].x + 3, pts[3].y - 3, { steps: 5 });
-  const marker = pg1.locator('rect[stroke="#ea580c"][width="12"]');
+  const marker = pg1.locator(CORNER_MARK);
   await expect(marker).toHaveCount(1);
   const mb = await marker.boundingBox();
   expect(Math.abs(mb.x + mb.width / 2 - pts[3].x)).toBeLessThan(1.5);
