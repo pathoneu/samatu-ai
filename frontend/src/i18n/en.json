@@ -876,6 +876,11 @@
       "revoke": "Revoke link",
       "close": "Close"
     },
+    "serverRefresh": {
+      "title": "Updated from the server",
+      "body": "showing the project's last saved version, not an older copy left in this browser",
+      "dismiss": "Got it"
+    },
     "reread": {
       "title": "The drawing was read again",
       "nothing": "Nothing changed — every room read the same.",

@@ -639,6 +639,50 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await shot(page, '10-patikra-partitions');
 });
 
+/** demo-objektas_h as this browser's cache holds it (the write-through copy in localStorage). */
+async function cachedProject(page) {
+  return page.evaluate((id) => {
+    try { return (JSON.parse(localStorage.getItem('samatu_projects') || '[]')).find((p) => p?.id === id) || {}; } catch { return {}; }
+  }, PROJECT);
+}
+
+/**
+ * W1-F F4: merge 04 + 05 in this browser, restore the start version ELSEWHERE (the Versijos route, as another
+ * tab or device would), reload: the screen shows the server's copy, never this browser's newer cached one.
+ */
+async function restoredElsewhereThenReload(page) {
+  await openProject(page);
+  await loadGeometry(page, 1);
+  await mergeRooms(page, await getProject());
+  await expect.poll(async () => roomsByNr(await cachedProject(page))['05']?._sujungta_i || null, { timeout: 15_000 }).toBe('04');
+  const start = readJson(START_JSON);
+  // The server stamps a save to the SECOND: a restore in the same second as this browser's save would carry
+  // the very stamp this browser last saw. Another tab or device takes longer than that.
+  const saved = (await getProject()).updated_at;
+  await expect.poll(() => new Date().toISOString().slice(0, 19) + 'Z', { timeout: 5_000 }).not.toBe(saved);
+  await api(`/api/projects/${PROJECT}/versions/${start.version}/restore`, { method: 'POST' });
+  expect(fingerprint(await getProject())).toMatchObject({ a04: 26.31, merged05: null, kampai: 475.66 });
+  await page.reload();
+  await viewerReady(page);
+  await expect(roomRow(page, '04')).toContainText('26,31');
+  await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveCount(0);
+  await expect.poll(async () => roomsByNr(await cachedProject(page))['04']?.plotas_m2, { timeout: 15_000 }).toBe(26.31);
+  await expect(page.getByTestId('server-refresh-notice')).toContainText('Atnaujinta iš serverio');
+}
+
+test('Versijos: a version restored elsewhere is what this browser shows after a reload', async ({ page }) => {
+  await restoredElsewhereThenReload(page);
+  note('merged here → restored elsewhere → reload: 04 26,31 · „Atnaujinta iš serverio"');
+});
+
+test('Versijos: … also when this browser\'s clock runs 10 min ahead of the server\'s', async ({ page }) => {
+  // The cached copy carries the time of this browser's last edit, the server's copy the server's time: with the
+  // PC clock 10 min fast the cached copy looked newer than the restore and stayed on screen (the stale sighting).
+  await page.clock.install({ time: new Date(Date.now() + 10 * 60_000) });
+  await restoredElsewhereThenReload(page);
+  note('browser clock +10 min: merged here → restored elsewhere → reload: 04 26,31 · „Atnaujinta iš serverio"');
+});
+
 test('Top bar: Versijos — compare with current, restore keeps „Prieš grąžinant"', async ({ page }) => {
   await openProject(page);
   await loadGeometry(page, 1);
