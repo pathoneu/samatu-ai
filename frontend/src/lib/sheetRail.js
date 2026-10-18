@@ -26,6 +26,21 @@ export const DISCIPLINES = [
 ];
 const DISCIPLINE_BY_KEY = Object.fromEntries(DISCIPLINES.map((d) => [d.key, d]));
 
+// The two rails' widths — SheetRail.jsx (`w-[232px]`) and TakeoffViewer's ThumbnailRail (`w-[148px]`); keep
+// them in step with those classes.
+export const SHEET_RAIL_WIDTH = 232;
+export const THUMBNAIL_RAIL_WIDTH = 148;
+const PANEL_GAP = 8;
+
+/**
+ * Where a panel floating at the drawing's top-left starts („Rasti panašius", the count types): right of the
+ * open rail, never over it (2026-10-18 audit §4.6 item 4 — the review panel covered ~76 px of the sheet list).
+ */
+export function floatingPanelLeft({ railOpen, sheetRail }) {
+  if (!railOpen) return PANEL_GAP;
+  return (sheetRail ? SHEET_RAIL_WIDTH : THUMBNAIL_RAIL_WIDTH) + PANEL_GAP;
+}
+
 /** The type choices the rename editor offers: the classification's enum with its LT labels. */
 export const SHEET_TYPE_OPTIONS = Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 

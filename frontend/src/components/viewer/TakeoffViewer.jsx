@@ -53,7 +53,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
-import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor } from '@/lib/sheetRail';
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft } from '@/lib/sheetRail';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -1263,6 +1263,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
         const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         const sheetRail = sheetPages && !check ? buildSheetRail({ puslapiai: sheetPages, overrides: sheetOverrides, pageCount: totalPages }) : null;
+        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1488,7 +1489,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             )}
             {/* „Rasti panašius" review list (2026-10-16). */}
             {symbol.active && (
-              <div className="absolute top-2 z-30 w-72" style={{ left: railOpen ? 156 : 8 }}>
+              <div className="absolute top-2 z-30 w-72" style={{ left: panelLeft }}>
                 <SymbolReviewPanel documentId={activeDocumentId} search={symbol} countTypes={countTypes} totalPages={totalPages || 1} />
               </div>
             )}
@@ -1496,7 +1497,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {measureTool === 'count' && (
               <div
                 className="absolute top-2 z-30 w-60 shadow-lg"
-                style={{ left: railOpen ? (sheetRail ? 240 : 156) : 8 }}
+                style={{ left: panelLeft }}
               >
                 <CountLegendPanel
                   countTypes={countTypes}
