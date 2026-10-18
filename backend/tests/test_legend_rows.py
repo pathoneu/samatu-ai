@@ -21,10 +21,15 @@ BOX_M = (320.0, 95.0, 460.0, 150.0)          # around the legend, mediabox point
 
 
 @pytest.fixture(autouse=True)
-def _fresh_cache():
+def _fresh_cache(tmp_path, monkeypatch):
+    from extractor import cv_render_cache
+    from extractor.vector_symbols import clear_glyph_cache
+    monkeypatch.setattr(cv_render_cache, "CACHE_DIR", tmp_path / "cv_cache")    # rasters stay out of backend/data
     sz.clear()
+    clear_glyph_cache()
     yield
     sz.clear()
+    clear_glyph_cache()
 
 
 def _legend_sheet(**kw) -> Sheet:
@@ -354,3 +359,65 @@ def test_the_generalised_counter_agrees_with_the_diffuser_entry(case):
     for r, n in zip(rows, new):
         assert any(label.startswith(r["text"][:12]) or r["text"].startswith(label[:12]) for label in want)
         assert n["count"] == next(v for k, v in want.items() if k.startswith(r["text"][:12]) or r["text"].startswith(k[:12]))
+
+
+# ── A3: the shape search over every sheet for a black glyph ────────────────
+
+def _padded(box_pt, pad=1.0):
+    return [box_pt[0] - pad, box_pt[1] - pad, box_pt[2] + pad, box_pt[3] + pad]
+
+
+def _non_source(entry):
+    return [c for c in entry["candidates"] if not c["is_source"]]
+
+
+def _centres(cands):
+    return sorted(((c["box_pct"][0] + c["box_pct"][2]) / 2, (c["box_pct"][1] + c["box_pct"][3]) / 2) for c in cands)
+
+
+def test_the_black_circle_is_found_on_every_sheet_and_the_drawing_around_it_is_not():
+    from extractor.cv_match import batch_find_symbol
+    pdf = _counting_plan()
+    circle = _rows(pdf)[1]
+    res = batch_find_symbol(pdf, 1, _padded(circle["glyph_box_pt"]))
+    assert res["status"] == "ok" and not res["partial"]
+    assert [e["page"] for e in res["pages"]] == [1, 2, 3]
+    assert [len(_non_source(e)) for e in res["pages"]] == [len(CIRCLES_1), len(CIRCLES_2), len(CIRCLES_1)]
+    assert sum(c["is_source"] for c in res["pages"][0]["candidates"]) == 1
+    # twins of one symbol score alike: the floor is the best twin minus the margin, never under min_score
+    assert res["score_floor"] >= res["min_score"]
+    assert res["reference_score"] - res["score_floor"] == pytest.approx(res["margin"], abs=1e-4)
+    want = sorted((x / W, y / H) for _k, x, y in CIRCLES_1)
+    assert _flat(_centres(_non_source(res["pages"][0]))) == pytest.approx(_flat(want), abs=0.004)
+
+
+def test_a_turned_sheets_shape_matches_are_in_the_display_frame():
+    from extractor.cv_match import batch_find_symbol
+    pdf = build_plan([_legend_sheet(rotate=90, symbol_marks=CROSSES_1)])
+    cross = _rows(pdf, rotation=90)[2]
+    res = batch_find_symbol(pdf, 1, _padded(cross["glyph_box_pt"]))
+    want = sorted(tuple(_rotate_pct(x / W, y / H, 90)) for _k, x, y in CROSSES_1)
+    assert _flat(_centres(_non_source(res["pages"][0]))) == pytest.approx(_flat(want), abs=0.004)
+
+
+def test_a_raster_sheet_is_skipped_and_said(monkeypatch):
+    from extractor import cv_match
+    monkeypatch.setattr(cv_match, "RASTER_INK_SHARE", -1.0)          # every sheet looks like a scan
+    pdf = build_plan([_legend_sheet(symbol_marks=CIRCLES_1)])
+    res = cv_match.batch_find_symbol(pdf, 1, _padded(_rows(pdf)[1]["glyph_box_pt"]))
+    assert [e["skipped"] for e in res["pages"]] == ["raster"] and res["pages"][0]["candidates"] == []
+
+
+def test_the_time_budget_bad_boxes_and_missing_sheets():
+    from extractor.cv_match import batch_find_symbol
+    pdf = build_plan([_legend_sheet(symbol_marks=CIRCLES_1)])
+    box = _padded(_rows(pdf)[1]["glyph_box_pt"])
+    late = batch_find_symbol(pdf, 1, box, time_budget_s=0.0)
+    assert late["partial"] and late["pages_not_read"] == [1] and "dalis" in late["detail"]
+    assert batch_find_symbol(pdf, 4, box)["status"] == "no_page"
+    assert batch_find_symbol(pdf, 1, [10, 10, 5, 5])["status"] == "bad_box"
+    assert batch_find_symbol(pdf, 1, [10, 10, 400, 600])["status"] == "bad_box"
+    assert batch_find_symbol(pdf, 1, [560, 20, 575, 35])["status"] == "no_ink"       # an empty corner
+    assert batch_find_symbol(b"nope", 1, box)["status"] in ("no_page", "failed")
+    for res in (late, batch_find_symbol(pdf, 1, [10, 10, 5, 5])):
+        assert not user_text.is_banned(res["detail"])
