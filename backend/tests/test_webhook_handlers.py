@@ -79,7 +79,7 @@ def test_checkout_subscription_sets_plan_active(tmp_path, monkeypatch):
     event = {
         "id": "evt_sub_ok", "type": "checkout.session.completed",
         "data": {"object": {
-            "mode": "subscription",
+            "mode": "subscription", "payment_status": "paid",
             "client_reference_id": user["id"],
             "subscription": "sub_abc",
             "current_period_end": period,
@@ -104,7 +104,7 @@ def test_checkout_subscription_without_resolvable_price_still_sets_status(
     event = {
         "id": "evt_sub_noprice", "type": "checkout.session.completed",
         "data": {"object": {
-            "mode": "subscription",
+            "mode": "subscription", "payment_status": "paid",
             "client_reference_id": user["id"],
             "subscription": "sub_np",
         }},
@@ -124,7 +124,7 @@ def test_checkout_oneoff_grants_credit_once(tmp_path, monkeypatch):
     user = db.create_user("one@x.lt", "!x", name="One")
     event = {
         "id": "evt_oneoff", "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment", "client_reference_id": user["id"]}},
+        "data": {"object": {"mode": "payment", "payment_status": "paid", "client_reference_id": user["id"]}},
     }
     r1 = _post_event(event)
     r2 = _post_event(event)  # re-delivery of the same id
@@ -246,6 +246,6 @@ def test_checkout_completed_unresolvable_user_no_crash(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     event = {
         "id": "evt_bad_user", "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment", "client_reference_id": "ghost"}},
+        "data": {"object": {"mode": "payment", "payment_status": "paid", "client_reference_id": "ghost"}},
     }
     assert _post_event(event).status_code == 200

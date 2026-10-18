@@ -172,11 +172,11 @@ def _check_user_quota(user_id: str | None) -> None:
     from billing.entitlements import quota_exceeded
     user = db.get_user_by_id(user_id)
     if user and quota_exceeded(user):
+        from billing.entitlements import quota_message
         raise HTTPException(
             status_code=402,
             detail={"error": "quota_exceeded", "plan": user.get("plan"),
-                    "message": "Išnaudotas mėnesio projektų limitas. "
-                               "Atnaujinkite planą."},
+                    "message": quota_message(user)},
         )
 
 
@@ -219,8 +219,9 @@ def _check_trial_gate(user_id: str | None) -> None:
         raise HTTPException(
             status_code=402,
             detail={"error": "trial_used",
-                    "message": "Nemokamas bandymas jau panaudotas šiai "
-                               "įmonei. Įsigykite planą."},
+                    "message": "Nemokamas bandymas šiai įmonei (pagal įmonės "
+                               "kodą) jau panaudotas. Kitą projektą galėsite "
+                               "skaityti pasirinkę planą nustatymuose."},
         )
 
 

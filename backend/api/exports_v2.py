@@ -62,7 +62,13 @@ def _require_project_access(request: Request, project_id: str) -> dict:
     answered 403 for a foreign project until 2026-09-29). Returns the caller's
     user dict.
     """
-    return _auth.require_owned_project(request, project_id)
+    user = _auth.require_owned_project(request, project_id)
+    # Tier gate (billing M1): F2/F3 belong to the paid plans. Ownership first —
+    # a foreign id is a 404 before any plan is looked at. A no-op while
+    # BILLING_ENABLED is off.
+    from billing.entitlements import require_feature
+    require_feature(user, "f2f3_export")
+    return user
 
 
 _SALTINIS_TO_F2_SOURCE = {
