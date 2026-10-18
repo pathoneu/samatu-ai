@@ -47,6 +47,7 @@ import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu from './MeasureContextMenu';
 import OutlineToolButtons from './OutlineToolButtons';
 import OutlineToolPanel from './OutlineToolPanel';
+import OverlayLegend from './OverlayLegend';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
@@ -1441,14 +1442,14 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onCancel={outlineTools.cancel}
               onSave={outlineTools.save}
             />
-            {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
-            {wallsLayerVisible && !check && (
-              <div className="absolute bottom-2 right-2 z-30 px-3 py-1.5 rounded border border-border bg-card/95 text-[11px] text-foreground shadow-md pointer-events-none flex items-center gap-3" data-testid="walls-legend">
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(71,85,105,0.5)' }} />Sienos (iš vektorinio PDF)</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>
-              </div>
+            {/* Layer legend (2026-10-16 walls; v3 W1-C zones too): what each line style on the sheet means,
+                named once, where the layers are — the overlay vocabulary never rides on colour alone. */}
+            {(wallsLayerVisible || zoneFillsVisible) && !check && (
+              <OverlayLegend
+                layers={[zoneFillsVisible && 'zones', wallsLayerVisible && 'walls'].filter(Boolean)}
+                className="absolute bottom-2 right-2 z-panel max-w-[calc(100%-1rem)]"
+                data-testid={wallsLayerVisible ? 'walls-legend' : 'zones-legend'}
+              />
             )}
             {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
             {(scalesOpen || scaleCheck) && !check && project && (

@@ -302,7 +302,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
                 </div>
                 {g.items.map((c) => (
                   <div key={c.id}
-                    className={`flex items-center gap-2 px-2 py-0.5 text-xs ${s.hoveredId === c.id ? 'bg-[hsl(var(--conf-med)/0.12)]' : ''}`}
+                    className={`flex items-center gap-2 px-2 py-0.5 text-xs ${s.hoveredId === c.id ? 'bg-[hsl(var(--ov-proposed)/0.12)]' : ''}`}
                     onMouseEnter={() => s.setHoveredId(c.id)} onMouseLeave={() => s.setHoveredId(null)}
                     data-testid="symbol-row">
                     <button type="button" className="mono tabular w-6 text-right text-muted-foreground hover:underline"
@@ -312,7 +312,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
                     <span className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden" title={`Panašumas ${formatScore(c.score)}`}>
                       <span className="block h-full rounded-full"
                         style={{ width: `${Math.round(Math.max(0, (c.score - MIN_THRESHOLD) / (1 - MIN_THRESHOLD)) * 100)}%`,
-                          background: c.isSource ? 'hsl(var(--viewer-chrome-active))' : 'hsl(var(--conf-med))' }} />
+                          background: c.isSource ? 'hsl(var(--ov-read))' : 'hsl(var(--ov-proposed))' }} />
                     </span>
                     <span className="mono tabular w-8 text-right">{formatScore(c.score)}</span>
                     {c.isSource && <span className="text-[10px] text-muted-foreground" title="Tai jūsų apvestas pavyzdys">pavyzdys</span>}

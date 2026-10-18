@@ -10,18 +10,23 @@
  * A live chip shows what the ring measures at the page's scale next to the table's area, so the person
  * sees the consequence of a move before saving; a self-crossing ring turns red (the owner refuses to
  * save it).
+ *
+ * v3 overlay vocabulary (lib/overlayTokens): the ring being edited and its handles are the
+ * tool-at-work orange, solid; red only when the ring crosses itself (an error); snap mark orange square;
+ * the readout a neutral label pill.
  */
 import { useMemo, useRef, useState } from 'react';
 import { nearestEdge, nearestVertex, polygonCentroid, selfIntersects } from '@/lib/polygonGeometry';
 import { formatNumberLT, realPathLengthM, shoelaceAreaM2 } from '@/lib/measureGeometry';
 import { displayRotationFor, normalizeRotation } from '@/lib/viewerEngine/pageRotation';
+import { LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
 
 const SNAP_PX = 8;
 const VERTEX_R = 6;
 const HIT_R = 12;
 const GHOST_R = 4;
-const STROKE = '#b45309';   // amber — an edit in progress, distinct from the evergreen committed outline
-const INVALID = '#dc2626';  // red — the ring crosses itself
+const STROKE = ov('editing');  // an edit in progress — the tool-at-work colour, distinct from a read outline
+const INVALID = ov('error');   // the ring crosses itself — an error
 
 export default function OutlineEditLayer({
   points, onChange, onGestureStart = null, geometry, renderedSize,
@@ -118,15 +123,15 @@ export default function OutlineEditLayer({
       <path
         d={[px, ...(holes || []).map((h) => h.map(toPx))].filter((r) => r.length >= 3)
           .map((r) => `M ${r.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`).join(' ')}
-        fill={stroke} fillOpacity={0.08} fillRule="evenodd" stroke={stroke} strokeWidth={2} strokeLinejoin="round" pointerEvents="none"
+        style={paint({ fill: stroke, stroke })} fillOpacity={0.08} fillRule="evenodd" strokeWidth={STROKE_PX} strokeLinejoin="round" pointerEvents="none"
       />
       {px.map((p, i) => {
         const q = px[(i + 1) % px.length];
         return (
           <circle
             key={`g${i}`} cx={(p.x + q.x) / 2} cy={(p.y + q.y) / 2} r={GHOST_R}
-            fill="#ffffff" stroke={stroke} strokeWidth={1.5} opacity={0.8}
-            style={{ cursor: 'copy' }} onPointerDown={insertAt(i)}
+            style={{ ...paint({ fill: ov('label-bg'), stroke }), cursor: 'copy' }} strokeWidth={1.5} opacity={0.85}
+            onPointerDown={insertAt(i)}
           >
             <title>Pridėti viršūnę</title>
           </circle>
@@ -134,7 +139,7 @@ export default function OutlineEditLayer({
       })}
       {px.map((p, i) => (
         <g key={`v${i}`} data-outline-vertex={i}>
-          <circle cx={p.x} cy={p.y} r={VERTEX_R} fill="#ffffff" stroke={stroke} strokeWidth={2} pointerEvents="none" />
+          <circle cx={p.x} cy={p.y} r={VERTEX_R} style={paint({ fill: ov('label-bg'), stroke })} strokeWidth={STROKE_PX} pointerEvents="none" />
           {/* a wider invisible target: a 6 px handle at 79 % zoom is too small to grab reliably */}
           <circle
             cx={p.x} cy={p.y} r={HIT_R} fill="transparent" stroke="none"
@@ -144,11 +149,13 @@ export default function OutlineEditLayer({
           </circle>
         </g>
       ))}
-      {snapPx && <rect x={snapPx.x - 6} y={snapPx.y - 6} width={12} height={12} fill="none" stroke="#ea580c" strokeWidth={2} pointerEvents="none" />}
+      {snapPx && <rect x={snapPx.x - 6} y={snapPx.y - 6} width={12} height={12} fill="none" style={paint({ stroke: ov('editing') })} strokeWidth={STROKE_PX} pointerEvents="none" />}
       {readout && centre && (
         <g pointerEvents="none" data-outline-readout>
-          <rect x={centre.x - (readout.text.length * 6.2 + 12) / 2} y={centre.y - 10} width={readout.text.length * 6.2 + 12} height={20} rx={3} fill="#1f2937" fillOpacity={0.92} />
-          <text x={centre.x} y={centre.y + 4} textAnchor="middle" fontSize={11} fontFamily="system-ui, sans-serif" fill={readout.crossing ? '#fca5a5' : '#ffffff'}>
+          <rect x={centre.x - labelWidth(readout.text) / 2} y={centre.y - 10} width={labelWidth(readout.text)} height={20} rx={2}
+            style={paint({ fill: ov('label-bg'), stroke: readout.crossing ? INVALID : STROKE })} fillOpacity={0.96} strokeWidth={1.5} />
+          <text x={centre.x} y={centre.y + 4} textAnchor="middle" fontSize={LABEL_FONT_PX} fontWeight={readout.crossing ? 600 : 500}
+            style={{ ...LABEL_STYLE, ...paint({ fill: readout.crossing ? INVALID : ov('label-fg') }) }}>
             {readout.text}
           </text>
         </g>

@@ -1,35 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  roomZoneColor, confidenceHex, ROOM_ZONE_COLORS, CONFIDENCE_HEX,
+  roomTypeWord, ROOM_TYPE_WORDS, areaConfidenceText,
 } from './roomZones.js';
 
-test('roomZoneColor: known paskirtis → its hue', () => {
-  assert.equal(roomZoneColor('miegamoji'), '#3b82f6');
-  assert.equal(roomZoneColor('vonia'), '#06b6d4');
-  assert.equal(roomZoneColor('virtuve'), '#f59e0b');
+// v3 overlay vocabulary (founder decision 2026-10-18): zones share one neutral tint — the room type
+// is a WORD in the label, never a hue; area confidence is a sentence, never a coloured dot.
+test('roomTypeWord: known paskirtis → its word', () => {
+  assert.equal(roomTypeWord('miegamoji'), 'miegamasis');
+  assert.equal(roomTypeWord('vonia'), 'vonia');
+  assert.equal(roomTypeWord('virtuve'), 'virtuvė');
+  assert.equal(roomTypeWord('tambūras'), 'tambūras');
 });
 
-test('roomZoneColor: unknown / missing paskirtis → default green', () => {
-  assert.equal(roomZoneColor('nesamone'), '#10b981');
-  assert.equal(roomZoneColor(undefined), '#10b981');
+test('roomTypeWord: unknown / missing paskirtis → null (the label just leaves it out)', () => {
+  assert.equal(roomTypeWord('nesamone'), null);
+  assert.equal(roomTypeWord(undefined), null);
 });
 
-test('confidenceHex: maps the four confidence levels', () => {
-  assert.equal(confidenceHex('high'), '#16a34a');
-  assert.equal(confidenceHex('medium'), '#d97706');
-  assert.equal(confidenceHex('low'), '#dc2626');
-  assert.equal(confidenceHex('unknown'), '#9ca3af');
+test('no colour is left in the room-type map', () => {
+  for (const word of Object.values(ROOM_TYPE_WORDS)) assert.doesNotMatch(word, /^#|rgb|hsl/);
 });
 
-test('confidenceHex: unrecognised value → unknown grey', () => {
-  assert.equal(confidenceHex('bogus'), '#9ca3af');
-  assert.equal(confidenceHex(undefined), '#9ca3af');
-});
-
-test('color maps are frozen-ish plain objects', () => {
-  assert.equal(typeof ROOM_ZONE_COLORS, 'object');
-  assert.equal(CONFIDENCE_HEX.high, '#16a34a');
+test('areaConfidenceText: only an area that needs a look says something', () => {
+  assert.equal(areaConfidenceText('high'), null);
+  assert.equal(areaConfidenceText('medium'), 'plotą verta patikrinti');
+  assert.equal(areaConfidenceText('low'), 'plotą būtina patikrinti');
+  assert.equal(areaConfidenceText('unknown'), 'plotas nežinomas');
+  assert.equal(areaConfidenceText(undefined), null);
 });
 
 import { buildRoomZone } from './roomZones.js';
@@ -57,14 +55,21 @@ test('buildRoomZone: polygon_pct → scaled polygon geometry', () => {
   assert.ok(Math.abs(z.geometry.points[2][1] - 440) < 1e-9); // 0.55*800
   assert.equal(z.nr, '102');
   assert.equal(z.label, 'Svetainė/virtuvė');
-  assert.equal(z.color, '#f59e0b');                        // valgomasis
+  assert.equal(z.typeWord, 'valgomasis');                  // the type is a word, not a hue
+  assert.equal(z.color, undefined);
 });
 
-test('buildRoomZone: eksplikacija area → high confidence, green dot', () => {
+test('buildRoomZone: eksplikacija area → high confidence, nothing to say about it', () => {
   const z = buildRoomZone(roomPolygon, SIZE);
   assert.equal(z.confidence, 'high');                      // single eksplikacija source
-  assert.equal(z.confidenceColor, '#16a34a');
-  assert.equal(z.areaLabel, '50,5 m²');                    // lt-LT, 1 decimal
+  assert.equal(z.confidenceText, null);
+  assert.equal(z.areaLabel, '50,54 m²');                   // lt-LT, 2 decimals — as the room list prints it
+});
+
+test('buildRoomZone: outline kind follows the source — flood fill is an estimate (dashed)', () => {
+  assert.equal(buildRoomZone(roomPolygon, SIZE).outline, 'estimated');
+  assert.equal(buildRoomZone({ ...roomPolygon, polygon_source: 'vektoriniai_konturai' }, SIZE).outline, 'read');
+  assert.equal(buildRoomZone({ ...roomPolygon, polygon_source: 'corrected' }, SIZE).outline, 'confirmed');
 });
 
 test('buildRoomZone: traced flood-fill polygon is NOT approximate', () => {
@@ -111,7 +116,7 @@ test('buildRoomZone: vision-sourced area → low confidence (red)', () => {
     polygon_pct: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]],
   }, SIZE);
   assert.equal(z.confidence, 'low');
-  assert.equal(z.confidenceColor, '#dc2626');
+  assert.equal(z.confidenceText, 'plotą būtina patikrinti');
 });
 
 test('buildRoomZone: no geometry at all → null', () => {
@@ -130,7 +135,7 @@ test('buildRoomZone: plotas_m2 null → unknown confidence, empty areaLabel', ()
     polygon_pct: [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]],
   }, SIZE);
   assert.equal(z.confidence, 'unknown');
-  assert.equal(z.confidenceColor, '#9ca3af');
+  assert.equal(z.confidenceText, 'plotas nežinomas');
   assert.equal(z.areaLabel, '');
 });
 
@@ -169,6 +174,7 @@ test('C1(b2): NO polygon_source with marker_pct → tier-2 marker at the printed
   assert.equal(z.geometry.type, 'marker');
   assert.deepEqual([z.geometry.cx, z.geometry.cy], [550, 600]);  // 0.55*1000, 0.30*2000
   assert.equal(z.approximate, true);
+  assert.equal(z.outline, 'marker');                               // only the number — no outline to style
 });
 
 test('C1(d): synthesized_from_bbox with only bbox_pct (no anchor) → null (Tier 3)', () => {

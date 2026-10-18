@@ -29,12 +29,15 @@ import { buildCheckOverlay } from '@/lib/checkOverlay';
 import { displayPointOf } from '@/lib/roomOutline';
 import { laneScalesOf } from '@/lib/durableScale';
 import { cleanUserText } from '@/lib/userText';
+import { WALL_STATE_STYLE } from '@/components/viewer/CheckLayer';
+import { ov, paint } from '@/lib/overlayTokens';
 
+// The check layer's own line styles (viewer/CheckLayer) — the legend cannot drift from the drawing.
 const WALL_LEGEND = [
-  ['read', '#15803d', null, 'legendWallRead'],
-  ['borrowed', '#b45309', null, 'legendWallBorrowed'],
-  ['outline', '#64748b', null, 'legendWallOutline'],
-  ['missing', '#dc2626', '5 4', 'legendWallMissing'],
+  ['read', 'legendWallRead'],
+  ['borrowed', 'legendWallBorrowed'],
+  ['outline', 'legendWallOutline'],
+  ['missing', 'legendWallMissing'],
 ];
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border border-border bg-card px-3 '
@@ -280,12 +283,13 @@ export default function RoomDrawingPane({
         </p>
       )}
       {(states.size > 0 || hasOpenings) && (
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground" data-testid="check-legend">
           <li className="font-semibold uppercase tracking-wide">{t('project.roomSheet.legendWallsTitle')}</li>
-          {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, colour, dash, key]) => (
+          {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, key]) => (
             <li key={state} className="flex items-center gap-1.5">
-              <svg width="22" height="8" aria-hidden="true">
-                <line x1="1" y1="4" x2="21" y2="4" stroke={colour} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={dash || undefined} />
+              <svg width="24" height="8" aria-hidden="true">
+                <line x1="1" y1="4" x2="23" y2="4" style={paint({ stroke: WALL_STATE_STYLE[state].stroke })} strokeWidth="3.5"
+                  strokeLinecap={WALL_STATE_STYLE[state].dash ? 'butt' : 'round'} strokeDasharray={WALL_STATE_STYLE[state].dash || undefined} />
               </svg>
               {t(`project.roomSheet.${key}`)}
             </li>
@@ -293,7 +297,7 @@ export default function RoomDrawingPane({
           {hasStrings && (
             <li className="flex items-center gap-1.5">
               <svg width="22" height="8" aria-hidden="true">
-                <line x1="1" y1="4" x2="21" y2="4" stroke="#15803d" strokeOpacity="0.55" strokeWidth="6" strokeLinecap="round" />
+                <line x1="1" y1="4" x2="21" y2="4" style={paint({ stroke: ov('read') })} strokeOpacity="0.45" strokeWidth="6" strokeLinecap="round" />
               </svg>
               {t('project.roomSheet.legendStrings')}
             </li>
@@ -301,7 +305,7 @@ export default function RoomDrawingPane({
           {hasOpenings && (
             <li className="flex items-center gap-1.5">
               <svg width="22" height="8" aria-hidden="true">
-                <line x1="2" y1="4" x2="20" y2="4" stroke="#7c3aed" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="2" y1="4" x2="20" y2="4" style={paint({ stroke: ov('opening') })} strokeWidth="4.5" strokeLinecap="round" />
               </svg>
               {t('project.roomSheet.legendOpenings')}
             </li>

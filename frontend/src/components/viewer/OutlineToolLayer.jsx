@@ -11,6 +11,11 @@
  * Works in DISPLAY-frame page fractions (the frame `polygon_pct` lives in); geometry is computed in
  * PDF points of the displayed sheet, so a tolerance means the same at every zoom. Controlled: the state
  * lives in useOutlineTool, every change goes back through `onChange`.
+ *
+ * v3 overlay vocabulary (lib/overlayTokens): the outline being worked on is the tool-at-work orange,
+ * solid; everything not yet saved that the tool PROPOSES — the cut line, the halves, the merged
+ * outline, a neighbour to pick, a hole being drawn — is the one dash, in the proposal slate blue (a
+ * picked part turns solid); a refusal is red (an error); chips are neutral label pills.
  */
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -22,12 +27,14 @@ import {
   displaySizePt, holeFit, holesInside, pctRingToPts, ptsRingToPct, rectRing, ringAt, splitRingByLine, unionTouchingRings,
 } from '@/lib/outlineTools';
 import { roomHoles, roomHoleWalls } from './useOutlineTool';
+import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
 
 const SNAP_PX = 8;
-const EDIT = '#b45309';       // amber — the outline being worked on (same as the vertex editor)
-const KEEP = '#2f6b4f';       // the theme's evergreen — what stays / what the result will be
-const OTHER = '#64748b';      // slate — the half that leaves, a neighbour to pick
-const HOLE = '#7c3aed';       // violet — a hole being drawn
+const EDIT = ov('editing');     // the outline being worked on (same as the vertex editor)
+const KEEP = ov('proposed');    // what the result will be — proposed until it is saved
+const OTHER = ov('wall');       // the half that leaves, a neighbour to pick
+const HOLE = ov('proposed');    // a hole being drawn — proposed
+const REFUSED = ov('error');    // a merge the geometry refuses
 const MERGE_TOL_M = 0.05;     // outlines this close (5 cm on the sheet) touch
 
 const SPLIT_REFUSED = {
@@ -53,11 +60,14 @@ function pathOf(rings, toPx) {
 
 function Chip({ at, text, tone = 'dark' }) {
   if (!at || !text) return null;
-  const w = text.length * 6.2 + 12;
+  const w = labelWidth(text);
   return (
     <g pointerEvents="none" data-outline-tool-chip>
-      <rect x={at.x - w / 2} y={at.y - 10} width={w} height={20} rx={3} fill={tone === 'dark' ? '#1f2937' : KEEP} fillOpacity={0.92} />
-      <text x={at.x} y={at.y + 4} textAnchor="middle" fontSize={11} fontFamily="system-ui, sans-serif" fill="#ffffff">{text}</text>
+      <rect x={at.x - w / 2} y={at.y - 10} width={w} height={20} rx={2}
+        style={paint({ fill: ov('label-bg'), stroke: tone === 'dark' ? ov('selected', 0.35) : KEEP })}
+        fillOpacity={0.96} strokeWidth={tone === 'dark' ? 1 : 1.5} />
+      <text x={at.x} y={at.y + 4} textAnchor="middle" fontSize={LABEL_FONT_PX} fontWeight={tone === 'dark' ? 500 : 600}
+        style={{ ...LABEL_STYLE, ...paint({ fill: ov('label-fg') }) }}>{text}</text>
     </g>
   );
 }
@@ -232,38 +242,38 @@ export default function OutlineToolLayer({
     >
       {/* the room's outline as it stands, holes cut out (even-odd) */}
       {!(tool.mode === 'merge' && tool.union) && !showSplitParts && (
-        <path d={pathOf([tool.ring, ...(tool.holes || [])], toPx)} fill={EDIT} fillOpacity={0.1} fillRule="evenodd" stroke={EDIT} strokeWidth={2} strokeLinejoin="round" pointerEvents="none" />
+        <path d={pathOf([tool.ring, ...(tool.holes || [])], toPx)} style={paint({ fill: EDIT, stroke: EDIT })} fillOpacity={0.1} fillRule="evenodd" strokeWidth={STROKE_PX} strokeLinejoin="round" pointerEvents="none" />
       )}
 
       {tool.mode === 'split' && parts && parts.map((p, i) => {
         const kept = tool.keep === i;
         const lit = tool.parts ? (hoverPart === i || kept) : false;
-        const col = tool.keep == null ? (lit ? KEEP : EDIT) : (kept ? KEEP : OTHER);
+        const col = tool.keep == null ? KEEP : (kept ? KEEP : OTHER);
         const area = m2(p.ring, p.holes);
         const label = tool.parts
           ? (tool.keep == null ? `${fmt(area)} — spustelėkite, jei lieka ${tool.nr}` : (kept ? `Lieka ${tool.nr}: ${fmt(area)}` : `Kita dalis: ${fmt(area)}`))
           : fmt(area);
         return (
           <g key={`part${i}`} data-split-part={i}>
-            <path d={pathOf([p.ring, ...p.holes], toPx)} fill={col} fillOpacity={lit ? 0.22 : 0.1} fillRule="evenodd"
-              stroke={col} strokeWidth={2} strokeDasharray={tool.keep != null && !kept ? '6 4' : undefined} pointerEvents="none" />
+            <path d={pathOf([p.ring, ...p.holes], toPx)} style={paint({ fill: col, stroke: col })} fillOpacity={lit ? 0.22 : 0.1} fillRule="evenodd"
+              strokeWidth={kept ? 2.5 : STROKE_PX} strokeDasharray={kept ? undefined : DASH} pointerEvents="none" />
             <Chip at={centreOf(p.ring)} text={label} tone={kept ? 'keep' : 'dark'} />
           </g>
         );
       })}
       {tool.mode === 'split' && !tool.parts && tool.a && (
         <g pointerEvents="none">
-          {cursor && <line x1={toPx(tool.a).x} y1={toPx(tool.a).y} x2={toPx(cursor).x} y2={toPx(cursor).y} stroke={EDIT} strokeWidth={1.5} strokeDasharray="5 4" />}
+          {cursor && <line x1={toPx(tool.a).x} y1={toPx(tool.a).y} x2={toPx(cursor).x} y2={toPx(cursor).y} style={paint({ stroke: KEEP })} strokeWidth={1.5} strokeDasharray={DASH} />}
           {preview?.chord && (
-            <line x1={toPx(preview.chord[0]).x} y1={toPx(preview.chord[0]).y} x2={toPx(preview.chord[1]).x} y2={toPx(preview.chord[1]).y} stroke={EDIT} strokeWidth={2.5} />
+            <line x1={toPx(preview.chord[0]).x} y1={toPx(preview.chord[0]).y} x2={toPx(preview.chord[1]).x} y2={toPx(preview.chord[1]).y} style={paint({ stroke: KEEP })} strokeWidth={2.5} strokeDasharray={DASH} />
           )}
-          <circle cx={toPx(tool.a).x} cy={toPx(tool.a).y} r={5} fill="#ffffff" stroke={EDIT} strokeWidth={2} />
+          <circle cx={toPx(tool.a).x} cy={toPx(tool.a).y} r={5} style={paint({ fill: ov('label-bg'), stroke: EDIT })} strokeWidth={STROKE_PX} />
         </g>
       )}
       {tool.mode === 'split' && tool.parts && tool.chord && (
-        <line pointerEvents="none" x1={toPx(tool.chord[0]).x} y1={toPx(tool.chord[0]).y} x2={toPx(tool.chord[1]).x} y2={toPx(tool.chord[1]).y} stroke={EDIT} strokeWidth={2.5} />
+        <line pointerEvents="none" x1={toPx(tool.chord[0]).x} y1={toPx(tool.chord[0]).y} x2={toPx(tool.chord[1]).x} y2={toPx(tool.chord[1]).y} style={paint({ stroke: KEEP })} strokeWidth={2.5} strokeDasharray={DASH} />
       )}
-      {tool.mode === 'split' && !tool.parts && cursor && <circle cx={toPx(cursor).x} cy={toPx(cursor).y} r={4} fill={EDIT} pointerEvents="none" />}
+      {tool.mode === 'split' && !tool.parts && cursor && <circle cx={toPx(cursor).x} cy={toPx(cursor).y} r={4} style={paint({ fill: EDIT })} pointerEvents="none" />}
 
       {tool.mode === 'merge' && neighbours.map((r) => {
         const ring = r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]);
@@ -274,8 +284,9 @@ export default function OutlineToolLayer({
         return (
           <g key={`n${nr}`} data-merge-target={nr}
             onPointerEnter={() => setHoverNr(nr)} onPointerLeave={() => setHoverNr((cur) => (cur === nr ? null : cur))}>
-            <path d={pathOf([ring, ...roomHoles(r)], toPx)} fill={refused ? '#dc2626' : OTHER} fillOpacity={lit ? 0.2 : 0.06} fillRule="evenodd"
-              stroke={refused ? '#dc2626' : OTHER} strokeWidth={lit || picked ? 2 : 1.25} strokeDasharray={picked ? undefined : '6 4'} />
+            <title>{refused ? `${nr}: sujungti negalima` : `Spustelėkite — sujungti su ${nr}${r.pavadinimas ? ` ${r.pavadinimas}` : ''}`}</title>
+            <path d={pathOf([ring, ...roomHoles(r)], toPx)} style={paint({ fill: refused ? REFUSED : OTHER, stroke: refused ? REFUSED : OTHER })} fillOpacity={lit ? 0.2 : 0.06} fillRule="evenodd"
+              strokeWidth={lit || picked ? STROKE_PX : 1.5} strokeDasharray={picked || refused ? undefined : DASH} />
             {(lit || picked) && <Chip at={centreOf(ring)} text={`${nr} · ${r.pavadinimas || ''}`.trim()} />}
           </g>
         );
@@ -284,7 +295,7 @@ export default function OutlineToolLayer({
         const u = hoverMerge?.union || tool.union;
         return (
           <g pointerEvents="none">
-            <path d={pathOf([u.ring, ...u.holes], toPx)} fill={KEEP} fillOpacity={0.14} fillRule="evenodd" stroke={KEEP} strokeWidth={2.5} />
+            <path d={pathOf([u.ring, ...u.holes], toPx)} style={paint({ fill: KEEP, stroke: KEEP })} fillOpacity={0.14} fillRule="evenodd" strokeWidth={2.5} strokeDasharray={DASH} />
             <Chip at={centreOf(u.ring)} tone="keep" text={`${tool.nr} + ${hoverMerge ? hovered.nr : tool.targetNr} = ${fmt(m2(u.ring, u.holes))}`} />
           </g>
         );
@@ -296,12 +307,12 @@ export default function OutlineToolLayer({
 
       {tool.mode === 'subtract' && (
         <g pointerEvents="none">
-          {dragRect && <path d={pathOf([dragRect], toPx)} fill={HOLE} fillOpacity={0.18} stroke={HOLE} strokeWidth={1.5} strokeDasharray="4 3" />}
+          {dragRect && <path d={pathOf([dragRect], toPx)} style={paint({ fill: HOLE, stroke: HOLE })} fillOpacity={0.18} strokeWidth={STROKE_PX} strokeDasharray={DASH} />}
           {(tool.draft || []).length > 0 && (
             <polyline points={[...tool.draft, ...(cursor ? [cursor] : [])].map((p) => { const q = toPx(p); return `${q.x},${q.y}`; }).join(' ')}
-              fill="none" stroke={HOLE} strokeWidth={1.5} strokeDasharray="4 3" />
+              fill="none" style={paint({ stroke: HOLE })} strokeWidth={STROKE_PX} strokeDasharray={DASH} />
           )}
-          {(tool.draft || []).map((p, i) => <circle key={i} cx={toPx(p).x} cy={toPx(p).y} r={i === 0 ? 5 : 3} fill="#ffffff" stroke={HOLE} strokeWidth={1.5} />)}
+          {(tool.draft || []).map((p, i) => <circle key={i} cx={toPx(p).x} cy={toPx(p).y} r={i === 0 ? 5 : 3} style={paint({ fill: ov('label-bg'), stroke: HOLE })} strokeWidth={1.5} />)}
           <Chip
             at={centreOf(tool.ring)}
             text={dragRect

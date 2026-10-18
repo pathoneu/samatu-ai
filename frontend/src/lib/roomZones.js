@@ -4,7 +4,9 @@
  *
  * The viewer is a FACE over the existing engine (design spec 2026-07-01 §3):
  * these functions add NO new quantity math. They only
- *   1. map a room's paskirtis → a stable fill color (identity),
+ *   1. name a room's paskirtis in words (the room type goes into the label —
+ *      zones share ONE neutral tint, v3 overlay vocabulary, founder decision
+ *      2026-10-18),
  *   2. bridge polygon_pct / bbox_pct → screen pixels (reusing
  *      planOverlayGeometry — the coordinate bridge that was never wired into a
  *      visible overlay),
@@ -16,22 +18,30 @@
 
 import { computeAreaConfidence } from './areaConfidence.js';
 import { getPolygonPctPoints } from './planOverlayGeometry.js';
+import { outlineKindOf } from './overlayTokens.js';
 
-// paskirtis → hex. Moved verbatim from AiRoomOverlay (industry takeoff tools per-category hues)
-// so a glance reveals functional zones without reading labels.
-export const ROOM_ZONE_COLORS = {
-  gyvenamoji: '#10b981', svetaine: '#10b981',
-  miegamoji: '#3b82f6', miegamasis: '#3b82f6', vaikui: '#3b82f6',
-  virtuve: '#f59e0b', valgomasis: '#f59e0b',
-  vonia: '#06b6d4', vonios: '#06b6d4', wc: '#06b6d4', san: '#06b6d4', sanitarine: '#06b6d4',
-  koridorius: '#a78bfa', holas: '#a78bfa', prieskambaris: '#a78bfa',
-  drabuzine: '#ec4899', 'rūbinė': '#ec4899',
-  sandeliukas: '#94a3b8', saugykla: '#94a3b8', katiline: '#94a3b8', ukio: '#94a3b8',
-  garazas: '#64748b', 'tambūras': '#64748b', tamburas: '#64748b',
-  balkonas: '#22c55e', terasa: '#22c55e',
+// paskirtis → the word the label shows. v3 overlay vocabulary (2026-10-18, founder decision 2):
+// zones no longer carry a hue per room type (9 Tailwind hues, 6 of them under 3:1 on the white
+// sheet, no legend) — they share one neutral tint and the type is WRITTEN in the label.
+export const ROOM_TYPE_WORDS = {
+  gyvenamoji: 'gyvenamoji', svetaine: 'svetainė',
+  miegamoji: 'miegamasis', miegamasis: 'miegamasis', vaikui: 'vaiko kambarys',
+  virtuve: 'virtuvė', valgomasis: 'valgomasis', kabinetas: 'darbo kambarys',
+  vonia: 'vonia', vonios: 'vonia', wc: 'WC', san: 'san. mazgas', sanitarine: 'san. mazgas',
+  san_mazgas: 'san. mazgas', skalbykla: 'skalbykla', pirtis: 'pirtis',
+  koridorius: 'koridorius', holas: 'holas', prieskambaris: 'prieškambaris', laiptine: 'laiptinė',
+  drabuzine: 'drabužinė', 'rūbinė': 'rūbinė', rubine: 'rūbinė',
+  sandeliukas: 'sandėliukas', saugykla: 'sandėliukas', katiline: 'katilinė', ukio: 'ūkio patalpa',
+  techpatalpa: 'techninė patalpa',
+  garazas: 'garažas', 'tambūras': 'tambūras', tamburas: 'tambūras',
+  balkonas: 'balkonas', terasa: 'terasa',
 };
 
-const DEFAULT_ZONE_COLOR = '#10b981';
+/** The room type in words for the label, or null when the type is unknown. */
+export function roomTypeWord(paskirtis) {
+  if (!paskirtis) return null;
+  return ROOM_TYPE_WORDS[paskirtis] || ROOM_TYPE_WORDS[String(paskirtis).toLowerCase()] || null;
+}
 
 // FOUNDER DECISION (2026-07-11): the default room presentation is a numbered
 // MARKER at the polygon centroid, NOT the filled polygon — on real plans the
@@ -41,21 +51,16 @@ const DEFAULT_ZONE_COLOR = '#10b981';
 // once the traced polygons are trusted again.
 export const ROOM_POLYGON_FILLS_DEFAULT_VISIBLE = false;
 
-export function roomZoneColor(paskirtis) {
-  return ROOM_ZONE_COLORS[paskirtis] || DEFAULT_ZONE_COLOR;
-}
-
-// confidence → hex for the on-canvas dot + stroke. Matches the app's 🟢🟡🔴
-// language and the count-tool prototype's green/amber/red.
-export const CONFIDENCE_HEX = {
-  high: '#16a34a',
-  medium: '#d97706',
-  low: '#dc2626',
-  unknown: '#9ca3af',
+// Area confidence in words (the old coloured dot had only an English <title>): said only when the
+// area needs a look — a trusted area adds nothing to the label.
+const AREA_CHECK_TEXT = {
+  medium: 'plotą verta patikrinti',
+  low: 'plotą būtina patikrinti',
+  unknown: 'plotas nežinomas',
 };
 
-export function confidenceHex(confidence) {
-  return CONFIDENCE_HEX[confidence] || CONFIDENCE_HEX.unknown;
+export function areaConfidenceText(confidence) {
+  return AREA_CHECK_TEXT[confidence] || null;
 }
 
 // A polygon whose source is in this set is NOT a real traced outline — the
@@ -173,13 +178,17 @@ export function buildRoomZone(room, { renderedWidth, renderedHeight } = {}) {
   return {
     nr: room.nr,
     label: room.pavadinimas || `#${room.nr}`,
+    // two decimals, as the room list and the table print it (the label used to say „4,5" beside „4,48")
     areaLabel: area != null
-      ? `${area.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} m²`
+      ? `${area.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`
       : '',
     paskirtis: room.paskirtis || null,
-    color: roomZoneColor(room.paskirtis),
+    typeWord: roomTypeWord(room.paskirtis),
     confidence,
-    confidenceColor: confidenceHex(confidence),
+    confidenceText: areaConfidenceText(confidence),
+    // how the outline is drawn (lib/overlayTokens): solid = read / confirmed, dashed = estimated;
+    // a Tier-2 room has no outline — only its printed number
+    outline: geometry.type === 'marker' ? 'marker' : outlineKindOf(room),
     approximate,
     geometry,
     marker,
