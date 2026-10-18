@@ -223,6 +223,8 @@ def _raster_count(pdf_bytes: bytes, row: dict, geo, wanted: list[int], min_score
     box = _mediabox_box(pdf_bytes, row, geo)
     exclude = {row["page"]: [row["legend_bbox_pct"]]} if row.get("legend_bbox_pct") else None
     first, rest = _pages_for(pdf_bytes, row, wanted, other_sheets)
+    if not first:                          # no sheet carries the row's text: search them all (pages=[] would too)
+        first, rest = rest, []
     started = time.monotonic()
     res = batch_find_symbol(pdf_bytes, row["page"], box, first, min_score, exclude=exclude, time_budget_s=budget)
     if res["status"] != "ok":
@@ -400,8 +402,7 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
             if a["status"] == "ok":
                 answers[k] = {**a, "saltinis": "vektoriai",
                               "instances": [{**i, "score": None, "saltinis": "vektoriai"} for i in a["instances"]],
-                              "kiti": [{**i, "score": None, "saltinis": "vektoriai"} for i in a["kiti"]],
-                              "fallback": bool(a["detail"] and "kitame lape" in a["detail"])}
+                              "kiti": [{**i, "score": None, "saltinis": "vektoriai"} for i in a["kiti"]]}
     for k, r in enumerate(rows):
         if k in answers:
             continue

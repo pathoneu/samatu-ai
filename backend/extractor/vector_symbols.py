@@ -550,7 +550,8 @@ def _legend_copy(box: tuple, words: list[dict], first: str) -> bool:
 
 def _answer(t: dict) -> dict:
     return {"row_id": t.get("row_id"), "status": "ok", "defined": False, "count": 0, "anchors": 0, "parts": 0,
-            "per_page": [], "instances": [], "kiti": [], "legend_copies": 0, "partial": False, "pages_not_read": [],
+            "per_page": [], "instances": [], "kiti": [], "fallback": False, "legend_copies": 0, "partial": False,
+            "pages_not_read": [],
             "pages_skipped": [], "detail": None}
 
 
@@ -637,7 +638,8 @@ def _count_many(pdf_bytes, templates, pages, zones, exclude, other_sheets, budge
         # (`other_sheets`) or when the legend's sheets hold no instance (a legend printed on a sheet of its own).
         classes = sorted({(tp["anchor"]["col"], round(tp["anchor"]["long"], 1)) for i in live for tp in groups[i]}, key=str)
         coloured = _colour_pages(pdf_bytes, classes, wanted)
-        candidates = wanted if coloured is None else sorted(set(coloured))
+        own_pages = {int(templates[i]["page"]) for i in live} & set(wanted)
+        candidates = wanted if coloured is None else sorted(set(coloured) | own_pages)
         texts = _folded_texts(pdf_bytes, digest, candidates)
         keys = {i: _row_key(templates[i].get("text")) for i in live}
 
@@ -694,6 +696,7 @@ def _count_many(pdf_bytes, templates, pages, zones, exclude, other_sheets, budge
                 elif not fallback:
                     a["kiti"].extend(o["found"])
             a["per_page"].sort(key=lambda r: r["page"])
+            a["fallback"] = fallback
             a["instances"] = counted[i]
             a["count"] = len(counted[i])
             notes = []
