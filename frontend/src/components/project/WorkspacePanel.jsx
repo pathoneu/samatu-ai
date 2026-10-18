@@ -73,12 +73,6 @@ const SOURCE_TITLE = {
   ai: 'Numatyta pagal paskirtį. Mažesnis patikimumas — privaloma patikrinti.',
 };
 
-const CONF_TITLE = {
-  high: 'Aukštas pasitikėjimas',
-  medium: 'Vidutinis pasitikėjimas',
-  low: 'Žemas pasitikėjimas — privaloma patikrinti',
-};
-
 // ── Auto-poll takeoff store (manual polygons added in PdfViewer) ──────────
 function useTakeoff(projectId) {
   const [takeoff, setTakeoff] = useState(() => loadTakeoff(projectId));

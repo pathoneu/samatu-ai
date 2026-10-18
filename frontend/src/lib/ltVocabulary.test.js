@@ -153,6 +153,7 @@ const RETIRED = [
   ['AI ženklas', 'say „Rasta automatiškai"'],
   ['Žemas AI', 'say what to do: „Būtina patikrinti" (lib/confidence.js)'],
   ['AI-powered', 'English and „AI" on screen'],
+  ['pasitikėjimas', 'say what to do — lib/confidence.js areaConfidenceSentence / confidenceLabel'],
 ];
 
 test('components carry none of the retired screen phrases', () => {
