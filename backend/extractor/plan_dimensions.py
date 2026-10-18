@@ -223,12 +223,13 @@ def _page_lines_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None) -> di
     """Hairline segments per page, in the DISPLAY frame the strings use:
     {page: {"h": [(x0, x1, y, thickness)], "v": [(y0, y1, x, thickness)]}}
     — the bounds PDFium reports, which include the stroke and the caps, so a
-    segment's drawn length is its extent less its thickness. The frame is settled
-    the way _iter_pages_pdfium settles it for characters — by which of the
-    two page orientations contains the boxes — and /Rotate is then applied,
-    so a line and the string over it agree on where they are."""
+    segment's drawn length is its extent less its thickness. The frame is the
+    page's (pdf_vectors.page_frames, as for the characters) and /Rotate is then
+    applied, so a line and the string over it agree on where they are."""
     import pypdfium2 as pdfium
     import pypdfium2.raw as C
+
+    from .pdf_vectors import check_content_frame, page_frames
 
     out: dict[int, dict] = {}
     doc = pdfium.PdfDocument(pdf_bytes)
@@ -239,8 +240,7 @@ def _page_lines_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None) -> di
                 continue
             page = doc[idx]
             try:
-                Ws, Hs = (float(v) for v in page.get_size())
-                rotation = int(page.get_rotation() or 0) % 360
+                W, H, _Wd, _Hd, rotation = page_frames(page)
                 boxes: list[tuple[float, float, float, float]] = []
                 for obj in page.get_objects(max_depth=4):
                     if obj.type != C.FPDF_PAGEOBJ_PATH:
@@ -252,11 +252,8 @@ def _page_lines_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None) -> di
                     w, h = r - l, t - b
                     if (h <= LINE_THICK_PT and w >= LINE_MIN_PT) or (w <= LINE_THICK_PT and h >= LINE_MIN_PT):
                         boxes.append((l, b, r, t))
-                xmax = max((bx[2] for bx in boxes), default=0.0)
-                ymax = max((bx[3] for bx in boxes), default=0.0)
-                W, H = Ws, Hs
-                if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
-                    W, H = Hs, Ws
+                check_content_frame(W, H, max((bx[2] for bx in boxes), default=0.0),
+                                    max((bx[3] for bx in boxes), default=0.0), "hairlines", pn)
                 hs: list[tuple[float, float, float, float]] = []
                 vs: list[tuple[float, float, float, float]] = []
                 for l, b, r, t in boxes:
@@ -395,13 +392,13 @@ SLANT_CHAR_GAP = 1.6        # characters of one run are no further apart than th
 
 def _slanted_runs_unlocked(pdf_bytes: bytes, wanted: set[int]) -> dict[int, dict]:
     """{page: {"W", "H", "runs": [{text, pts — character centres in the DISPLAY frame}]}} for digit runs
-    written at a slant. The frame is settled the way `_page_lines_pdfium_unlocked` settles it."""
+    written at a slant. The frame is the page's (pdf_vectors.page_frames), as for the hairlines."""
     import math
 
     import pypdfium2 as pdfium
     import pypdfium2.raw as C
 
-    from .pdf_vectors import _to_display
+    from .pdf_vectors import _to_display, check_content_frame, page_frames
 
     out: dict[int, dict] = {}
     doc = pdfium.PdfDocument(pdf_bytes)
@@ -413,8 +410,7 @@ def _slanted_runs_unlocked(pdf_bytes: bytes, wanted: set[int]) -> dict[int, dict
             page = doc[idx]
             tp = None
             try:
-                Ws, Hs = (float(v) for v in page.get_size())
-                rotation = int(page.get_rotation() or 0) % 360
+                W, H, Wd, Hd, rotation = page_frames(page)
                 tp = page.get_textpage()
                 found: list[tuple[str, float, tuple[float, float, float, float]]] = []
                 xmax = ymax = 0.0
@@ -426,10 +422,7 @@ def _slanted_runs_unlocked(pdf_bytes: bytes, wanted: set[int]) -> dict[int, dict
                     box = tuple(float(v) for v in tp.get_charbox(i, loose=True))
                     xmax, ymax = max(xmax, box[2]), max(ymax, box[3])
                     found.append((t, math.degrees(C.FPDFText_GetCharAngle(tp, i)), box))
-                W, H = Ws, Hs
-                if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
-                    W, H = Hs, Ws
-                Wd, Hd = (H, W) if rotation in (90, 270) else (W, H)
+                check_content_frame(W, H, xmax, ymax, "slanted strings", pn)
                 runs: list[dict] = []
                 cur: dict | None = None
                 for t, angle, (l, b, r, tt) in found:
