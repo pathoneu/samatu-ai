@@ -80,7 +80,7 @@ None so far. Candidates (each asked for first, with purpose and cost): Vision le
 
 | When | Branch | What | Checks at merge |
 |---|---|---|---|
-| | | | |
+| 2026-10-18 | v3/audit-bugs (W0-B, 33b6a65) | the seven audit bugs: room-sheet viewer reads the main viewer's scale map (`checkViewerScales`), one floating-panel offset rule (`floatingPanelLeft`), count hint „kairėje", missing-rooms chip points to „Patikra" with number agreement, zone tooltip describes the ring, one area formatter with two decimals (`roomAreaText`), outline buttons on one line at 1280; banned-word copy pass („N rasta automatiškai", `areaConfidenceSentence`, „Sienos, kurias programa perskaitė", „po naujo skaičiavimo", one verb „Taisyti kontūrą" + „Kontūras paspaudus"); „Nustatymai" kept | frontend only, 13 commits; merged tree: units 1268 pass / 0 fail, eslint clean, build OK; worker screenshots at 1440 and 1280; manager spot-check of hint and chip texts on the worker's port |
 
 ## Founder decisions log
 
