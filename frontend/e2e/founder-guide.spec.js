@@ -222,8 +222,10 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
 
 test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', async ({ page }) => {
   await openProject(page);
-  const chip = page.getByRole('button', { name: /mastelis 1:115 \(išmatuotas pagal matmenis\)$/ });
-  await expect(chip).toHaveText('Spėjamas mastelis 1:115 (išmatuotas pagal matmenis)');
+  // the scale chip at the drawing's bottom-left (W1-D ScaleChip; was the status bar's sentence)
+  const chip = page.getByTestId('scale-chip');
+  await expect(chip).toHaveAttribute('data-scale-state', 'spejamas');
+  await expect(chip).toContainText('1:115');
   await page.getByTestId('scales-toggle').click();
   const panel = page.getByTestId('scale-overview');
   await expect(panel).toContainText('0 patvirtinti · 8 spėjami · 0 nenustatyti');
@@ -232,7 +234,7 @@ test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', 
   await panel.getByTestId('scale-confirm-all').click();
   await expect(panel).toContainText('8 patvirtinti · 0 spėjami · 0 nenustatyti');
   await expect(panel.locator('[data-scale-row][data-scale-state="patvirtintas"]')).toHaveCount(8);
-  await expect(chip).toHaveText('Patvirtintas mastelis 1:115 (išmatuotas pagal matmenis)');
+  await expect(chip).toHaveAttribute('data-scale-state', 'patvirtintas');
   await expect.poll(async () => fingerprint(await getProject()).confirmedScales, { timeout: 15_000 }).toBe(8);
   note('8 / 8 patvirtinti 1:115');
 
@@ -267,7 +269,8 @@ test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', 
   await shot(page, '04-scales');
   await page.getByRole('button', { name: 'Atšaukti', exact: true }).click();
   await page.keyboard.press('Escape');
-  await expect(chip).toHaveText('Patvirtintas mastelis 1:115 (išmatuotas pagal matmenis)');
+  await expect(chip).toHaveAttribute('data-scale-state', 'patvirtintas');
+  await expect(chip).toContainText('1:115');
   note('calibration → artimiausias 1:100 (atšaukta)');
 });
 

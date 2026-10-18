@@ -29,7 +29,7 @@ export const MERGE_ROOM_KEYS = [
   '_sujungta_i', '_elementai_pries_sujungima', '_perimetras_pries_sujungima', 'n_partition_walls',
 ];
 
-function withMergeKeys(rooms, sujungimas) {
+export function withMergeKeys(rooms, sujungimas) {
   if (!sujungimas || typeof sujungimas !== 'object') return rooms;
   return rooms.map((r) => {
     const keys = sujungimas[String(r?.nr ?? '')];
@@ -44,12 +44,28 @@ function withMergeKeys(rooms, sujungimas) {
   });
 }
 
+/**
+ * One `previous` from several answers' (a split saves two rooms with two requests): per room, per key, the
+ * FIRST answer's value wins — every answer read the same stored project, so they agree where they overlap.
+ */
+export function mergePrevious(...previous) {
+  const out = {};
+  for (const prev of previous) {
+    if (!prev || typeof prev !== 'object') continue;
+    for (const [nr, keys] of Object.entries(prev)) {
+      if (!keys || typeof keys !== 'object') continue;
+      out[nr] = { ...keys, ...(out[nr] || {}) };
+    }
+  }
+  return out;
+}
+
 function failure(answer) {
   return new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
 }
 
 /** v8_rooms (older blobs carry both lists) follow the rooms that changed. */
-function withV8(project, rooms) {
+export function withV8(project, rooms) {
   const patch = { patalpos: rooms };
   if (Array.isArray(project?.v8_rooms)) {
     const byNr = new Map(rooms.map((r) => [String(r?.nr), r]));
@@ -63,12 +79,19 @@ function withV8(project, rooms) {
  * project) and build the patch from `getFresh()` — the project as stored AFTER the answers came back,
  * so an edit that landed meanwhile is not reverted. → the patch ({patalpos, v8_rooms?, _apimtis?}).
  */
-export async function saveOutlineTool(op, { api, getFresh }) {
+export async function saveOutlineTool(op, { api, getFresh, onPrevious = null }) {
+  // „Atšaukti" (Pathon v3 W1-D): every answer carries `previous`; `onPrevious({action, nr, previous})` hands the
+  // host what to PUT back through the same route to undo this operation.
+  const undoable = (action, nr, ...answers) => {
+    const previous = mergePrevious(...answers.map((a) => a?.previous));
+    if (onPrevious && Object.keys(previous).length) onPrevious({ action, nr: String(nr), previous });
+  };
   if (op?.kind === 'set') {
     const answer = await api.outlineSet(op.nr, { page: op.page, polygon_pct: op.polygon, holes: op.holes, ...wallsOf(op) });
     const fresh = getFresh();
     const rooms = roomsWithOutline(fresh, op.nr, answer);
     if (!rooms) throw failure(answer);
+    undoable('outline-set', op.nr, answer);
     return withV8(fresh, rooms);
   }
   if (op?.kind === 'split') {
@@ -87,6 +110,7 @@ export async function saveOutlineTool(op, { api, getFresh }) {
     const rooms = roomsWithSplit(fresh, {
       status: 'ok', rooms: { [String(op.nr)]: mine.room, [String(op.other.nr)]: theirs.room }, kitu_angos: kitu,
     });
+    undoable('outline-set', op.nr, mine, theirs);
     return withV8(fresh, rooms);
   }
   if (op?.kind === 'merge') {
@@ -96,6 +120,7 @@ export async function saveOutlineTool(op, { api, getFresh }) {
     const fresh = getFresh();
     const rooms = roomsWithSplit(fresh, answer);
     if (!rooms) throw failure(answer);
+    undoable('outline-merge', op.goneNr, answer);
     return withV8(fresh, withMergeKeys(rooms, answer.sujungimas));
   }
   throw new Error(`Nežinomas kontūro veiksmas: ${op?.kind}`);
