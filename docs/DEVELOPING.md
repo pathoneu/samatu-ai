@@ -190,6 +190,38 @@ Then: Sąmata → switch → type into a blank cell (becomes an `rnk-` row in `d
 - Nightly DB backups are checked (`PRAGMA integrity_check`) before upload, their outcome shows in the admin cockpit's health panel, and old ones are **never deleted** until `SAMATU_BACKUP_KEEP_DAYS` is set — a founder decision; `scripts/report_backup_retention.py --days N` shows what a value would delete. Details: `RUNBOOK.md` §2a.
 - All work is on `viewer-rebuild`; nothing auto-deploys.
 
+## Limits (v3 W7-A M7, 2026-10-18)
+
+What the app refuses or warns about, where it lives, and the measurement behind each number.
+
+| Limit | Value | Where | Basis |
+|---|---|---|---|
+| Uploaded PDF size | 200 MB | `main.MAX_PDF_SIZE_BYTES`, `_validate_pdf_upload` | magic bytes + size, before parsing |
+| Pages a paid read sends | 100 | `main.py` (MAX_PAGES note), Vision pipeline | Anthropic request limit |
+| Page dimensions | ≤ 4320 pt edge, ≤ 11,52 M pt² area | `_MAX_PAGE_DIM_PT`, `_MAX_PAGE_AREA_PT2` | ≈ 200 MP at 300 DPI; page 1 only (audit -19 open) |
+| Paid interior read time | 25–28 min typical (12–34 min in the 2026-09-29 audit) | `/extract-interior-stream`, no overall server timeout; 10 s keepalive, survives a dropped stream | programme "Paid runs log" |
+| Other extract routes | 900 s timeout | `/extract`, facade / roof / earthworks / concrete | `asyncio.timeout(900)` |
+| Paid reads per user per hour | 20 (`SAMATU_USER_HOURLY_EXTRACTS`; 0 = off) | `_check_user_spend_cap` | env; € daily cap `SAMATU_USER_DAILY_SPEND_EUR` defaults 0 = off |
+| Default per-client rate | 30 / min per bucket | `_check_rate_limit` | sliding 60 s window, keyed by `_client_key` |
+| `/recompute-interior` | 120 / min per client, ≤ 500 rooms per call | `RECOMPUTE_INTERIOR_PER_MIN` | measured below |
+| Emailed links | 3 per purpose per account per hour | `api/auth_email.MAX_LINKS_PER_HOUR` | on top of the per-IP bucket |
+| Telemetry session | ≤ 2000 gestures | `api/telemetry.MAX_GESTURES` | — |
+| Measurements on one sheet | warning at 1500 (never blocked) | `frontend/src/lib/measureLimits.js` | measured below |
+
+**Measurements per sheet** (headless Chromium 1440×900 on the dev Mac, demo-objektas_h sheet 1, a mix of areas / lines / perimeters / counts; open time, then 40 pans + 16 Ctrl-wheel zooms, rAF frame gaps and long tasks; script `m7_measure.mjs` in the W7-A scratchpad, numbers copied here):
+
+| Measurements | Drawing + overlay on screen | Slowest frame | p95 frame | Long tasks (longest) | JS heap |
+|---|---|---|---|---|---|
+| 0 | 1,1 s | 17 ms | 17 ms | 0 | ≈ 100–140 MB |
+| 1000 | 1,2 s | 50 ms | 17 ms | 0 | 131 MB |
+| 2000 | 1,3 s | 117 ms | 17 ms | 2 (74 ms) | 148 MB |
+| 4000 | 1,8 s | 250 ms | 17 ms | 4 (142 ms) | 177 MB |
+| 8000 | 2,7 s | 533 ms | 67 ms | 19 (317 ms) | 239 MB |
+
+The first stutter a person notices (a frame over 100 ms) appears between 1000 and 2000 here, sooner on a slower laptop: the warning fires once per sheet at 1500.
+
+**`/recompute-interior`** (local single uvicorn worker, auth off, `m7_recompute_timing.py`): 11 rooms (demo-objektas_h) p50 50 ms, ~20 calls/s max; 8 parallel callers → p50 485 ms each. 110 rooms p50 391 ms, 2,5 calls/s; 8 parallel → p50 3,6 s. It is CPU-only and every room edit calls it, and production runs one worker for everyone, so a loop from one client could stall everybody. Decision: its own bucket of 120/min per client (2/s, far above a person editing rooms); the 500-room cap bounds one call. Residual: a client sending 500-room payloads at 2/s could still keep a worker busy — a per-user CPU budget is the next step if that is ever seen.
+
 ## Housekeeping gotchas
 
 - **A response key that starts with `_sa` never reaches the browser.** FastAPI's

@@ -119,6 +119,7 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
 # dev/staging from abusive clients (eg. accidental script loops).
 _RATE_BUCKET: dict[str, deque] = defaultdict(deque)
 _RATE_LIMIT_PER_MIN = 30  # generous; one estimator might do 5-10/hour normally
+RECOMPUTE_INTERIOR_PER_MIN = 120  # v3 M7: every room edit recomputes; see recompute_interior
 _RATE_BUCKET_LAST_GC = [0.0]  # mutable cell so we can update from inside func
 
 # M5 (2026-05-06): per-user daily Vision spend cap. Default disabled; set
@@ -260,8 +261,9 @@ def _client_key(request: "Request") -> str:
 _RATE_LOCK = _threading.Lock()
 
 
-def _check_rate_limit(client_ip: str, endpoint: str) -> None:
-    """Sliding-window rate limit. Raises 429 on overflow.
+def _check_rate_limit(client_ip: str, endpoint: str, limit: int | None = None) -> None:
+    """Sliding-window rate limit. Raises 429 on overflow. `limit` = calls per
+    minute for this bucket (default _RATE_LIMIT_PER_MIN).
 
     Sprint §AUDIT (2026-04-29): periodic janitor evicts empty buckets so the
     dict doesn't grow unbounded over weeks of unique IPs. Runs at most every
@@ -273,7 +275,7 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
         # Drop entries older than 60s
         while bucket and now - bucket[0] > 60:
             bucket.popleft()
-        over = len(bucket) >= _RATE_LIMIT_PER_MIN
+        over = len(bucket) >= (limit or _RATE_LIMIT_PER_MIN)
         if not over:
             bucket.append(now)
         # Janitor: evict stale entries every 10 minutes. Cheap because most
@@ -7060,6 +7062,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # Pure formulas, no Anthropic call → plain login, no spend reservation and
     # no € cap: every room edit lands here (audit 2026-09-29).
     _auth.require_user(request)
+    # v3 M7 rate decision (measured 2026-10-18, DEVELOPING.md › Limits): 50 ms
+    # for an 11-room project, ~390 ms for 110 rooms, on one worker that serves
+    # everyone. 120/min per client (2/s) is far above any person editing rooms
+    # and stops a loop from monopolising the worker.
+    _check_rate_limit(_client_key(request), "recompute-interior", limit=RECOMPUTE_INTERIOR_PER_MIN)
     # DoS guard: bound per-request work. A real interior project is tens of
     # rooms; 500 is generous headroom, absurd payloads are rejected.
     if len(payload.patalpos) > 500:
