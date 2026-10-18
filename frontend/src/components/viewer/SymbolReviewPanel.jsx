@@ -180,7 +180,7 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     let created = null;
     if (!type) {
       const label = String(newLabel || '').trim();
-      if (!label) { toast.info('Įrašykite naujo tipo pavadinimą, pvz. „Durys (AI)"'); return false; }
+      if (!label) { toast.info('Įrašykite naujo tipo pavadinimą, pvz. „Durys"'); return false; }
       created = makeCountType(label, countTypes);
       type = created;
     }
@@ -357,7 +357,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
             </div>
             {typeChoice === '__new' && (
               <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="Tipo pavadinimas, pvz. Durys (AI)"
+                placeholder="Tipo pavadinimas, pvz. Durys"
                 className="h-7 px-2 rounded border border-border bg-background text-xs" aria-label="Naujo tipo pavadinimas"
                 data-testid="symbol-new-type"
                 onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur(); } }} />

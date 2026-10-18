@@ -141,7 +141,7 @@ export default function OverlayPdfDialog({ project, onClose }) {
               ) : null}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Brūkšniniai kontūrai — programos pasiūlyti (AI), ištisiniai — jūsų nubrėžti ar pataisyti. Legenda kiekviename lape.
+              Brūkšniniai kontūrai — rasti automatiškai, ištisiniai — jūsų nubrėžti ar pataisyti. Legenda kiekviename lape.
             </p>
           </div>
         </div>

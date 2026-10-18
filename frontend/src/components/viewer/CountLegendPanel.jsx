@@ -131,16 +131,20 @@ export default function CountLegendPanel({
               }`}
             >
               <Glyph shape={type.shape} color={type.color} />
-              <span className="flex-1 min-w-0 truncate">{type.label}</span>
-              {ai > 0 && (
-                <span
-                  className="inline-flex items-center gap-0.5 px-1 rounded-sm text-[10px] leading-4 bg-[hsl(var(--conf-med)/0.12)] text-[hsl(var(--conf-med))]"
-                  title={`${ai} iš ${tally} rasta automatiškai („Rasti panašius") — tuščiavidurės žymės brėžinyje, patikrinkite`}
-                  data-testid={`clegend-ai-${type.id}`}
-                >
-                  {ai} AI
-                </span>
-              )}
+              {/* The name keeps the row; „N rasta automatiškai" sits under it (2026-10-18: beside it, the
+                  longer Lithuanian words cut the name down to one letter). */}
+              <span className="flex-1 min-w-0 flex flex-col items-start">
+                <span className="max-w-full truncate">{type.label}</span>
+                {ai > 0 && (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1 rounded-sm text-[10px] leading-4 bg-[hsl(var(--conf-med)/0.12)] text-[hsl(var(--conf-med))]"
+                    title={`${ai} iš ${tally} rasta automatiškai („Rasti panašius") — tuščiavidurės žymės brėžinyje, patikrinkite`}
+                    data-testid={`clegend-ai-${type.id}`}
+                  >
+                    {ai} rasta automatiškai
+                  </span>
+                )}
+              </span>
               <span
                 className="tabular-nums text-xs opacity-80 min-w-[1.5rem] text-right"
                 title={`Pažymėta ${tally} vnt.`}
