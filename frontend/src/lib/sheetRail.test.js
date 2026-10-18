@@ -4,7 +4,7 @@ import {
   buildSheetRail, splitSheetName, disciplineOf, setSheetOverride, clearSheetOverride, overrideFor,
   searchHitsByPage, calloutHoverText, lapuForma, DISCIPLINES,
   SHEET_RAIL_KEY, readSheetRailFull, writeSheetRailFull, stripTag, stripLabel,
-  floatingPanelLeft, SHEET_RAIL_WIDTH, SHEET_STRIP_WIDTH, THUMBNAIL_RAIL_WIDTH,
+  floatingPanelLeft, sheetRailWidth, SHEET_RAIL_WIDTH, SHEET_STRIP_WIDTH, THUMBNAIL_RAIL_WIDTH,
 } from './sheetRail.js';
 
 // The stored classification of the 8-sheet demo project (types and names as the blob carries them).
@@ -161,4 +161,15 @@ test('a floating panel clears the 56 px sheet strip', () => {
   assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true, strip: true }), 64);
   assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: true, strip: true }), 240, 'the full rail wins');
   assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: false, strip: true }), 8, 'no sheets → no strip');
+});
+
+// Pathon v3 click model (W1-B): the tool cards float at the drawing's left edge; a panel clears them too.
+test('a floating panel clears the tool cards, and the chrome starts where the sheet list ends', () => {
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true, strip: true, toolRail: 72 }), 64 + 72 + 8);
+  assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: true, strip: true, toolRail: 72 }), 240 + 80);
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: false, toolRail: 0 }), 8, 'no tool cards (check view) → the old rule');
+  assert.equal(sheetRailWidth({ railOpen: false, sheetRail: true, strip: true }), SHEET_STRIP_WIDTH);
+  assert.equal(sheetRailWidth({ railOpen: true, sheetRail: true }), SHEET_RAIL_WIDTH);
+  assert.equal(sheetRailWidth({ railOpen: true, sheetRail: false }), THUMBNAIL_RAIL_WIDTH);
+  assert.equal(sheetRailWidth({ railOpen: false, sheetRail: false, strip: true }), 0);
 });

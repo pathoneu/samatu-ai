@@ -70,6 +70,16 @@ test('matchViewerHotkey: plain keys, modifiers and shift', () => {
   assert.equal(matchViewerHotkey(ev('p', { metaKey: true })), 'print');
   assert.equal(matchViewerHotkey(ev('l')), 'toolLasso');
   assert.equal(matchViewerHotkey(ev('L', { shiftKey: true })), 'toolLasso');
+  // v3 click model: every rail tool has a key; 1 / V is „Žymėti", fit-to-width moved to W
+  assert.equal(matchViewerHotkey(ev('1')), 'toolSelect');
+  assert.equal(matchViewerHotkey(ev('v')), 'toolSelect');
+  assert.equal(matchViewerHotkey(ev('w')), 'fitWidth');
+  assert.equal(matchViewerHotkey(ev('h')), 'toolPan');
+  assert.equal(matchViewerHotkey(ev('k')), 'toolCalibrate');
+  assert.equal(matchViewerHotkey(ev('r')), 'toolRoom');
+  // plain F is „Rasti panašius"; text search keeps Ctrl+F and /
+  assert.equal(matchViewerHotkey(ev('f')), 'toolFindSimilar');
+  assert.equal(matchViewerHotkey(ev('/')), 'openSearch');
   // plain Z is the draft / outline undo, not the global one
   assert.equal(matchViewerHotkey(ev('z')), null);
   // browser combos stay with the browser

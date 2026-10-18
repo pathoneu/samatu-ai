@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch, ListChecks, Lasso } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, Pentagon, Search, Printer, Download, Undo2, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -48,27 +48,15 @@ import MeasureContextMenu from './MeasureContextMenu';
 import OutlineToolButtons from './OutlineToolButtons';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
+import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
+import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
-import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
+import { matchViewerHotkey, withKey, hintText, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
-import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
-
-// Measurement tool palette (Phase 3). 'select' exists so committed measurements
-// can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
-// Labeled: founder 2026-07-14 — unlabeled icons read as "all of these do the
-// same thing". label renders next to the icon; title keeps the hotkey hint.
-const MEASURE_TOOLS = [
-  { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Pažymėti jau nubrėžtą matavimą — po to Delete jį ištrina' },
-  { id: 'lasso', Icon: Lasso, label: 'Laso', title: withKey('Apvesti kelis matavimus ir žymes — visi apvesti pažymimi; Shift — pridėti; dešinysis klavišas — veiksmai su visais', 'toolLasso') },
-  { id: 'distance', Icon: Ruler, label: 'Atstumas', title: withKey('Matuoti atstumą tarp dviejų taškų, rezultatas metrais', 'toolDistance') },
-  { id: 'area', Icon: Pentagon, label: 'Plotas', title: withKey('Matuoti plotą apvedant kontūrą, rezultatas m²', 'toolArea') },
-  { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: withKey('Matuoti kontūro ilgį, rezultatas metrais', 'toolPerimeter') },
-  { id: 'count', Icon: Hash, label: 'Kiekis', title: withKey('Skaičiuoti vienetus (rozetes, šviestuvus) spustelint kiekvieną', 'toolCount') },
-  { id: 'calibrate', Icon: Scaling, label: 'Mastelis', title: 'Nustatyti brėžinio mastelį: pažymėkite atkarpą, kurios tikrą ilgį žinote, ir jį įrašykite' },
-];
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, sheetRailWidth, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
 
 // Empty measurement draft (shape of measureOverlayReducer's state).
 const EMPTY_DRAFT = { points: [], committed: false };
@@ -80,6 +68,7 @@ const EMPTY_DRAFT = { points: [], committed: false };
 // so the visible exit was the one nobody was told about. Multi-step flows
 // (kalibravimas, kiekis) now number their steps.
 const MEASURE_HINTS = {
+  pan: 'Rankutė: tempkite brėžinį · Esc — baigti',
   select: `Spustelėkite matavimą jam pažymėti · ${hintText(['deleteSelected'])} · dešinysis klavišas — meniu`,
   lasso: `Laso: apveskite matavimus ir žymes (Shift — pridėti) · dešinysis klavišas — veiksmai su visais · ${hintText(['deleteSelected'])}`,
   distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
@@ -175,10 +164,9 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, railOpen, onToggleThumbs, measureTool, onMeasureTool, searchOpen, onToggleSearch, onCloseSearch, zoneFillsVisible, onToggleZoneFills, wallsLayerVisible, onToggleWallsLayer, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, outlineToolsSlot = null, onDownload, historyOpen = false, onToggleHistory = null, onOpenGuide = null, symbolSearchActive = false, onToggleSymbolSearch = null, addon = null, scalesOpen = false, onToggleScales = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, searchOpen, onToggleSearch, onCloseSearch, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, outlineToolsSlot = null, addon = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
-  const { provides: printApi } = usePrint(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
   const cur = visiblePageOf(scroll);
   // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
@@ -194,12 +182,6 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const canFill = focusedRoomNr != null && onStartFill;
   return (
     <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
-      <button
-        className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
-        title={withKey('Puslapių juosta', 'toggleThumbs')}
-        onClick={onToggleThumbs}
-      ><PanelLeft className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       {/* The reading button („Perskaityti lapą", renderToolbarAddon) — first, so a narrow toolbar never hides it. */}
       {addon && <>{addon(cur, total)}<span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" /></>}
       {/* Deterministic: jump to visible page ± 1. The plugin's relative
@@ -216,86 +198,6 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
       <button className={btn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
       <button className={btn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
-      {onToggleZoneFills && (
-        <>
-          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {/* Zone-fill layer toggle. Founder decision 2026-07-14: a clean drawing is the
-              default (only the chosen room's ring); this re-enables the filled room polygons.
-              2026-10-18: the title still promised number markers, gone since 2026-07-14.
-              2026-07-28: the old title named the CURRENT state and then the
-              OTHER state's action in one breath ("užpildai: įjungta (rodyti
-              žymeklius)") — both readings were wrong. Say only what the click
-              will do, and say what a "zona" is. */}
-          <button
-            className={zoneFillsVisible ? pressed : btn}
-            title={zoneFillsVisible
-              ? 'Paslėpti nuspalvintas patalpas — brėžinys liks švarus, pasirinkta patalpa bus pažymėta žiedu ties jos numeriu'
-              : 'Nuspalvinti visas patalpas pagal jų kontūrus (dabar brėžinys švarus — pasirinkta patalpa pažymima žiedu ties jos numeriu)'}
-            aria-pressed={!!zoneFillsVisible}
-            onClick={onToggleZoneFills}
-          ><Layers className="w-4 h-4" /></button>
-          {/* Walls layer (2026-10-16, Togal analysis §10): the wall solid, every room outline and
-              every opening the program read from the vector PDF — the QA view of the geometry lane. */}
-          {onToggleWallsLayer && (
-            <button
-              type="button"
-              className={wallsLayerVisible ? pressed : btn}
-              title={wallsLayerVisible
-                ? 'Paslėpti sienų sluoksnį'
-                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš brėžinio'}
-              aria-pressed={!!wallsLayerVisible}
-              aria-label="Sienų sluoksnis"
-              data-testid="viewer-walls-layer"
-              onClick={onToggleWallsLayer}
-            ><BrickWall className="w-4 h-4" /></button>
-          )}
-        </>
-      )}
-      {onMeasureTool && (
-        <>
-          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {MEASURE_TOOLS.map(({ id, Icon, label, title }) => (
-            <button
-              key={id}
-              data-coach={id}
-              className={(measureTool === id ? pressed : btn) + ' inline-flex items-center gap-1'}
-              title={title}
-              aria-pressed={measureTool === id}
-              onClick={() => onMeasureTool(id)}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="text-meta leading-none hidden lg:inline">{label}</span>
-            </button>
-          ))}
-          {/* „Rasti panašius" (2026-10-16, Togal's AI Image Search): box one symbol → similar ones → count. */}
-          {onToggleSymbolSearch && (
-            <button
-              type="button"
-              className={(symbolSearchActive ? pressed : btn) + ' inline-flex items-center gap-1'}
-              title="Rasti panašius: apveskite vieną simbolį (pvz., duris) — programa suras panašius pagal formą, jūs peržiūrite ir pridedate kaip kiekį"
-              aria-pressed={!!symbolSearchActive}
-              onClick={onToggleSymbolSearch}
-              data-testid="viewer-symbol-search"
-            >
-              <ScanSearch className="w-4 h-4" />
-              <span className="text-meta leading-none hidden lg:inline">Rasti panašius</span>
-            </button>
-          )}
-          {onToggleScales && (
-            <button
-              type="button"
-              className={(scalesOpen ? pressed : btn) + ' inline-flex items-center gap-1'}
-              title="Visų lapų masteliai: koks nustatytas, iš kur jis, ar patvirtintas"
-              aria-pressed={scalesOpen}
-              onClick={onToggleScales}
-              data-testid="scales-toggle"
-            >
-              <ListChecks className="w-4 h-4" />
-              <span className="text-meta leading-none hidden lg:inline">Masteliai</span>
-            </button>
-          )}
-        </>
-      )}
       {canFill && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
@@ -380,32 +282,8 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           )}
         </>
       )}
-      {/* Right group: search + print + download. */}
+      {/* Right: search. Istorija, „?", print and download live in the rail's „Daugiau". */}
       <div className="ml-auto flex items-center gap-1">
-        {onToggleHistory && (
-          <button
-            type="button"
-            className={(historyOpen ? pressed : btn) + ' inline-flex items-center gap-1'}
-            title={`Istorija: paskutiniai veiksmai su matavimais ir žymėmis, grįžimas į bet kurį žingsnį (${keyText('undo')} — atšaukti)`}
-            aria-pressed={!!historyOpen}
-            onClick={onToggleHistory}
-            data-testid="viewer-history-toggle"
-          >
-            <History className="w-4 h-4" />
-            <span className="text-meta leading-none hidden xl:inline">Istorija</span>
-          </button>
-        )}
-        {onOpenGuide && (
-          <button
-            type="button"
-            className={btn + ' w-6 h-6 inline-flex items-center justify-center font-semibold'}
-            title={withKey('Spartieji klavišai', 'openGuide')}
-            aria-label="Spartieji klavišai"
-            onClick={onOpenGuide}
-            data-testid="viewer-shortcuts-open"
-          >?</button>
-        )}
-        <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
         {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
         <button
           className={searchOpen ? pressed : btn}
@@ -413,11 +291,6 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           aria-pressed={!!searchOpen}
           onClick={onToggleSearch}
         ><Search className="w-4 h-4" /></button>
-        <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-        <button className={btn} title={withKey('Spausdinti brėžinį', 'print')} disabled={!printApi} onClick={() => printApi?.print()}><Printer className="w-4 h-4" /></button>
-        {/* Honest title: this hands back the ORIGINAL uploaded PDF — the
-            measurements and zones are not burned into it. (2026-07-28.) */}
-        <button className={btn} title="Atsisiųsti originalų PDF (be matavimų ir kontūrų)" disabled={!onDownload} onClick={onDownload || undefined}><Download className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -539,6 +412,37 @@ function ThumbnailRail({ documentId }) {
 }
 
 /**
+ * RailHost — the tool cards (ToolRail) with the viewer's own „Daugiau" menu: the items the old toolbar
+ * carried at its far end (Masteliai, Istorija, print, download, „?") and the wide sheet list (T).
+ */
+function RailHost({ documentId, compact, activeTool, onTool, available, layers, onToggleLayer, onDownload, scalesOpen = false, onToggleScales = null, historyOpen = false, onToggleHistory = null, railOpen = false, onToggleRail = null, onOpenGuide = null }) {
+  const { provides: printApi } = usePrint(documentId);
+  const mac = useMemo(() => isMacPlatform(), []);
+  const more = [
+    onToggleScales && { id: 'scales', label: 'Masteliai', Icon: ListChecks, checked: !!scalesOpen, onSelect: onToggleScales, testId: 'scales-toggle' },
+    onToggleHistory && { id: 'history', label: 'Istorija', Icon: History, checked: !!historyOpen, onSelect: onToggleHistory, testId: 'viewer-history-toggle', shortcut: keyText('undo', { mac }) },
+    'separator',
+    onToggleRail && { id: 'rail', label: 'Plati lapų juosta', Icon: PanelLeft, checked: !!railOpen, onSelect: onToggleRail, shortcut: keyText('toggleThumbs', { mac }), testId: 'viewer-thumbs-toggle' },
+    { id: 'print', label: 'Spausdinti brėžinį', Icon: Printer, onSelect: () => printApi?.print(), disabled: !printApi, shortcut: keyText('print', { mac }), testId: 'viewer-print' },
+    { id: 'download', label: 'Atsisiųsti originalų PDF (be matavimų)', Icon: Download, onSelect: () => onDownload?.(), disabled: !onDownload, testId: 'viewer-download' },
+    'separator',
+    onOpenGuide && { id: 'guide', label: 'Spartieji klavišai', Icon: Keyboard, onSelect: onOpenGuide, shortcut: keyText('openGuide', { mac }), testId: 'viewer-shortcuts-open' },
+  ].filter(Boolean).filter((item, i, all) => item !== 'separator' || (i > 0 && all[i - 1] !== 'separator' && i < all.length - 1));
+  return (
+    <ToolRail
+      compact={compact}
+      mac={mac}
+      activeTool={activeTool}
+      onTool={onTool}
+      available={available}
+      layers={layers}
+      onToggleLayer={onToggleLayer}
+      more={more}
+    />
+  );
+}
+
+/**
  * ViewerHotkeys — the viewer keyboard contract, one window keydown listener.
  * WHICH key does WHAT lives in lib/viewerShortcuts (the table the „?" guide
  * prints); this component only maps a matched entry id to its action. Guarded:
@@ -550,12 +454,12 @@ function ThumbnailRail({ documentId }) {
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer }) {
+function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onRoomTool = null }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
   // Scroll state through a ref so the window listener isn't re-bound on every
-  // scroll tick — only the fit keys ('0'/'1') read it, to pre-sync the plugin's
+  // scroll tick — only the fit keys ('0'/'W') read it, to pre-sync the plugin's
   // lagging currentPage to the page actually on screen before fitting.
   const scrollRef = useRef(scroll);
   useEffect(() => { scrollRef.current = scroll; });
@@ -585,6 +489,12 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       openSearch: () => (onOpenSearch ? (onOpenSearch(), true) : false),
       print: () => (printApi ? (printApi.print(), true) : false),
       openGuide: () => (onOpenGuide ? (onOpenGuide(), true) : false),
+      toolSelect: () => tool('select'),
+      toolPan: () => tool('pan'),
+      toolCalibrate: () => tool('calibrate'),
+      toolFindSimilar: () => (fillArmed || !onToggleSymbolSearch ? false : (onToggleSymbolSearch(), true)),
+      // R — the room tool (vector outline from one click) is wired by W1-D; until then the key does nothing.
+      toolRoom: () => (fillArmed || !onRoomTool ? false : (onRoomTool(), true)),
       toolDistance: () => tool('distance'),
       toolArea: () => tool('area'),
       toolPerimeter: () => tool('perimeter'),
@@ -612,7 +522,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onRoomTool]);
   return null;
 }
 
@@ -1279,6 +1189,33 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     return () => document.removeEventListener('wheel', onWheel, { capture: true });
   }, []);
 
+  // ---- Click model chrome (Pathon v3 W1-B) ----------------------------------
+  // The hand („Rankutė", H): a drag scrolls the drawing; no layer under it sees the pointer.
+  useDragPan({ rootRef: tvRootRef, armed: measureTool === 'pan' && active && !check });
+  // The tool cards keep their labels while the canvas is tall enough for them, icons only below that.
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const chromeObserver = useRef(null);
+  const chromeRef = useCallback((el) => {
+    chromeObserver.current?.disconnect();
+    chromeObserver.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setChromeHeight(Math.round(el.getBoundingClientRect().height)));
+    ro.observe(el);
+    chromeObserver.current = ro;
+  }, []);
+  const railCompact = chromeHeight > 0 && chromeHeight < railHeight() + 16;
+  // „Patalpa" (R): the one-click room outline — W1-D wires it (vector outline_at); null keeps the card disabled.
+  const onRoomTool = null;
+  // The tool the cards show pressed: the armed mode, „Rasti panašius" while its session is open.
+  const railActiveTool = symbol.active ? 'findSimilar' : (measureTool === 'scalecheck' ? null : measureTool);
+  const onRailTool = (id) => {
+    if (id === 'findSimilar') { toggleSymbolSearch(); return; }
+    if (id === 'room') { onRoomTool?.(); return; }
+    armMeasureTool(id);
+  };
+  // What the page layers and the status bar are told: the hand is not a page tool (it owns the pointer above them).
+  const pageTool = measureTool === 'pan' ? null : measureTool;
+
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
@@ -1292,7 +1229,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const railOpen = sheetRail ? sheetRailFull : (thumbsPref ?? (check ? false : (totalPages ?? 1) > 1));
         const toggleRail = () => (sheetRail ? setSheetRailFull(!sheetRailFull) : setRailOpen(!railOpen));
         // Floating panels start right of whichever rail is showing — the full rail, the 56 px strip, the thumbnails.
-        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail, strip: true });
+        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail, strip: true, toolRail: check ? 0 : RAIL_WIDTH });
+        // The chrome floating over the drawing starts where the sheet list ends, so nothing ever covers the list.
+        const chromeLeft = sheetRailWidth({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1302,17 +1241,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             fillFor={fillFor}
             onStartFill={startFill}
             onCancelFill={() => setFillFor(null)}
-            railOpen={railOpen}
-            onToggleThumbs={toggleRail}
-            measureTool={measureTool}
-            onMeasureTool={check ? null : armMeasureTool}
             searchOpen={searchOpen}
             onToggleSearch={() => setSearchOpen((v) => !v)}
             onCloseSearch={() => setSearchOpen(false)}
-            zoneFillsVisible={zoneFillsVisible}
-            onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
-            wallsLayerVisible={wallsLayerVisible}
-            onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
             outlineEdit={outlineEdit}
             onStartOutlineEdit={check || !onRoomOutlineEdit ? null : startOutlineEdit}
             onSaveOutlineEdit={saveOutlineEdit}
@@ -1329,15 +1260,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 onCancel={outlineTools.cancel}
               />
             )}
-            onDownload={handleDownload}
-            historyOpen={historyOpen}
-            onToggleHistory={check ? null : () => setHistoryOpen((v) => !v)}
-            onOpenGuide={() => setGuideOpen(true)}
-            symbolSearchActive={symbol.active}
-            onToggleSymbolSearch={check ? null : toggleSymbolSearch}
             addon={check ? null : renderToolbarAddon}
-            scalesOpen={scalesOpen}
-            onToggleScales={check || !project ? null : () => setScalesOpen((v) => !v)}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
@@ -1361,7 +1284,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onOpenGuide={() => setGuideOpen((v) => !v)}
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
+            onToggleSymbolSearch={check ? null : toggleSymbolSearch}
+            onRoomTool={check ? null : onRoomTool}
           />}
+          {measureTool === 'pan' && <style>{PAN_CURSOR_CSS}</style>}
           <div className="relative flex flex-1 min-h-0">
             {sheetRail
               ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
@@ -1398,7 +1324,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onOutlineToolChange={outlineTools.change}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
-                      measureTool={measureTool === 'scalecheck' ? 'calibrate' : measureTool}
+                      measureTool={pageTool === 'scalecheck' ? 'calibrate' : pageTool}
                       measurements={measurements}
                       measureScale={effectiveScales[layout.pageNumber] || null}
                       snapEnabled={snapEnabled}
@@ -1454,6 +1380,36 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 />
               </ZoomGestureWrapper>
             </Viewport>
+            {/* The chrome floating over the drawing (Pathon v3 click model): laid out right of the sheet list so it
+                never covers it; click-through except on its own cards. */}
+            <div
+              ref={chromeRef}
+              className="absolute inset-y-0 right-0 z-panel pointer-events-none"
+              style={{ left: chromeLeft }}
+              data-canvas-chrome
+            >
+              {!check && (
+                <div className="absolute top-2 left-2">
+                  <RailHost
+                    documentId={activeDocumentId}
+                    compact={railCompact}
+                    activeTool={railActiveTool}
+                    onTool={onRailTool}
+                    available={{ room: onRoomTool ? undefined : 'Patalpos įrankis dar ruošiamas — kol kas pasirinkite patalpą sąraše ir spauskite „Kontūras paspaudus".' }}
+                    layers={{ zones: zoneFillsVisible, walls: wallsLayerVisible }}
+                    onToggleLayer={(id) => (id === 'zones' ? setZoneFillsVisible((v) => !v) : setWallsLayerVisible(!wallsLayerVisible))}
+                    onDownload={handleDownload}
+                    scalesOpen={scalesOpen}
+                    onToggleScales={project ? () => setScalesOpen((v) => !v) : null}
+                    historyOpen={historyOpen}
+                    onToggleHistory={() => setHistoryOpen((v) => !v)}
+                    railOpen={railOpen}
+                    onToggleRail={toggleRail}
+                    onOpenGuide={() => setGuideOpen(true)}
+                  />
+                </div>
+              )}
+            </div>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
             {(measureTool != null || outlineEdit || symbol.active) && (
@@ -1554,7 +1510,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             fillFor={fillFor}
             fillBusy={fillBusy}
             measureScales={effectiveScales}
-            measureTool={measureTool}
+            measureTool={pageTool}
             onCalibrateClick={() => armMeasureTool('calibrate')}
             outlineEdit={outlineEdit}
             projectId={projectId}
