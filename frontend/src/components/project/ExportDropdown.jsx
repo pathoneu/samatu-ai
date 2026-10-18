@@ -150,6 +150,9 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     // account default) — the server used to print 21 % whatever was chosen.
     vat_rate: vatRateOf({ vat_rate: extra.vat_rate ?? project.vat_rate }, s.vat_rate),
     vidine_kopija: internalCopy,
+    // v3 M5: his internal copy gets „Pakeitimų žurnalas" — the server reads the
+    // project's own change log (ownership-checked); the client's copy never asks.
+    ...(internalCopy && project.id ? { project_id: project.id } : {}),
     ...(suKodu ? { su_kodu: true } : {}),
   };
   const res = await fetch(`${API}/${endpoint}`, {

@@ -14,7 +14,7 @@ import { getSettings } from '@/lib/projectStore';
 import { staleRowsForExport, staleRowCarryTargets } from '@/lib/mergeDarbuSarasas';
 import { exportSections, linesForExport, linesWithoutPrice } from '@/lib/exportLines';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
-import { DEFAULT_GROUPING, GROUPINGS } from '@/lib/exportGrouping';
+import { DEFAULT_GROUPING, GROUPINGS, groupingsFor } from '@/lib/exportGrouping';
 import ExportGroupingPreview from './ExportGroupingPreview';
 import {
   exportSelectionKey,
@@ -329,7 +329,7 @@ export default function ExportFilterModal({
           <div className="px-5 py-3 border-b border-border">
             <p className="text-[11px] text-muted-foreground">Grupuoti pagal</p>
             <div role="radiogroup" aria-label="Grupuoti pagal" className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
-              {GROUPINGS.map((g) => (
+              {groupingsFor(project).map((g) => (
                 <label key={g.value} title={g.desc}
                   className="flex items-start gap-2 px-2 py-1 rounded hover:bg-muted/40 cursor-pointer transition-colors">
                   <input type="radio" name="grupavimas" value={g.value} checked={grupavimas === g.value}

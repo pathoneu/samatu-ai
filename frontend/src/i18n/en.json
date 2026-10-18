@@ -1523,7 +1523,7 @@
     },
     "exportInternal": {
       "label": "Internal copy with notes",
-      "desc": "Adds a sheet with the app's notes for you and, when prices are split, labour and material price columns. Send your client the file without them."
+      "desc": "Adds a sheet with the app's notes for you, a „Change log“ sheet (what you changed and when) and, when prices are split, labour and material price columns. Send your client the file without them."
     },
     "samataTemplate": {
       "layoutLabel": "Layout",

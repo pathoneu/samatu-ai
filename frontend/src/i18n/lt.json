@@ -1578,7 +1578,7 @@
     },
     "exportInternal": {
       "label": "Vidinė kopija su pastabomis",
-      "desc": "Prideda lapą su programos pastabomis jums ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
+      "desc": "Prideda lapą su programos pastabomis jums, lapą „Pakeitimų žurnalas“ (ką ir kada keitėte) ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
     },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",

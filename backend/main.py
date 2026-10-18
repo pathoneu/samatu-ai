@@ -5111,7 +5111,7 @@ def _sequential_export_nr(eilutes: list[dict],
 def generate_excel(request: Request, data: dict):
     # Sprint §AUDIT (2026-04-29): require auth — was open endpoint, vulnerable
     # to abuse (each call spins up openpyxl + heavy I/O).
-    _auth.require_user(request)
+    _excel_user = _auth.require_user(request)
     from datetime import date as _date
     # P3 (2026-07-04 pentest, pass 3): this /generate-excel path writes user/AI
     # text (imone, projektas, skyrius, nr, aprašymas, mato_vnt) straight into
@@ -5652,6 +5652,13 @@ def generate_excel(request: Request, data: dict):
                 c.border = border
                 c.font   = Font(size=9)
             ws_past.row_dimensions[ri].height = 16
+
+    # „Pakeitimų žurnalas" (v3 M5): the internal copy also lists what he changed
+    # and every saved version — only for a project he owns (api/change_log_sheet).
+    if data.get("vidine_kopija") is True and data.get("project_id"):
+        from api.change_log_sheet import change_log_entries, write_change_log_sheet
+        write_change_log_sheet(wb, change_log_entries(str(data["project_id"]), _excel_user),
+                               projektas, safe_cell=_safe_cell)
 
     buf = io.BytesIO()
     wb.save(buf)
