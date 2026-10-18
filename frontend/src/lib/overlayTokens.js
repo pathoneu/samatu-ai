@@ -37,9 +37,10 @@ export const DASH = DASH_ESTIMATED;
 export const LABEL_FONT_PX = 12;
 export const LABEL_FONT_FAMILY = 'var(--font-sans)';
 export const LABEL_STYLE = { fontFamily: LABEL_FONT_FAMILY, fontVariantNumeric: 'tabular-nums' };
-/** Rough text width at LABEL_FONT_PX in the sans (Plex Sans ≈ 0.56 em per character). */
+/** Rough text width at LABEL_FONT_PX in the sans (Plex Sans ≈ 0.53 em per character, tabular digits
+ *  included; W0-B measured 0.45 em for lowercase prose — erring wide never clips a label). */
 export function labelWidth(text, px = LABEL_FONT_PX) {
-  return String(text ?? '').length * px * 0.56 + 14;
+  return String(text ?? '').length * px * 0.53 + 14;
 }
 
 /** SVG paint as a style object: var() resolves here in every browser (presentation attributes vary). */
