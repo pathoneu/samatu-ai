@@ -357,3 +357,29 @@ def test_a_legend_table_takes_the_row_ruled_apart_under_it():
     _close(legend["bbox_pct"], _pct(x, top - 8, x + sum(TABLE_COL_W), top + 5 * TABLE_ROW_H + 4.5), tol=0.005)
     assert "5 eil." in legend["evidence"]["detail"]
     assert not [z for z in sz.detect_zones(build_plan([s]), 1) if z["kind"] == "lentele"]
+
+
+# ── frames: a zone in the viewer's measurement space (E4) ───────────────────
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_zone_to_mediabox_pt_inverts_the_viewer_turn(rotation):
+    """cv_match._rotate_pct turns mediabox fractions into display fractions; zone_to_mediabox_pt is its
+    inverse, in mediabox points from the top-left (cv_tools `box_pt`)."""
+    Wm, Hm = 595.0, 842.0
+    box_m = [100.0, 200.0, 250.0, 260.0]                  # mediabox points, top-left origin
+    pts = [_rotate_pct(x / Wm, y / Hm, rotation) for x, y in
+           ((box_m[0], box_m[1]), (box_m[2], box_m[1]), (box_m[0], box_m[3]), (box_m[2], box_m[3]))]
+    zone = {"bbox_pct": [min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts)]}
+    assert sz.zone_to_mediabox_pt(zone, (Wm, Hm), rotation) == pytest.approx(box_m, abs=0.02)
+
+
+@pytest.mark.parametrize("rotation", [90, 270])
+def test_a_rotated_sheets_table_zone_lands_on_the_table_in_mediabox_points(rotation):
+    """End to end on a /Rotate sheet: the table zone, turned into mediabox points, is the box the table was
+    drawn at (the synthetic sheet is drawn unrotated, so its drawing coordinates ARE mediabox points)."""
+    s = _full_sheet(legend_block_at=None, notes_at=None, title_block=None, rotate=rotation)
+    res = sz.read_zones(build_plan([s]), 1)
+    table = _one(res["zones"], "lentele")
+    x, top = TABLE_AT
+    want = [x, top, x + sum(TABLE_COL_W), top + len(TABLE_ROWS) * TABLE_ROW_H]
+    assert sz.zone_to_mediabox_pt(table, (W, H), res["rotation"]) == pytest.approx(want, abs=3.0)

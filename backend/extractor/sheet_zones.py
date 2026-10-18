@@ -36,8 +36,19 @@ Zone: {kind, bbox_pct: [x0, y0, x1, y1], label: str | None, confidence: "read" |
 Zones may overlap and nest (a plan's dimension strings run under a legend beside it; a legend can sit in the
 title block's band): at a point the innermost zone wins and a plan comes last (`zone_at`).
 
-Every bbox_pct is in the PDFium DISPLAY frame — PDF points, origin top-left, y down, /Rotate applied —
-divided by the page size as displayed (the frame room `polygon_pct`, `_vieta` and the evidence crops use).
+THE THREE FRAMES (inventory 2026-10-18, gap 7) — every bbox_pct here is in the second one:
+  1. pdfplumber page frame — points from the page's top-left, /Rotate applied by pdfminer (vector_symbols,
+     door_schedule, find_tables). Measured on objektas_a p6 (/Rotate 270) and on synthetic /Rotate 90 and
+     270 sheets: a word or a table lands within 0,05 % of PDFium's display position, so a pdfplumber box
+     over (page.width, page.height) IS a display fraction once the page box origin is subtracted.
+  2. PDFium DISPLAY frame — PDF points, origin top-left, y down, /Rotate applied (pdf_vectors, the
+     character reader, room `polygon_pct`, `_vieta`, evidence crops). `bbox_pct` = display points / the page
+     size as displayed (PDFium's `get_size`, which has /Rotate applied — `display_frame`). Two readers of
+     this frame settle it from where the content lies and can be wrong on a turned sheet; their output is
+     then not used (see `read_phrases`, `_detect`).
+  3. Unrotated MEDIABOX points, origin top-left — the viewer's measurement space (cv_tools `box_pt`;
+     clicks arrive in it). `zone_to_mediabox_pt` turns a zone into it; `cv_match._rotate_pct` is the
+     same turn the other way (mediabox → display).
 
 PDFium is read only under `pdfium_guard.PDFIUM_LOCK` (pdf_vectors and the character reader take it; the
 glyph reader below takes it itself). Results are cached per PDF digest and page.
@@ -894,11 +905,33 @@ def zone_at(zones: Sequence[dict], x_pct: float, y_pct: float) -> dict | None:
     return min(hits, key=order) if hits else None
 
 
+def zone_to_mediabox_pt(zone: dict, page_size: tuple[float, float], rotation: int) -> list[float]:
+    """A zone's display-frame box → [x0, y0, x1, y1] in UNROTATED mediabox points from the top-left — the
+    viewer's measurement space (cv_tools `box_pt`). `page_size` is the mediabox (width, height) before
+    /Rotate; `rotation` the page's /Rotate. Inverse of cv_match._rotate_pct (mediabox → display)."""
+    Wm, Hm = (float(v) for v in page_size)
+    rot = int(rotation) % 360
+    x0, y0, x1, y1 = (float(v) for v in zone["bbox_pct"])
+    xs, ys = [], []
+    for dx, dy in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
+        if rot == 90:            # display (1 − y, x) ← mediabox (x, y)
+            mx, my = dy, 1 - dx
+        elif rot == 180:
+            mx, my = 1 - dx, 1 - dy
+        elif rot == 270:         # display (y, 1 − x) ← mediabox (x, y)
+            mx, my = 1 - dy, dx
+        else:
+            mx, my = dx, dy
+        xs.append(mx * Wm)
+        ys.append(my * Hm)
+    return [round(min(xs), 2), round(min(ys), 2), round(max(xs), 2), round(max(ys), 2)]
+
+
 def clear() -> None:
     """Drop the cache (tests)."""
     with _cache_lock:
         _cache.clear()
 
 
-__all__ = ["KINDS", "NO_TEXT", "ZONES_VERSION", "clear", "detect_zones", "fold", "read_zones", "zone_at",
-           "zones_for_pages"]
+__all__ = ["KINDS", "NO_TEXT", "ZONES_VERSION", "clear", "detect_zones", "display_frame", "fold", "read_zones",
+           "zone_at", "zone_to_mediabox_pt", "zones_for_pages"]
