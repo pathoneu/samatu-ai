@@ -20,6 +20,12 @@
  *
  * Dismissals persist in localStorage so a user who has judged a warning
  * doesn't re-read it every reload.
+ *
+ * v3 W1-C (one notice system, audit B#5): ONE Notice instead of three tinted
+ * boxes, so the sąmata rows reach the first screen. The line always carries
+ * every count; the high tier („Įspėjimai") is always listed in full; „Verta
+ * patikrinti" and „Pastabos" open behind „Rodyti visus (N)". Arriving from the
+ * top bar's pill (focusNonce) opens everything, as before.
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -50,6 +56,7 @@ import {
   withoutDismissed,
 } from '../../lib/sanityDismissals';
 import { cleanUserText } from '@/lib/userText';
+import Notice from '@/components/ui/Notice';
 
 // Colours come from the semantic confidence tokens in index.css
 // (--conf-low red / --conf-med amber) — never raw bg-red-500/bg-gray-900,
@@ -88,6 +95,8 @@ export default function SanityWarningsBanner({
   const [openOverride, setOpenOverride] = useState({});
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState(null);
+  // The med/low tiers behind one click (the high tier is always shown).
+  const [expanded, setExpanded] = useState(false);
 
   const warnings = useMemo(
     () => (Array.isArray(sanity?.warnings) ? sanity.warnings : []),
@@ -109,14 +118,15 @@ export default function SanityWarningsBanner({
   useEffect(() => {
     if (!focusNonce) return;
     setOpenOverride(prev => ({ ...prev, [SEV_HIGH]: true, [SEV_MED]: true }));
+    setExpanded(true);
   }, [focusNonce]);
 
   if (!sanity || warnings.length === 0) return null;
 
   if (active.length === 0) {
     return (
-      <div className="text-xs text-muted-foreground flex items-center gap-2 py-2">
-        <Eye className="w-3 h-3" />
+      <div className="text-meta text-muted-foreground flex items-center gap-2 py-2">
+        <Eye className="w-3.5 h-3.5" aria-hidden="true" />
         {t('project.sanity.allHiddenA')}{warnings.length}{t('project.sanity.allHiddenB')}
         <button
           onClick={() => { setDismissed(new Set()); saveDismissed(new Set()); }}
@@ -186,70 +196,80 @@ export default function SanityWarningsBanner({
     }
   };
 
+  const hasHigh = groups.some(([sev]) => sev === SEV_HIGH);
+  const tone = hasHigh ? 'error' : groups.some(([sev]) => sev === SEV_MED) ? 'warning' : 'info';
+  const restCount = groups.filter(([sev]) => sev !== SEV_HIGH).reduce((n, [, items]) => n + items.length, 0);
+  const shownGroups = expanded ? groups : groups.filter(([sev]) => sev === SEV_HIGH);
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-        <span className="font-medium text-foreground">{t('project.sanity.headerTitle')}</span>
-        <span>·</span>
-        <span className={counts.warnings > 0 ? 'font-medium text-foreground' : undefined}>
-          {t('project.sanity.pillWarnings', { count: counts.warnings })}
-        </span>
-        <span>·</span>
-        <span>{t('project.sanity.pillNotes', { count: counts.notes })}</span>
+    <Notice
+      tone={tone}
+      title={t('project.sanity.headerTitle')}
+      data-testid="sanity-notice"
+      action={(
+        <>
+          {projectId && (
+            <button
+              onClick={handleRevalidate}
+              disabled={revalidating}
+              className="inline-flex items-center gap-1 text-meta underline hover:no-underline disabled:opacity-50 disabled:no-underline"
+              style={{ color: 'hsl(var(--accent-2))' }}
+              title={t('project.sanity.revalidateTitle')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${revalidating ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {revalidating ? t('project.sanity.revalidating') : t('project.sanity.revalidate')}
+            </button>
+          )}
+          {restCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="inline-flex min-h-[32px] items-center gap-1 rounded border border-border bg-card px-2.5 text-ui font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-testid="sanity-toggle"
+            >
+              {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+              {expanded ? t('project.sanity.collapse') : t('project.sanity.showAll', { count: restCount })}
+            </button>
+          )}
+        </>
+      )}
+    >
+      {/* every count, always on the line — the honest-disclosure rule */}
+      <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
+        {groups.map(([severity, items], i) => (
+          <span key={severity} className="inline-flex items-center gap-1">
+            {i > 0 && <span aria-hidden="true">·</span>}
+            <span className={severity === SEV_LOW ? undefined : 'font-medium text-foreground'}>
+              {t(SEVERITY_META[severity].labelKey)} {items.length}
+            </span>
+          </span>
+        ))}
         {summary.rooms_count != null && (
           <>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <span>{t('project.sanity.summary', { count: Number(summary.rooms_count) || 0, area: ltNumber(summary.total_area_m2, 1) })}</span>
           </>
         )}
-        {projectId && (
-          <button
-            onClick={handleRevalidate}
-            disabled={revalidating}
-            className="ml-auto inline-flex items-center gap-1 text-xs underline hover:no-underline disabled:opacity-50 disabled:no-underline"
-            style={{ color: 'hsl(var(--accent-2))' }}
-            title={t('project.sanity.revalidateTitle')}
-          >
-            <RefreshCw className={`w-3 h-3 ${revalidating ? 'animate-spin' : ''}`} />
-            {revalidating ? t('project.sanity.revalidating') : t('project.sanity.revalidate')}
-          </button>
-        )}
-      </div>
+      </p>
       {revalidateError && (
-        <div
-          className="text-xs rounded px-2 py-1"
-          style={{
-            color: 'hsl(var(--conf-low))',
-            background: 'hsl(var(--conf-low) / 0.08)',
-            border: '1px solid hsl(var(--conf-low) / 0.3)',
-          }}
-        >
-          {revalidateError}
-        </div>
+        <p className="text-destructive" role="alert">{revalidateError}</p>
       )}
 
-      {groups.map(([severity, items]) => {
+      {shownGroups.map(([severity, items]) => {
         const meta = SEVERITY_META[severity];
         const Icon = meta.icon;
-        const expanded = isOpen(severity);
+        const open = isOpen(severity);
 
         return (
-          <div
-            key={severity}
-            className="rounded"
-            style={{
-              border: `1px solid hsl(${meta.tone} / 0.35)`,
-              background: `hsl(${meta.tone} / 0.06)`,
-            }}
-          >
+          <div key={severity} className="border-t border-border pt-1.5" data-sanity-group={severity}>
             <button
               onClick={() => toggleGroup(severity)}
-              aria-expanded={expanded}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left"
-              style={{ color: `hsl(${meta.tone})` }}
+              aria-expanded={open}
+              className="w-full flex items-center gap-2 py-1 text-left"
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="text-sm font-semibold">
+              <Icon className="w-4 h-4 shrink-0" style={{ color: `hsl(${meta.tone})` }} aria-hidden="true" />
+              <span className="text-ui font-semibold text-foreground">
                 {t('project.sanity.groupHead', { label: t(meta.labelKey), count: items.length })}
               </span>
               <span className="ml-auto flex items-center gap-2">
@@ -258,24 +278,24 @@ export default function SanityWarningsBanner({
                   tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); dismissAllInGroup(severity); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); dismissAllInGroup(severity); } }}
-                  className="text-xs opacity-70 hover:opacity-100 underline cursor-pointer"
+                  className="text-meta text-muted-foreground hover:text-foreground underline cursor-pointer"
                   title={t('project.sanity.hideAllTitle')}
                 >
                   {t('project.sanity.hideAll')}
                 </span>
-                {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" />}
               </span>
             </button>
-            {expanded && (
-              <ul className="px-3 pb-2 space-y-2">
+            {open && (
+              <ul className="pb-1 space-y-2">
                 {items.map((w, i) => {
                   const action = warningAction(w);
                   const expected = expectedSuffix(w);
                   // „101 Tambūras: …" — never „[101]Tambūras: …"
                   const note = roomNoteParts(w);
                   return (
-                    <li key={warningKey(w) + i} className="text-xs flex items-start gap-2 group">
-                      <span className="opacity-60 shrink-0 mt-0.5">·</span>
+                    <li key={warningKey(w) + i} className="flex items-start gap-2 group">
+                      <span className="text-muted-foreground shrink-0" aria-hidden="true">·</span>
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="text-foreground">
                           {note.room && <><strong>{note.room}</strong>{' '}</>}
@@ -298,7 +318,7 @@ export default function SanityWarningsBanner({
                             className="inline-flex items-center gap-1 underline hover:no-underline"
                             style={{ color: 'hsl(var(--accent-2))' }}
                           >
-                            <Sliders className="w-3 h-3" />
+                            <Sliders className="w-3.5 h-3.5" aria-hidden="true" />
                             {t('project.sanity.openAssumptions')}
                           </button>
                         )}
@@ -309,10 +329,10 @@ export default function SanityWarningsBanner({
                         /* Was hover-only: the only way to dismiss a warning
                            was to find it with the mouse. (Design §5.) */
                         aria-label={t('project.sanity.hideOneTitle')}
-                        className="shrink-0 inline-flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+                        className="shrink-0 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                         style={{ width: 28, height: 28 }}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </li>
                   );
@@ -322,6 +342,6 @@ export default function SanityWarningsBanner({
           </div>
         );
       })}
-    </div>
+    </Notice>
   );
 }

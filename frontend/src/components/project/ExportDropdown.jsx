@@ -327,7 +327,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
             <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
             <div className="flex-1">
               <div className="font-medium text-foreground">Excel (.xlsx)</div>
-              <div className="text-[11px] text-muted-foreground">Sąmata su skyriais ir kainomis</div>
+              <div className="text-meta text-muted-foreground">Sąmata su skyriais ir kainomis</div>
             </div>
           </button>
           {hasTemplate && (
@@ -339,7 +339,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
               <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
               <div className="flex-1">
                 <div className="font-medium text-foreground">Excel — kaip mano sąmatose</div>
-                <div className="text-[11px] text-muted-foreground">Jūsų skyriai ir pavadinimai, tušti langeliai tušti</div>
+                <div className="text-meta text-muted-foreground">Jūsų skyriai ir pavadinimai, tušti langeliai tušti</div>
               </div>
             </button>
           )}
@@ -351,7 +351,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
             <FileText className="w-4 h-4 text-muted-foreground" />
             <div className="flex-1">
               <div className="font-medium text-foreground">PDF pasiūlymas</div>
-              <div className="text-[11px] text-muted-foreground">Spausdintinas komercinis pasiūlymas</div>
+              <div className="text-meta text-muted-foreground">Spausdintinas komercinis pasiūlymas</div>
             </div>
           </button>
           {project?.has_pdf !== false && project?.id && (
@@ -363,7 +363,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
               <MapIcon className="w-4 h-4 text-muted-foreground" />
               <div className="flex-1">
                 <div className="font-medium text-foreground">PDF su žymėjimais</div>
-                <div className="text-[11px] text-muted-foreground">Brėžiniai su kontūrais, matavimais ir legenda</div>
+                <div className="text-meta text-muted-foreground">Brėžiniai su kontūrais, matavimais ir legenda</div>
               </div>
             </button>
           )}

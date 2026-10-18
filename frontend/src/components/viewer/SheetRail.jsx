@@ -51,7 +51,7 @@ function useNearViewport(rootRef) {
   return [ref, near];
 }
 
-const selectCls = 'w-full h-7 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] px-1.5 text-[11px] text-[hsl(var(--viewer-chrome-foreground))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--viewer-chrome-active))]';
+const selectCls = 'w-full h-7 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] px-1.5 text-meta text-[hsl(var(--viewer-chrome-foreground))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--viewer-chrome-active))]';
 
 function SheetEditor({ sheet, onSave, onCancel, onReset }) {
   const [name, setName] = useState(sheet.fullName);
@@ -76,7 +76,7 @@ function SheetEditor({ sheet, onSave, onCancel, onReset }) {
         maxLength={200}
         onChange={(e) => setName(e.target.value)}
         aria-label="Lapo pavadinimas"
-        className={`${selectCls} px-2 text-[12px]`}
+        className={`${selectCls} px-2 text-meta`}
       />
       <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Lapo tipas" className={selectCls}>
         {SHEET_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -84,19 +84,19 @@ function SheetEditor({ sheet, onSave, onCancel, onReset }) {
       <select value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Lapo grupė" className={selectCls}>
         {DISCIPLINE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <p className="text-[10px] leading-snug text-[hsl(var(--viewer-chrome-foreground)/0.6)]" title={sheet.autoName}>
+      <p className="text-meta leading-snug text-[hsl(var(--viewer-chrome-foreground)/0.75)]" title={sheet.autoName}>
         Automatinis: {sheet.autoName} · {sheetTypeLabel(sheet.autoTipas)}
       </p>
       <div className="flex items-center gap-1">
-        <button type="button" onClick={save} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] text-white text-[11px]">
+        <button type="button" onClick={save} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] text-white text-meta">
           <Check className="w-3 h-3" />Išsaugoti
         </button>
-        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]">
+        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]">
           <X className="w-3 h-3" />Atšaukti
         </button>
       </div>
       {sheet.overridden && (
-        <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-[11px] text-[hsl(var(--viewer-chrome-active))] hover:underline">
+        <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-active))] hover:underline">
           <RotateCcw className="w-3 h-3" />Atkurti automatinį
         </button>
       )}
@@ -121,31 +121,31 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className={`mono tabular text-[10px] ${current ? 'text-[hsl(var(--viewer-chrome-active))] font-semibold' : 'text-[hsl(var(--viewer-chrome-foreground)/0.6)]'}`} title={numberTitle}>
+            <span className={`mono tabular text-meta ${current ? 'text-[hsl(var(--viewer-chrome-active))] font-semibold' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`} title={numberTitle}>
               {sheet.shortNumber || sheet.page}
             </span>
-            {sheet.shortNumber && <span className="mono tabular text-[9px] text-[hsl(var(--viewer-chrome-foreground)/0.45)]">psl. {sheet.page}</span>}
+            {sheet.shortNumber && <span className="mono tabular text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]">psl. {sheet.page}</span>}
             {searching && (
               <span
-                className={`ml-auto mono tabular text-[10px] px-1 rounded-[2px] ${hits ? 'bg-[hsl(var(--viewer-chrome-active))] text-white' : 'text-[hsl(var(--viewer-chrome-foreground)/0.4)]'}`}
+                className={`ml-auto mono tabular text-meta px-1 rounded-[2px] ${hits ? 'bg-[hsl(var(--viewer-chrome-active))] text-white' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}
                 title={hits ? `Paieškos rezultatų šiame lape: ${hits}` : 'Šiame lape paieška nieko nerado'}
                 data-testid="sheet-hits"
               >{hits || 0}</span>
             )}
           </span>
-          <span className="block text-[11.5px] leading-tight text-[hsl(var(--viewer-chrome-foreground))] line-clamp-2 break-words">
+          <span className="block text-meta leading-tight text-[hsl(var(--viewer-chrome-foreground))] line-clamp-2 break-words">
             {sheet.name}
           </span>
           <span className="mt-0.5 flex items-center gap-1 flex-wrap">
-            <span className="inline-flex items-center gap-1 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] px-1 text-[9.5px] leading-[14px] text-[hsl(var(--viewer-chrome-foreground)/0.75)]">
+            <span className="inline-flex items-center gap-1 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] px-1 text-meta leading-[14px] text-[hsl(var(--viewer-chrome-foreground)/0.75)]">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: pageTypeColor(sheet.tipas) }} />
               {sheetTypeLabel(sheet.tipas)}
             </span>
             {sheet.overridden && (
-              <span className="text-[9.5px] text-[hsl(var(--viewer-chrome-active))]" title={`Pakeitėte jūs. Automatinis: ${sheet.autoName} · ${sheetTypeLabel(sheet.autoTipas)}`}>jūsų</span>
+              <span className="text-meta text-[hsl(var(--viewer-chrome-active))]" title={`Pakeitėte jūs. Automatinis: ${sheet.autoName} · ${sheetTypeLabel(sheet.autoTipas)}`}>jūsų</span>
             )}
             {!sheet.classified && !sheet.overridden && (
-              <span className="text-[9.5px] text-[hsl(var(--viewer-chrome-foreground)/0.5)]" title="Šio lapo programa neklasifikavo — pavadinkite jį patys">neklasifikuotas</span>
+              <span className="text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]" title="Šio lapo programa neklasifikavo — pavadinkite jį patys">neklasifikuotas</span>
             )}
           </span>
         </span>
@@ -156,7 +156,7 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
           title="Pervadinti lapą"
           aria-label={`Pervadinti lapą ${sheet.page}`}
-          className="absolute right-1.5 top-1.5 w-6 h-6 rounded-[2px] flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground)/0.6)] bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[hsl(var(--viewer-chrome-active))]"
+          className="absolute right-1.5 top-1.5 w-6 h-6 rounded-[2px] flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground)/0.75)] bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[hsl(var(--viewer-chrome-active))]"
         >
           <Pencil className="w-3 h-3" />
         </button>
@@ -193,13 +193,13 @@ function SheetStripRow({ documentId, sheet, current, hits, searching, label, roo
         <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
           {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 40, height: 'auto', display: 'block' }} />}
         </span>
-        <span className={`mono tabular text-[12px] leading-tight ${current ? 'font-semibold text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}>
+        <span className={`mono tabular text-meta leading-tight ${current ? 'font-semibold text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}>
           {stripTag(sheet)}
         </span>
       </button>
       {searching && hits > 0 && (
         <span
-          className="pointer-events-none absolute right-1 top-1 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] px-1 text-[12px] leading-[16px] text-white mono tabular"
+          className="pointer-events-none absolute right-1 top-1 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] px-1 text-meta leading-[16px] text-white mono tabular"
           data-testid="sheet-hits"
         >{hits}</span>
       )}
@@ -356,11 +356,11 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
               type="button"
               onClick={() => toggleGroup(g.key)}
               aria-expanded={!isClosed}
-              className="sticky top-0 z-10 flex w-full items-center gap-1 px-2 h-7 bg-[hsl(var(--viewer-chrome))] border-b border-[hsl(var(--viewer-chrome-border))] text-[10.5px] font-semibold uppercase tracking-wide text-[hsl(var(--viewer-chrome-foreground)/0.75)] hover:text-[hsl(var(--viewer-chrome-foreground))]"
+              className="sticky top-0 z-10 flex w-full items-center gap-1 px-2 h-7 bg-[hsl(var(--viewer-chrome))] border-b border-[hsl(var(--viewer-chrome-border))] text-meta font-semibold text-[hsl(var(--viewer-chrome-foreground)/0.75)] hover:text-[hsl(var(--viewer-chrome-foreground))]"
             >
               {isClosed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               <span className="truncate">{g.label}</span>
-              <span className="ml-auto shrink-0 whitespace-nowrap mono tabular font-normal normal-case text-[hsl(var(--viewer-chrome-foreground)/0.5)]">
+              <span className="ml-auto shrink-0 whitespace-nowrap mono tabular font-normal normal-case text-[hsl(var(--viewer-chrome-foreground)/0.75)]">
                 {searching ? `${groupHits} / ` : ''}{g.sheets.length}
               </span>
             </button>
@@ -390,7 +390,7 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
         );
       })}
       {rail.sheets.length === 0 && (
-        <p className="p-3 text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.6)]">Lapų sąrašas dar neparuoštas.</p>
+        <p className="p-3 text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]">Lapų sąrašas dar neparuoštas.</p>
       )}
     </aside>
   );

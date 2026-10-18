@@ -47,6 +47,7 @@ import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu from './MeasureContextMenu';
 import OutlineToolButtons from './OutlineToolButtons';
 import OutlineToolPanel from './OutlineToolPanel';
+import OverlayLegend from './OverlayLegend';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
@@ -92,10 +93,12 @@ const MEASURE_HINTS = {
 // Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
 // Key names come from lib/viewerShortcuts, the table the „?" guide prints.
 const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · ${hintText(['outlineUndo', 'outlineSave', 'outlineCancel'])}`;
-// What the status bar adds to a measure hint about snapping, by the sheet's wall geometry status.
+// What this sheet snaps to, by its wall geometry status — said in the status bar while a snapping tool is
+// armed (the tool's own instruction lives in the pill on the drawing, once — v3 W1-C). One snap colour;
+// the mark's shape says what the click lands on (MeasureLayer SnapDot).
 const SNAP_NOTE = {
-  ok: ' · prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)',
-  no_walls: ' · šiame lape sienų programa neperskaitė — prilimpa tik prie matavimų',
+  ok: 'Prilimpa prie brėžinio sienų kampų (kvadratas), sienų (rombas) ir jūsų matavimų (apskritimas)',
+  no_walls: 'Šiame lape sienų programa neperskaitė — prilimpa tik prie jūsų matavimų',
 };
 
 // visiblePageOf moved to lib/visiblePage (2026-10-16): the scale panel reads the same page.
@@ -154,17 +157,17 @@ function SearchBox({ documentId, onClose }) {
         placeholder="Ieškoti brėžinyje…"
         aria-label="Paieška dokumente"
         title="Ieško teksto brėžinyje (patalpų pavadinimų, žymėjimų). Skenuotuose PDF teksto nėra — nerasta nieko."
-        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-[12px] text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
+        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-meta text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
       />
       {hasQuery && (
-        <span className="mono tabular text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
+        <span className="mono tabular text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
           {total > 0 ? `${(search.activeResultIndex ?? 0) + 1} / ${total}` : '0 / 0'}
         </span>
       )}
       <button className={btn} title="Ankstesnis rezultatas (Shift+Enter)" disabled={total === 0} onClick={() => searchApi?.previousResult()}><ChevronUp className="w-4 h-4" /></button>
       <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
       {noHits && (
-        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
+        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
           Rezultatų nėra — šis PDF greičiausiai skenuotas (be teksto)
         </span>
       )}
@@ -190,7 +193,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
   const canFill = focusedRoomNr != null && onStartFill;
   return (
-    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
+    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
       <button
         className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
         title={withKey('Puslapių juosta', 'toggleThumbs')}
@@ -261,7 +264,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               onClick={() => onMeasureTool(id)}
             >
               <Icon className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">{label}</span>
+              <span className="text-meta leading-none hidden lg:inline">{label}</span>
             </button>
           ))}
           {/* „Rasti panašius" (2026-10-16, Togal's AI Image Search): box one symbol → similar ones → count. */}
@@ -275,7 +278,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               data-testid="viewer-symbol-search"
             >
               <ScanSearch className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">Rasti panašius</span>
+              <span className="text-meta leading-none hidden lg:inline">Rasti panašius</span>
             </button>
           )}
           {onToggleScales && (
@@ -288,7 +291,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               data-testid="scales-toggle"
             >
               <ListChecks className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">Masteliai</span>
+              <span className="text-meta leading-none hidden lg:inline">Masteliai</span>
             </button>
           )}
         </>
@@ -389,7 +392,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             data-testid="viewer-history-toggle"
           >
             <History className="w-4 h-4" />
-            <span className="text-[11px] leading-none hidden xl:inline">Istorija</span>
+            <span className="text-meta leading-none hidden xl:inline">Istorija</span>
           </button>
         )}
         {onOpenGuide && (
@@ -463,28 +466,30 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   // costs no extra request; `select` and `count` do not snap, the others do.
   const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
-  const snapNote = snapsHere ? (SNAP_NOTE[geometryStatus] || '') : '';
-  const measureHint = symbolHint || (outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null));
+  // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
+  // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
+  const snapNote = snapsHere && !symbolHint && !outlineEdit ? (SNAP_NOTE[geometryStatus] || '') : '';
   return (
-    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
+    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
       {fillFor != null ? (
         <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">
           {fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`}
         </span>
-      ) : measureHint ? (
-        <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">{measureHint}</span>
       ) : (
-        /* Idle: the scale readout doubles as the calibration entry point. */
-        <button
-          type="button"
-          onClick={onCalibrateClick || undefined}
-          title={scaleStatusTitle(pageScale)}
-          className={`ml-auto whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
-        >
-          {scaleText}
-        </button>
+        <>
+          {snapNote && <span className="ml-auto min-w-0 truncate" title={snapNote}>{snapNote}</span>}
+          {/* The scale readout doubles as the calibration entry point. */}
+          <button
+            type="button"
+            onClick={onCalibrateClick || undefined}
+            title={scaleStatusTitle(pageScale)}
+            className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
+          >
+            {scaleText}
+          </button>
+        </>
       )}
     </div>
   );
@@ -521,7 +526,7 @@ function ThumbnailRail({ documentId }) {
               />
               <span
                 style={{ height: m.labelHeight, lineHeight: `${m.labelHeight}px` }}
-                className={`mono tabular text-[10px] ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
+                className={`mono tabular text-meta ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
               >
                 {pageNumber}
               </span>
@@ -1452,7 +1457,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
             {(measureTool != null || outlineEdit || symbol.active) && (
-              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap`}>
+              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-panel px-3.5 py-1.5 rounded-panel border border-border bg-card text-ui text-foreground shadow-md pointer-events-none w-max max-w-[calc(100%-1rem)] text-center`}>
                 {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
             )}
@@ -1469,14 +1474,14 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onCancel={outlineTools.cancel}
               onSave={outlineTools.save}
             />
-            {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
-            {wallsLayerVisible && !check && (
-              <div className="absolute bottom-2 right-2 z-30 px-3 py-1.5 rounded border border-border bg-card/95 text-[11px] text-foreground shadow-md pointer-events-none flex items-center gap-3" data-testid="walls-legend">
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(71,85,105,0.5)' }} />Sienos, kurias programa perskaitė</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>
-              </div>
+            {/* Layer legend (2026-10-16 walls; v3 W1-C zones too): what each line style on the sheet means,
+                named once, where the layers are — the overlay vocabulary never rides on colour alone. */}
+            {(wallsLayerVisible || zoneFillsVisible) && !check && (
+              <OverlayLegend
+                layers={[zoneFillsVisible && 'zones', wallsLayerVisible && 'walls'].filter(Boolean)}
+                className="absolute bottom-2 right-2 z-panel max-w-[calc(100%-1rem)]"
+                data-testid={wallsLayerVisible ? 'walls-legend' : 'zones-legend'}
+              />
             )}
             {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
             {(scalesOpen || scaleCheck) && !check && project && (
@@ -1667,7 +1672,7 @@ export default function TakeoffViewer({
     () => (fileUrl ? makeViewerPlugins(fileUrl, exportFileName || undefined) : null),
     [fileUrl, exportFileName],
   );
-  if (error) return <div className="p-5 text-sm text-red-600">Variklio klaida: {String(error.message || error)}</div>;
+  if (error) return <div className="p-5 text-sm text-destructive">Variklio klaida: {String(error.message || error)}</div>;
   if (isLoading || !engine || !plugins) return <div className="p-5 text-sm text-muted-foreground">Kraunamas PDF variklis…</div>;
   return (
     <div className="h-full" data-takeoff-viewer>
