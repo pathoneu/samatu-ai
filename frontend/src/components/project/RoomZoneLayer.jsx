@@ -90,6 +90,8 @@ export default function RoomZoneLayer({
   page,
   renderedSize,
   focusedRoomNr = null,
+  // Rooms selected beside the focused one (Shift+click on the drawing, Pathon v3 W1-D): the same selected style.
+  selectedRoomNrs = null,
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
   onRoomClick = null,
@@ -145,7 +147,8 @@ export default function RoomZoneLayer({
   if (!width || !height) return null;
   if (zones.length === 0 && missingCount === 0) return null;
 
-  const isFocusedZone = (z) => focusedRoomNr != null && String(z.nr) === String(focusedRoomNr);
+  const selectedSet = new Set(Array.from(selectedRoomNrs || []).map(String));
+  const isFocusedZone = (z) => (focusedRoomNr != null && String(z.nr) === String(focusedRoomNr)) || selectedSet.has(String(z.nr));
   // Hover = internal (cursor on the zone) OR external (cursor on the panel row) —
   // the panel→canvas half of the cheap bidirectional hover sync.
   const isHoveredZone = (z) =>
@@ -200,7 +203,7 @@ export default function RoomZoneLayer({
                 strokeWidth={isFocused ? SELECTED_STROKE_PX : 1.5}
                 opacity={isFocused ? 1 : 0.6} />
               {isFocused && (
-                <OverlayLabel x={0} y={-ringR - 24} text={chipLabelFor(z.label)} sub={chipSubFor(z)} border={INK} />
+                <OverlayLabel x={0} y={-ringR - 24} text={chipLabelFor(z.label)} sub={chipSubFor(z)} border={INK} data-room-label={z.nr} />
               )}
             </g>
           );
@@ -315,6 +318,7 @@ export default function RoomZoneLayer({
         return (
           <OverlayLabel
             key={`chip-${z.nr}`}
+            data-room-label={isFocused ? z.nr : undefined}
             x={cx} y={cy}
             text={chipLabelFor(z.label)}
             sub={[chipSubFor(z), outlineNote(z)].filter(Boolean).join(' · ')}

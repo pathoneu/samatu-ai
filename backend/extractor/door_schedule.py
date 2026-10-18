@@ -128,8 +128,71 @@ def _parse_table(page, heading_words: list[dict]) -> list[dict]:
         if m:
             kiekis = int(m.group(1))
         rows.append({"kodas": cw["text"].rstrip("*"), "plotis_mm": width, "aukstis_mm": height,
-                     "tipas": _row_type(text), "kiekis": kiekis, "tekstas": text[:160]})
+                     "tipas": _row_type(text), "kiekis": kiekis, "tekstas": text[:160],
+                     "bbox_pct": _words_pct(page, [cw] + cells)})
     return rows
+
+
+def _words_pct(page, words: list[dict]) -> list[float] | None:
+    """The box around these words as display-frame fractions [x0, y0, x1, y1] (extractor/table_reader: the
+    pdfplumber page frame, its page box origin subtracted, IS the PDFium display frame)."""
+    try:
+        ox, oy = float(page.bbox[0]), float(page.bbox[1])
+        pw, ph = float(page.width), float(page.height)
+        if not words or pw <= 0 or ph <= 0:
+            return None
+        clip = lambda v: min(max(v, 0.0), 1.0)  # noqa: E731
+        return [round(clip((min(w["x0"] for w in words) - ox) / pw), 5), round(clip((min(w["top"] for w in words) - oy) / ph), 5),
+                round(clip((max(w["x1"] for w in words) - ox) / pw), 5), round(clip((max(w["bottom"] for w in words) - oy) / ph), 5)]
+    except Exception:  # noqa: BLE001 — a box is evidence, never the reason a row is lost
+        return None
+
+
+def _union_pct(boxes: list) -> list[float] | None:
+    boxes = [b for b in boxes if isinstance(b, (list, tuple)) and len(b) == 4]
+    if not boxes:
+        return None
+    return [min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)]
+
+
+# where a ruled table may stand relative to its heading, as shares of the page: just under it (or the heading
+# ruled inside it), overlapping it sideways
+_RULED_ABOVE, _RULED_BELOW, _RULED_SIDE = 0.02, 0.25, 0.15
+
+
+def _ruled_rows(pdf_bytes: bytes, pg: int, page, heading_words: list[dict]) -> tuple[list[dict], dict | None]:
+    """The rows of the RULED door table under this heading (extractor/table_reader + schedules: cells, each row
+    with its box), in this scanner's row shape — or ([], None) when the heading stands over no ruled door table
+    (a schedule drawn as plain text: the word-position parser reads it)."""
+    try:
+        from .schedules import classify_table, schedule_rows
+        from .table_reader import read_tables
+        head = _words_pct(page, heading_words)
+        if head is None:
+            return [], None
+        best = None
+        for t in read_tables(pdf_bytes, pg):
+            kind, roles = classify_table(t)
+            if kind not in ("durys", "langai") or not schedule_rows(t, "durys", roles)[0]:
+                continue                                        # a table of doors and windows still gives its doors
+            x0, y0, x1, _ = t["bbox_pct"]
+            if not (head[1] - _RULED_ABOVE <= y0 <= head[3] + _RULED_BELOW):
+                continue
+            if x1 < head[0] - _RULED_SIDE or x0 > head[2] + _RULED_SIDE:
+                continue
+            if best is None or y0 < best[0]["bbox_pct"][1]:
+                best = (t, roles)
+        if best is None:
+            return [], None
+        table, roles = best
+        rows = []
+        for r in schedule_rows(table, "durys", roles)[0][:_MAX_ROWS]:
+            rows.append({"kodas": str(r["kodas"]).rstrip("*"), "plotis_mm": r["plotis_mm"], "aukstis_mm": r["aukstis_mm"],
+                         "tipas": r["tipas"], "kiekis": r["kiekis"], "tekstas": str(r.get("tekstas") or "")[:160],
+                         "bbox_pct": r.get("bbox_pct")})
+        return rows, table
+    except Exception:  # noqa: BLE001 — the word parser is always there to fall back on
+        return [], None
 
 
 def _count_on_plans(code: str, texts: list[str], table_page: int) -> int:
@@ -186,7 +249,13 @@ def scan_door_schedule(pdf_bytes: bytes) -> dict:
     """{status: lentele|anotacijos|gaminiai|nera, text_layer_ok, pages, lentele: {page, eilutes: [...]},
         beapvadines, su_apvadais, stumdomos, kitos (units the table lists), neaiskios + neaiskus_kodai (units
         and codes of rows that name both frame types — counted under `kitos`, never as either type),
-        anotacijos_beapvadines, pastaba_visos, pastaba_beapvadines, stumdomos_pastaba, gaminiai: [...], sakinys}."""
+        anotacijos_beapvadines, pastaba_visos, pastaba_beapvadines, stumdomos_pastaba, gaminiai: [...], sakinys}.
+
+    Since 2026-10-18 (Pathon v3 W3-A) the table is read from its RULED cells when the heading stands over a
+    ruled door table (extractor/table_reader + schedules: header roles, a „Kiekis" column read as the count),
+    else from word positions as before; `lentele` gains `bbox_pct` (the table) and `saltinis` („lentele" |
+    „zodziai"), every row gains `page` and `bbox_pct` — display-frame fractions [x0, y0, x1, y1], the frame of
+    the evidence crops, so a row can be shown on the drawing."""
     try:
         from .pdf_page_cache import page_texts
         texts = [t or "" for t in page_texts(pdf_bytes)]
@@ -241,13 +310,20 @@ def scan_door_schedule(pdf_bytes: bytes) -> dict:
                             break
                     if not picked:
                         continue
-                    rows = _parse_table(page, picked)
+                    # the ruled table's cells first (table_reader: each row with its box); a schedule written as
+                    # plain text is read from its word positions, as before
+                    rows, ruled = _ruled_rows(pdf_bytes, pg, page, picked)
+                    source = "lentele" if rows else "zodziai"
+                    if not rows:
+                        rows = _parse_table(page, picked)
                     if not rows:
                         continue
                     for r in rows:
                         if r["kiekis"] is None:
                             r["kiekis"] = max(1, _count_on_plans(r["kodas"], texts, pg))
-                    out["lentele"] = {"page": pg, "eilutes": rows}
+                        r["page"] = pg
+                    box = (ruled or {}).get("bbox_pct") or _union_pct([r.get("bbox_pct") for r in rows])
+                    out["lentele"] = {"page": pg, "eilutes": rows, "bbox_pct": box, "saltinis": source}
                     if pg not in out["pages"]:
                         out["pages"].append(pg)
                     break

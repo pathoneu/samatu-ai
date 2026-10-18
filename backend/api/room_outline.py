@@ -27,6 +27,7 @@ from __future__ import annotations
 import copy
 import logging
 from datetime import datetime, timezone
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -87,6 +88,9 @@ class OutlineAt(BaseModel):
     y_pct: float = Field(ge=0.0, le=1.0)
     pritarta: bool = False            # the point is inside the outline the lane proposed and he said „Tinka"
     klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question answered (journal note)
+    # The viewer's room tool R (Pathon v3 W1-D): the outline is only PROPOSED — he reviews it and his next
+    # click or Enter saves it through `outline-set` (`kaip: "parodyta"`). A preview is not an act: no journal row.
+    perziura: bool = False
 
 
 class PagePoint(BaseModel):
@@ -112,6 +116,10 @@ class OutlineSet(BaseModel):
     # „Kas atimama?" per hole: True — a column / shaft, its faces are painted walls (the default); False — a floor
     # opening or anything else with no walls. Missing or shorter than `holes` → True for the rest.
     holes_walls: list[bool] | None = Field(default=None, max_length=50)
+    # „parodyta": the ring is the wall face he POINTED at with the room tool (`outline-at` with `perziura`, then
+    # saved) — the outline is said to be the one he showed, and, like „Parodyti patalpą", an unread perimeter is
+    # left to the walls rather than replaced by the ring's length. Absent: a ring he drew or edited.
+    kaip: Literal["parodyta"] | None = None
 
 
 class OutlineMerge(OutlineSet):
@@ -146,7 +154,8 @@ def _laid_onto(page: int, sutapdinimas: dict):
 def _todays_reading(request: Request, project_id: str, room_nr: str, page: int, bucket: str):
     """Everything both endpoints start from: the owner's project, its drawing, and TODAY's lane reading on a
     deep copy — where the other rooms are, every sheet's scale, how the sheets lie over each other.
-    → (pdf_bytes, (W, H), parsed copy, dims, geo meta, scale of `page`, rooms, the room)."""
+    → (pdf_bytes, (W, H), parsed copy, dims, geo meta, scale of `page`, rooms, the room, the STORED project —
+    untouched, what `previous` is read from)."""
     project = _project_for(request, project_id)
     from main import _check_rate_limit, _client_key
     _check_rate_limit(_client_key(request), bucket)
@@ -176,13 +185,38 @@ def _todays_reading(request: Request, project_id: str, room_nr: str, page: int, 
         raise HTTPException(status_code=400, detail="Šio lapo mastelio neradau — parodykite patalpą plane, kuriame užrašyti matmenys.")
     rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict)]
     room = next(r for r in rooms if _nr(r) == wanted)
-    return pdf_bytes, (W, H), parsed, dims, geo, float(scale), rooms, room
+    return pdf_bytes, (W, H), parsed, dims, geo, float(scale), rooms, room, project
+
+
+def _previous(stored: dict, answer: dict, room_nr: str | None = None, extra_keys: tuple[str, ...] = ()) -> dict:
+    """What an answer would change, AS STORED before it (Pathon v3 W1-D: „Atšaukti" after every save): for each
+    room the answer gives keys to (`room` — that is `room_nr` — or `rooms`), every geometry key (+ `extra_keys`)
+    with its stored value, null where the room had none; for each neighbour in `kitu_angos`, its stored
+    openings. The browser PUTs it back through the same route to undo the save."""
+    by_nr = {_nr(r): r for r in (stored.get("patalpos") or []) if isinstance(r, dict)}
+    changed = list((answer.get("rooms") or {}).keys()) if isinstance(answer.get("rooms"), dict) else (
+        [str(room_nr)] if room_nr is not None and isinstance(answer.get("room"), dict) else [])
+    out: dict[str, dict] = {}
+    for nr in changed:
+        r = by_nr.get(str(nr)) or {}
+        out[str(nr)] = {k: copy.deepcopy(r.get(k)) for k in (*GEOMETRY_ROOM_KEYS, *extra_keys)}
+    for nr in (answer.get("kitu_angos") or {}):
+        if str(nr) not in out:
+            out[str(nr)] = {"_angos_sienose": copy.deepcopy((by_nr.get(str(nr)) or {}).get("_angos_sienose"))}
+    return out
+
+
+def _with_previous(stored: dict, answer: dict, room_nr: str | None = None, extra_keys: tuple[str, ...] = ()) -> dict:
+    """`answer` + its `previous` when it is a saving answer (`status: "ok"`); any other answer unchanged."""
+    if not isinstance(answer, dict) or answer.get("status") != "ok":
+        return answer
+    return {**answer, "previous": _previous(stored, answer, room_nr, extra_keys)}
 
 
 # Plain `def`: PDF parsing and geometry, 100 % blocking — the threadpool's job.
 @router.post("/{project_id}/rooms/{room_nr}/outline-at")
 def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: OutlineAt):
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room, stored = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
     lay = _laid_onto(body.page, geo.get("sutapdinimas") or {})
     others: dict[str, list] = {}
     seats: dict[str, tuple[float, float]] = {}
@@ -216,8 +250,8 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             cut = propose_split(pdf_bytes, body.page, seats2, areas2, float(scale), (W, H), face_pct=union)
             if cut.get("status") == "ok":
                 if body.pritarta:
-                    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut),
-                                       klausimas=body.klausimas)
+                    divided = _with_previous(stored, _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut))
+                    return divided if body.perziura else _remembered(project_id, divided, klausimas=body.klausimas)
                 return {"status": "shared", "su": other, "page": body.page, "line_pct": cut["line_pct"], "pagal": cut["pagal"],
                         "rooms": {nr: {**part, "plotas_uzrasas_m2": areas2.get(nr)} for nr, part in cut["rooms"].items()}}
         return hit
@@ -241,12 +275,13 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             room.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
 
-    return _remembered(project_id, {
+    answer = _with_previous(stored, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }, _nr(room), klausimas=body.klausimas)
+    }, _nr(room))
+    return answer if body.perziura else _remembered(project_id, answer, _nr(room), klausimas=body.klausimas)
 
 
 def _ring_of(raw: list[list[float]], what: str) -> list[tuple[float, float]]:
@@ -310,9 +345,10 @@ def _convex_corners(hole, scale: float) -> int:
 
 def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], scale: float,
                  *, table_m2: float | None = None, extra: dict | None = None,
-                 holes_walls: list[bool] | None = None) -> float:
+                 holes_walls: list[bool] | None = None, saltinis: str = DRAWN) -> float:
     """Write the person's ring (and holes) onto `room` as its corrected outline → the drawn perimeter.
-    `table_m2`: the printed area the drawn one is compared with (default: the room's own)."""
+    `table_m2`: the printed area the drawn one is compared with (default: the room's own). `saltinis`: what he
+    did — drew it (`nubrezta`, the default) or pointed at the wall face with the room tool (`parodyta`)."""
     m = _measured(ring, holes, size, scale)
     if table_m2 is None:
         table = room.get("plotas_m2")
@@ -328,7 +364,7 @@ def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], 
     own = room.get("plotas_m2")
     room["_konturas"] = {"page": page, "plotas_m2": m["plotas_m2"], "perimetras_m": m["perimetras_m"],
                          "plotas_uzrasas_m2": own if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0 else None,
-                         "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": DRAWN}
+                         "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": saltinis}
     if holes:
         walls = list(holes_walls or [])
         skyles = [{**h, "sienos": bool(walls[i]) if i < len(walls) else True} for i, h in enumerate(m["skyles"])]
@@ -368,16 +404,19 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     # same 404 as a stranger's well-formed one — never a 400 that says the project exists.
     _project_for(request, project_id)
     ring, holes = _drawn_rings(body)
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
-    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale, holes_walls=body.holes_walls)
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room, stored = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    pointed = body.kaip == "parodyta"
+    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale, holes_walls=body.holes_walls,
+                              saltinis=POINTED_AT if pointed else DRAWN)
     apply_geometry(parsed, pdf_bytes, dims)
-    _drawn_perimeter_if_unread(room, perimetras)
-    return _remembered(project_id, {
+    if not pointed:
+        _drawn_perimeter_if_unread(room, perimetras)
+    return _remembered(project_id, _with_previous(stored, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }, _nr(room), klausimas=body.klausimas)
+    }, _nr(room)), _nr(room), klausimas=body.klausimas)
 
 
 # „Sujungti" writes these room keys besides the geometry ones (2026-10-16, follow-up (a)): the kept room bills BOTH
@@ -451,7 +490,7 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     kept_nr, gone_nr = str(body.kept_nr).strip(), str(room_nr).strip()
     if kept_nr == gone_nr:
         raise HTTPException(status_code=400, detail="Patalpos su ja pačia sujungti negalima")
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, kept = _todays_reading(request, project_id, kept_nr, body.page, "room_outline")
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, kept, stored = _todays_reading(request, project_id, kept_nr, body.page, "room_outline")
     gone = next((r for r in rooms if _nr(r) == gone_nr), None)
     if gone is None:
         raise HTTPException(status_code=404, detail="Patalpa nerasta")
@@ -543,14 +582,14 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
         else:
             kept["_sujungimas"]["perimetras"] = (f"Perimetras lieka {_lt(p_a)} m (įrašytas jūsų) — patalpos {gone_nr} "
                                                  "sienų prie jo pridėti negalima, nes vienas kontūras neturi perimetro")
-    return _remembered(project_id, {
+    return _remembered(project_id, _with_previous(stored, {
         "status": "ok",
         "rooms": {nr: {k: r.get(k) for k in GEOMETRY_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "sujungimas": {nr: {k: r.get(k) for k in MERGE_ROOM_KEYS} for nr, r in ((kept_nr, kept), (gone_nr, gone))},
         "ispejimas": finish_warning,
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not kept and r is not gone and isinstance(r.get("_angos_sienose"), dict)},
-    }, klausimas=body.klausimas)
+    }, extra_keys=MERGE_ROOM_KEYS), klausimas=body.klausimas)
 
 
 def _joined_with(pdf_bytes: bytes, *, page: int, rooms: list[dict], room: dict, other_nr: str, lay, scale: float,
@@ -631,7 +670,7 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
     """Two rooms no wall separates, divided by ONE line through `a` and `b` (vector_rooms.split_space). Both
     rooms come back with their own outlines — the boundary marked `menamos`, never a wall — and their walls
     read again. Saves nothing."""
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room, stored = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
     lay = _laid_onto(body.page, geo.get("sutapdinimas") or {})
     by_nr = {_nr(r): r for r in rooms}
     if body.su:
@@ -654,7 +693,8 @@ def api_room_split_space(request: Request, project_id: str, room_nr: str, body: 
                       areas, scale, (W, H), face_pct=face)
     if hit["status"] != "ok":
         return hit
-    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit), klausimas=body.klausimas)
+    return _remembered(project_id, _with_previous(stored, _divided(parsed, pdf_bytes, dims, rooms, members, body.page, hit)),
+                       klausimas=body.klausimas)
 
 
 @router.post("/{project_id}/rooms/{room_nr}/split-proposal")
@@ -669,7 +709,7 @@ def api_room_split_proposal(request: Request, project_id: str, room_nr: str):
         raise HTTPException(status_code=404, detail="Patalpa nerasta")
     space = mine.get("_atvira_erdve") if isinstance(mine.get("_atvira_erdve"), dict) else {}
     page = int(space.get("page") or (mine.get("_vieta") or {}).get("page") or mine.get("puslapio_nr") or 1)
-    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, page, "room_outline")
+    pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room, stored = _todays_reading(request, project_id, room_nr, page, "room_outline")
     status, members, seats = _shared_space(rooms, room, _laid_onto(page, geo.get("sutapdinimas") or {}))
     if status:
         return {"status": status}
@@ -678,5 +718,79 @@ def api_room_split_proposal(request: Request, project_id: str, room_nr: str):
                         face_pct=space.get("polygon_pct") if space.get("kisene") else None)
     if hit["status"] != "ok":
         return {"status": hit["status"]}
-    return {**_divided(parsed, pdf_bytes, dims, rooms, members, page, hit),
+    return {**_with_previous(stored, _divided(parsed, pdf_bytes, dims, rooms, members, page, hit)),
             "line_pct": hit["line_pct"], "pagal": hit["pagal"], "page": page}
+
+
+# ── „Atšaukti" after every save (Pathon v3 W1-D, D3; audit F5) ─────────────────────────────────────────────
+# Every saving answer above carries `previous` — the rooms' keys as stored before it. The browser's undo PUTs
+# that `previous` back through the SAME path; the server saves nothing (as everywhere here): it checks the
+# owner, the rooms and the keys, writes ONE journal row per room with source „atsaukta", and answers in the
+# forward answer's shape (`rooms` = geometry keys, `sujungimas` = merge keys, null = remove), so the sheet
+# lands it with the very functions it landed the save with. The same PUT twice is the same answer.
+
+UNDONE = "atsaukta"                    # `corrections.source` of an undo
+
+
+class OutlineRestore(BaseModel):
+    """„Atšaukti": `previous` of a saving answer, {room nr: {key: value | null}}."""
+    previous: dict[str, Any] = Field(default_factory=dict)
+    klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question the undone act answered
+
+
+def _restore(request: Request, project_id: str, room_nr: str, body: OutlineRestore, act: str,
+             allowed: tuple[str, ...]) -> dict:
+    stored = _project_for(request, project_id)          # ownership FIRST (tests/test_route_ownership_policy.py)
+    prev = body.previous
+    if not prev or len(prev) > 60 or not all(isinstance(v, dict) for v in prev.values()):
+        raise HTTPException(status_code=400, detail="Nėra ką atšaukti")
+    wanted = str(room_nr).strip()
+    keys = {str(nr).strip(): v for nr, v in prev.items()}
+    if wanted not in keys:
+        raise HTTPException(status_code=400, detail="Atšaukti galima tik šios patalpos pakeitimą")
+    by_nr = {_nr(r): r for r in (stored.get("patalpos") or []) if isinstance(r, dict)}
+    if any(nr not in by_nr for nr in keys):
+        raise HTTPException(status_code=404, detail="Patalpa nerasta")
+    bad = sorted({k for v in keys.values() for k in v if k not in allowed})
+    if bad:
+        raise HTTPException(status_code=400, detail="Šių patalpos duomenų atšaukti negalima: " + ", ".join(bad))
+
+    answer: dict = {
+        "status": "ok",
+        "rooms": {nr: {k: v[k] for k in GEOMETRY_ROOM_KEYS if k in v} for nr, v in keys.items()},
+        "kitu_angos": {},
+        "atsaukta": act,
+    }
+    if act == "sujungimas":
+        answer["sujungimas"] = {nr: {k: v[k] for k in MERGE_ROOM_KEYS if k in v} for nr, v in keys.items()}
+    try:
+        import db as _db
+        for nr, v in keys.items():
+            if not set(v) - {"_angos_sienose"}:
+                continue                                   # a neighbour's openings only: not a room he changed
+            k = v.get("_konturas") if isinstance(v.get("_konturas"), dict) else {}
+            _db.log_correction_once(
+                project_id=project_id, field_path=f"patalpa.{nr}.kontūras", old_value=None,
+                new_value={UNDONE: act, "saltinis": k.get("saltinis"), "plotas_m2": k.get("plotas_m2")},
+                source=UNDONE, room_nr=nr, note=body.klausimas or None)
+    except Exception as exc:  # noqa: BLE001 — the journal is never the undo
+        log.warning("undo journal write failed project=%s: %r", project_id, exc)
+    return answer
+
+
+@router.put("/{project_id}/rooms/{room_nr}/outline-set")
+def api_room_outline_set_undo(request: Request, project_id: str, room_nr: str, body: OutlineRestore):
+    """Undo an outline-set answer (a drawn, edited, pointed or holed outline; a split's halves)."""
+    return _restore(request, project_id, room_nr, body, "konturas", GEOMETRY_ROOM_KEYS)
+
+
+@router.put("/{project_id}/rooms/{room_nr}/outline-merge")
+def api_room_outline_merge_undo(request: Request, project_id: str, room_nr: str, body: OutlineRestore):
+    """Undo „Sujungti": both rooms' geometry and merge keys as they were."""
+    return _restore(request, project_id, room_nr, body, "sujungimas", (*GEOMETRY_ROOM_KEYS, *MERGE_ROOM_KEYS))
+
+
+@router.put("/{project_id}/rooms/{room_nr}/split-space")
+def api_room_split_space_undo(request: Request, project_id: str, room_nr: str, body: OutlineRestore):
+    """Undo a space divided by a line: both rooms' geometry as it was."""
+    return _restore(request, project_id, room_nr, body, "padalijimas", GEOMETRY_ROOM_KEYS)

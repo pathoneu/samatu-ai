@@ -37,7 +37,8 @@ import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject, flushProjectSaves } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
-import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
+import { fetchOutlineAt, fetchOutlineMerge, fetchOutlineSet, restoreOutline } from '@/lib/roomOutlineApi';
+import { isNewest, newerSaves, restorePatch, ticketFor, undoneRooms, undoneSentence, UNDO_SUPERSEDED } from '@/lib/outlineUndo';
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
@@ -371,8 +372,52 @@ export default function InteriorWorkspace({
       polygon_corrected_at: new Date().toISOString(),
     };
     const fresh = getProject(project.id) || project;
+    // „Atšaukti" (Pathon v3 W1-D): the raster fill is saved in the browser alone, so its undo is too — the
+    // room's polygon keys as they were (null where it had none).
+    const before = (fresh.patalpos || []).find((r) => String(r?.nr) === String(roomNr)) || {};
+    const restore = Object.fromEntries(Object.keys(patch).concat('polygon_pct').map((k) => [k, before[k] ?? null]));
+    const ticket = ticketFor(undoRegistryRef.current, [String(roomNr)]);
     const updated = updateProject(project.id, roomPatchFields(fresh, { [String(roomNr)]: patch }));
     if (updated) onProjectChange?.(updated);
+    return {
+      undo: () => {
+        if (!isNewest(undoRegistryRef.current, ticket)) { toast.info(UNDO_SUPERSEDED); return; }
+        ticketFor(undoRegistryRef.current, [String(roomNr)]);
+        const now = getProject(project.id) || project;
+        const back = updateProject(project.id, roomPatchFields(now, { [String(roomNr)]: restore }));
+        if (back) onProjectChange?.(back);
+        toast.success(`Atšaukta: patalpos ${roomNr} kontūras grąžintas`);
+      },
+    };
+  };
+
+  // „Atšaukti" after every outline save (Pathon v3 W1-D, D3): the server's answer carries `previous`; the undo
+  // PUTs it back through the same route and lands the answer like the save, then the sheet recomputes. An
+  // older save of a room is not undone after a newer one (it would drop the newer one).
+  const undoRegistryRef = useRef(newerSaves());
+  const makeOutlineUndo = ({ action, nr, previous } = {}) => {
+    if (!previous || !Object.keys(previous).length) return null;
+    const ticket = ticketFor(undoRegistryRef.current, undoneRooms(previous));
+    return async () => {
+      if (!isNewest(undoRegistryRef.current, ticket)) { toast.info(UNDO_SUPERSEDED); return; }
+      try {
+        await flushProjectSaves().catch(() => null);
+        const answer = await restoreOutline(project.id, nr, action, previous);
+        const patch = restorePatch(getProject(project.id) || project, answer);
+        if (!patch) throw new Error('Atšaukti nepavyko');
+        ticketFor(undoRegistryRef.current, undoneRooms(previous));      // the undo is now the newest change
+        const updated = updateProject(project.id, patch);
+        if (updated) onProjectChange?.(updated);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
+            detail: { projectId: project.id, reason: 'outline-undone', roomNr: nr, quiet: true },
+          }));
+        }
+        toast.success(undoneSentence(action, previous), { description: 'Kiekiai perskaičiuojami.' });
+      } catch (e) {
+        toast.error(e?.userMessage || e?.message || 'Atšaukti nepavyko');
+      }
+    };
   };
 
   // Outline edited vertex by vertex in the viewer (2026-10-16): the server measures the ring, reads its
@@ -380,8 +425,7 @@ export default function InteriorWorkspace({
   // roomsWithOutline applies them to the rooms and nothing else. Saving dispatches
   // samatu:project-recompute, which InteriorProject routes through /recompute-interior — the one path
   // every other room edit takes.
-  const handleRoomOutlineEdit = async (roomNr, page, points, holes = null) => {
-    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points, holes });
+  const landOutlineAnswer = (roomNr, answer, reason) => {
     const fresh = getProject(project.id) || project;
     const rooms = roomsWithOutline(fresh, roomNr, answer);
     if (!rooms) throw new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
@@ -394,28 +438,54 @@ export default function InteriorWorkspace({
     if (updated) onProjectChange?.(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
-        detail: { projectId: project.id, reason: 'outline-edited', roomNr },
+        // quiet: the save's own toast says the quantities are being recomputed and holds its „Atšaukti"
+        detail: { projectId: project.id, reason, roomNr, quiet: true },
       }));
     }
+  };
+  const handleRoomOutlineEdit = async (roomNr, page, points, holes = null) => {
+    await flushProjectSaves().catch(() => null);
+    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points, holes });
+    landOutlineAnswer(roomNr, answer, 'outline-edited');
+    return { undo: makeOutlineUndo({ action: 'outline-set', nr: String(roomNr), previous: answer?.previous }) };
+  };
+
+  // The viewer's room tool R (Pathon v3 W1-D): one click → the wall-exact outline PROPOSED (outline-at with
+  // `perziura` — read, nothing saved, no journal row), then saved once he has seen it through outline-set
+  // (`kaip: 'parodyta'`) — the walls and openings read again and the sheet recomputed on the same path as
+  // every outline save. The stored project is brought up to date first, so the server reads what he sees.
+  const handleRoomToolPreview = async (roomNr, point) => {
+    await flushProjectSaves().catch(() => null);
+    return fetchOutlineAt(project.id, roomNr, point, { perziura: true });
+  };
+  const handleRoomToolCommit = async (roomNr, body) => {
+    await flushProjectSaves().catch(() => null);
+    const answer = await fetchOutlineSet(project.id, roomNr, body);
+    landOutlineAnswer(roomNr, answer, 'outline-pointed');
+    return { undo: makeOutlineUndo({ action: 'outline-set', nr: String(roomNr), previous: answer?.previous }) };
   };
 
   // Outline tools (2026-10-16): „Padalyti" / „Sujungti" / „Atimti" — lib/outlineToolSave builds ONE patch
   // from the server's answers, then the sheet recomputes once on the usual path.
   const handleOutlineTool = async (op) => {
+    await flushProjectSaves().catch(() => null);
+    let undoable = null;
     const patch = await saveOutlineTool(op, {
       api: {
         outlineSet: (nr, body) => fetchOutlineSet(project.id, nr, body),
         outlineMerge: (nr, body) => fetchOutlineMerge(project.id, nr, body),
       },
       getFresh: () => getProject(project.id) || project,
+      onPrevious: (u) => { undoable = u; },
     });
     const updated = updateProject(project.id, patch);
     if (updated) onProjectChange?.(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
-        detail: { projectId: project.id, reason: `outline-${op.kind}`, roomNr: op.nr ?? op.keptNr },
+        detail: { projectId: project.id, reason: `outline-${op.kind}`, roomNr: op.nr ?? op.keptNr, quiet: true },
       }));
     }
+    return { undo: makeOutlineUndo(undoable || {}) };
   };
 
   // Persist measurements + per-page calibration scales from the viewer's local
@@ -721,6 +791,8 @@ export default function InteriorWorkspace({
         onRoomPolygonFill={handleRoomPolygonFill}
         onRoomOutlineEdit={handleRoomOutlineEdit}
         onOutlineTool={handleOutlineTool}
+        onRoomToolPreview={handleRoomToolPreview}
+        onRoomToolCommit={handleRoomToolCommit}
         fillRequest={fillRequest}
         exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
         initialMeasurements={project?.measurements || []}

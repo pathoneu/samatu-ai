@@ -17,7 +17,7 @@
  * outline, a neighbour to pick, a hole being drawn — is the one dash, in the proposal slate blue (a
  * picked part turns solid); a refusal is red (an error); chips are neutral label pills.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { nearestEdge, nearestVertex, polygonCentroid } from '@/lib/polygonGeometry';
 import { formatNumberLT, shoelaceAreaM2 } from '@/lib/measureGeometry';
@@ -95,6 +95,20 @@ export default function OutlineToolLayer({
     ? (rooms || []).filter((r) => String(r?.nr) !== tool.nr && roomPageOf(r) === tool.page
       && Array.isArray(r.polygon_pct) && r.polygon_pct.length >= 3)
     : []), [rooms, tool?.mode, tool?.nr, tool?.page]);
+  // A merge started with its target already picked (Shift+click, then M — Pathon v3 W1-B): measure it as if it
+  // had been clicked, once; refused or not on this sheet → the usual click asks for it.
+  const tryMergeRef = useRef(null);
+  useEffect(() => {
+    if (tool?.mode !== 'merge' || !tool.pendingTargetNr || tool.targetNr || !tryMergeRef.current) return;
+    const room = neighbours.find((r) => String(r.nr) === tool.pendingTargetNr);
+    const res = room ? tryMergeRef.current(room) : null;
+    if (!res || res.refused) {
+      onChange((cur) => ({ ...cur, pendingTargetNr: null, ...(res?.refused ? { refused: { nr: String(room.nr), status: res.refused } } : {}) }), { snapshot: false });
+      if (res?.refused) toast.error(`${room.nr}: ${MERGE_REFUSED[res.refused]}`);
+      return;
+    }
+    onChange((cur) => ({ ...cur, pendingTargetNr: null, targetNr: String(room.nr), union: res.union, holeWalls: res.holeWalls, refused: null }), { snapshot: false });
+  }, [tool?.mode, tool?.pendingTargetNr, tool?.targetNr, neighbours, size]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!width || !height || !tool || !size) return null;
 
   const toPx = ([fx, fy]) => ({ x: fx * width, y: fy * height });
@@ -141,6 +155,7 @@ export default function OutlineToolLayer({
     return { union: { ring: ptsRingToPct(res.ring, size), holes: holes.map((h) => ptsRingToPct(h, size)) },
       holeWalls: [...(tool.holeWalls || []), ...roomHoleWalls(room)] };
   };
+  tryMergeRef.current = tryMerge;
   const hovered = tool.mode === 'merge' && hoverNr && hoverNr !== tool.targetNr
     ? neighbours.find((r) => String(r.nr) === hoverNr) : null;
   const hoverMerge = hovered ? tryMerge(hovered) : null;

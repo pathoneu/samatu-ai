@@ -75,7 +75,9 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
   const [tool, setTool] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const start = useCallback((mode) => {
+  // `opts.targetNr` (merge, Pathon v3 W1-B): a room already picked — Shift+click on the drawing — so the merge
+  // is proposed at once instead of waiting for a click on it (OutlineToolLayer measures it on its sheet).
+  const start = useCallback((mode, opts = {}) => {
     const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
     const ring = roomRing(r);
     if (!ring) {
@@ -93,6 +95,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
       tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
       history: [],
       ...(mode === 'subtract' ? { shape: 'rect', draft: [], dirty: false } : {}),
+      ...(mode === 'merge' && opts.targetNr && String(opts.targetNr) !== String(r.nr) ? { pendingTargetNr: String(opts.targetNr) } : {}),
     });
   }, [focusedRoom, rooms, onBeforeStart]);
 
@@ -120,13 +123,19 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
     if (!op || !onSave) return;
     setSaving(true);
     try {
-      await onSave(op);
+      const saved = await onSave(op);
+      // „Atšaukti" for 10 s (Pathon v3 W1-D, D3): the host PUTs the rooms' previous keys back (both rooms of a
+      // merge or a split, the holes of a subtract).
+      const undo = typeof saved?.undo === 'function' ? saved.undo : null;
       const what = {
         split: op.kind === 'split' ? `Patalpa ${op.nr} padalyta — kita dalis priskirta patalpai ${op.other.nr}` : `Patalpa ${op.nr} padalyta — kita dalis neįtraukta`,
         merge: `Patalpa ${op.goneNr} prijungta prie ${op.keptNr} — abiejų plotai ir angos skaičiuojami patalpoje ${op.keptNr}`,
         subtract: `Patalpos ${op.nr} kontūras išsaugotas su ${op.holes.length} išpjov${op.holes.length === 1 ? 'a' : 'omis'}`,
       }[t.mode];
-      toast.success(what, { description: 'Sienos perskaitytos iš naujo, kiekiai perskaičiuojami.' });
+      toast.success(what, {
+        description: 'Sienos perskaitytos iš naujo, kiekiai perskaičiuojami.',
+        ...(undo ? { duration: 10_000, action: { label: 'Atšaukti', onClick: () => { undo(); } } } : {}),
+      });
       setTool(null);
     } catch (e) {
       toast.error(e?.userMessage || e?.message || 'Nepavyko išsaugoti kontūro');

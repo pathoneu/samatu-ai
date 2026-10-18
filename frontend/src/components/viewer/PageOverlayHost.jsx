@@ -9,7 +9,6 @@
  * zones go non-interactive so they can't swallow measure clicks.
  */
 import { useEffect, useMemo } from 'react';
-import { X } from 'lucide-react';
 import { RenderLayer } from '@embedpdf/plugin-render/react';
 import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { SearchLayer } from '@embedpdf/plugin-search/react';
@@ -28,10 +27,11 @@ import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
 import OutlineToolLayer from './OutlineToolLayer';
 import CalloutLayer from './CalloutLayer';
+import RoomProposalLayer from './RoomProposalLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
-function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
+function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale = null, renderedWidth = null, renderedHeight = null }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
   // COORDINATE CONTRACT (verified in @embedpdf/plugin-interaction-manager dist):
   // PagePointerProvider's default convertEventToPoint runs restorePosition(),
@@ -41,13 +41,18 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
   // here must therefore be the mediabox size in POINTS (pageSizePt), so that
   // consumers get pct with a straight divide. pageRotation (/Rotate enum) is
   // included for context only — no rotation math belongs in this path.
+  // Pathon v3 W1-D: the click also says whether Shift was held (Shift+click adds a room to the selection), the
+  // page's screen pixels per PDF point (`scale`, for hit tolerances) and its size on screen.
   useEffect(() => register({
-    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation }),
-  }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint]);
+    onClick: (pos, evt) => onPagePoint?.({
+      pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation,
+      shiftKey: !!evt?.shiftKey, scale, renderedWidth, renderedHeight,
+    }),
+  }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale, renderedWidth, renderedHeight]);
   return null;
 }
 
-// Screen anchor for the selected measurement's delete affordance: centroid for
+// Screen anchor for the selected measurement (the selection bar stands above it): centroid for
 // areas (matches its label), middle vertex for lines, the dot for counts.
 function deleteAnchorFor(m, adapter) {
   if (!m?.points?.length) return null;
@@ -66,6 +71,8 @@ export default function PageOverlayHost({
   pageRotation = 0,
   pageSizePt = null,
   focusedRoomNr,
+  // Rooms Shift+clicked beside the focused one (Pathon v3 W1-D) — drawn with the same selected style.
+  selectedRoomNrs = null,
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
   // Founder decision 2026-07-11: rooms render as numbered markers by default;
@@ -118,6 +125,8 @@ export default function PageOverlayHost({
   sheetLinks = null,
   // A later edition of the drawing over this sheet (togal-v2 W10): {rid, record, mode, opacity} or null.
   revisionOverlay = null,
+  // The room tool R's state (useRoomTool) while it is armed, else null — its proposal is drawn on its sheet.
+  roomTool = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -212,7 +221,7 @@ export default function PageOverlayHost({
             below the room zones so measure/zone interactions are unaffected. */}
         <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
       </div>
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} />
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} scale={adapter?.scale ?? null} renderedWidth={width} renderedHeight={height} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       {checkMode && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -238,13 +247,23 @@ export default function PageOverlayHost({
           page={layout.pageNumber}
           renderedSize={{ width, height }}
           focusedRoomNr={focusedRoomNr}
+          selectedRoomNrs={selectedRoomNrs}
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           zoneFillsVisible={zoneFillsVisible}
           interactive={!measureActive && !outlineEdit && !outlineTool}
-          onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
+          // Selecting is the page click's job (TakeoffViewer.handlePagePoint hit-tests what this layer draws, so
+          // Shift+click can add a room); a zone of its own would re-focus the room after the page did. Without
+          // the viewer's selection (`onPagePoint` absent) the zone still focuses its room as before.
+          onRoomClick={onPagePoint ? () => {} : (zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
+      )}
+      {/* The room tool's proposal (Pathon v3 W1-D) — over the zones, under the measurements; pointer-transparent. */}
+      {!checkMode && roomTool && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <RoomProposalLayer page={layout.pageNumber} state={roomTool} renderedSize={{ width, height }} />
+        </div>
       )}
       {!checkMode && sheetLinks && projectId && (
         <CalloutLayer
@@ -282,18 +301,14 @@ export default function PageOverlayHost({
             calibA={measureCalibA}
             onCalibAChange={onMeasureCalibAChange}
           />
-          {deleteAt && onMeasureDelete && (
-            <button
-              type="button"
-              title="Ištrinti matavimą (Delete)"
-              aria-label="Ištrinti matavimą"
-              onClick={(e) => { e.stopPropagation(); onMeasureDelete(selectedMeasurement.id); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              style={{ position: 'absolute', left: deleteAt.x + 10, top: deleteAt.y - 26, pointerEvents: 'auto' }}
-              className="w-5 h-5 rounded-full bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] shadow-sm flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground))] hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
-            >
-              <X className="w-3 h-3" />
-            </button>
+          {/* Where the selected mark is — the selection bar (v3 W1-B B6) stands right above it with
+              Pervadinti · Keisti tipą · Rodyti sąraše · Ištrinti (the old one-icon ✕ lived here). */}
+          {deleteAt && (
+            <span
+              aria-hidden="true"
+              data-measure-anchor={selectedMeasurement.id}
+              style={{ position: 'absolute', left: deleteAt.x - 12, top: deleteAt.y - 12, width: 24, height: 24, pointerEvents: 'none' }}
+            />
           )}
         </div>
       )}

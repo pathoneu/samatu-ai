@@ -1,14 +1,15 @@
 /**
  * ViewerCoachMarks — the viewer's first-run walkthrough (lib/viewerCoachMarks):
- * Mastelis → Atstumas → Taisyti kontūrą, each card under its toolbar button
- * (`data-coach="…"` inside `rootRef`), a ring around the button, shown once per
- * browser. „Praleisti", the X, Esc and finishing all mark it done.
+ * Mastelis → Atstumas → Taisyti kontūrą, each card at its button (`data-coach="…"`
+ * inside `rootRef`) — beside a tool card on the left rail, under the selected room's
+ * action bar — a ring around the button, shown once per browser. „Praleisti", the X,
+ * Esc and finishing all mark it done.
  *
  * Not the project-level OnboardingTooltips pattern: that one is a centred
  * balloon behind a backdrop; these cards must point at a button and leave the
  * drawing usable underneath.
  */
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, modalOpen } from '@/lib/viewerCoachMarks';
 
@@ -19,6 +20,8 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
   const [barRect, setBarRect] = useState(null);
+  const [side, setSide] = useState('below');
+  const cardRef = useRef(null);   // the card's real height keeps a card beside a low tool inside the window
   const [, setTick] = useState(0);
   // A dialog or drawer is open: step aside until it closes (v3 M6 — the card
   // sat on the coach layer above every dialog and covered it).
@@ -31,21 +34,21 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
   }, [enabled, delayMs]);
 
   const current = COACH_STEPS[step];
-  // Follow the anchor: the toolbar scrolls sideways on narrow screens and buttons come and go.
+  // Follow the anchor: buttons come and go (the room's action bar exists only while a room is selected).
   useLayoutEffect(() => {
     if (!visible) return undefined;
     const measure = () => {
       const el = rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`);
       const r = el?.getBoundingClientRect();
       setRect(r && r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } : null);
-      // No button (e.g. „Taisyti kontūrą" before a room is chosen): sit under the toolbar instead.
-      const bar = rootRef?.current?.firstElementChild?.getBoundingClientRect();
-      setBarRect(bar && bar.width > 0 ? { left: bar.left, width: bar.width, bottom: bar.bottom } : null);
+      // A tool card stands in a column on the left: its card goes beside it, not over the next tools.
+      setSide(el?.closest?.('[data-tool-rail]') || !el ? 'right' : 'below');
+      // No button (e.g. „Taisyti kontūrą" before a room is chosen): sit beside the tool cards instead.
+      const bar = rootRef?.current?.querySelector('[data-tool-rail]')?.getBoundingClientRect();
+      setBarRect(bar && bar.width > 0 ? { left: bar.left, top: bar.top, width: bar.width, height: Math.min(bar.height, 120), bottom: bar.bottom } : null);
       setYielding(modalOpen());
       setTick((n) => n + 1);
     };
-    // The toolbar scrolls sideways when the window is narrow — bring this step's button into view once.
-    rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
     measure();
     const id = setInterval(measure, 400);
     window.addEventListener('resize', measure);
@@ -66,8 +69,8 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
 
   if (!visible || !current || yielding) return null;
   const pos = rect
-    ? coachCardPosition(rect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W })
-    : { ...coachCardPosition(barRect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W }), arrowLeft: null };
+    ? coachCardPosition(rect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side })
+    : { ...coachCardPosition(barRect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side: 'right' }), arrowLeft: null, arrowTop: null };
   const last = step === COACH_STEPS.length - 1;
   return (
     <>
@@ -79,6 +82,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
         />
       )}
       <div
+        ref={cardRef}
         role="dialog"
         aria-label={`Įvadas: ${current.title}`}
         className="fixed z-coach rounded-[2px] border border-border bg-card text-card-foreground shadow-xl p-4"
@@ -91,6 +95,13 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
             aria-hidden
             className="absolute -top-[6px] w-[10px] h-[10px] rotate-45 bg-card border-l border-t border-border"
             style={{ left: pos.arrowLeft - 5 }}
+          />
+        )}
+        {pos.arrowTop != null && (
+          <span
+            aria-hidden
+            className="absolute -left-[6px] w-[10px] h-[10px] rotate-45 bg-card border-l border-b border-border"
+            style={{ top: pos.arrowTop - 5 }}
           />
         )}
         <div className="flex items-start justify-between mb-1.5">

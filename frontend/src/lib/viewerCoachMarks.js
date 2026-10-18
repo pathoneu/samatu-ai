@@ -1,5 +1,6 @@
 // First-run coach marks for the viewer (2026-10-16, Togal analysis §11): three
-// steps anchored to their toolbar buttons, shown once per browser.
+// steps anchored to their buttons — the tool cards on the left, the selected room's action bar (v3 W1-B) —
+// shown once per browser.
 import { keyText } from './viewerShortcuts.js';
 
 export const COACH_STORAGE_KEY = 'samatu_viewer_onboarded';
@@ -10,25 +11,26 @@ export const COACH_STEPS = [
     anchor: 'calibrate',
     title: 'Mastelis',
     body: 'Prieš matuojant patikrinkite lapo mastelį — jis parašytas apačioje, būsenos juostoje, kartu su tuo, iš kur jis paimtas. '
-      + 'Jei rašo „Mastelis nenustatytas", spauskite „Mastelis", spustelėkite atkarpos, kurios tikrą ilgį žinote, pradžią ir pabaigą ir įrašykite tą ilgį. '
+      + `Jei rašo „Mastelis nenustatytas", kairėje spauskite „Mastelis" (${keyText('toolCalibrate', { mac: false })}), spustelėkite atkarpos, kurios tikrą ilgį žinote, pradžią ir pabaigą ir įrašykite tą ilgį. `
       + 'Programa pasiūlys artimiausią įprastą mastelį (1:50, 1:100…).',
   },
   {
     id: 'distance',
     anchor: 'distance',
     title: 'Atstumas',
-    body: `Spustelėkite pradžią ir pabaigą („Baigti" arba dukart spustelėkite) — rezultatas metrais atsiras dešinėje, skiltyje „Matavimai". `
-      + 'Žymeklis prilimpa: oranžinė žymė — prie brėžinio sienos kampo ar paviršiaus, žalia — prie jau nubrėžto matavimo taško. '
-      + `Klaviatūra: ${keyText('toolDistance', { mac: false })} — atstumas, ${keyText('toolArea', { mac: false })} — plotas; „?" — visi klavišai.`,
+    body: 'Spustelėkite pradžią ir pabaigą — atstumas įsirašo antru spustelėjimu, rezultatas metrais atsiras dešinėje, skiltyje „Matavimai". '
+      + 'Žymeklis prilimpa: kvadratas — prie brėžinio sienos kampo, rombas — prie sienos, apskritimas — prie jau nubrėžto matavimo taško. '
+      + 'Ką spustelėti toliau, sako sakinys prie žymeklio. '
+      + `Klaviatūra: ${keyText('toolDistance', { mac: false })} — atstumas, ${keyText('toolArea', { mac: false })} — plotas, tarpas — tempti brėžinį; „?" — visi klavišai.`,
   },
   {
     id: 'outline',
     anchor: 'outline-edit',
     title: 'Taisyti kontūrą',
-    body: 'Pasirinkite patalpą sąraše arba brėžinyje — viršuje atsiras „Taisyti kontūrą". Tempkite kampus (jie prilimpa prie sienų — oranžinė žymė), '
+    body: `Pasirinkite patalpą sąraše arba brėžinyje — prie jos užrašo atsiras juosta su „Taisyti kontūrą" (${keyText('roomEditOutline', { mac: false })}). Tempkite kampus (jie prilimpa prie sienų), `
       + 'spustelėkite vidurio tašką — pridėsite kampą, dukart spustelėkite kampą — pašalinsite. Enter išsaugo: sienos ir angos perskaitomos iš naujo, kiekiai perskaičiuojami.',
     // The button exists only while a room is selected — say where it will appear instead of pointing at nothing.
-    missingAnchorNote: 'Mygtukas atsiras pasirinkus patalpą.',
+    missingAnchorNote: 'Juosta su šiuo mygtuku atsiras pasirinkus patalpą.',
   },
 ];
 
@@ -51,15 +53,23 @@ export function markCoachMarksDone(storage) {
 }
 
 /**
- * Where the card goes for an anchor rect (viewport px): below it, clamped into the
- * viewport. No anchor → centred near the top. Returns { left, top, arrowLeft|null }.
+ * Where the card goes for an anchor rect (viewport px): below it — or, with side 'right', beside it (the
+ * tool cards stand in a column, so a card below would cover the next tools) — clamped into the viewport.
+ * No anchor → centred near the top. Returns { left, top, arrowLeft|null, arrowTop|null }.
  */
-export function coachCardPosition(rect, { vw, vh, cardW = 320, gap = 10, margin = 12 } = {}) {
-  if (!rect) return { left: Math.max(margin, (vw - cardW) / 2), top: Math.min(96, vh / 4), arrowLeft: null };
+export function coachCardPosition(rect, { vw, vh, cardW = 320, cardH = 220, gap = 10, margin = 12, side = 'below' } = {}) {
+  if (!rect) return { left: Math.max(margin, (vw - cardW) / 2), top: Math.min(96, vh / 4), arrowLeft: null, arrowTop: null };
+  if (side === 'right') {
+    const right = rect.left + rect.width;
+    const left = Math.min(right + gap, Math.max(margin, vw - cardW - margin));
+    const top = Math.min(Math.max(margin, rect.top - 12), Math.max(margin, vh - cardH - margin));
+    const mid = rect.top + (rect.height || 0) / 2;
+    return { left, top, arrowLeft: null, arrowTop: Math.min(Math.max(14, mid - top), cardH - 14) };
+  }
   const centre = rect.left + rect.width / 2;
   const left = Math.min(Math.max(margin, centre - cardW / 2), Math.max(margin, vw - cardW - margin));
   const top = rect.bottom + gap;
-  return { left, top, arrowLeft: Math.min(Math.max(14, centre - left), cardW - 14) };
+  return { left, top, arrowLeft: Math.min(Math.max(14, centre - left), cardW - 14), arrowTop: null };
 }
 
 /** „Rodyti įvadą dar kartą" (Pagalba): the next opened drawing shows the walkthrough again. */

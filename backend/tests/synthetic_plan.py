@@ -55,6 +55,13 @@ class Sheet:
     table_rows: tuple[tuple[str, ...], ...] | None = None   # …and its rows (default TABLE_ROWS)
     table_tail_rows: tuple[tuple[str, ...], ...] | None = None   # rows ruled APART, TABLE_TAIL_GAP under the table (objektas_h p2's last legend row)
     rotate: int = 0                                         # the page's /Rotate — drawn unrotated, the viewer turns it
+    # Legend counting (2026-10-18, W2-A): instances of the legend's glyphs on the plan — (LEGEND_ROWS index,
+    # centre x, centre y) in POINTS from the sheet's top-left, drawn exactly as the legend row draws its glyph.
+    symbol_marks: list[tuple[int, float, float]] = field(default_factory=list)
+    # Schedules (2026-10-18, extractor/table_reader.py + schedules.py): any number of ruled tables, each a
+    # `RuledTable` (positions in POINTS from the sheet's top-left) — merged header cells, rows drawn without a
+    # rule between them, a table continued on the next sheet.
+    ruled_tables: list = field(default_factory=list)
 
 
 # What the zone blocks draw — the tests predict boxes from these.
@@ -266,6 +273,7 @@ def build_plan(sheets: list[Sheet]) -> bytes:
             c.setFont(LT_FONT, 7)
             c.drawString(ORIGIN[0], 30, sheet.title)             # in the title block, the lowest part of the sheet
         _zone_blocks(c, sheet)
+        _symbol_marks(c, sheet)
         c.showPage()
     c.save()
     if any(sheet.rotate for sheet in sheets):
@@ -354,3 +362,87 @@ def pocket_and_room() -> Sheet:
         ("3000", 1 + 2 * t + o, t, 1 + 2 * t + o, 3 + t),                # room 2 left (the partition)
     ]
     return Sheet(walls=walls, badges=badges, dims=dims)
+
+
+# ── legend counting (2026-10-18, W2-A) ─────────────────────────────────────
+
+
+def _symbol_marks(c, sheet: "Sheet") -> None:
+    """The legend's glyphs drawn on the plan at `sheet.symbol_marks` — the same paths _zone_blocks draws in
+    the legend rows: 0 a red filled 6 pt square, 1 a hairline 3 pt-radius circle, 2 a black 6 pt cross."""
+    if not sheet.symbol_marks:
+        return
+    _, H = A4
+    for kind, x, y in sheet.symbol_marks:
+        cy = H - y
+        if kind == 0:
+            c.setFillColorRGB(0.9, 0.2, 0.1)
+            c.rect(x - 3, cy - 3, 6, 6, stroke=0, fill=1)
+        elif kind == 1:
+            c.setStrokeGray(0.0)
+            c.setLineWidth(0.25)
+            c.circle(x, cy, 3, stroke=1, fill=0)
+        else:
+            c.setStrokeGray(0.0)
+            c.setLineWidth(0.4)
+            c.line(x - 3, cy - 3, x + 3, cy + 3)
+            c.line(x - 3, cy + 3, x + 3, cy - 3)
+    c.setFillGray(0.0)
+
+
+# ── ruled tables (2026-10-18, extractor/table_reader.py, extractor/schedules.py) ─────────────────────────────
+
+
+@dataclass
+class RuledTable:
+    """A ruled table drawn at `at` (x, top in POINTS from the sheet's top-left). `rows` are the cells row by row;
+    a cell is None where a merged cell from the left or from above covers it. `spans` = (row, col, colspan,
+    rowspan) of the merged cells. A cell's text may hold „\\n" — its lines are written one under the other (two
+    table lines drawn without a rule between them: give that row a taller height in `row_hs`)."""
+    at: tuple[float, float]
+    rows: tuple
+    col_w: tuple[float, ...]
+    title: str | None = None
+    row_h: float = 14.0
+    row_hs: tuple[float, ...] | None = None        # per-row heights (default row_h each)
+    spans: tuple = ()
+    font: float = 5.0
+
+
+def _draw_ruled_table(c, t: "RuledTable") -> None:
+    _, H = A4
+    x, top = t.at
+    heights = list(t.row_hs or (t.row_h,) * len(t.rows))
+    ys = [top]
+    for h in heights:
+        ys.append(ys[-1] + h)
+    xs = [x]
+    for w in t.col_w:
+        xs.append(xs[-1] + w)
+    span = {(r, col): (cs, rs) for r, col, cs, rs in t.spans}
+    c.setFillGray(0.0)
+    if t.title:
+        c.setFont(LT_FONT, 6)
+        c.drawString(x, H - top + 3, t.title)          # just above the table, like TABLE_TITLE
+    c.setStrokeGray(0.0)
+    c.setLineWidth(0.5)
+    c.setFont(LT_FONT, t.font)
+    for r, row in enumerate(t.rows):
+        for col, text in enumerate(row):
+            if text is None:
+                continue                                 # covered by a merged cell
+            cs, rs = span.get((r, col), (1, 1))
+            x0, x1 = xs[col], xs[min(col + cs, len(xs) - 1)]
+            y0, y1 = ys[r], ys[min(r + rs, len(ys) - 1)]
+            c.rect(x0, H - y1, x1 - x0, y1 - y0, stroke=1, fill=0)
+            for k, line in enumerate(str(text).split("\n")):
+                c.drawString(x0 + 2, H - y0 - 9 - k * (t.font + 2), line)
+
+
+_zone_blocks_before_ruled_tables = _zone_blocks
+
+
+def _zone_blocks(c, sheet: "Sheet") -> None:  # noqa: F811 — the zone blocks, then the sheet's ruled tables
+    _zone_blocks_before_ruled_tables(c, sheet)
+    for t in sheet.ruled_tables or ():
+        _draw_ruled_table(c, t)

@@ -12,10 +12,20 @@ test('three steps in order: Mastelis → Atstumas → Taisyti kontūrą', () => 
   for (const s of COACH_STEPS) assert.ok(s.anchor && s.body.length > 40, s.id);
 });
 
-test('the snap marks are explained (orange = drawing, green = measurement)', () => {
+test('the snap marks are explained by shape (v3: one snap colour, the shape says what the click lands on)', () => {
   const all = COACH_STEPS.map((s) => s.body).join(' ');
-  assert.match(all, /oranžinė/);
-  assert.match(all, /žalia/);
+  assert.match(all, /kvadratas/);
+  assert.match(all, /rombas/);
+  assert.match(all, /apskritimas/);
+  assert.doesNotMatch(all, /oranžinė|žalia/);
+});
+
+test('the steps name the keys of the click model: K, E, Space', () => {
+  const byId = Object.fromEntries(COACH_STEPS.map((s) => [s.id, s.body]));
+  assert.match(byId.calibrate, /\(K\)/);
+  assert.match(byId.outline, /\(E\)/);
+  assert.match(byId.distance, /tarpas — tempti brėžinį/);
+  assert.match(byId.distance, /antru spustelėjimu/);
 });
 
 test('shown once: done after markCoachMarksDone, under the agreed key', () => {
@@ -53,4 +63,14 @@ test('the walkthrough steps aside while a dialog or overlay is open (v3 M6)', ()
   for (const part of ['[role="dialog"][data-state="open"]', '[role="alertdialog"]', '.fixed.inset-0.z-50']) {
     assert.ok(MODAL_SELECTOR.includes(part), part);
   }
+});
+
+test('beside a tool card (side right) the card stands right of it, arrow at its middle', () => {
+  const p = coachCardPosition({ left: 120, top: 300, width: 64, height: 34, bottom: 334 }, { vw: 1280, vh: 720, side: 'right' });
+  assert.equal(p.left, 120 + 64 + 10);
+  assert.equal(p.top, 288);
+  assert.equal(p.arrowLeft, null);
+  assert.equal(p.arrowTop, 300 + 17 - 288);
+  const low = coachCardPosition({ left: 120, top: 690, width: 64, height: 20, bottom: 710 }, { vw: 1280, vh: 720, side: 'right' });
+  assert.ok(low.top + 220 <= 720 - 12 + 0.001, 'kept inside the window');
 });

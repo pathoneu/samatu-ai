@@ -21,8 +21,8 @@ export const HELP_SECTIONS = Object.freeze([
     id: 'konturas',
     title: 'Kaip pataisyti patalpos kontūrą',
     steps: [
-      'Pasirinkite patalpą sąraše arba brėžinyje — viršuje atsiras „Taisyti kontūrą".',
-      'Tempkite kampus: jie prilimpa prie sienų (oranžinė žymė). Spustelėkite vidurio tašką — pridėsite kampą, dukart spustelėkite kampą — pašalinsite.',
+      'Pasirinkite patalpą sąraše arba brėžinyje — prie jos užrašo atsiras juosta su „Taisyti kontūrą" (klavišas E).',
+      'Tempkite kampus: jie prilimpa prie sienų — kvadratas rodo sienos kampą, rombas — sieną. Spustelėkite vidurio tašką — pridėsite kampą, dukart spustelėkite kampą — pašalinsite.',
       'Enter išsaugo: sienos ir angos perskaitomos iš naujo, kiekiai perskaičiuojami. Esc atsisako.',
       'Suklydote? Ctrl+Z (Mac — ⌘Z) grąžina paskutinį pakeitimą; ankstesnes projekto būsenas rasite „Versijos".',
     ],
@@ -56,12 +56,13 @@ export const WHATS_NEW = Object.freeze([
       'Eksporte — jūsų PVM tarifas: 21, 9 arba 0 %. Numatytąjį naujiems projektams nustatysite „Nustatymuose".',
       'Excel sąmatą galima grupuoti pagal aukštus ir butus; vidinėje kopijoje — lapas „Pakeitimų žurnalas".',
       'Įvadas brėžinyje nebeuždengia atidarytų langų.',
+      'Kai viename lape matavimų daugiau nei 1500, programa perspėja — brėžinys gali pradėti strigti.',
     ],
   },
   {
     date: '2026-10-16',
     items: [
-      'Matuojant ir nustatant mastelį žymeklis prilimpa prie sienų kampų ir paviršių (oranžinė žymė).',
+      'Matuojant ir nustatant mastelį žymeklis prilimpa prie sienų kampų ir paviršių.',
       'Nustatant mastelį programa pasiūlo artimiausią įprastą mastelį ir parodo skirtumą procentais.',
       '„Taisyti kontūrą" — patalpos kontūrą taisote kampas po kampo, sienos perskaitomos iš naujo.',
     ],

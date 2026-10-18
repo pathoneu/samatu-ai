@@ -169,11 +169,20 @@ def template_ink_px(template: np.ndarray) -> int:
 
 def _orientations(ink: np.ndarray):
     """Every rotation of the template, plain and mirrored (doors come in left
-    and right hand, so a mirror is the same symbol)."""
+    and right hand, so a mirror is the same symbol). An orientation identical
+    to one already given (a circle, a cross — symmetric symbols) is skipped:
+    it would score the same everywhere and NMS keeps the first one anyway, so
+    the answer is unchanged and a symmetric symbol is searched up to 8× faster."""
+    seen: set[tuple] = set()
     for mirrored in (False, True):
         base = cv2.flip(ink, 1) if mirrored else ink
         for deg in BOX_SEARCH_ROTATIONS:
-            yield _rotate(base, deg), deg, mirrored
+            arr = _rotate(base, deg)
+            key = (arr.shape, arr.tobytes())
+            if key in seen:
+                continue
+            seen.add(key)
+            yield arr, deg, mirrored
 
 
 def find_symbol_by_shape(
@@ -281,3 +290,203 @@ def px_box_to_pt(box_px, page_w_pt: float, page_h_pt: float, rot: int,
         xs.append(fx * page_w_pt)
         ys.append(fy * page_h_pt)
     return [round(min(xs), 2), round(min(ys), 2), round(max(xs), 2), round(max(ys), 2)]
+
+
+# ── the shape search over every sheet, server side (Pathon v3, W2-A A3) ────
+#
+# A black legend glyph (a switch, a socket drawn in black) is never counted by
+# the vector counter — black paths are also the walls. `batch_find_symbol`
+# runs the box search above for one template box over every sheet in one call:
+# the same dpi budget per sheet (search_dpi), a raster / dark sheet skipped and
+# said (`skipped: "raster"`), PDFium only under PDFIUM_LOCK (render_page and
+# the geometry read take it), and a time budget — the sheets not searched in
+# time are listed and the answer is `partial`.
+#
+# WHICH CANDIDATES. The smoke suite measured on objektas_h (2026-10-18): an
+# 8 × 8 pt box round a pendant lamp hits the 300-candidate cap with nearly flat
+# scores (1 / 0,9868 / 0,9692 — the true twin 0,987, noise 0,969), so a fixed
+# score threshold does not separate a symbol from the drawing. The answer keeps
+# the candidates within BATCH_MARGIN of the best candidate that is not the
+# template itself (twins of one symbol score alike; the drawing around them
+# lower), never below `min_score`, at most BATCH_MAX_PER_PAGE per sheet, the
+# best first. Every candidate is still a proposal the person accepts or
+# rejects. Measured separations per corpus project: scripts/legend_count_report.py.
+
+BATCH_MARGIN = 0.02
+BATCH_MAX_PER_PAGE = 60
+BATCH_TIME_BUDGET_S = 45.0
+BATCH_ZONE_KINDS_WITHOUT_MARKS = ("legenda", "lentele", "antspaudas")
+
+
+def _mediabox_geometry(pdf_bytes: bytes) -> list[tuple[float, float, int]]:
+    """(width_pt, height_pt, /Rotate) of every page — the UNROTATED mediabox, the viewer's measurement
+    space (cv_tools._pages_geometry). One PDFium parse, under PDFIUM_LOCK."""
+    import pypdfium2 as pdfium
+
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf_bytes)
+        try:
+            out = []
+            for i in range(len(doc)):
+                page = doc[i]
+                try:
+                    x0, y0, x1, y1 = page.get_mediabox()
+                    out.append((float(x1 - x0), float(y1 - y0), int(page.get_rotation() or 0) % 360))
+                finally:
+                    page.close()
+            return out
+        finally:
+            doc.close()
+
+
+def _box_pct(box_pt, w: float, h: float, rot: int) -> list[float]:
+    """Mediabox points → DISPLAY-frame fractions (the frame zones and room outlines use)."""
+    pts = [_rotate_pct(x / w, y / h, rot) for x, y in ((box_pt[0], box_pt[1]), (box_pt[2], box_pt[1]),
+                                                     (box_pt[0], box_pt[3]), (box_pt[2], box_pt[3]))]
+    return [round(min(p[0] for p in pts), 5), round(min(p[1] for p in pts), 5),
+            round(max(p[0] for p in pts), 5), round(max(p[1] for p in pts), 5)]
+
+
+def _iou(a, b) -> float:
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def batch_find_symbol(project_pdf: bytes, template_page: int, box_pt, pages=None, min_score: float = 0.70, *,
+                      margin: float = BATCH_MARGIN, max_per_page: int = BATCH_MAX_PER_PAGE, zones: bool = True,
+                      exclude: dict | None = None, time_budget_s: float = BATCH_TIME_BUDGET_S) -> dict:
+    """The box search for one template over many sheets. `template_page` and `pages` are 1-BASED (the legend
+    and zone readers' numbering; cv_tools' `page_idx` is 0-based); `box_pt` = [x0, y0, x1, y1] in unrotated
+    mediabox points from the top-left (a legend row's `glyph_box_pt`). Default pages: every sheet, the
+    template's own first.
+
+    {status: ok|no_page|bad_box|no_ink|failed, detail, template_page, box_pt, min_score, margin, reference_score,
+     score_floor, pages: [{page, dpi, page_ink_share, skipped: None|"raster", raw_count, truncated, top_scores,
+     candidates: [{box_pt, box_pct, score, scale, rotation, mirrored, is_source}]}], partial, pages_not_read,
+     elapsed_s}. `candidates` are the kept ones (see WHICH CANDIDATES above); the template's own box is in
+    them with `is_source: true`; none inside a legend, table or title-block zone (`zones`) or inside
+    `exclude` ({page: [bbox_pct, …]}, DISPLAY fractions — the legend box the person drew). `box_pct` is the
+    DISPLAY frame. Never raises."""
+    import time
+
+    started = time.monotonic()
+    out = {"status": "ok", "detail": None, "template_page": int(template_page), "box_pt": [float(v) for v in box_pt],
+           "min_score": float(min_score), "margin": float(margin), "reference_score": None, "score_floor": None,
+           "pages": [], "partial": False, "pages_not_read": [], "elapsed_s": 0.0}
+    try:
+        return _batch(project_pdf, int(template_page), [float(v) for v in box_pt], pages, float(min_score),
+                      float(margin), int(max_per_page), zones, exclude or {}, float(time_budget_s), started, out)
+    except Exception:  # noqa: BLE001 — the search never sinks its caller
+        import logging
+        logging.getLogger("samatu.cv_match").warning("batch symbol search failed", exc_info=True)
+        out.update(status="failed", detail="panašių ženklų paieška nepavyko", pages=[])
+        out["elapsed_s"] = round(time.monotonic() - started, 2)
+        return out
+
+
+def _batch(pdf: bytes, tpage: int, box: list[float], pages, min_score: float, margin: float, max_per_page: int,
+           zones: bool, exclude: dict, budget: float, started: float, out: dict) -> dict:
+    import time
+
+    from .cv_render_cache import render_page
+    try:
+        geo = _mediabox_geometry(pdf)
+    except Exception:  # noqa: BLE001
+        out.update(status="no_page", detail="brėžinio atidaryti nepavyko")
+        return out
+    n = len(geo)
+    if not 1 <= tpage <= n:
+        out.update(status="no_page", detail="tokio lapo brėžinyje nėra")
+        return out
+    tw, th, trot = geo[tpage - 1]
+    x0, y0, x1, y1 = box
+    if not (x1 > x0 and y1 > y0) or x0 < 0 or y0 < 0 or x1 > tw + 1 or y1 > th + 1:
+        out.update(status="bad_box", detail="ženklo rėmelis už lapo ribų")
+        return out
+    if (x1 - x0) > tw * 0.25 or (y1 - y0) > th * 0.25:
+        out.update(status="bad_box", detail="rėmelis per didelis — apibrėžkite vieną ženklą, ne plano dalį")
+        return out
+    wanted = sorted({int(p) for p in (pages or range(1, n + 1)) if 1 <= int(p) <= n})
+    order = ([tpage] if tpage in wanted else []) + [p for p in wanted if p != tpage]
+    templates: dict[int, np.ndarray] = {}
+
+    def template_at(dpi: int) -> np.ndarray | None:
+        if dpi not in templates:
+            raster = render_page(pdf, tpage - 1, dpi)
+            bx, by, bw, bh = pt_box_to_px(box, tw, th, trot, raster.shape[1], raster.shape[0])
+            bx, by = max(0, bx), max(0, by)
+            crop = raster[by:by + bh, bx:bx + bw]
+            templates[dpi] = crop if crop.size and template_ink_px(crop) >= MIN_TEMPLATE_INK_PX else None
+        return templates[dpi]
+
+    zone_cache: dict[int, list] = {}
+
+    def in_no_mark_zone(page: int, cx: float, cy: float) -> bool:
+        if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in (exclude.get(page) or exclude.get(str(page)) or [])):
+            return True
+        if not zones:
+            return False
+        from .sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones, zone_at
+        if page not in zone_cache:
+            zone_cache[page] = read_zones(pdf, page, table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
+        z = zone_at(zone_cache[page], cx, cy)
+        return z is not None and z.get("kind") in BATCH_ZONE_KINDS_WITHOUT_MARKS
+
+    raw_pages: list[dict] = []
+    for k, page in enumerate(order):
+        if time.monotonic() - started > budget:
+            out["partial"] = True
+            out["pages_not_read"] = order[k:]
+            break
+        pw, ph, prot = geo[page - 1]
+        dpi = search_dpi(pw, ph)
+        template = template_at(dpi)
+        if template is None:
+            out.update(status="no_ink", detail="rėmelyje beveik nėra linijų — apibrėžkite patį ženklą")
+            return out
+        raster = render_page(pdf, page - 1, dpi)
+        share = ink_share(raster)
+        entry = {"page": page, "dpi": dpi, "page_ink_share": round(share, 4), "skipped": None, "raw_count": 0,
+                 "truncated": False, "top_scores": [], "candidates": []}
+        if share > RASTER_INK_SHARE:
+            entry["skipped"] = "raster"
+            raw_pages.append(entry)
+            continue
+        found = find_symbol_by_shape(raster, template, min_score=min_score, max_results=300, dpi=dpi)
+        rh, rw = raster.shape[:2]
+        cands = []
+        for c in found["candidates"]:
+            bpt = px_box_to_pt(c["bbox"], pw, ph, prot, rw, rh)
+            pct = _box_pct(bpt, pw, ph, prot)
+            is_source = page == tpage and _iou(bpt, box) > 0.3
+            if not is_source and in_no_mark_zone(page, (pct[0] + pct[2]) / 2, (pct[1] + pct[3]) / 2):
+                continue
+            cands.append({"box_pt": bpt, "box_pct": pct, "score": c["score"], "scale": c["scale"],
+                          "rotation": c["rotation"], "mirrored": c["mirrored"], "is_source": is_source})
+        entry.update(raw_count=len(cands), truncated=found["truncated"],
+                     top_scores=[c["score"] for c in cands if not c["is_source"]][:5], candidates=cands)
+        raw_pages.append(entry)
+    others = [c["score"] for e in raw_pages for c in e["candidates"] if not c["is_source"]]
+    reference = max(others) if others else None
+    floor = max(min_score, reference - margin) if reference is not None else min_score
+    for e in raw_pages:
+        kept: list[dict] = []
+        for c in sorted(e["candidates"], key=lambda c: (not c["is_source"], -c["score"])):
+            if not (c["is_source"] or c["score"] >= floor):
+                continue
+            # one symbol, one candidate: a shifted or rescaled hit whose centre lies inside a better one's box
+            # is the same symbol (objektas_h's slot diffuser: three hits along one 2 × 20 pt double line)
+            cx, cy = (c["box_pt"][0] + c["box_pt"][2]) / 2, (c["box_pt"][1] + c["box_pt"][3]) / 2
+            if any(k["box_pt"][0] <= cx <= k["box_pt"][2] and k["box_pt"][1] <= cy <= k["box_pt"][3] for k in kept):
+                continue
+            kept.append(c)
+        e["candidates"] = kept[:max_per_page]
+    out.update(pages=raw_pages, reference_score=reference, score_floor=round(floor, 4))
+    if out["partial"]:
+        out["detail"] = "ne visi lapai peržiūrėti per skirtą laiką — rasta tik dalis"
+    out["elapsed_s"] = round(time.monotonic() - started, 2)
+    return out
