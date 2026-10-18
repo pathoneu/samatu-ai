@@ -534,5 +534,54 @@ def tables_meta(res: dict) -> dict:
             "lenteles": tables, "ziniarasciai": schedules, "sekundes": res.get("sekundes")}
 
 
+# ── a room's row in a table (room facts, Patikra questions) ─────────────────
+
+
+def _nr_key(v) -> str:
+    return str(v or "").strip().upper()
+
+
+def row_for_room(rows: list[dict], room: dict) -> dict | None:
+    """The one table row that names this room: by its number (01 = 1), else by its name when the table gives
+    no numbers. Two rows that both fit say nothing — None, never a guess."""
+    from .universal_rules import fold_room_label
+    nr = _nr_key(room.get("nr"))
+    rows = [r for r in rows or [] if isinstance(r, dict)]
+    if nr:
+        hits = [r for r in rows if _nr_key(r.get("nr")) == nr]
+        if not hits and nr.lstrip("0"):
+            hits = [r for r in rows if _nr_key(r.get("nr")).lstrip("0") == nr.lstrip("0") and _nr_key(r.get("nr"))]
+        if len(hits) == 1:
+            return hits[0]
+        if hits:
+            return None
+    name = fold_room_label(str(room.get("pavadinimas") or ""))
+    if not name:
+        return None
+    hits = [r for r in rows if not _nr_key(r.get("nr")) and fold_room_label(str(r.get("pavadinimas") or "")) == name]
+    return hits[0] if len(hits) == 1 else None
+
+
+def finish_row_for(project: dict, room: dict) -> dict | None:
+    """This room's row of the finish schedule (`_apdailos_lentele`), or None."""
+    rec = project.get("_apdailos_lentele") if isinstance(project.get("_apdailos_lentele"), dict) else {}
+    return row_for_room(((rec.get("lentele") or {}).get("eilutes") or []), room)
+
+
+def room_table_row_for(project: dict, room: dict) -> dict | None:
+    """This room's row of the room table as the „lentelės" stage read it (`_meta.lenteles`), or None."""
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    eks = ((meta.get("lenteles") or {}).get("ziniarasciai") or {}).get("eksplikacija") or {}
+    return row_for_room(eks.get("rows") or [], room)
+
+
+def finish_sentence(row: dict) -> str:
+    """„Apdailos lentelėje (2 lapas): grindys — Keraminės plytelės; sienos — Dažomos; lubos — Dažomos."""
+    parts = [f"{lt} — {row[key]}" for key, lt in (("grindys", "grindys"), ("sienos", "sienos"), ("lubos", "lubos"),
+                                                    ("grindjuostes", "grindjuostės")) if row.get(key)]
+    return f"Apdailos lentelėje ({row.get('page')} lapas): " + "; ".join(parts) + "."
+
+
 __all__ = ["CANDIDATE_RE", "KINDS", "SCHEDULES_VERSION", "candidate_pages", "classify_table", "finish_record",
-           "read_schedules", "schedule_rows", "tables_meta", "windows_record"]
+           "finish_row_for", "finish_sentence", "read_schedules", "room_table_row_for", "row_for_room",
+           "schedule_rows", "tables_meta", "windows_record"]
