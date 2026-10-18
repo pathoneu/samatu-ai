@@ -180,19 +180,24 @@ def main() -> int:
                         kept_f += not ok
                 # the scores before the floor: re-run with margin 1 (keeps everything ≥ min_score)
                 s_all = batch_find_symbol(pdf, r["page"], box, pages, margin=1.0, max_per_page=300, time_budget_s=120.0)
+                t_scores: list[float] = []
+                f_scores: list[float] = []
                 for e in s_all["pages"]:
                     for c in [c for c in e["candidates"] if not c["is_source"]]:
                         ok = _centre_in(c["box_pct"], truth[e["page"]])
                         if ok:
                             raw_t += 1
                             best_t = max(best_t or 0, c["score"])
+                            t_scores.append(c["score"])
                         else:
                             raw_f += 1
                             best_f = max(best_f or 0, c["score"])
+                            f_scores.append(c["score"])
                 name = "" if args.no_labels else r["text"][:30]
                 print(f"   raster p{r['page']} {name}: vector {a['count']} | ≥min_score true {raw_t} false {raw_f} | "
                       f"best true {best_t} best false {best_f} | floor {s['score_floor']} kept true {kept_t} false {kept_f}"
                       f" | {time.time() - t3:.1f}s{' PARTIAL' if s['partial'] else ''}")
+                print(f"      true scores {sorted(t_scores, reverse=True)} | best false {sorted(f_scores, reverse=True)[:6]}")
             # black rows have no truth here: the score ranks on their own legend sheet show the separation
             for r in [r for r in rows if r["glyph_kind"] == "juodas" and r["countable"]][:3]:
                 w, h, rot = geo[r["page"] - 1]

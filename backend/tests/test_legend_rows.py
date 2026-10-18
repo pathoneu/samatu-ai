@@ -107,8 +107,16 @@ def test_one_long_stroke_is_a_length_sample_a_double_line_is_a_symbol():
     d.text(182, 664, "LED juosta")
     d.double_line(150, 673, 25, GREEN)
     d.text(182, 676, "Plyšinis difuzorius")
-    rows = lr.split_legend_rows(d.pdf(), 1, [140 / DW, 650 / DH, 400 / DW, 690 / DH])["rows"]
-    assert [(r["text"], r["countable"]) for r in rows] == [("LED juosta", False), ("Plyšinis difuzorius", True)]
+    path = d.c.beginPath()                                   # the same double line as ONE path object (objektas_h)
+    d.c.setLineWidth(0.6)
+    for off in (-1.0, 1.0):
+        path.moveTo(150, DH - 685 + off)
+        path.lineTo(175, DH - 685 + off)
+    d.c.drawPath(path, stroke=1, fill=0)
+    d.text(182, 688, "Plyšinis vienu keliu")
+    rows = lr.split_legend_rows(d.pdf(), 1, [140 / DW, 650 / DH, 400 / DW, 700 / DH])["rows"]
+    assert [(r["text"], r["countable"]) for r in rows] == [
+        ("LED juosta", False), ("Plyšinis difuzorius", True), ("Plyšinis vienu keliu", True)]
 
 
 @pytest.mark.parametrize("rotation", [90, 180, 270])

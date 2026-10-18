@@ -38,7 +38,7 @@ import re
 
 from .sheet_zones import (
     GLYPH_MAX_PT, GLYPH_MIN_PT, GLYPH_REACH_PT, LEGEND_HEADING_RE, MIN_TEXT_CHARS, SWATCH_MAX_H_PT, SWATCH_MAX_W_PT,
-    _is_number_phrase, display_frame, read_phrases, read_zones, zone_to_mediabox_pt,
+    _is_number_phrase, display_frame, read_phrases, read_zones, zone_at, zone_to_mediabox_pt,
 )
 
 log = logging.getLogger("samatu.legend_rows")
@@ -143,6 +143,10 @@ def read_marks(pdf_bytes: bytes, page: int, region: tuple[float, float, float, f
                             m["fill"] = _rgb((r.value, g.value, b.value))
                         if stroke_on.value and C.FPDFPageObj_GetStrokeColor(handle, r, g, b, a) and a.value:
                             m["stroke"] = _rgb((r.value, g.value, b.value))
+                        # how many pieces the path draws: a slot diffuser's two lines can be ONE path object
+                        m["subpaths"] = max(1, sum(
+                            1 for i in range(max(0, C.FPDFPath_CountSegments(handle)))
+                            if C.FPDFPathSegment_GetType(C.FPDFPath_GetPathSegment(handle, i)) == C.FPDF_SEGMENT_MOVETO))
                     out.append(m)
                     if len(out) > MAX_MARKS:
                         truncated = True
@@ -252,12 +256,13 @@ def _kind_and_colour(marks: list[dict]) -> tuple[str, str | None]:
 
 def _countable(box: tuple[float, float, float, float], marks: list[dict]) -> bool:
     """False for a sample of a length or an area, not a symbol: ONE stroke drawn thin and long (an LED strip, a
-    cable — objektas_d's „LED juosta" matched 1308 strokes; a slot diffuser is a DOUBLE line, two marks), or a
+    cable — objektas_d's „LED juosta" matched 1308 strokes; a slot diffuser is a DOUBLE line, two pieces even
+    when drawn as one path — objektas_h), or a
     filled box bigger than a symbol that is the whole glyph (a material swatch)."""
     w, h = box[2] - box[0], box[3] - box[1]
     long, short = max(w, h), min(w, h)
-    paths = [m for m in marks if not m["image"]]
-    if len(paths) == 1 and short <= COUNTABLE_THIN_PT and long >= LINE_SAMPLE_LONG_PT and long >= 3 * short:
+    pieces = sum(int(m.get("subpaths") or 1) for m in marks if not m["image"])
+    if pieces == 1 and short <= COUNTABLE_THIN_PT and long >= LINE_SAMPLE_LONG_PT and long >= 3 * short:
         return False
     if long > COUNTABLE_COMPACT_PT and any(_visible(m["fill"]) and (m["x1"] - m["x0"]) >= 0.8 * w
                                            and (m["bottom"] - m["top"]) >= 0.8 * h for m in marks):
@@ -480,7 +485,18 @@ def suggest_legend_rows(pdf_bytes: bytes, page: int, zones: list[dict] | None = 
             continue
         x0, y0, x1, y1 = zone["bbox_pct"]
         box = [max(0.0, x0 - ZONE_PAD), max(0.0, y0 - ZONE_PAD), min(1.0, x1 + ZONE_PAD), min(1.0, y1 + ZONE_PAD)]
-        legends.append({"zone": zone, **split_legend_rows(pdf_bytes, page, box)})
+        res = split_legend_rows(pdf_bytes, page, box)
+        # a legend zone that runs into the title block (objektas_a p9) must not turn its lines into rows
+        kept = []
+        for r in res["rows"]:
+            t = r["text_bbox_pct"]
+            z = zone_at(zones, (t[0] + t[2]) / 2, (t[1] + t[3]) / 2)
+            if z is None or z.get("kind") != "antspaudas":
+                kept.append(r)
+        if len(kept) < len(res["rows"]):
+            note = f"{len(res['rows']) - len(kept)} eil. antspaude — ne legendos eilutės"
+            res = {**res, "rows": kept, "detail": "; ".join(x for x in (res.get("detail"), note) if x)}
+        legends.append({"zone": zone, **res})
     return {"page": int(page), "status": "ok",
             "detail": None if legends else "šiame lape legendos nerasta — nubrėžkite rėmelį per ją",
             "legends": legends}
