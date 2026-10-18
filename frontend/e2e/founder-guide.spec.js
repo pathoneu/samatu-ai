@@ -344,18 +344,24 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveText('sujungta į 04');
   await expectKiekiai(page, [['Dažymo kampų montavimas', '489,76 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
   note('merge: 04 = 26,31 + 35,50 = 61,81 m² · lubos 143,27 · kampai 475,66 → 489,76');
-  // Recorded, not asserted (reported to the manager as an app bug): after the merge the room list's header and
-  // the server's floor-ratio checks add the absorbed 05 (35,50 m²) on top of 04's 61,81 m² — 178,77 m² of
-  // floor against 143,27 m² of ceiling, hence a false „Lubų plotas 0,80× grindų ploto".
-  const header = (await page.getByRole('button', { name: /^Patalpos 11 / }).innerText()).replace(/\s+/g, ' ');
-  const ratios = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
-  note(`[bug, recorded] after merge: „${header}" · ${ratios.join(' · ')}`);
+  // W1-F F1 (was recorded as a bug by W0-A): the totals outside the billed lines count 05's 35,50 m² once —
+  // inside 04 — so the room list's header stays 143,27 m² (not 178,77) and the server's floor-ratio checks
+  // say what they said before the merge (no false „Lubų plotas 0,80× grindų ploto", no „…sienų plotas 1,72×").
+  await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
+  const floorRatios = (p) => (p.lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
+  await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 }).toEqual(floorRatios(project));
+  note(`after merge: „Patalpos 11 143,27 m²" · checks as before the merge: ${floorRatios(project).join(' · ') || '—'}`);
 
   // „Atimti" (saved): a 2,06 m² column, „Kas atimama?" = kolona → 4 corners × 2,82 m
   await subtractColumn(page, await getProject());
   await expectKiekiai(page, [['Dažymo kampų montavimas', '501,04 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
   note('subtract 2,06 m² kolona: kampai 489,76 → 501,04 · lubos 143,27');
   await shot(page, '05-room-tools');
+  // W1-F F1: „Patalpų suvestinė" (Sąmata) adds the rooms the same way — 05 inside 04, once
+  await page.getByTestId('step-samata').click();
+  await page.getByTestId('samata-expand').click();
+  await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
+  note('Sąmata „Patalpų suvestinė": 11 patalpų · 143,27 m²');
 });
 
 test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async ({ page }) => {

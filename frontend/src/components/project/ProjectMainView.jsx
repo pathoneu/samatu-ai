@@ -49,6 +49,7 @@ import RowDetailPanel from './RowDetailPanel';
 import { ApplyAssembliesButton, KodasChip, priceSplitTitle, useAssemblies } from './RinkiniaiControls';
 import { effectiveKodas } from '@/lib/kodas';
 import { materialPriceNotes } from '@/lib/assemblyPricing';
+import { floorAreaTotal } from '@/lib/floorArea';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
@@ -678,10 +679,8 @@ export default function ProjectMainView({
   const reverseVat = isReverseVat(project);
   const vatPct = vatPercent(project);
 
-  const totalArea = useMemo(() => {
-    const rooms = project.v8_rooms || project.patalpos || [];
-    return rooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
-  }, [project]);
+  // A room merged into another is inside the room it joined (lib/floorArea) — never counted twice.
+  const totalArea = useMemo(() => floorAreaTotal(project.v8_rooms || project.patalpos || []), [project]);
 
   // Project-wide hidroizoliacijos plotas. Backend stores it on every room
   // (denormalized so any /recompute response carries it); read once.
