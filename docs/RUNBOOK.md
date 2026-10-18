@@ -272,8 +272,13 @@ From your laptop, with browser DevTools open:
 - **Uptime monitoring:** UptimeRobot free tier — ping every 5 min
   (`/health` is the backend health check path).
 - **Error tracking:** Sentry free tier (5k events/mo) — wire later if needed.
-- **Email:** until SMTP is set up, password reset is unavailable. For beta,
-  this is acceptable — users can register fresh.
+- **Email (v3 M2, 2026-10-18):** password reset and email verification are
+  built and provider-agnostic: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+  `SMTP_PASSWORD`, `SMTP_FROM` (any SMTP relay) plus `PATHON_APP_URL`
+  (the links point there). Until SMTP is set, nothing is sent and the login
+  page keeps the write-to-us link. Only after a test reset email arrives,
+  consider `SAMATU_REQUIRE_EMAIL_VERIFIED=1` (no session until the emailed
+  link is opened). Provider choice is the founder's.
 
 ## 8. Rollback plan
 
@@ -283,6 +288,39 @@ If a deploy breaks production:
 2. If rollback also broken: comment out the broken endpoint, redeploy.
 3. Worst case: pause Anthropic API key in console — paid endpoints stop
    returning, app stays available without AI.
+
+## 8a. Deploy checklist — a togal-v2 batch to `main` (v3 W7-A M10, 2026-10-18)
+
+Production today is **Vercel (`app.pathon.eu`) + Railway (`api.pathon.eu`), both auto-deploying from `main`** (Render above is the older path). Every step marked **[founder]** is the founder's: no worker pushes, merges or touches Railway / Vercel.
+
+**Before**
+
+1. **[founder]** Say OK for this batch. Nothing reaches `main` without it.
+2. Local gates on the batch head (a worker or the manager runs these and quotes the lines):
+   - `cd backend && SAMATU_AUTH_DISABLED=1 ../venv/bin/python -m pytest -q -p no:cacheprovider` — 0 failed;
+   - `cd frontend && npm run -s test:units && npm run -s lint && npm run -s build`;
+   - eval gate, both passes identical to the baseline: `venv/bin/python eval_harness.py --totals-only --recompute --gate` and `--rows --recompute --gate` (four passes incl. `--replay-geometry` when a lane changed) — `GATE OK`;
+   - `npm run test:e2e` against a local backend + Vite (DEVELOPING.md › Tests).
+3. Confidential terms over everything that becomes public with the push: `git diff origin/main...togal-v2 | grep '^+' | grep -v '^+++' | grep -i -F -f backend/.confidential-terms` and `git log origin/main..togal-v2 --format=%B | grep -i -F -f backend/.confidential-terms` must print nothing. Known: commit bad14b7's message carries a denylisted term — **[founder]** decide (rewrite that message or accept) before pushing.
+4. **[founder]** Environment, names only (values on the host, never in the repo) — new since `main`: `SMTP_HOST/PORT/USER/PASSWORD/FROM` (optional, email off without them), `SAMATU_REQUIRE_EMAIL_VERIFIED` (leave unset), `PATHON_APP_URL=https://app.pathon.eu` (emailed links, Google return, Checkout), `SAMATU_DATA_DIR` on the volume (symbol-training crops, telemetry, annotations, calibrations). Check: `BILLING_ENABLED` unset or `0`; `SAMATU_USER_DAILY_SPEND_EUR` > 0 is advised (audit -1).
+5. Database: every change is additive (`users.email_verified_at`, `email_tokens`), applied on boot; old code ignores them, so a rollback is safe. **[founder]** Make sure last night's R2 backup exists (admin cockpit „Atsarginė DB kopija" green) or take one.
+6. **[founder]** CI as a gate: open the PR `togal-v2 → main` and wait for `.github/workflows/ci.yml` to pass; turn on "Wait for CI" in Railway and Vercel and make the CI jobs required checks on `main` (both are settings only the founder can change). CI does not run the eval — step 2 does.
+7. **[founder]** Right before merging: `scripts/safe_deploy_check.sh` (needs the Railway CLI logged in) must print `✅ no extraction in flight` — a redeploy kills a running paid read.
+8. **[founder]** Merge. Railway and Vercel deploy on their own.
+
+**After — smoke on the production URLs (≈ 10 min, no paid read)**
+
+1. `curl -s https://api.pathon.eu/health` → 200 and `"commit"` = the merged head's short sha.
+2. `https://app.pathon.eu/` loads; log in; `/pagalba` opens; the sidebar shows „Pagalba".
+3. `/login` → „Pamiršote slaptažodį?": with SMTP set it opens the reset form, without it the write-to-us link — both are correct, depending on step 4.
+4. Open an existing project: the drawing renders, Patikra opens, „Nustatymai" opens and closes.
+5. Export Excel and PDF with PVM 21 % (and once at 9 %): the totals line says „PVM 9%:" and the sum matches the screen. Internal copy has „Pakeitimų žurnalas".
+6. `curl -s https://api.pathon.eu/api/billing/v2/status` → `"enabled": false`.
+7. Headers on an API response: `Strict-Transport-Security`, `Content-Security-Policy`, `X-Frame-Options: DENY`.
+
+**Rollback**: Railway → Deployments → the previous deployment → Redeploy; Vercel → Deployments → the previous production deployment → Promote to Production. Additive migrations mean the old code runs on the new database.
+
+Status 2026-10-18: written, not yet run on dev or prod (workers may not touch either); the local gates of step 2 are what W7-A ran.
 
 ## 9. Decommission / shutdown
 
