@@ -150,3 +150,24 @@ def test_dimension_strings_land_on_their_lines_in_the_display_frame(rotation):
         assert best is not None and best <= TEXT_TOL_PT, (d, best)
         back = _back_to_mediabox(d["bbox"], rotation, Wd, Hd)
         assert ORIGIN[1] + LOW_M * PT_PER_M - TEXT_TOL_PT <= back[1] <= H_A4 - 1, back   # turned back: low on the mediabox
+
+
+# ── what the zones see (sheet_zones refuses a reader whose frame is not the page's) ──
+
+@pytest.mark.parametrize("rotation", [90, 270])
+def test_sheet_zones_use_both_readers_on_a_turned_sheet_whose_drawing_stays_low(rotation):
+    """objektas_e's 17 sheets: the zones used to drop the text and the plan („rėmas nesutampa"); with the
+    frame from the page nothing is dropped and the plan zone lands on the walls."""
+    sz.clear()
+    try:
+        s = _low_sheet(rotation)
+        res = sz.read_zones(build_plan([s]), 1)
+        assert "nesutampa" not in str(res.get("detail") or ""), res["detail"]
+        plan = [z for z in res["zones"] if z["kind"] == "planas"]
+        assert len(plan) == 1, res["zones"]
+        Wd, Hd = res["width_pt"], res["height_pt"]
+        want = _to_display_pt(_union(_drawn_box(*w, s) for w in s.walls), rotation, Wd, Hd)
+        b = plan[0]["bbox_pct"]
+        _close([b[0] * Wd, b[1] * Hd, b[2] * Wd, b[3] * Hd], want, 0.02 * max(Wd, Hd))   # the zones' 2 % tolerance
+    finally:
+        sz.clear()
