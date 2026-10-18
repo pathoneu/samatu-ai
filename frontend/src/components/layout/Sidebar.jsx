@@ -14,7 +14,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
-  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard, Layers,
+  Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard, Layers, LifeBuoy,
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { useBilling } from '@/hooks/useBilling';
@@ -188,6 +188,13 @@ export default function Sidebar({ onNavigate = null }) {
             onClick={onNavigate}
           />
         )}
+        <NavBtn
+          to="/pagalba"
+          icon={LifeBuoy}
+          label={t('layout.nav.pagalba')}
+          isActive={location.pathname.startsWith('/pagalba')}
+          onClick={onNavigate}
+        />
         <NavBtn
           to="/settings"
           icon={Settings}

@@ -26,6 +26,7 @@ const Register = lazy(() => import('@/pages/Register'));
 const ForgotPassword = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.ResetPassword })));
 const VerifyEmail = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.VerifyEmail })));
+const Pagalba = lazy(() => import('@/pages/Pagalba'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const Cookies = lazy(() => import('@/pages/Cookies'));
 const Terms = lazy(() => import('@/pages/Terms'));
@@ -157,6 +158,7 @@ function App() {
                 <Route path="/billing/success" element={<BillingResult variant="success" />} />
                 <Route path="/billing/cancel" element={<BillingResult variant="cancel" />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/pagalba" element={<Pagalba />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Route>
               <Route path="*" element={<PageNotFound />} />

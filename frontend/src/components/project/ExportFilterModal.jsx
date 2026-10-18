@@ -257,7 +257,8 @@ export default function ExportFilterModal({
               [VAT_STANDARD, 'standard', 'standardDesc'],
               [VAT_REVERSE, 'reverse', 'reverseDesc'],
             ].map(([mode, label, desc]) => (
-              <label key={mode}
+              <div key={mode}>
+              <label
                 className="flex items-start gap-2.5 px-2 py-1.5 rounded hover:bg-muted/40 cursor-pointer transition-colors">
                 <input
                   type="radio"
@@ -272,21 +273,22 @@ export default function ExportFilterModal({
                   <span className="block text-[12px] text-muted-foreground">{t(`project.vatChoice.${desc}`, { rate: vatRate })}</span>
                 </span>
               </label>
+              {mode === VAT_STANDARD && vatMode === VAT_STANDARD && (
+                <div role="radiogroup" aria-label={t('project.vatChoice.rateTitle')}
+                  className="mt-1 ml-8 flex items-center gap-3 text-sm" data-testid="export-vat-rate">
+                  <span className="text-[12px] text-muted-foreground">{t('project.vatChoice.rateTitle')}</span>
+                  {VAT_RATES.map((rate) => (
+                    <label key={rate} className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" name="vat_rate" value={rate} checked={vatRate === rate}
+                        onChange={() => chooseRate(rate)} className="w-4 h-4 accent-foreground" />
+                      <span className="tabular-nums">{rate} %</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              </div>
             ))}
           </div>
-          {vatMode === VAT_STANDARD && (
-            <div role="radiogroup" aria-label={t('project.vatChoice.rateTitle')}
-              className="mt-1 ml-8 flex items-center gap-3 text-sm" data-testid="export-vat-rate">
-              <span className="text-[12px] text-muted-foreground">{t('project.vatChoice.rateTitle')}</span>
-              {VAT_RATES.map((rate) => (
-                <label key={rate} className="flex items-center gap-1 cursor-pointer">
-                  <input type="radio" name="vat_rate" value={rate} checked={vatRate === rate}
-                    onChange={() => chooseRate(rate)} className="w-4 h-4 accent-foreground" />
-                  <span className="tabular-nums">{rate} %</span>
-                </label>
-              ))}
-            </div>
-          )}
           {vatFromLabel && (
             <p className="mt-1 px-2 text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
               {t('project.vatChoice.fromLabel')}

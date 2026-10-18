@@ -61,3 +61,32 @@ export function coachCardPosition(rect, { vw, vh, cardW = 320, gap = 10, margin 
   const top = rect.bottom + gap;
   return { left, top, arrowLeft: Math.min(Math.max(14, centre - left), cardW - 14) };
 }
+
+/** „Rodyti įvadą dar kartą" (Pagalba): the next opened drawing shows the walkthrough again. */
+export function resetCoachMarks(storage) {
+  try { store(storage)?.removeItem(COACH_STORAGE_KEY); } catch { /* private mode */ }
+}
+
+/**
+ * A dialog, drawer or full-screen overlay is open (v3 W7-A M6). The walkthrough
+ * sits on the coach layer (z-coach 60, above the modal layer 50) so it can point
+ * at toolbar buttons — which means it would cover a dialog. While one is open the
+ * card and its ring step aside (same step afterwards) and Esc belongs to the
+ * dialog. Radix dialogs / sheets / alert dialogs announce themselves; the app's
+ * hand-made overlays are `fixed inset-0` on the modal layer.
+ */
+export const MODAL_SELECTOR = [
+  '[role="dialog"][data-state="open"]',
+  '[role="alertdialog"]',
+  '[aria-modal="true"]',
+  '.fixed.inset-0.z-50',
+  '.fixed.inset-0.z-modal',
+].join(', ');
+
+export function modalOpen(doc = (typeof document !== 'undefined' ? document : null)) {
+  try {
+    return !!doc?.querySelector?.(MODAL_SELECTOR);
+  } catch {
+    return false;
+  }
+}

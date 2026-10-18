@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COACH_STEPS, COACH_STORAGE_KEY, coachMarksDone, markCoachMarksDone, coachCardPosition } from './viewerCoachMarks.js';
+import { COACH_STEPS, COACH_STORAGE_KEY, coachMarksDone, markCoachMarksDone, coachCardPosition, modalOpen, MODAL_SELECTOR } from './viewerCoachMarks.js';
 
 const memStore = () => {
   const m = new Map();
@@ -42,4 +42,15 @@ test('card sits under its anchor and stays inside the viewport', () => {
   assert.ok(edge.left + 320 <= 1280 - 12 + 0.001);
   const none = coachCardPosition(null, { vw: 1280, vh: 800 });
   assert.equal(none.arrowLeft, null);
+});
+
+test('the walkthrough steps aside while a dialog or overlay is open (v3 M6)', () => {
+  const docWith = (hit) => ({ querySelector: (sel) => { assert.equal(sel, MODAL_SELECTOR); return hit; } });
+  assert.equal(modalOpen(docWith({})), true);
+  assert.equal(modalOpen(docWith(null)), false);
+  assert.equal(modalOpen({ querySelector: () => { throw new Error('bad selector'); } }), false);
+  assert.equal(modalOpen(null), false);
+  for (const part of ['[role="dialog"][data-state="open"]', '[role="alertdialog"]', '.fixed.inset-0.z-50']) {
+    assert.ok(MODAL_SELECTOR.includes(part), part);
+  }
 });
