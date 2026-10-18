@@ -434,5 +434,105 @@ def read_schedules(pdf_bytes: bytes, pages: Iterable[int] | None = None, *, max_
     return out
 
 
-__all__ = ["CANDIDATE_RE", "KINDS", "SCHEDULES_VERSION", "candidate_pages", "classify_table", "read_schedules",
-           "schedule_rows"]
+# ── the records a project stores (api/free_reread.py, the „lentelės" stage) ──
+
+
+def _lt(n: int, one: str, few: str, many: str) -> str:
+    """„1 langas", „3 langai", „11 langų" (api/detect_run._lt, lib/ltPlural.js)."""
+    last, last_two = n % 10, n % 100
+    word = many if (10 <= last_two <= 19 or last == 0) else one if last == 1 else few
+    return f"{n} {word}"
+
+
+def _size(r: dict) -> str:
+    return f"{r['plotis_mm']}×{r['aukstis_mm']}" if r.get("plotis_mm") and r.get("aukstis_mm") else ""
+
+
+def _pages_word(pages: list[int]) -> str:
+    return (f"{pages[0]} lapas" if len(pages) == 1 else "lapai " + ", ".join(str(p) for p in pages))
+
+
+_ROW_KEYS = {
+    "langai": ("kodas", "plotis_mm", "aukstis_mm", "tipas_tekstas", "kiekis", "pastaba", "page", "bbox_pct"),
+    "apdaila": ("nr", "pavadinimas", "grindys", "sienos", "lubos", "grindjuostes", "grindu_danga", "page", "bbox_pct"),
+}
+
+
+def _no_table(res: dict, what: str) -> str:
+    if res.get("status") == "no_text":
+        return "Brėžinio lapuose nėra teksto sluoksnio — lentelių programa perskaityti negali."
+    return f"{what} brėžinyje nerasta."
+
+
+def windows_record(res: dict, pdf_bytes: bytes | None = None) -> dict:
+    """`_langu_ziniarastis`: {status: lentele|nera, pages, lentele: {page, bbox_pct, pages, saltinis, eilutes:
+    [{kodas, plotis_mm, aukstis_mm, tipas_tekstas, kiekis, kiekis_saltinis, pastaba, page, bbox_pct}]}, kiekis,
+    sakinys}. A row without a count column is counted where its code stands on the drawing (door_schedule's
+    rule); a code standing nowhere counts once."""
+    sched = (res.get("ziniarasciai") or {}).get("langai")
+    if not sched or not sched.get("rows"):
+        return {"status": "nera", "pages": [], "lentele": None, "kiekis": 0,
+                "sakinys": _no_table(res, "Langų žiniaraščio")}
+    texts: list[str] = []
+    if pdf_bytes is not None:
+        try:
+            from .pdf_page_cache import page_texts
+            texts = [t or "" for t in page_texts(pdf_bytes)]
+        except Exception:  # noqa: BLE001
+            texts = []
+    rows = []
+    for r in sched["rows"]:
+        row = {k: r.get(k) for k in _ROW_KEYS["langai"]}
+        row["kiekis_saltinis"] = "lentele" if row.get("kiekis") is not None else "planas"
+        if row.get("kiekis") is None:
+            from .door_schedule import _count_on_plans
+            row["kiekis"] = max(1, _count_on_plans(str(row["kodas"]), texts, int(row.get("page") or 0))) if texts else 1
+        rows.append(row)
+    total = sum(int(r.get("kiekis") or 0) for r in rows)
+    parts = [" ".join(x for x in (r["kodas"], _size(r), f"×{r['kiekis']}") if x) for r in rows]
+    sentence = (f"Langų žiniaraštyje ({_pages_word(sched['pages'])}): " + ", ".join(parts)
+                + f" — iš viso {_lt(total, 'langas', 'langai', 'langų')}.")
+    return {"status": "lentele", "pages": list(sched["pages"]),
+            "lentele": {"page": sched["page"], "pages": list(sched["pages"]), "bbox_pct": sched.get("bbox_pct"),
+                        "saltinis": "lentele", "pavadinimas": sched.get("title"), "eilutes": rows},
+            "kiekis": total, "sakinys": sentence}
+
+
+def finish_record(res: dict) -> dict:
+    """`_apdailos_lentele`: {status: lentele|nera, pages, lentele: {page, bbox_pct, pages, saltinis, eilutes: [{nr,
+    pavadinimas, grindys, sienos, lubos, grindjuostes, grindu_danga, page, bbox_pct}]}, sakinys}."""
+    sched = (res.get("ziniarasciai") or {}).get("apdaila")
+    if not sched or not sched.get("rows"):
+        return {"status": "nera", "pages": [], "lentele": None, "sakinys": _no_table(res, "Apdailos lentelės")}
+    rows = [{k: r.get(k) for k in _ROW_KEYS["apdaila"]} for r in sched["rows"]]
+    said = [lt for key, lt in (("grindys", "grindys"), ("sienos", "sienos"), ("lubos", "lubos"),
+                               ("grindjuostes", "grindjuostės")) if any(r.get(key) for r in rows)]
+    sentence = (f"Apdailos lentelėje ({_pages_word(sched['pages'])}) — {_lt(len(rows), 'patalpa', 'patalpos', 'patalpų')}"
+                + (": " + ", ".join(said) + "." if said else "."))
+    return {"status": "lentele", "pages": list(sched["pages"]),
+            "lentele": {"page": sched["page"], "pages": list(sched["pages"]), "bbox_pct": sched.get("bbox_pct"),
+                        "saltinis": "lentele", "pavadinimas": sched.get("title"), "eilutes": rows},
+            "sakinys": sentence}
+
+
+def tables_meta(res: dict) -> dict:
+    """`_meta.lenteles`: what the stage read — every table found (a summary: where it stands, its title and header,
+    which schedule it is) and every schedule with its rows and boxes."""
+    tables = {}
+    for page, ts in (res.get("lenteles") or {}).items():
+        tables[page] = [{"table_id": t.get("table_id"), "page": t.get("page"), "bbox_pct": t.get("bbox_pct"),
+                         "title": t.get("title"), "header": t.get("header"), "cols": t.get("cols"),
+                         "eilutes": len(t.get("rows") or []), "ziniarastis": t.get("schedule")} for t in ts]
+    schedules = {}
+    for kind, s in (res.get("ziniarasciai") or {}).items():
+        if not s:
+            continue
+        schedules[kind] = {k: s.get(k) for k in ("kind", "title", "page", "pages", "table_ids", "bbox_pct", "columns",
+                                                 "tesinys", "eilutes", "rows", "totals")}
+    return {"versija": res.get("versija", SCHEDULES_VERSION), "status": res.get("status"), "detail": res.get("detail"),
+            "lapai": list(res.get("lapai") or []), "praleisti": dict(res.get("praleisti") or {}),
+            "lenteles": tables, "ziniarasciai": schedules, "sekundes": res.get("sekundes")}
+
+
+__all__ = ["CANDIDATE_RE", "KINDS", "SCHEDULES_VERSION", "candidate_pages", "classify_table", "finish_record",
+           "read_schedules", "schedule_rows", "tables_meta", "windows_record"]
