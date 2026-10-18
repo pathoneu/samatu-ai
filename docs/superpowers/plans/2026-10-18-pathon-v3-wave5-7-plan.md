@@ -15,7 +15,7 @@
 | SKIP | It is outside interior finishing (hidden types stay hidden), US-format specific, decoration, a chat/agent feature beyond Pokalbis, or a parity-only marketing feature |
 | FOUNDER DECISION | Multi-user, roles, collaboration, the pro-layer switch |
 
-**Engine rule.** Table 2 gaps become INPUT or REMINDER tasks. Any edit to `universal_rules.py`, `vision_call.py`, `line_items.py` or a lane belongs to the manager and follows the "measured" protocol:
+**Engine rule.** Table 2 gaps become INPUT or REMINDER tasks. Any edit to `universal_rules.py`, `vision_call.py`, `line_items.py` or a lane is written by the worker and approved by the manager under the "measured" protocol (the manager never edits code — the founder's rule):
 - behind a flag, default off;
 - four eval passes (`--totals-only` and `--rows`, each with `--recompute --gate`, plus the `--replay-geometry` pair);
 - deltas reported per codename;
@@ -194,24 +194,24 @@
 
 ## Track W5-E — Calculation completeness, interior only (`v3/calc-completeness`, 8138 / 5218)
 
-**Engine rule (repeated).** The worker writes inputs, notices and tests. Engine edits are the manager's and follow the measured protocol above. Formulas come only from CLAUDE.md §1; no factor or default is ever taken from the contractor's sąmata.
+**Engine rule (repeated).** The worker writes inputs, notices and tests. Engine diffs are written by the worker behind a flag and approved by the manager under the measured protocol above. Formulas come only from CLAUDE.md §1; no factor or default is ever taken from the contractor's sąmata.
 
 **Files**
 - New backend: `extractor/reminders.py` (pure, €0), `api/reminders.py` (`GET …/reminders`, owner first), tests.
 - Frontend: `RoomSheet.jsx`, `FactRow.jsx` (inputs); the Notice component in Patikra and Sąmata.
-- Engine side (manager): `universal_rules.py`, `vision_call.py`.
+- Engine side (worker writes, manager approves): `universal_rules.py`, `vision_call.py`.
 
 **Tasks**
 - [ ] **E1** [T2-1.1-furniture, T2-1.1-panel] INPUT: furniture and panel zones per room.
   - Source: a box the user draws on an elevation or plan, or the built-in-furniture text.
   - Output: `_baldu_zonos_m2` and `_plokstes_zonos_m2`, each with its crop.
-  - The CLAUDE.md §1.1 deduction is the manager's (flag `SAMATU_FURNITURE_ZONES=0`).
+  - The CLAUDE.md §1.1 deduction is written behind flag `SAMATU_FURNITURE_ZONES=0` and approved by the manager.
 - [ ] **E2** [T2-1.9, T2-W-wallpaper] Wallpaper rolls = ⌈area / usable area per roll⌉ (CLAUDE.md §1.9; the constant exists), with §3 waste.
   - Applies to rooms whose finish reads „tapetai"; the input is the tapetai m² already read.
-  - Engine edit by the manager behind a flag.
-- [ ] **E3** [T2-1.5] INPUT: niche depth (`nisos_gylis_m`) from the ceiling-plan detail, or typed. The term length × depth × 3 is added by the manager behind a flag.
+  - Engine edit behind a flag, approved by the manager.
+- [ ] **E3** [T2-1.5] INPUT: niche depth (`nisos_gylis_m`) from the ceiling-plan detail, or typed. The term length × depth × 3 is added behind a flag and approved by the manager.
 - [ ] **E4** [T2-1.13] Data and TV outlets: the legend rows „Interneto lizdas" and „TV lizdas" (W2-A) get their own sąmata rows through W2-B's count → row path. A blank row with a question appears when the legend has no such row.
-- [ ] **E5** [T2-1.14] A bathtub row from the sanitary reader's existing `vonia` count. Floor drains (trapai) come from legend counts (W2-A); no paid prompt change. Both rows are added by the manager behind a flag.
+- [ ] **E5** [T2-1.14] A bathtub row from the sanitary reader's existing `vonia` count. Floor drains (trapai) come from legend counts (W2-A); no paid prompt change. Both rows are added behind a flag and approved by the manager.
 - [ ] **E6** [T2-1.10, T2-1.11] Packaging shown beside the Medžiagos quantity: „N maišų po 25 kg", „N kibirų po 10 l". The container size is a visible assumption in Nustatymai. Kilograms and litres are unchanged.
 - [ ] **E7** [T2-1.6, T2-W-herringbone, T2-W-hex, T2-W-paint] Measured:
   - flag `SAMATU_WASTE_BY_PATTERN=0` wires `UNIVERSAL_RULES["waste_factors"]` by the read pattern (tile spec, floor plan) instead of the fixed 1,08 / 1,10;
@@ -238,7 +238,7 @@
 - [ ] **G4** The look itself (#147 dark frame, any palette change) waits for the founder („set the look later"). Prepare two screenshots and merge nothing.
 - [ ] **G5** Verify: `npm run probe:ui` no worse; units, lint, build; W0-A smoke green.
 
-## Track W7-A — Market readiness (`v3/market-readiness`, 8140 / 5220)
+## Track W7-A — Market readiness (`v3/market-readiness`, 8141 / 5221)
 
 Each item has three parts: the fact (coverage §3), the task, how it is verified.
 
@@ -251,7 +251,7 @@ Each item has three parts: the fact (coverage §3), the task, how it is verified
   - Task: the founder picks the provider; then verification email, password reset, and OAuth requiring `email_verified`.
   - Verify: tests.
 - [ ] **M3** Security -14 and -21, plus a re-audit.
-  - Facts: the architect legend routes are global (`api/legends.py:141,156`) and must be scoped per owner before W2-B B4 reuses them; `stored_at` is returned at `api/calibrate.py:274`.
+  - Facts: the architect legend routes are global (`api/legends.py:141,156`) and must be scoped per owner before W2-B B4 reuses them — **-14 is fixed in W2-A** (it already edits `api/legends.py`; M3 only verifies it); `stored_at` is returned at `api/calibrate.py:274`.
   - Task: fix both; re-audit the 12 unknowns (-4, -5, -6, -8, -10, -11, -12, -15, -16, -17, -18, -19) with a fixed / still-open line each.
   - Verify: ownership-policy test and new tests.
 - [ ] **M4** PVM.

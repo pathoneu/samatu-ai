@@ -59,7 +59,7 @@ Demo projects: `http://localhost:<VITE_PORT>/project/demo-objektas_h` (vector PD
 | W5-D reading completeness (floor-covering legend, zone-aware counts, Vision fallbacks behind OK, figures + heights in the free re-read, scale per viewport, tags, hatch search, multi-PDF intake) | `v3/reading-completeness` | 8137 | 5217 | 5 |
 | W5-E calculation completeness, interior only (inputs and reminders; engine edits by the manager behind flags, measured) | `v3/calc-completeness` | 8138 | 5218 | 5 |
 | W6-A look hygiene (`.dark` / `dark:` / `[hsl(var())]` codemod, ✨ leftovers, room-name rows; the look itself waits for the founder) | `v3/look-hygiene` | 8139 | 5219 | 6 |
-| W7-A market readiness (billing checklist, email, security -14/-21 + re-audit, PVM in exports, help, limits, data, accuracy claims, deploy plan) | `v3/market-readiness` | 8140 | 5220 | 7 |
+| W7-A market readiness (billing checklist, email, security -14/-21 + re-audit, PVM in exports, help, limits, data, accuracy claims, deploy plan) | `v3/market-readiness` | 8141 | 5221 | 7 |
 
 Wave-1 rows are briefed only after the wave-1 implementation plan is written and reviewed; W1-B/C/D branch off W1-A once its frame is merged (they all touch the viewer). Waves 5–7 (and W1-F): `docs/superpowers/plans/2026-10-18-pathon-v3-wave5-7-plan.md`, which homes every UNPLANNED row of `2026-10-18-pathon-v3-coverage.md`.
 
