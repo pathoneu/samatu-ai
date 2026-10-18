@@ -8,8 +8,9 @@
  * viewer already had (the old toolbar's room buttons, the right-click menu's items); the bar only moves
  * them to where the eye is. Never hover-only: icon and word on every button, the key in its title.
  *
- * Placement (lib/selectionPlacement): right above the room's label or the mark, never on it; docked at
- * the top centre when the selection is off screen. `anchor` is the box from useChromeRects.
+ * Placement (lib/selectionPlacement): pinned at the top centre under the chrome's top row (the viewer passes
+ * no anchor — a bar standing next to the room covered the neighbour he clicks next); never on the selected
+ * label or the chrome's own cards (`avoid`). With an `anchor` it would stand right above it instead.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Pentagon, Scissors, Combine, SquareDashed, CircleSlash, FileSearch, MoreHorizontal, SquarePen, Pencil, Shapes, ListTree, Trash2, X } from 'lucide-react';

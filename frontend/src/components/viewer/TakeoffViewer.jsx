@@ -1603,12 +1603,15 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   <ModePill pill={pill} onAction={onPillAction} />
                 </div>
               )}
-              {/* The selected room's or marks' actions, right above the label (lib/selectionPlacement). */}
+              {/* The selected room's or marks' actions, pinned under the top row of cards (Kreo's fly-menu default):
+                  measured on demo-objektas_h at 1280 px, a bar standing next to the room covered the neighbour he
+                  Shift+clicks next — the click pressed „Padalyti" instead. Pinned, it never moves under the cursor;
+                  it steps below the selected label if that label is up there (lib/selectionPlacement). */}
               {(barRoomActions || barMarks) && (
                 <SelectionBar
                   frame={chromeRects.frame}
-                  anchor={chromeRects.rects.anchor}
-                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip].filter(Boolean)}
+                  anchor={null}
+                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip, chromeRects.rects.label, chromeRects.rects.anchor].filter(Boolean)}
                   insetLeft={check ? 8 : RAIL_WIDTH + 16}
                   room={barRoomActions}
                   marks={barRoomActions ? null : barMarks}

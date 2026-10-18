@@ -193,7 +193,7 @@ test.describe('click model and chrome', () => {
     await expect(page.locator('[data-sonner-toast]').filter({ hasText: /^Plotas: / })).toBeVisible();
   });
 
-  test('the selection bar stands above the selected room with icon and text; the legend never covers the label', async ({ page }) => {
+  test('the selection bar is pinned under the top cards with icon and text, never on the label; the legend never covers the label', async ({ page }) => {
     await openProject(page);
     await focusRoom(page, '02');
     const bar = page.getByTestId('selection-bar');
@@ -201,6 +201,9 @@ test.describe('click model and chrome', () => {
     const label = await box(page.locator('[data-room-label="02"]'));
     const b = await box(bar);
     expect(overlaps(b, label), 'the bar is not on the label').toBe(false);
+    for (const card of ['[data-nav-cluster]', '[data-canvas-header]']) {
+      expect(overlaps(b, await box(page.locator(card))), `the bar is not on ${card}`).toBe(false);
+    }
     for (const id of ['outline-edit-start', 'outline-tool-split', 'outline-tool-merge', 'outline-tool-subtract', 'selection-exclude', 'selection-evidence']) {
       const btn = bar.getByTestId(id);
       await expect(btn).toBeVisible();
