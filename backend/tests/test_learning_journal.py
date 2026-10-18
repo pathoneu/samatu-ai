@@ -55,6 +55,15 @@ def test_rooms_outlines_questions_symbols_and_chat():
         "Patalpa 02: patalpą sujungėte su kita"
     assert sentence_for({"source": "konturas", "room_nr": "05", "new_value": None}) == \
         "Patalpa 05: kontūrą pataisėte ranka"
+    # „Atšaukti" after an outline save (Pathon v3 W1-D): what was undone
+    assert sentence_for({"source": "atsaukta", "room_nr": "04", "new_value": {"atsaukta": "konturas"}}) == \
+        "Patalpa 04: kontūro pakeitimą atšaukėte"
+    assert sentence_for({"source": "atsaukta", "room_nr": "05", "new_value": {"atsaukta": "sujungimas"}}) == \
+        "Patalpa 05: patalpų sujungimą atšaukėte"
+    assert sentence_for({"source": "atsaukta", "room_nr": "04", "new_value": {"atsaukta": "padalijimas"}}) == \
+        "Patalpa 04: erdvės padalijimą atšaukėte"
+    assert sentence_for({"source": "atsaukta", "room_nr": "04", "new_value": None}) == \
+        "Patalpa 04: pakeitimą atšaukėte"
     assert sentence_for({"source": "patalpa_patvirtinta", "room_nr": "03", "new_value": 10.12}) == \
         "Patalpa 03: plotą 10,12 m² patvirtinote"
     assert sentence_for({"source": "klausimas_tinka", "note": "erdve:03-04"}) == \

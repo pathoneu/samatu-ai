@@ -54,6 +54,8 @@ export const VIEWER_SHORTCUTS = [
   { id: 'countRemove', group: 'measure', bound: 'mouse', label: 'Kiekio įrankiu — pašalinti tą žymę', display: 'Spustelėti ant žymės' },
 
   // ── Kontūro taisymas
+  // Pathon v3 W1-D: the room tool — one click inside a room, its outline off the walls, proposed then saved.
+  { id: 'toolRoom', group: 'outline', bound: 'hotkeys', label: 'Patalpa — kontūras vienu spustelėjimu patalpos viduje', combos: [{ keys: ['r', 'R'] }] },
   { id: 'outlineDrag', group: 'outline', bound: 'mouse', label: 'Perkelti viršūnę (prilimpa prie sienų)', display: 'Tempti kampą' },
   { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti vidurio tašką' },
   { id: 'outlineRemove', group: 'outline', bound: 'mouse', label: 'Pašalinti viršūnę', display: 'Dukart spustelėti kampą' },

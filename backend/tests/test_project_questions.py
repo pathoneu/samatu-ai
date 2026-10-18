@@ -225,7 +225,9 @@ def test_a_room_left_out_of_the_estimate_asks_nothing():
 
 
 def test_questions_come_in_the_order_that_lets_one_answer_settle_the_next():
-    assert ORDER == ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "grindys", "apdaila")
+    # the schedule questions (Pathon v3 W3-A, `lenteles=True`) stand beside the kind they check
+    assert ORDER == ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "lentele_durys",
+                     "lentele_langai", "grindys", "lentele_apdaila", "apdaila", "lentele_suma")
     rooms = [
         _quiet("01", _tile_read_source="none", grindu_danga=None, grindu_danga_saltinis=None, elementai=[],
                lubu_aukstis_saltinis="default_fallback", perimetras_m=None, _perimetras_ivertis_m=9.0,
