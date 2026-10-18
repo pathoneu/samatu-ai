@@ -1042,10 +1042,11 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
   return (
     // The project frame (Pathon v3, design §3/§6): top bar, step rail, the workspace, the step's own exit —
-    // exactly one screen high, so the step's one big button is always on screen and nothing scrolls the
-    // top bar away. The workspace is mounted ONCE for all four steps: a step changes how much of the width
-    // the drawing gets and what the right panel shows, never the drawing itself.
-    <div className="flex flex-col h-[calc(100dvh-3.5rem)] md:h-screen min-h-[560px]" data-testid="project-frame" data-view={step}>
+    // exactly one screen high on a desktop (md+), so the step's one big button is always on screen and
+    // nothing scrolls the top bar away; a phone (view-only) keeps the page scroll and a tall workspace. The
+    // workspace is mounted ONCE for all four steps: a step changes how much of the width the drawing gets
+    // and what the right panel shows, never the drawing itself.
+    <div className="flex flex-col md:h-screen md:min-h-[560px]" data-testid="project-frame" data-view={step}>
       <ProjectTopBar
         project={project}
         totalNet={totalNet}
@@ -1075,7 +1076,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       <InteriorWorkspace
         project={project}
         view={step}
-        className="flex-1 min-h-0"
+        className="flex-1 min-h-[640px] md:min-h-0"
         focusedPage={focusedPage}
         focusedRoom={focusedRoom}
         onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
