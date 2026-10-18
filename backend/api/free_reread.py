@@ -92,6 +92,30 @@ def api_free_reread_status(request: Request, project_id: str):
     }
 
 
+def zone_pages(lane: dict) -> list[int]:
+    """The sheets the lane read the plan on — its alignment groups, the sheets it traced, the floor sheets —
+    whose zones the re-read stores. Every other sheet's zones are one GET away (api/sheet_zones.py): a
+    whole 65-sheet drawing is ~40 s of zone reading (objektas_b), too much to add to every re-read."""
+    pages: set[int] = set()
+    for group in lane.get("grupes") or []:
+        pages.update(int(p) for p in group)
+    pages.update(int(p) for p in lane.get("lapai") or [])
+    pages.update(int(p) for p in (lane.get("grindu_dangos") or {}).get("lapai") or [])
+    return sorted(p for p in pages if p >= 1)
+
+
+def _store_zones(parsed: dict, pdf_bytes: bytes, lane: dict, project_id) -> None:
+    """`_meta.zonos` = {"<page>": [zone, …]} for the lane's sheets (extractor/sheet_zones.py). An ADDITION:
+    no room key changes, `LANE_VERSION` stays, and the browser's merge (lib/freeReread.js) takes only
+    `_meta.geometrija`, so nothing lands on the stored project from here in this wave. Never fails the read."""
+    try:
+        from extractor.sheet_zones import REREAD_TABLE_MAX_OBJECTS, zones_for_pages
+        parsed.setdefault("_meta", {})["zonos"] = zones_for_pages(pdf_bytes, zone_pages(lane),
+                                                                  table_max_objects=REREAD_TABLE_MAX_OBJECTS)
+    except Exception as exc:  # noqa: BLE001 — zones are extra evidence, never the reason a re-read fails
+        log.warning("free-reread sheet zones failed for %s: %r", project_id, exc)
+
+
 def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, then the
     drawing's door schedule and its vector symbols — answered in the shape POST /free-reread returns. Saves
@@ -126,6 +150,7 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         vector_symbols = scan_vector_symbols(pdf_bytes)
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
+    _store_zones(parsed, pdf_bytes, out, project.get("id"))
     return {
         "status": "ok",
         "lane": out.get("status"),

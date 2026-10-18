@@ -228,7 +228,7 @@ def test_a_second_read_of_the_same_page_is_cached(monkeypatch):
     pdf = build_plan([_full_sheet()])
     calls = []
     real = sz._detect
-    monkeypatch.setattr(sz, "_detect", lambda b, p: calls.append(p) or real(b, p))
+    monkeypatch.setattr(sz, "_detect", lambda b, p, cap=None: calls.append(p) or real(b, p, cap))
     first = sz.read_zones(pdf, 1)
     second = sz.read_zones(pdf, 1)
     assert calls == [1] and first == second

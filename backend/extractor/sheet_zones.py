@@ -45,6 +45,7 @@ glyph reader below takes it itself). Results are cached per PDF digest and page.
 from __future__ import annotations
 
 import collections
+import copy
 import hashlib
 import io
 import logging
@@ -74,7 +75,9 @@ TABLE_MIN_COLS = 2
 TABLE_MAX_PAGE_SHARE = 0.45  # a ruled box bigger than this is the sheet's frame, not a table
 TABLE_MIN_FILLED = 0.30      # share of cells with text — wall lines drawn as boxes make empty „tables"
 TABLE_MIN_TEXT_ROWS = 3
-TABLE_MAX_OBJECTS = 150_000  # a sheet drawing more objects is not laid out for tables (see _detect)
+TABLE_MAX_OBJECTS = 150_000  # a sheet drawing more objects is not laid out for tables (see _detect)…
+REREAD_TABLE_MAX_OBJECTS = 40_000   # …and in the free re-read, which reads every plan sheet at once, this many
+                                    # (objektas_g: 50–60 k objects a sheet, 3,8 s of pdfplumber layout each, no table)
 TABLE_IN_PLAN_FILLED = 0.7   # a ruled grid inside a plan's walls is the walls, unless nearly every cell has text
 GLYPH_MAX_PT = 12.0          # a legend glyph: a drawn mark at most this big (≈ 4 mm)…
 GLYPH_MIN_PT = 2.0           # …and at least this (a hatch dot is no glyph)…
@@ -683,7 +686,7 @@ def _plan_label(b, phrases, H) -> str | None:
     return best[1] if best else None
 
 
-def _detect(pdf_bytes: bytes, page: int) -> dict:
+def _detect(pdf_bytes: bytes, page: int, table_max_objects: int | None = None) -> dict:
     from .pdf_vectors import page_geometry, page_paths
     frame = display_frame(pdf_bytes, page)
     base = {"page": int(page), "width_pt": 0.0, "height_pt": 0.0, "rotation": 0,
@@ -712,7 +715,7 @@ def _detect(pdf_bytes: bytes, page: int) -> dict:
 
     tables: list[dict] = []
     if n_chars >= MIN_TEXT_CHARS:
-        if n_objects <= TABLE_MAX_OBJECTS:
+        if n_objects <= (TABLE_MAX_OBJECTS if table_max_objects is None else table_max_objects):
             tables = _tables(pdf_bytes, page, W, H)
         else:
             # pdfplumber lays out every object to find ruled tables: objektas_b's hatched sheets (200–300 k
@@ -818,24 +821,26 @@ def _detect(pdf_bytes: bytes, page: int) -> dict:
     return {**base, "zones": zones}
 
 
-def _key(pdf_bytes: bytes, page: int) -> tuple[bytes, int, int]:
-    return (hashlib.blake2b(pdf_bytes, digest_size=16).digest(), int(page), ZONES_VERSION)
+def _key(pdf_bytes: bytes, page: int, cap: int) -> tuple[bytes, int, int, int]:
+    return (hashlib.blake2b(pdf_bytes, digest_size=16).digest(), int(page), ZONES_VERSION, int(cap))
 
 
-def read_zones(pdf_bytes: bytes, page: int) -> dict:
+def read_zones(pdf_bytes: bytes, page: int, *, table_max_objects: int | None = None) -> dict:
     """{page, width_pt, height_pt, rotation, versija, status: ok|no_text|no_page|failed, detail, zones} for a
-    1-based page. Cached per PDF digest and page; never raises."""
+    1-based page. Cached per PDF digest, page and table cap; never raises. `table_max_objects`: lay out for
+    tables only a sheet drawing at most this many objects (default TABLE_MAX_OBJECTS)."""
     if not pdf_bytes or int(page) < 1:
         return {"page": int(page), "width_pt": 0.0, "height_pt": 0.0, "rotation": 0, "versija": ZONES_VERSION,
                 "zones": [], "status": "no_page", "detail": "tokio lapo brėžinyje nėra"}
-    key = _key(pdf_bytes, page)
+    cap = TABLE_MAX_OBJECTS if table_max_objects is None else int(table_max_objects)
+    key = _key(pdf_bytes, page, cap)
     with _cache_lock:
         hit = _cache.get(key)
         if hit is not None:
             _cache.move_to_end(key)
-            return hit
+            return copy.deepcopy(hit)
     try:
-        res = _detect(pdf_bytes, int(page))
+        res = _detect(pdf_bytes, int(page), cap)
     except Exception as exc:  # noqa: BLE001 — a zone reading never sinks its caller
         log.warning("sheet zones failed on page %s: %r", page, exc)
         return {"page": int(page), "width_pt": 0.0, "height_pt": 0.0, "rotation": 0, "versija": ZONES_VERSION,
@@ -845,17 +850,18 @@ def read_zones(pdf_bytes: bytes, page: int) -> dict:
         _cache.move_to_end(key)
         while len(_cache) > _CACHE_MAX:
             _cache.popitem(last=False)
-    return res
+    return copy.deepcopy(res)
 
 
-def detect_zones(pdf_bytes: bytes, page: int) -> list[dict]:
+def detect_zones(pdf_bytes: bytes, page: int, *, table_max_objects: int | None = None) -> list[dict]:
     """The zones of a 1-based page (see the module docstring). `[]` for a sheet with nothing readable."""
-    return list(read_zones(pdf_bytes, page)["zones"])
+    return list(read_zones(pdf_bytes, page, table_max_objects=table_max_objects)["zones"])
 
 
-def zones_for_pages(pdf_bytes: bytes, pages: Iterable[int]) -> dict[str, list[dict]]:
+def zones_for_pages(pdf_bytes: bytes, pages: Iterable[int], *, table_max_objects: int | None = None) -> dict[str, list[dict]]:
     """{"<page>": zones} for the given pages — the shape `_meta.zonos` stores."""
-    return {str(int(p)): detect_zones(pdf_bytes, int(p)) for p in sorted({int(p) for p in pages if int(p) >= 1})}
+    return {str(int(p)): detect_zones(pdf_bytes, int(p), table_max_objects=table_max_objects)
+            for p in sorted({int(p) for p in pages if int(p) >= 1})}
 
 
 _PRIORITY = {"antspaudas": 0, "lentele": 1, "legenda": 2, "pastabos": 3, "kita": 4, "planas": 5}
