@@ -156,6 +156,8 @@ const RETIRED = [
   ['pasitikėjimas', 'say what to do — lib/confidence.js areaConfidenceSentence / confidenceLabel'],
   ['vektorinio PDF', 'file-format words — „Sienos, kurias programa perskaitė"'],
   ['vektorinių sienų', 'file-format words — „sienų programa neperskaitė"'],
+  ['naujos analizės', '„analizė" is banned — „po naujo skaičiavimo"'],
+  ['dirbtinio intelekto užklaus', 'say what it does — „Nemokama, skaičiuoja iš brėžinio"'],
 ];
 
 test('components carry none of the retired screen phrases', () => {
