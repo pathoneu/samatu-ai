@@ -109,3 +109,8 @@ docs/superpowers/fixtures/**/*.xlsx
 
 # Live pilot telemetry (project ids, session timings) — local only, never committed
 backend/telemetry/*.jsonl
+
+# Founder-guide e2e smoke (frontend/e2e): screenshots, Playwright output, the data snapshots
+frontend/e2e/__screens__/
+frontend/e2e/.results/
+frontend/e2e/.state/
