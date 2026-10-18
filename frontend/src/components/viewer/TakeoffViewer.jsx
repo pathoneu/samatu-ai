@@ -299,10 +299,10 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           {/* Outline editing (2026-10-16): the focused room's outline vertex by vertex, snapping to the
               drawing's walls; „Išsaugoti" re-reads its walls server side (api outline-set). */}
           {outlineEdit ? (
-            <span className="inline-flex items-center gap-1 mr-1">
+            <span className="inline-flex shrink-0 items-center gap-1 mr-1">
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white disabled:opacity-60"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white whitespace-nowrap disabled:opacity-60"
                 title={outlineInvalid
                   ? 'Kontūras kertasi pats su savimi — pataisykite viršūnes, tada išsaugokite'
                   : 'Išsaugoti pakeistą kontūrą (Enter) — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti'}
@@ -324,7 +324,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               ><Undo2 className="w-4 h-4" /></button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
                 title="Atšaukti kontūro redagavimą (Esc) — niekas neišsaugoma"
                 onClick={onCancelOutlineEdit}
               >
@@ -335,7 +335,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           ) : (onStartOutlineEdit && fillFor == null) ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] mr-1"
+              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap mr-1"
               title={`Redaguoti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
               onClick={onStartOutlineEdit}
               data-testid="outline-edit-start"
@@ -348,7 +348,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           {!outlineEdit && fillFor == null && outlineToolsSlot}
           {fillFor == null ? (
             <button
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
+              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
               title={`Perbrėžti patalpos ${focusedRoomNr} zoną: paspaudus — spustelėkite patalpos viduje brėžinyje, kontūras bus surastas automatiškai`}
               onClick={() => onStartFill(focusedRoomNr)}
             >
@@ -357,9 +357,9 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             </button>
           ) : (
             /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex shrink-0 items-center gap-1">
               <button
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))]"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))] whitespace-nowrap"
                 title={`Laukiama spustelėjimo patalpos ${fillFor} viduje. Paspauskite čia arba Esc — atšaukti.`}
                 onClick={onCancelFill}
               >
