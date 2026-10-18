@@ -336,24 +336,24 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             <button
               type="button"
               className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap mr-1"
-              title={`Redaguoti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
+              title={`Taisyti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
               onClick={onStartOutlineEdit}
               data-testid="outline-edit-start"
               data-coach="outline-edit"
             >
               <Pentagon className="w-3.5 h-3.5" />
-              <span>Redaguoti kontūrą</span>
+              <span>Taisyti kontūrą</span>
             </button>
           ) : null}
           {!outlineEdit && fillFor == null && outlineToolsSlot}
           {fillFor == null ? (
             <button
               className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
-              title={`Perbrėžti patalpos ${focusedRoomNr} zoną: paspaudus — spustelėkite patalpos viduje brėžinyje, kontūras bus surastas automatiškai`}
+              title={`Kontūras paspaudus: spustelėkite patalpos ${focusedRoomNr} viduje brėžinyje — kontūras bus surastas automatiškai`}
               onClick={() => onStartFill(focusedRoomNr)}
             >
               <SquarePen className="w-3.5 h-3.5" />
-              <span>Taisyti kontūrą</span>
+              <span>Kontūras paspaudus</span>
             </button>
           ) : (
             /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
@@ -364,7 +364,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
                 onClick={onCancelFill}
               >
                 <SquarePen className="w-3.5 h-3.5" />
-                <span>Taisyti kontūrą</span>
+                <span>Kontūras paspaudus</span>
               </button>
               <button
                 className="p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
@@ -786,7 +786,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
   );
   const focusedRoomNr = focusedRoom?.nr ?? null;
-  // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
+  // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
+  // „Taisyti kontūrą", the name the vertex editor now carries — one verb per outline fix).
   const [fillFor, setFillFor] = useState(null);
   // Round-trip in flight (backend flood-fill takes ~3-6 s) — drives the status
   // hint so the user sees progress instead of a silent stall (audit P0).
@@ -813,7 +814,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const startOutlineEdit = () => {
     const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
     if (!r || !Array.isArray(r.polygon_pct) || r.polygon_pct.length < 3) {
-      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
+      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Kontūras paspaudus"');
       return;
     }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close(); outlineTools.cancel();
@@ -1049,7 +1050,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
     symbol.open();
   };
-  // External fill arming (review-queue pencil → "Taisyti kontūrą" armed here).
+  // External fill arming (review-queue pencil → „Kontūras paspaudus" armed here).
   // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
   useEffect(() => {
     if (fillRequest?.nr != null) startFill(fillRequest.nr);

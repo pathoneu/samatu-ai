@@ -158,6 +158,8 @@ const RETIRED = [
   ['vektorinių sienų', 'file-format words — „sienų programa neperskaitė"'],
   ['naujos analizės', '„analizė" is banned — „po naujo skaičiavimo"'],
   ['dirbtinio intelekto užklaus', 'say what it does — „Nemokama, skaičiuoja iš brėžinio"'],
+  ['Redaguoti kontūr', 'one verb for outline fixes: the vertex editor is „Taisyti kontūrą"'],
+  ['Kontūro redagavimas', 'one verb for outline fixes: „Kontūro taisymas"'],
 ];
 
 test('components carry none of the retired screen phrases', () => {

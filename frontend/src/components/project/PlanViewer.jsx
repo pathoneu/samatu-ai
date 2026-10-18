@@ -697,7 +697,7 @@ export default function PlanViewer({
               title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėkite patalpos viduje`}
             >
               <Wand2 className="w-4 h-4 inline mr-1.5" />
-              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Taisyti kontūrą'}
+              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Kontūras paspaudus'}
             </button>
           )}
           {fillLoading && (
