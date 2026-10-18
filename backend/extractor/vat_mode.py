@@ -32,3 +32,32 @@ def is_reverse_vat(data: Any) -> bool:
     if mode == VAT_STANDARD:
         return False
     return str(data.get("archetipas") or "").strip().lower() == "renovacija"
+
+
+# The PVM rates the contractor can pick (Settings › PVM tarifas, and the export
+# dialog): 21 % standard, 9 % reduced, 0 %. v3 W7-A M4 (2026-10-18): the rate
+# used to stop at the browser — both exports printed 21 % whatever he chose.
+VAT_RATES = (21, 9, 0)
+DEFAULT_VAT_RATE = 21
+
+
+def vat_rate_percent(data: Any) -> int:
+    """The PVM % a document adds: 0 under reverse VAT (the line is not printed
+    at all — `is_reverse_vat`), else the payload's `vat_rate` when it is one of
+    VAT_RATES, else 21. Strings ("9", "9,0", "9 %") are read; anything else
+    falls back to 21 so a stray value can never zero the tax."""
+    if not isinstance(data, dict):
+        return DEFAULT_VAT_RATE
+    if is_reverse_vat(data):
+        return 0
+    raw = data.get("vat_rate")
+    if isinstance(raw, bool) or raw is None:
+        return DEFAULT_VAT_RATE
+    try:
+        if isinstance(raw, str):
+            raw = raw.replace("%", "").replace(",", ".").strip()
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_VAT_RATE
+    rate = int(round(value))
+    return rate if abs(value - rate) < 1e-9 and rate in VAT_RATES else DEFAULT_VAT_RATE

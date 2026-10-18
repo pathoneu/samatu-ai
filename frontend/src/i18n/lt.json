@@ -522,6 +522,7 @@
       "representativeHint": "Rodoma po įmonės pavadinimu pasiūlyme.",
       "vatRate": "PVM tarifas",
       "vatRateTitle": "Numatytasis PVM naujiems projektams. Standartinis — 21%; renovacijai taikomas atvirkštinis PVM.",
+      "vatRateHint": "Taikoma naujiems projektams. Esamo projekto tarifą parinksite eksportuodami.",
       "removeLogoTitle": "Pašalinti logotipą — eksportuojamuose PDF jo nebeliks",
       "logo": "Logotipas",
       "logoAlt": "Logotipas",
@@ -1550,8 +1551,9 @@
     },
     "vatChoice": {
       "title": "PVM dokumente",
-      "standard": "Pridėti 21 % PVM",
-      "standardDesc": "Prie sumos pridedama 21 % PVM eilutė — įprastas atvejis.",
+      "standard": "Pridėti {{rate}} % PVM",
+      "rateTitle": "Tarifas:",
+      "standardDesc": "Prie sumos pridedama {{rate}} % PVM eilutė — įprastas atvejis. Tarifas išsaugomas šiam projektui.",
       "reverse": "Atvirkštinis PVM",
       "reverseDesc": "Užsakovas — PVM mokėtojas ir PVM apskaičiuoja pats (PVMĮ 96 str.). PVM eilutė dokumente nespausdinama.",
       "fromLabel": "Atvirkštinį PVM parinko programa, nes projektas atpažintas kaip renovacija. Patikrinkite ir pasirinkite patys."

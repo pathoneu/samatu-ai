@@ -521,6 +521,7 @@
       "representativeHint": "Shown under the company name on the bid.",
       "vatRate": "VAT rate",
       "vatRateTitle": "Default VAT for new projects. Standard is 21%; renovation uses reverse VAT.",
+      "vatRateHint": "Applies to new projects. Pick an existing project’s rate when you export it.",
       "removeLogoTitle": "Remove the logo — it will no longer appear on exported PDFs",
       "logo": "Logo",
       "logoAlt": "Logo",
@@ -1497,8 +1498,9 @@
     },
     "vatChoice": {
       "title": "VAT on the document",
-      "standard": "Add 21 % VAT",
-      "standardDesc": "A 21 % VAT line is added to the total — the usual case.",
+      "standard": "Add {{rate}} % VAT",
+      "rateTitle": "Rate:",
+      "standardDesc": "A {{rate}} % VAT line is added to the total — the usual case. The rate is saved for this project.",
       "reverse": "Reverse-charge VAT",
       "reverseDesc": "The customer is VAT-registered and accounts for VAT themselves (Law on VAT, Art. 96). No VAT line is printed.",
       "fromLabel": "Reverse-charge VAT was picked by the app because the project was recognised as a renovation. Please check and choose yourself."

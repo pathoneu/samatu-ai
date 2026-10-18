@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VAT_REVERSE, VAT_STANDARD, isReverseVat, vatChoice, vatPercent } from './vatMode.js';
+import { VAT_REVERSE, VAT_STANDARD, isReverseVat, vatChoice, vatPercent, vatRateOf, parseVatRate } from './vatMode.js';
 
 // The drawing label `archetipas` is read off the drawing, not chosen by the
 // contractor. His explicit `vat_mode` must win in both directions; with none,
@@ -24,6 +24,17 @@ test('without his choice the old label rule stays exactly', () => {
   assert.equal(vatPercent({ archetipas: 'renovacija' }), 0);
   assert.equal(vatPercent({}), 21);
   assert.equal(vatPercent({ vat_rate: 9 }), 9, 'the stored rate still applies');
+});
+
+test('the PVM rate: 21 / 9 / 0 are kept (0 is a choice, not „missing"), anything else falls back', () => {
+  assert.equal(vatRateOf({ vat_rate: 0 }), 0, 'the old `|| 21` turned 0 % into 21 %');
+  assert.equal(vatPercent({ vat_rate: 0 }), 0);
+  assert.equal(vatRateOf({ vat_rate: '9' }), 9);
+  assert.equal(vatRateOf({ vat_rate: 15 }), 21, 'not a Lithuanian rate he can pick');
+  assert.equal(vatRateOf({}, 9), 9, 'no project rate → the account default');
+  assert.equal(vatRateOf({}, 'x'), 21);
+  assert.equal(parseVatRate(true), null);
+  assert.equal(vatPercent({ vat_rate: 9, vat_mode: 'reverse_vat' }), 0, 'reverse VAT still prints no PVM');
 });
 
 test('vatChoice says whether the mode came from him or from the label', () => {

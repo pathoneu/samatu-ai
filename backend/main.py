@@ -5399,6 +5399,9 @@ def generate_excel(request: Request, data: dict):
     # Reverse-VAT — no output VAT line; VISO equals the be-PVM sum. His
     # `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
     _reverse_vat = _is_reverse_vat(data)
+    # v3 M4: his PVM rate (21 / 9 / 0 %) — was a hard-coded 21 %.
+    from extractor.vat_mode import vat_rate_percent as _vat_rate_percent
+    _vat_pct = _vat_rate_percent(data)
 
     def _write_totals(ws, rows: list[dict], r: int):
         ws.row_dimensions[r].height = 6
@@ -5437,7 +5440,7 @@ def generate_excel(request: Request, data: dict):
             _tot(r + 1, "IŠ VISO (be PVM):", f"=F{r}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
         else:
-            _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
+            _tot(r + 1, f"PVM {_vat_pct}%:", f"=ROUND(F{r}*{_vat_pct / 100:.2f},2)")
             _tot(r + 2, "IŠ VISO su PVM:",  f"=F{r}+F{r+1}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
 
@@ -5786,7 +5789,10 @@ def generate_pdf(request: Request, data: dict):
     # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
     # His `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
     _reverse_vat = _is_reverse_vat(data)
-    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
+    # v3 M4: his PVM rate (21 / 9 / 0 %) — was a hard-coded 21 %.
+    from extractor.vat_mode import vat_rate_percent as _vat_rate_percent
+    _vat_pct     = _vat_rate_percent(data)
+    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * _vat_pct / 100, 2)
     viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
     # A priced export is a SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by definition
     # carries no prices, so that title over Kaina/Suma columns + a VISO su PVM
@@ -6171,7 +6177,7 @@ def generate_pdf(request: Request, data: dict):
         # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
         tot_row("IŠ VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
     else:
-        tot_row("PVM 21%:",      pvm)
+        tot_row(f"PVM {_vat_pct}%:", pvm)
         tot_row("IŠ VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
 
     # Global style
@@ -7899,7 +7905,7 @@ Senų vietų nebėra: mygtukas „Prielaidos" dabar vadinasi „Nustatymai", ski
      kiekvieno skyriaus pavadinimo.
    - Kiekio ir kainos langeliai: spustelėkite ir įrašykite; Enter įrašo ir
      pereina prie kitos eilutės kainos, Esc atsisako. Dešimtainis skirtukas —
-     kablelis arba taškas („12,5"). Suma, skyrių tarpinės sumos ir PVM 21 %
+     kablelis arba taškas („12,5"). Suma, skyrių tarpinės sumos ir PVM (21, 9 ar 0 %)
      perskaičiuojami iš karto. Neteisingas arba per didelis skaičius (virš
      99 999 999) atmetamas su pranešimu. Ranka pakeistas kiekis pažymėtas
      „rank.".
@@ -7929,7 +7935,7 @@ Senų vietų nebėra: mygtukas „Prielaidos" dabar vadinasi „Nustatymai", ski
      lapas „Sąmata", atskiras lapas kiekvienam skyriui ir lapai „Prielaidos",
      „Patalpos", „Pastabos"; pakeitus kiekį ar kainą faile, sumos
      persiskaičiuoja. „PDF pasiūlymas" — spausdinti paruoštas pasiūlymas:
-     antraštė SĄMATA (jei kainos suvestos), skyrių sumos, PVM 21 % eilutė ir
+     antraštė SĄMATA (jei kainos suvestos), skyrių sumos, PVM eilutė pagal pasirinktą tarifą ir
      parašų blokas.
    - Prieš siunčiant parodoma, kiek eilučių be kainos; „Įrašyti kainas"
      nuveda į „Sąmatą" prie pirmos tokios eilutės. Jei kainos neturi nė viena

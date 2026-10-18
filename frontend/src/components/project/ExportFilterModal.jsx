@@ -9,7 +9,8 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ltCount } from '@/lib/ltPlural';
-import { VAT_REVERSE, VAT_STANDARD, vatChoice } from '@/lib/vatMode';
+import { VAT_RATES, VAT_REVERSE, VAT_STANDARD, vatChoice, vatRateOf } from '@/lib/vatMode';
+import { getSettings } from '@/lib/projectStore';
 import { staleRowsForExport, staleRowCarryTargets } from '@/lib/mergeDarbuSarasas';
 import { exportSections, linesForExport, linesWithoutPrice } from '@/lib/exportLines';
 import { X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
@@ -50,6 +51,9 @@ export default function ExportFilterModal({
   // PVM (audit 2026-09-29): called with 'standard' | 'reverse_vat' when he
   // picks one; the parent stores it on the project as `vat_mode`.
   onVatModeChange,
+  // PVM rate (v3 M4): called with 21 | 9 | 0 when he picks one; the parent
+  // stores it on the project as `vat_rate`.
+  onVatRateChange,
   // Stale rows (audit exports-money-4, 2026-09-30): called with 'remove' |
   // 'carry' when he answers the stale-row line; the parent edits the sąmata.
   onStaleChoice,
@@ -103,6 +107,13 @@ export default function ExportFilterModal({
     setVatFromLabel(false);
     onVatModeChange?.(mode);
   };
+  // The rate the standard line adds (21 / 9 / 0 %): the project's, else the
+  // account default from Settings (getSettings is the local copy of it).
+  const [vatRate, setVatRate] = useState(() => vatRateOf(project, getSettings()?.vat_rate));
+  const chooseRate = (rate) => {
+    setVatRate(rate);
+    onVatRateChange?.(rate);
+  };
 
   // A row the last recompute could not reproduce keeps its OLD quantity; beside
   // its re-tiered successor the export billed the same work twice. He answers
@@ -150,6 +161,7 @@ export default function ExportFilterModal({
       uzsakovas: uzsakovas.trim(),
       objektas: objektas.trim(),
       vat_mode: vatMode,
+      vat_rate: vatRate,
       vidine_kopija: format !== 'pdf' && internalCopy,
       su_kodu: format !== 'pdf' && suKodu,
       grupavimas: canGroup ? grupavimas : DEFAULT_GROUPING,
@@ -256,12 +268,25 @@ export default function ExportFilterModal({
                   className="mt-0.5 w-4 h-4 accent-foreground"
                 />
                 <span className="flex-1">
-                  <span className="block text-sm text-foreground">{t(`project.vatChoice.${label}`)}</span>
-                  <span className="block text-[12px] text-muted-foreground">{t(`project.vatChoice.${desc}`)}</span>
+                  <span className="block text-sm text-foreground">{t(`project.vatChoice.${label}`, { rate: vatRate })}</span>
+                  <span className="block text-[12px] text-muted-foreground">{t(`project.vatChoice.${desc}`, { rate: vatRate })}</span>
                 </span>
               </label>
             ))}
           </div>
+          {vatMode === VAT_STANDARD && (
+            <div role="radiogroup" aria-label={t('project.vatChoice.rateTitle')}
+              className="mt-1 ml-8 flex items-center gap-3 text-sm" data-testid="export-vat-rate">
+              <span className="text-[12px] text-muted-foreground">{t('project.vatChoice.rateTitle')}</span>
+              {VAT_RATES.map((rate) => (
+                <label key={rate} className="flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="vat_rate" value={rate} checked={vatRate === rate}
+                    onChange={() => chooseRate(rate)} className="w-4 h-4 accent-foreground" />
+                  <span className="tabular-nums">{rate} %</span>
+                </label>
+              ))}
+            </div>
+          )}
           {vatFromLabel && (
             <p className="mt-1 px-2 text-[12px]" style={{ color: 'hsl(var(--conf-med))' }}>
               {t('project.vatChoice.fromLabel')}
