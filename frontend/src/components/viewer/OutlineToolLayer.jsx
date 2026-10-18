@@ -36,7 +36,7 @@ const SPLIT_REFUSED = {
 };
 export const MERGE_REFUSED = {
   apart: 'Kontūrai nesiliečia — tarp jų siena ar tarpas. Sujungti galima tik besiliečiančius kontūrus (pvz., per menamą ribą tarp virtuvės ir svetainės).',
-  overlap: 'Kontūrai persidengia — pirmiausia pataisykite vieną jų („Redaguoti kontūrą"), tada sujunkite.',
+  overlap: 'Kontūrai persidengia — pirmiausia pataisykite vieną jų („Taisyti kontūrą"), tada sujunkite.',
 };
 const HOLE_REFUSED = {
   small: 'Išpjova per maža',

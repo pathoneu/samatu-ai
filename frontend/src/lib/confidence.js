@@ -64,3 +64,15 @@ export function confidenceNeedsReview(value) {
 export function confidenceLabel(value) {
   return CONFIDENCE_LABELS[normalizeConfidence(value)];
 }
+
+// A room's area in one sentence, in the labels' words — the drawing's room chip (2026-10-18 audit §6 item 10:
+// it said „Ploto pasitikėjimas: high"). Takes any vocabulary, including areaConfidence's 'unknown' (a guess).
+const AREA_SENTENCES = {
+  [CONF_ZALIA]: 'Plotas skaitytas tiesiogiai — tikrinti nereikia.',
+  [CONF_GELTONA]: 'Plotą verta patikrinti.',
+  [CONF_RAUDONA]: 'Plotą būtina patikrinti.',
+};
+
+export function areaConfidenceSentence(value) {
+  return AREA_SENTENCES[normalizeConfidence(value)];
+}

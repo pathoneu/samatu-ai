@@ -1,6 +1,6 @@
 /**
  * ViewerCoachMarks — the viewer's first-run walkthrough (lib/viewerCoachMarks):
- * Mastelis → Atstumas → Redaguoti kontūrą, each card under its toolbar button
+ * Mastelis → Atstumas → Taisyti kontūrą, each card under its toolbar button
  * (`data-coach="…"` inside `rootRef`), a ring around the button, shown once per
  * browser. „Praleisti", the X, Esc and finishing all mark it done.
  *
@@ -35,7 +35,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
       const el = rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`);
       const r = el?.getBoundingClientRect();
       setRect(r && r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } : null);
-      // No button (e.g. „Redaguoti kontūrą" before a room is chosen): sit under the toolbar instead.
+      // No button (e.g. „Taisyti kontūrą" before a room is chosen): sit under the toolbar instead.
       const bar = rootRef?.current?.firstElementChild?.getBoundingClientRect();
       setBarRect(bar && bar.width > 0 ? { left: bar.left, width: bar.width, bottom: bar.bottom } : null);
       setTick((n) => n + 1);

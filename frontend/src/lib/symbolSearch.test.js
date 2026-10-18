@@ -80,7 +80,7 @@ test('pageRanges', () => {
 });
 
 test('kept candidates become count marks flagged as AI-found, yellow', () => {
-  const type = { id: 'durys-ai', label: 'Durys (AI)', color: '#16a34a' };
+  const type = { id: 'durys-ai', label: 'Durys', color: '#16a34a' };
   const ms = candidatesToMeasurements(normalizeCandidates(1, raw.slice(1, 3)), type);
   assert.equal(ms.length, 2);
   for (const m of ms) {

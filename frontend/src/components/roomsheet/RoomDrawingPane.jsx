@@ -27,7 +27,7 @@ import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';
 import { getPdfUrl } from '@/lib/pdfStore';
 import { buildCheckOverlay } from '@/lib/checkOverlay';
 import { displayPointOf } from '@/lib/roomOutline';
-import { laneScalesOf } from '@/lib/durableScale';
+import { checkViewerScales } from '@/lib/pageScales';
 import { cleanUserText } from '@/lib/userText';
 
 const WALL_LEGEND = [
@@ -92,7 +92,9 @@ export default function RoomDrawingPane({
     [room, facts, sutapdinimas, activeFactKey, pickFirst, proposal],
   );
   const check = useMemo(() => ({ pages: overlay.pages }), [overlay.pages]);
-  const laneScales = useMemo(() => laneScalesOf(project), [project]);
+  // The main viewer's own per-sheet map (lib/pageScales.checkViewerScales): a sheet he confirmed there reads
+  // „Patvirtintas" here too, not the lane's „Spėjamas".
+  const sheetScales = useMemo(() => checkViewerScales(project), [project]);
 
   const go = (target) => {
     if (!target?.page) return;
@@ -258,7 +260,7 @@ export default function RoomDrawingPane({
               rooms={[]}
               check={check}
               focus={focus}
-              laneScales={laneScales}
+              laneScales={sheetScales}
               onPagePoint={pick?.active && !pick.busy ? (pt) => pick.onPoint?.(displayPointOf(pt)) : null}
             />
           </ViewerBoundary>

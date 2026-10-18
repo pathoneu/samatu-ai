@@ -7,11 +7,11 @@ import { Sparkles } from 'lucide-react';
  *
  * Visual: cyan glow on dark chrome, dark sparkle icon.
  */
-export default function AiBadge({ className = '', label = 'AI' }) {
+export default function AiBadge({ className = '', label = '' }) {
   return (
     <span
       className={`inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold uppercase tracking-wide bg-viewer-chrome-active/20 text-viewer-chrome-active border border-viewer-chrome-active/40 ${className}`}
-      title="AI-powered feature"
+      title="Perskaityta iš brėžinio piešinio automatiškai — verta patikrinti"
     >
       <Sparkles className="w-2.5 h-2.5" />
       <span>{label}</span>

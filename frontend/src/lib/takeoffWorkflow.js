@@ -31,7 +31,7 @@ export function getQuantitySourceLabel(row) {
   return {
     manual: 'Rankinis',
     verified: 'Patvirtinta',
-    ai_symbol: 'AI ženklas',
+    ai_symbol: 'Rasta automatiškai',
     assumption: 'Prielaida',
     formula_estimate: 'Formulė',
     formula: 'Formulė',

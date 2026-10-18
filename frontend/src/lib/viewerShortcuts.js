@@ -20,7 +20,7 @@
 export const SHORTCUT_GROUPS = [
   { id: 'navigation', title: 'Naršymas' },
   { id: 'measure', title: 'Matavimai' },
-  { id: 'outline', title: 'Kontūro redagavimas' },
+  { id: 'outline', title: 'Kontūro taisymas' },
   { id: 'selection', title: 'Žymėjimas ir istorija' },
   { id: 'layers', title: 'Sluoksniai' },
 ];
@@ -53,7 +53,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'orthoLock', group: 'measure', bound: 'mouse', label: 'Brėžti tik horizontaliai, vertikaliai arba 45° kampu', display: 'Laikyti Shift' },
   { id: 'countRemove', group: 'measure', bound: 'mouse', label: 'Kiekio įrankiu — pašalinti tą žymę', display: 'Spustelėti ant žymės' },
 
-  // ── Kontūro redagavimas
+  // ── Kontūro taisymas
   { id: 'outlineDrag', group: 'outline', bound: 'mouse', label: 'Perkelti viršūnę (prilimpa prie sienų)', display: 'Tempti kampą' },
   { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti vidurio tašką' },
   { id: 'outlineRemove', group: 'outline', bound: 'mouse', label: 'Pašalinti viršūnę', display: 'Dukart spustelėti kampą' },
@@ -71,8 +71,8 @@ export const VIEWER_SHORTCUTS = [
   { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Uždaryti paiešką, išjungti įrankį, atsisakyti patalpos', combos: [{ keys: ['Escape'] }] },
 
   // ── Sluoksniai
-  { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpų zonas arba rodyti tik numerius', combos: [{ keys: ['u', 'U'] }] },
-  { id: 'toggleWallsLayer', group: 'layers', bound: 'hotkeys', label: 'Sienų sluoksnis: sienos, kontūrai ir angos iš PDF', combos: [{ keys: ['s', 'S'] }] },
+  { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpas arba palikti brėžinį švarų', combos: [{ keys: ['u', 'U'] }] },
+  { id: 'toggleWallsLayer', group: 'layers', bound: 'hotkeys', label: 'Sienų sluoksnis: sienos, kontūrai ir angos, kurias programa perskaitė', combos: [{ keys: ['s', 'S'] }] },
 ];
 
 const BY_ID = new Map(VIEWER_SHORTCUTS.map((s) => [s.id, s]));
