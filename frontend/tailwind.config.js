@@ -9,10 +9,32 @@ module.exports = {
   			mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
   			display: ['var(--font-display)', 'Sora', 'Hanken Grotesk', 'sans-serif'],
   		},
+  		// v3 W1-C: one corner for controls (2 px — the old md/sm calc() fell to 0 px and plain
+  		// `rounded` was Tailwind's 4 px), 4 px for floating panels. xl/2xl/full stay Tailwind's.
   		borderRadius: {
+  			DEFAULT: 'var(--radius)',
+  			sm: 'var(--radius)',
+  			md: 'var(--radius)',
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			panel: 'var(--radius-panel)'
+  		},
+  		// v3 W1-C type scale (design §6): 12 metadata only · 14 interface · 16 body · 18 · 24 · 30.
+  		// The same six sizes as Tailwind's xs/sm/base/lg/2xl/3xl; the names say what each is for.
+  		fontSize: {
+  			meta: ['12px', { lineHeight: '16px' }],
+  			ui: ['14px', { lineHeight: '20px' }],
+  			body: ['16px', { lineHeight: '24px' }],
+  			lead: ['18px', { lineHeight: '26px' }],
+  			title: ['24px', { lineHeight: '32px' }],
+  			display: ['30px', { lineHeight: '36px' }]
+  		},
+  		// v3 W1-C stacking scale — the --z-* tokens in index.css.
+  		zIndex: {
+  			canvas: 'var(--z-canvas)',
+  			panel: 'var(--z-panel)',
+  			popover: 'var(--z-popover)',
+  			modal: 'var(--z-modal)',
+  			coach: 'var(--z-coach)'
   		},
   		colors: {
   			background: 'hsl(var(--background))',

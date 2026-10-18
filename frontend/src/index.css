@@ -37,7 +37,9 @@
 
     /* Muted — fog surfaces + muted text */
     --muted: 90 6% 93%;                  /* #EDEEEC hover bg */
-    --muted-foreground: 202 3% 47%;      /* #73787B muted text */
+    /* #5D6265 muted text: 6,2:1 on white, 5,9:1 on parchment, 5,3:1 on fog (was #73787B, 4,2–4,4:1 —
+       under the 4,5:1 floor; v3 W1-C). Never fade it further with an opacity suffix. */
+    --muted-foreground: 202 4% 38%;
 
     /* Accent (component-state, NOT brand) */
     --accent: 90 6% 93%;                 /* selected row — fog */
@@ -110,6 +112,40 @@
     --viewer-chrome-hover: 90 6% 93%;         /* #EDEEEC button hover */
     --viewer-chrome-active: 165 24% 32%;      /* evergreen active state */
     --viewer-blueprint-bg: 120 3% 89%;        /* #E1E3E1 drawing-area "frame" */
+
+    /* ──── Overlay vocabulary (Pathon v3 W1-C; design 2026-10-18 §6, founder decision 2). What is
+            drawn ON the sheet means ONE thing everywhere — the viewer, the walls layer, the zones,
+            the tools and the Patikra check layer:
+              solid  = read from the drawing, or confirmed by the user;
+              dashed = estimated or proposed — nothing else (one pattern, lib/overlayTokens DASH);
+              red    = an error — nothing else;
+              selection = a heavy neutral outline plus a label;
+              one neutral zone tint; the room type is written in the label, never coded by hue.
+            Meaning never rides on colour alone: every element has a sentence (hover or legend).
+            Every stroke here is ≥ 3:1 on the white sheet (frontend/scripts/ui-probe.mjs checks it).
+            Stroke widths, alphas and the dash live in src/lib/overlayTokens.js. ──── */
+    --ov-read: 165 30% 30%;          /* #366358 evergreen — read on the drawing / confirmed · 6,8:1 */
+    --ov-estimated: 36 85% 33%;      /* #9C620D amber — estimated (always dashed) · 5,0:1 */
+    --ov-proposed: 207 44% 36%;      /* #336084 slate blue — proposed, waits for a click (dashed) · 6,7:1 */
+    --ov-user: 211 62% 44%;          /* #2B6EB6 the user's own measurement, default colour · 5,2:1 */
+    --ov-opening: 262 38% 46%;       /* #6949A2 violet — a door, window or passage in a wall · 6,8:1 */
+    --ov-wall: 206 12% 36%;          /* #515D67 slate — the wall solid; a piece measured off the outline · 6,8:1 */
+    --ov-selected: 201 32% 14%;      /* #18272F deep slate ink — the selection · 15:1 */
+    --ov-editing: 22 82% 40%;        /* #BA5012 orange — a tool at work: snap marks, the ring being edited · 5,0:1 */
+    --ov-error: 0 72% 42%;           /* #B81E1E red — an error, only an error · 6,5:1 */
+    --ov-zone-fill: 201 20% 40%;     /* #526C7A the one neutral room tint (alpha 0,16 / 0,24 hover) */
+    --ov-label-bg: 0 0% 100%;        /* label pills on the drawing: white … */
+    --ov-label-fg: 160 6% 10%;       /* … with slate ink, tabular numbers, the app's sans */
+
+    /* Stacking scale (v3 W1-C) — mirrored as z-canvas / z-panel / z-popover / z-modal / z-coach. */
+    --z-canvas: 10;
+    --z-panel: 30;
+    --z-popover: 40;
+    --z-modal: 50;
+    --z-coach: 60;
+
+    /* Corners: controls 2 px (--radius), floating panels 4 px. */
+    --radius-panel: 4px;
   }
 
   /* Dark parity block — the app is dark by default now (tokens above are
