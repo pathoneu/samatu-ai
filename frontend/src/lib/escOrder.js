@@ -7,7 +7,7 @@
 //
 //   1. a menu or dialog on top            — it closes itself; nothing else happens
 //   2. the last point of a measurement    — the drawing stays, one point shorter
-//   3. a calibration's first point
+//   3. a calibration's first point; the room tool's proposal or its „Kuri tai patalpa?" list (W1-D)
 //   4. an outline being edited            — left without saving
 //   5. an outline tool's last click (Padalyti / Sujungti / Atimti), then the tool itself
 //   6. „Rasti panašius", then an armed „Kontūras paspaudus"
@@ -23,6 +23,7 @@ export const ESC_STEPS = [
   { id: 'popover', when: (s) => !!s.popoverOpen },
   { id: 'draftPoint', when: (s) => (s.draftPoints || 0) > 0 },
   { id: 'calibPoint', when: (s) => !!s.calibPoint },
+  { id: 'roomProposal', when: (s) => !!s.roomProposal },
   { id: 'outlineEdit', when: (s) => !!s.outlineEdit },
   { id: 'outlineToolStep', when: (s) => !!s.outlineTool && (s.outlineToolSteps || 0) > 0 },
   { id: 'outlineTool', when: (s) => !!s.outlineTool },

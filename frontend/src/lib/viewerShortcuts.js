@@ -43,7 +43,8 @@ export const VIEWER_SHORTCUTS = [
   { id: 'toolArea', tool: 'area', group: 'tools', bound: 'hotkeys', label: 'Plotas — matuoti m²', combos: [{ keys: ['3'] }] },
   { id: 'toolPerimeter', tool: 'perimeter', group: 'tools', bound: 'hotkeys', label: 'Perimetras — kontūro ilgis metrais', combos: [{ keys: ['4'] }] },
   { id: 'toolCount', tool: 'count', group: 'tools', bound: 'hotkeys', label: 'Kiekis — skaičiuoti vienetus', combos: [{ keys: ['6'] }] },
-  { id: 'toolRoom', tool: 'room', group: 'tools', bound: 'hotkeys', label: 'Patalpa — kontūras vienu spustelėjimu patalpos viduje', combos: [{ keys: ['r', 'R'] }] },
+  // the room tool (Pathon v3 W1-D): one click inside a room, its outline off the walls, proposed, then saved
+  { id: 'toolRoom', tool: 'room', group: 'tools', bound: 'hotkeys', label: 'Patalpa — kontūras vienu spustelėjimu patalpos viduje; Enter arba kitas spustelėjimas išsaugo', combos: [{ keys: ['r', 'R'] }] },
   { id: 'toolFindSimilar', tool: 'findSimilar', group: 'tools', bound: 'hotkeys', label: 'Rasti panašius — apvesti vieną simbolį, programa suras panašius', combos: [{ keys: ['f', 'F'], shift: false }] },
   { id: 'toolCalibrate', tool: 'calibrate', group: 'tools', bound: 'hotkeys', label: 'Mastelis — nustatyti pagal atkarpą, kurios ilgį žinote', combos: [{ keys: ['k', 'K'] }] },
 

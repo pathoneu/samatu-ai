@@ -24,13 +24,14 @@ const nameOf = (tool) => railTool(tool)?.name || null;
  *   symbolActive = false, // „Rasti panašius" session open
  *   selectionCount = 0,   // measurements selected with „Žymėti" / „Laso"
  *   countType = null,     // { label, n } — the count tool's active type
+ *   roomPhase = null,     // the room tool R (W1-D useRoomTool): idle | reading | proposed | saving | picking
  *   mac,
  * }
  * → null | { id, name, detail, keys, actions: [{ id, label, primary?, disabled?, title? }] }
  */
 export function modePillFor(state = {}) {
   const { tool = null, draftPoints = 0, finishable = false, calibPoint = false, outlineEdit = null, fill = null,
-    symbolActive = false, selectionCount = 0, countType = null, mac = false } = state;
+    symbolActive = false, selectionCount = 0, countType = null, roomPhase = null, mac = false } = state;
   const exit = { id: 'toolExit', label: 'Išeiti', title: 'Išeiti iš įrankio (Esc)' };
 
   if (outlineEdit) {
@@ -126,6 +127,25 @@ export function modePillFor(state = {}) {
       detail: selectionCount ? `Pažymėta: ${selectionCount}` : null,
       keys: selectionCount ? hintText(['deleteSelected'], { mac }) : null,
       actions: selectionCount ? [{ id: 'deselect', label: 'Atžymėti' }, exit] : [exit],
+    };
+  }
+  if (tool === 'room') {
+    // review before it exists (W1-D): the outline is proposed on the drawing; saving and dropping it are here too
+    const proposed = roomPhase === 'proposed';
+    return {
+      id: 'room',
+      name: nameOf('room'),
+      detail: roomPhase === 'reading' ? 'Skaitomas kontūras…'
+        : roomPhase === 'saving' ? 'Saugoma…'
+          : roomPhase === 'picking' ? 'Pasirinkite patalpą sąraše kairėje'
+            : proposed ? 'Siūlomas kontūras — peržiūrėkite' : null,
+      keys: proposed ? 'Enter — išsaugoti · Esc — atmesti' : null,
+      actions: proposed
+        ? [
+            { id: 'roomSave', label: 'Išsaugoti', primary: true, title: 'Išsaugoti siūlomą kontūrą (Enter) — po to galėsite atšaukti' },
+            { id: 'roomDrop', label: 'Atmesti', title: 'Atmesti siūlomą kontūrą (Esc) — niekas neišsaugoma' },
+          ]
+        : [exit],
     };
   }
   if (tool === 'pan') {

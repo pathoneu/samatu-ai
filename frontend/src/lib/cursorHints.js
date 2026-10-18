@@ -27,12 +27,13 @@ export const CURSOR_HINT_FLASH_MS = 2600;
  *   fill = null,               // { nr, busy } — „Kontūras paspaudus"
  *   selectionCount = 0,        // marks selected with „Žymėti" / „Laso"
  *   outlineTool = null,        // useOutlineTool's state for split / merge / subtract
+ *   roomPhase = null,          // the room tool R (W1-D): idle | reading | proposed | saving | picking
  * }
  * → the sentence, or null.
  */
 export function cursorHintFor(state = {}) {
   const { mode = null, points = 0, shift = false, calibPoint = false, countType = null, symbolPhase = 'box',
-    fill = null, selectionCount = 0, outlineTool = null } = state;
+    fill = null, selectionCount = 0, outlineTool = null, roomPhase = null } = state;
   switch (mode) {
     // with a selection the keys are in the pill and the actions in the bar above it — the hint says what a click does
     case 'select':
@@ -62,6 +63,10 @@ export function cursorHintFor(state = {}) {
     case 'scalecheck':
       return calibPoint ? 'Spustelėkite atkarpos pabaigą' : 'Spustelėkite atkarpos, kurios ilgį žinote, pradžią';
     case 'room':
+      if (roomPhase === 'reading') return 'Skaitomas kontūras pagal sienas…';
+      if (roomPhase === 'saving') return 'Saugoma…';
+      if (roomPhase === 'picking') return 'Kuri tai patalpa? Pasirinkite sąraše kairėje';
+      if (roomPhase === 'proposed') return 'Spustelėkite — išsaugoti · kitoje patalpoje — išsaugoti ir siūlyti ją';
       return 'Spustelėkite patalpos viduje';
     case 'findSimilar':
       if (symbolPhase === 'searching') return 'Ieškoma panašių simbolių…';

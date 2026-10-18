@@ -37,10 +37,14 @@ import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
 import { selfIntersects } from '@/lib/polygonGeometry';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
+import { roomAtPoint, nextRoomSelection } from '@/lib/roomHitTest';
+import { displayPointOf } from '@/lib/roomOutline';
 import PageOverlayHost from './PageOverlayHost';
+import { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from './MeasureLayer';
 import CalibrateDialog from './CalibrateDialog';
 import { ScaleOverviewDock, ScaleGateChip } from './ScaleOverviewPanel';
 import ScaleCheckCard from './ScaleCheckCard';
+import ScaleChip from './ScaleChip';
 import CountLegendPanel from './CountLegendPanel';
 import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
@@ -60,6 +64,8 @@ import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
+import useRoomTool from './useRoomTool';
+import { RoomPickPanel } from './RoomProposalLayer';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
@@ -69,6 +75,13 @@ import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floa
 
 // Empty measurement draft (shape of measureOverlayReducer's state).
 const EMPTY_DRAFT = { points: [], committed: false };
+
+// „Atšaukti" in a save's toast (Pathon v3 W1-D, D3): the host's save resolves to `{undo}`; the toast keeps the
+// button for 10 s. A save with nothing to undo gets the plain toast.
+function undoAction(saved) {
+  const undo = typeof saved?.undo === 'function' ? saved.undo : null;
+  return undo ? { duration: 10_000, action: { label: 'Atšaukti', onClick: () => { undo(); } } } : {};
+}
 
 // The instruction for the armed tool is ONE sentence beside the pointer (lib/cursorHints, CursorHint —
 // v3 W1-B B3); the mode pill holds the mode's name and buttons, the status bar the scale and the snap note.
@@ -238,7 +251,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null, outlineEdit = null, projectId = null, symbolHint = null }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -255,7 +268,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const scaleText = scaleStatusText(pageScale);
   // Whether the visible sheet has wall geometry to snap to — same cache the page hosts fill, so this
   // costs no extra request; `select` and `count` do not snap, the others do.
-  const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
+  const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count' && measureTool !== 'room';
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
   // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
   // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
@@ -271,15 +284,11 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
       ) : (
         <>
           {snapNote && <span className="ml-auto min-w-0 truncate" title={snapNote}>{snapNote}</span>}
-          {/* The scale readout doubles as the calibration entry point. */}
-          <button
-            type="button"
-            onClick={onCalibrateClick || undefined}
-            title={scaleStatusTitle(pageScale)}
-            className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
-          >
-            {scaleText}
-          </button>
+          {/* The scale readout and its way in are the scale chip on the drawing (Pathon v3 W1-D, ScaleChip);
+              without one (a viewer with no project, the check view) the sentence stays here, read-only. */}
+          {!scaleChipShown && (
+            <span title={scaleStatusTitle(pageScale)} className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap`}>{scaleText}</span>
+          )}
         </>
       )}
     </div>
@@ -411,7 +420,7 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
       toolPan: () => tool('pan'),
       toolCalibrate: () => tool('calibrate'),
       toolFindSimilar: () => (fillArmed || !onToggleSymbolSearch ? false : (onToggleSymbolSearch(), true)),
-      // R — the room tool (vector outline from one click) is wired by W1-D; until then the key does nothing.
+      // R — the room tool (W1-D): one click inside a room, its outline off the walls, proposed, then saved.
       toolRoom: () => (fillArmed || !onRoomTool ? false : (onRoomTool(), true)),
       toolDistance: () => tool('distance'),
       toolArea: () => tool('area'),
@@ -452,19 +461,27 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
 // focused room the old effect re-ran scrollToPage on EVERY tick — the viewer
 // literally fought the user's navigation. Jump ONCE per new target; re-arm
 // only when the focus object itself changes (clicking a room again re-jumps).
-function FocusScroller({ documentId, focusedRoom, focusedPage }) {
+function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null }) {
   const { provides: scrollApi, state: scroll } = useScroll(documentId);
   // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
   // zone layer and this scroller must never disagree about a room's page.
   const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
   const doneRef = useRef(null);
-  useEffect(() => { doneRef.current = null; }, [focusedRoom, focusedPage]);
+  // Re-armed when the focus moves to another ROOM or page (Pathon v3 W1-D) — not when the same room comes back
+  // as a new object: every outline save re-derives the focused room from the saved project, and the old
+  // identity rule threw the view to the page's top-left after each save.
+  const focusKey = `${focusedRoom?.nr ?? ''}|${focusedPage ?? ''}`;
+  useEffect(() => { doneRef.current = null; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || !scrollApi?.scrollToPage) return;
     if (doneRef.current === targetPage) return; // one jump per target — never re-yank
     doneRef.current = targetPage;
+    // A room he clicked ON the drawing is already on screen (Pathon v3 W1-D): jumping to its page would
+    // throw the view back to the sheet's top-left corner under his cursor.
+    const skip = skipJumpRef?.current;
+    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) return;
     scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
-  }, [targetPage, scrollApi]);
+  }, [targetPage, scrollApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE JUMP CAN LAND ON NOTHING (2026-09-04, measured). `scrollToPage` is
   // callable before the pages have been measured, and calling it then computes
@@ -479,7 +496,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
   // user who scrolls anywhere during that first second has left page 1, so this
   // can never fight him (founder bug 2026-07-25 "scrolls by itself").
   const retriesRef = useRef(0);
-  useEffect(() => { retriesRef.current = 0; }, [focusedRoom, focusedPage]);
+  useEffect(() => { retriesRef.current = 0; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || targetPage <= 1 || !scrollApi?.scrollToPage) return;
     if (retriesRef.current >= 8) return;
@@ -584,7 +601,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -618,6 +635,39 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
   );
   const focusedRoomNr = focusedRoom?.nr ?? null;
+  // ---- Select by click (Pathon v3 W1-D, D1) ---------------------------------
+  // The focused room is the host's (the panel's room); Shift+click adds rooms beside it (`extraRoomNrs`), the
+  // way Togal and Kreo select several shapes. A click on the drawing that focuses a room must not make the
+  // viewer jump to that room's page — it is already under the cursor (FocusScroller reads `skipJumpRef`).
+  const [extraRoomNrs, setExtraRoomNrs] = useState([]);
+  const skipJumpRef = useRef(null);
+  const selectionFromClickRef = useRef(false);
+  // The host moved the focus (a list row, Patikra, Esc): the extra rooms were chosen beside the OLD room.
+  useEffect(() => {
+    if (selectionFromClickRef.current) { selectionFromClickRef.current = false; return; }
+    setExtraRoomNrs([]);
+  }, [focusedRoomNr]);
+  const applyRoomSelection = (next) => {
+    const cur = focusedRoomNr == null ? null : String(focusedRoomNr);
+    if (next.focused !== cur) {
+      selectionFromClickRef.current = true;
+      if (next.focused == null) onClearFocus?.();
+      else {
+        const room = (rooms || []).find((r) => String(r?.nr) === next.focused);
+        skipJumpRef.current = { nr: next.focused, until: Date.now() + 1500 };
+        onRoomZoneClick?.({ nr: next.focused, puslapio_nr: roomPageOf(room) });
+      }
+    }
+    setExtraRoomNrs(next.extra);
+  };
+  // A click at rest (or with „Žymėti") on the drawing: the room under it, else nothing (empty paper clears).
+  const selectRoomAt = (pt) => {
+    const where = displayPointOf(pt);
+    const hit = where ? roomAtPoint(rooms, where, {
+      renderedWidth: pt.renderedWidth, renderedHeight: pt.renderedHeight, hidden: hiddenRoomNrs,
+    }) : null;
+    applyRoomSelection(nextRoomSelection({ focused: focusedRoomNr, extra: extraRoomNrs }, hit?.nr ?? null, { shift: !!pt.shiftKey }));
+  };
   // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
   // „Taisyti kontūrą", the name the vertex editor now carries — one verb per outline fix).
   const [fillFor, setFillFor] = useState(null);
@@ -674,8 +724,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (outlineInvalid) { toast.error('Kontūras kertasi pats su savimi — pataisykite viršūnes prieš išsaugant'); return; }
     setOutlineSaving(true);
     try {
-      await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points, outlineEdit.holes);
-      toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`);
+      const saved = await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points, outlineEdit.holes);
+      // „Atšaukti" for 10 s (Pathon v3 W1-D): the host PUTs the room's previous geometry back.
+      toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`, undoAction(saved));
       setOutlineEdit(null);
     } catch (e) {
       toast.error(e?.userMessage || e?.message || 'Nepavyko išsaugoti kontūro');
@@ -713,6 +764,35 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // Measurements + per-page scales in PDF-point space (see MeasureLayer);
   // hydrated from the project, persisted back via onMeasureDataChange.
   const [measureTool, setMeasureTool] = useState(null);
+  // ---- The room tool R (Pathon v3 W1-D, D2) -------------------------------
+  // Armed as the measure tool 'room' (one pointer owner at a time, the same Esc and tool switching); its
+  // state, the requests and the save live in useRoomTool, the host (InteriorWorkspace) does the network.
+  const roomToolArmed = measureTool === 'room' && !check && Boolean(onRoomToolPreview && onRoomToolCommit);
+  const roomTool = useRoomTool({
+    active: roomToolArmed,
+    rooms,
+    projectId,
+    sutapdinimas: project?._meta?.geometrija?.sutapdinimas || null,
+    onPreview: onRoomToolPreview,
+    onCommit: onRoomToolCommit,
+    // No vector walls on the sheet: the raster click-fill is the fallback, shown first like every proposal.
+    onRasterPreview: onRoomPolygonFill ? async (nr, where) => {
+      const data = await clickToFill({ projectId, pageNr: where.page, clickXPct: where.x_pct, clickYPct: where.y_pct, sensitivity: 0.7, pdfBlob });
+      const pw = Number(data?.page_width_pdf);
+      const ph = Number(data?.page_height_pdf);
+      const ring = Array.isArray(data?.polygon_pdf) && pw > 0 && ph > 0 ? data.polygon_pdf.map(([x, y]) => [x / pw, y / ph]) : null;
+      return ring && ring.length >= 3 ? { ring, data } : null;
+    } : null,
+    onRasterCommit: onRoomPolygonFill ? (nr, data) => onRoomPolygonFill(nr, data) : null,
+    // The room he just outlined becomes the selected one, so he sees it (the drawing stays where it is).
+    onCommitted: (nr) => applyRoomSelection({ focused: String(nr), extra: [] }),
+  });
+  // The room tool owns the pointer alone: an outline being edited or a split/merge/subtract in progress stands down.
+  useEffect(() => {
+    if (!roomToolArmed) return;
+    setOutlineEdit(null);
+    outlineTools.cancel();
+  }, [roomToolArmed]); // eslint-disable-line react-hooks/exhaustive-deps
   // Committed measurements + count marks live in a history (lib/measureHistory, 2026-10-16): every
   // change goes through setMeasurements(update) and becomes one undoable entry in „Istorija".
   const [measureHist, dispatchMeasureHist] = useReducer(historyReducer, initialMeasurements || [], initHistory);
@@ -1022,16 +1102,24 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
 
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
+    if (roomToolArmed) { roomTool.click(pt); return; }   // the room tool R (Pathon v3 W1-D)
     if (fillFor == null) {
-      // Plain canvas click (no fill, no measure tool): clear the focused-room
-      // chip — a room stays "selected" only while the user means it (audit P2
-      // sticky chip) — and forward to any external consumer. While a measure
-      // tool owns the pointer, leave focus alone. Same while an outline is being
-      // edited: a drag that starts a hair off a vertex must not drop the focus
-      // (which would abandon the edit, 2026-10-16).
-      if (measureTool == null && !outlineEdit && !outlineTools.tool) {
-        onClearFocus?.();
-        onPagePoint?.(pt);
+      // Plain canvas click (no fill, no measure tool) — Pathon v3 W1-D: the room under the click is SELECTED
+      // (Shift adds or removes one), empty paper clears the selection (the audit P2 sticky-chip rule still
+      // holds: a room stays selected only while he means it); the click is forwarded to any external
+      // consumer. „Žymėti" selects rooms too, unless the click is on one of his measurements (MeasureLayer
+      // selects that one). While another measure tool owns the pointer, leave focus alone. Same while an
+      // outline is being edited: a drag that starts a hair off a vertex must not drop the focus (which would
+      // abandon the edit, 2026-10-16). The check view lent to Patikra keeps its own click: clear, then the pick.
+      if (!outlineEdit && !outlineTools.tool && (measureTool == null || measureTool === 'select')) {
+        if (check) {
+          if (measureTool == null) onClearFocus?.();
+        } else {
+          const tol = MEASURE_HIT_TOL_PX / (Number(pt.scale) > 0 ? Number(pt.scale) : 1);
+          const onMark = measureTool === 'select' && hitTestMeasurement({ x: pt.x, y: pt.y }, measurements, pt.pageIndex + 1, tol);
+          if (!onMark) selectRoomAt(pt);
+        }
+        if (measureTool == null) onPagePoint?.(pt);
       }
       return;
     }
@@ -1058,12 +1146,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         sensitivity: 0.7,
         pdfBlob,
       });
-      onRoomPolygonFill?.(fillFor, data);
+      const saved = onRoomPolygonFill?.(fillFor, data);
       // The AREA stays table-read (eksplikacija beats a traced polygon for
       // accuracy) — say so, or redrawing "because the area looked wrong"
       // reads as a silent no-op. (final-regression finding 2, 2026-07-28)
       toast.success(`Patalpos ${fillFor} kontūras pažymėtas`, {
         description: 'Plotas ir kiekiai lieka iš eksplikacijos — kontūro pataisymas naudojamas žymėjimui ir tikslumo mokymui.',
+        ...undoAction(saved),
       });
       setFillFor(null);
     } catch (e) {
@@ -1124,8 +1213,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     chromeObserver.current = ro;
   }, []);
   const railCompact = chromeHeight > 0 && chromeHeight < railHeight() + 16;
-  // „Patalpa" (R): the one-click room outline — W1-D wires it (vector outline_at); null keeps the card disabled.
-  const onRoomTool = null;
+  // „Patalpa" (R, W1-D): the one-click room outline, armed as the measure tool 'room' when the host gives the
+  // preview and the save; otherwise the card stays disabled with its reason.
+  const onRoomTool = !check && onRoomToolPreview && onRoomToolCommit ? () => armMeasureTool('room') : null;
   // The tool the cards show pressed: the armed mode, „Rasti panašius" while its session is open.
   const railActiveTool = symbol.active ? 'findSimilar' : (measureTool === 'scalecheck' ? null : measureTool);
   const onRailTool = (id) => {
@@ -1133,8 +1223,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (id === 'room') { onRoomTool?.(); return; }
     armMeasureTool(id);
   };
-  // What the page layers and the status bar are told: the hand is not a page tool (it owns the pointer above them).
-  const pageTool = measureTool === 'pan' ? null : measureTool;
+  // What the page layers and the status bar are told: neither the hand nor the room tool is a page tool (the hand
+  // owns the pointer above them; the room tool takes the page's click in handlePagePoint and draws its own layer).
+  const pageTool = measureTool === 'pan' || measureTool === 'room' ? null : measureTool;
   // The bottom pill (W1-B B2): only the active mode — its name, what it holds, its keys, finish / leave.
   const mac = useMemo(() => isMacPlatform(), []);
   const activeCountType = measureTool === 'count' ? countTypes.find((t) => t.id === activeCountTypeId) : null;
@@ -1148,6 +1239,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     symbolActive: symbol.active,
     selectionCount: selectedMeasureIds.length,
     countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
+    roomPhase: roomToolArmed ? roomTool.state.phase : null,
     mac,
   });
   // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
@@ -1167,6 +1259,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     fill: fillFor != null ? { nr: fillFor, busy: fillBusy } : null,
     selectionCount: selectedMeasureIds.length,
     outlineTool: outlineTools.tool,
+    roomPhase: roomToolArmed ? roomTool.state.phase : null,
   });
   const onPillAction = (id) => {
     if (id === 'outlineUndo') undoOutline();
@@ -1181,6 +1274,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     } else if (id === 'draftCancel') setDraftSlot({ pageNr: null, draft: EMPTY_DRAFT });
     else if (id === 'calibCancel') setCalibSlot({ pageNr: null, point: null });
     else if (id === 'deselect') setSelectedMeasureIds([]);
+    else if (id === 'roomSave') roomTool.commit();
+    else if (id === 'roomDrop') roomTool.escape();
     else if (id === 'toolExit') {
       if (measureTool === 'scalecheck') setScaleCheck(null);
       setMeasureTool(null);
@@ -1194,6 +1289,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       popoverOpen: !!measureMenu || !!calibRequest || guideOpen || openLayerInDocument(),
       draftPoints,
       calibPoint: calibSlot.point != null,
+      roomProposal: roomToolArmed && (roomTool.state.phase === 'proposed' || roomTool.state.phase === 'picking'),
       outlineEdit: !!outlineEdit,
       outlineTool: !!outlineTools.tool,
       outlineToolSteps: outlineTools.tool?.history?.length || 0,
@@ -1208,6 +1304,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       case 'popover': return true;           // the menu / dialog closes itself (Radix); nothing under it moves
       case 'draftPoint': dispatchDraft(draftSlot.pageNr, { type: 'undo' }); return true;
       case 'calibPoint': setCalibSlot({ pageNr: null, point: null }); return true;
+      case 'roomProposal': roomTool.escape(); return true;
       case 'outlineEdit': setOutlineEdit(null); return true;
       case 'outlineToolStep': outlineTools.undo(); return true;
       case 'outlineTool': outlineTools.cancel(); return true;
@@ -1251,7 +1348,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // E / M / X act on the selected room — never in the middle of a drawing or another outline action.
   const roomKeysFree = !check && focusedRoomNr != null && !outlineEdit && !outlineTools.tool && draftPoints === 0 && fillFor == null;
   const onRoomEdit = roomKeysFree && onRoomOutlineEdit ? startOutlineEdit : null;
-  const onRoomMerge = roomKeysFree && onOutlineTool ? () => outlineTools.start('merge') : null;
+  const onRoomMerge = roomKeysFree && onOutlineTool ? () => startMerge() : null;
   const onRoomSubtract = roomKeysFree && onOutlineTool ? () => outlineTools.start('subtract') : null;
 
   // ---- Selection bar (W1-B B6) ---------------------------------------------
@@ -1283,12 +1380,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onDelete: () => deleteMeasurement(selectedMeasureIds),
     onDeselect: () => setSelectedMeasureIds([]),
   } : null;
+  // A room Shift+clicked beside the focused one (W1-D) is the merge target M / „Sujungti" starts with.
+  const mergeTargetNr = extraRoomNrs.length === 1 ? String(extraRoomNrs[0]) : null;
+  const startMerge = () => outlineTools.start('merge', mergeTargetNr ? { targetNr: mergeTargetNr } : undefined);
   const barRoomActions = roomBarOn ? {
-    nr: String(barRoom.nr),
+    nr: [String(barRoom.nr), ...extraRoomNrs.map(String)].join(' + '),
     name: barRoom.pavadinimas || null,
     onEdit: onRoomOutlineEdit ? startOutlineEdit : null,
     onSplit: onOutlineTool ? () => outlineTools.start('split') : null,
-    onMerge: onOutlineTool ? () => outlineTools.start('merge') : null,
+    onMerge: onOutlineTool ? startMerge : null,
+    mergeTargetNr,
     onSubtract: onOutlineTool ? () => outlineTools.start('subtract') : null,
     onExclude: projectId ? () => openRoomSheet(barRoom.nr) : null,
     onEvidence: projectId ? () => openRoomSheet(barRoom.nr) : null,
@@ -1296,6 +1397,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   } : null;
   const roomLabelSelectors = focusedRoomNr != null
     ? [`[data-room-label="${focusedRoomNr}"]`, `[data-room-ring="${focusedRoomNr}"]`, `[data-room-zone="${focusedRoomNr}"]`] : [];
+  // The scale chip (W1-D) sits at the drawing's bottom-left: the pill, the bar and the legend keep off it.
   const chromeRects = useChromeRects(chromeEl, {
     anchor: marksBarOn ? (oneMark ? [`[data-measure-anchor="${oneMark.id}"]`] : []) : (roomBarOn ? roomLabelSelectors : []),
     label: roomLabelSelectors,
@@ -1304,6 +1406,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     nav: '[data-nav-cluster]',
     header: '[data-canvas-header]',
     legend: '[data-layer-legend]',
+    scaleChip: '[data-testid="scale-chip-root"]',
   });
   // Where the top row of cards ends (pages / zoom and search may wrap to two rows on a narrow canvas).
   const chromeTopBottom = Math.max(
@@ -1320,9 +1423,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const spots = [
       { id: 'bottom-right', left: f.width - 8 - size.width, top: f.height - 8 - size.height },
       { id: 'top-right', left: f.width - 8 - size.width, top: chromeTopBottom + 8 },
-      { id: 'bottom-left', left: (check ? 8 : RAIL_WIDTH + 16), top: f.height - 8 - size.height },
+      { id: 'bottom-left', left: (check ? 8 : RAIL_WIDTH + 16), top: f.height - 8 - size.height - (r.scaleChip ? r.scaleChip.height + 8 : 0) },
     ];
-    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header].filter(Boolean) });
+    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip].filter(Boolean) });
   })();
 
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
@@ -1344,7 +1447,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const chromeLeft = sheetRailWidth({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
-          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
+          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef} />}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
@@ -1398,6 +1501,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       checkData={check?.pages?.[layout.pageNumber] || null}
                       symbolSearch={symbol.active ? symbol : null}
                       focusedRoomNr={focusedRoomNr}
+                      selectedRoomNrs={extraRoomNrs}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
                       zoneFillsVisible={zoneFillsVisible}
@@ -1445,6 +1549,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                         point ? { pageNr: layout.pageNumber, point } : { pageNr: null, point: null })}
                       sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
                       revisionOverlay={check ? null : revisionOverlay}
+                      roomTool={roomToolArmed ? roomTool.state : null}
                     />
                   )}
                 />
@@ -1465,7 +1570,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                     compact={railCompact}
                     activeTool={railActiveTool}
                     onTool={onRailTool}
-                    available={{ room: onRoomTool ? undefined : 'Patalpos įrankis dar ruošiamas — kol kas pasirinkite patalpą sąraše ir spauskite „Kontūras paspaudus".' }}
+                    available={{ room: onRoomTool ? undefined : 'Patalpos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.' }}
                     layers={{ zones: zoneFillsVisible, walls: wallsLayerVisible }}
                     onToggleLayer={(id) => (id === 'zones' ? setZoneFillsVisible((v) => !v) : setWallsLayerVisible(!wallsLayerVisible))}
                     onDownload={handleDownload}
@@ -1494,7 +1599,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               </div>
               {/* The active mode's pill, bottom centre right of the tool cards. */}
               {pill && (
-                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: check ? 8 : RAIL_WIDTH + 16 }}>
+                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: Math.max(check ? 8 : RAIL_WIDTH + 16, chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.left + chromeRects.rects.scaleChip.width + 8 : 0) }}>
                   <ModePill pill={pill} onAction={onPillAction} />
                 </div>
               )}
@@ -1503,7 +1608,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 <SelectionBar
                   frame={chromeRects.frame}
                   anchor={chromeRects.rects.anchor}
-                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill].filter(Boolean)}
+                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip].filter(Boolean)}
                   insetLeft={check ? 8 : RAIL_WIDTH + 16}
                   room={barRoomActions}
                   marks={barRoomActions ? null : barMarks}
@@ -1519,7 +1624,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   style={legendSpot === 'top-right'
                     ? { top: chromeTopBottom + 8 }
                     : legendSpot === 'bottom-left'
-                      ? { left: RAIL_WIDTH + 16, bottom: 8 }
+                      ? { left: RAIL_WIDTH + 16, bottom: 8 + (chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.height + 8 : 0) }
                       : { bottom: 8 }}
                   data-layer-legend={legendSpot}
                   data-testid={wallsLayerVisible ? 'walls-legend' : 'zones-legend'}
@@ -1528,6 +1633,14 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             </div>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
+            {roomToolArmed && (
+              <RoomPickPanel
+                picking={roomTool.state.phase === 'picking' ? roomTool.state.picking : null}
+                onPick={roomTool.pick}
+                onCancel={roomTool.cancelPick}
+                left={panelLeft}
+              />
+            )}
 
             <div className="absolute inset-x-0 top-12 bottom-0 pointer-events-none z-30"><div className="pointer-events-auto">
             <OutlineToolPanel
@@ -1544,7 +1657,26 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onSave={outlineTools.save}
             />
             </div></div>
-            {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
+            {!check && (
+              <div className="absolute inset-x-0 top-2 bottom-0 pointer-events-none z-30"><div className="pointer-events-auto">
+                <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />
+              </div></div>
+            )}
+            {/* The sheet's scale, confirmed in one click (Pathon v3 W1-D, D4) — bottom-left of the drawing. */}
+            {!check && project && (
+              <ScaleChip
+                documentId={activeDocumentId}
+                scales={effectiveScales}
+                project={project}
+                durable={measureScales}
+                totalPages={totalPages}
+                left={panelLeft}
+                onConfirm={confirmScales}
+                onCalibrate={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
+                onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
+                onOverview={() => setScalesOpen(true)}
+              />
+            )}
             {(scalesOpen || scaleCheck) && !check && project && (
               <div className="absolute top-14 right-2 z-30 flex flex-col items-end gap-2">
                 {scaleCheck && (
@@ -1616,7 +1748,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             fillBusy={fillBusy}
             measureScales={effectiveScales}
             measureTool={pageTool}
-            onCalibrateClick={() => armMeasureTool('calibrate')}
+            scaleChipShown={!check && !!project}
             outlineEdit={outlineEdit}
             projectId={projectId}
             symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
@@ -1685,6 +1817,10 @@ export default function TakeoffViewer({
   onRoomOutlineEdit = null,
   // (op) => Promise — saves an outline tool's result: split / merge / subtract (lib/outlineToolSave, 2026-10-16).
   onOutlineTool = null,
+  // The room tool R (Pathon v3 W1-D): (nr, {page, x_pct, y_pct}) => the outline-at answer, read only („perziura");
+  // (nr, outline-set body) => Promise<{undo?}> — saves the outline he reviewed.
+  onRoomToolPreview = null,
+  onRoomToolCommit = null,
   rooms = [],
   focusedRoom = null,
   focusedPage = null,
@@ -1748,6 +1884,8 @@ export default function TakeoffViewer({
           renderToolbarAddon={renderToolbarAddon}
           onRoomOutlineEdit={onRoomOutlineEdit}
           onOutlineTool={onOutlineTool}
+          onRoomToolPreview={onRoomToolPreview}
+          onRoomToolCommit={onRoomToolCommit}
           check={check}
           focus={focus}
           rooms={rooms}

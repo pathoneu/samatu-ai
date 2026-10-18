@@ -37,6 +37,8 @@ test('count names the type and its tally, or says what is missing', () => {
 
 test('room tools, find similar and fill read their own state', () => {
   assert.equal(cursorHintFor({ mode: 'room' }), 'Spustelėkite patalpos viduje');
+  assert.match(cursorHintFor({ mode: 'room', roomPhase: 'reading' }), /Skaitomas/);
+  assert.match(cursorHintFor({ mode: 'room', roomPhase: 'proposed' }), /išsaugoti/);
   assert.equal(cursorHintFor({ mode: 'fill', fill: { nr: '04', busy: false } }), 'Spustelėkite patalpos 04 viduje');
   assert.match(cursorHintFor({ mode: 'fill', fill: { nr: '04', busy: true } }), /Ieškoma/);
   assert.match(cursorHintFor({ mode: 'split', outlineTool: {} }), /prasideda/);

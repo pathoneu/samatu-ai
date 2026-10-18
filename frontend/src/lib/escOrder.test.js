@@ -13,6 +13,7 @@ function pressUntilRest(start) {
     if (step === 'popover') s.popoverOpen = false;
     else if (step === 'draftPoint') s.draftPoints -= 1;
     else if (step === 'calibPoint') s.calibPoint = false;
+    else if (step === 'roomProposal') s.roomProposal = false;
     else if (step === 'outlineEdit') s.outlineEdit = false;
     else if (step === 'outlineToolStep') s.outlineToolSteps -= 1;
     else if (step === 'outlineTool') s.outlineTool = false;
@@ -82,4 +83,8 @@ test('a menu fading out after a choice is not an open layer (Esc reaches the pan
     assert.ok(OPEN_LAYER_SELECTOR.includes(`[role="${role}"]:not([data-state="closed"])`), role);
   }
   assert.ok(OPEN_LAYER_SELECTOR.includes('[data-draft-menu]'));
+});
+
+test('the room tool (W1-D): Esc drops the proposal first, then leaves the tool, then the room', () => {
+  assert.deepEqual(pressUntilRest({ tool: 'room', roomProposal: true, roomSelected: true }), ['roomProposal', 'tool', 'room']);
 });

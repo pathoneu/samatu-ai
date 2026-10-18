@@ -6,11 +6,11 @@
 
 import { API_BASE } from './apiBase.js';
 
-async function post(projectId, roomNr, action, payload, signal) {
+async function post(projectId, roomNr, action, payload, signal, method = 'POST') {
   const res = await fetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/rooms/${encodeURIComponent(roomNr)}/${action}`,
     {
-      method: 'POST',
+      method,
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -28,12 +28,14 @@ async function post(projectId, roomNr, action, payload, signal) {
 }
 
 /** `{status: 'ok', room, kitu_angos}` | `{status: 'taken'|'open'|'outside'|'no_walls', …}` */
-export async function fetchOutlineAt(projectId, roomNr, point, { signal, pritarta = false, klausimas = null } = {}) {
+export async function fetchOutlineAt(projectId, roomNr, point, { signal, pritarta = false, klausimas = null, perziura = false } = {}) {
   // `pritarta`: the point is inside the outline the program PROPOSED and he said „Tinka" (2026-09-23)
   // `klausimas`: the Patikra question this click answers — the server's journal row carries it (togal-v2 W11)
+  // `perziura`: the viewer's room tool only PROPOSES the outline (Pathon v3 W1-D) — no journal row; the save is
+  //   `fetchOutlineSet(…, {kaip: 'parodyta'})` once he has seen it
   return post(projectId, roomNr, 'outline-at',
     { page: point.page, x_pct: point.x_pct, y_pct: point.y_pct, ...(pritarta ? { pritarta: true } : {}),
-      ...(klausimas ? { klausimas: String(klausimas) } : {}) }, signal);
+      ...(klausimas ? { klausimas: String(klausimas) } : {}), ...(perziura ? { perziura: true } : {}) }, signal);
 }
 
 /** `{status: 'ok', rooms: {nr: geometry}, kitu_angos}` | `{status: 'bad_line'|'not_shared'|'too_many'|'no_walls'}` */
@@ -54,8 +56,10 @@ export async function fetchSplitProposal(projectId, roomNr, { signal } = {}) {
  * `{status: 'ok', room, kitu_angos}` — the ring the person drew becomes the room's corrected outline (2026-10-16).
  * `holes`: rings cut out of it („Atimti"); absent or empty clears the ones it had.
  */
-export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct, holes = null, holes_walls = null }, { signal } = {}) {
-  return post(projectId, roomNr, 'outline-set', { page, polygon_pct, ...holesBody(holes, holes_walls) }, signal);
+export async function fetchOutlineSet(projectId, roomNr, { page, polygon_pct, holes = null, holes_walls = null, kaip = null }, { signal } = {}) {
+  // `kaip: 'parodyta'`: the ring is the wall face he pointed at with the room tool (Pathon v3 W1-D), not one he drew
+  return post(projectId, roomNr, 'outline-set',
+    { page, polygon_pct, ...holesBody(holes, holes_walls), ...(kaip === 'parodyta' ? { kaip } : {}) }, signal);
 }
 
 /** `holes` and, per hole, his answer to „Kas atimama?" (`holes_walls`; absent → the server's default, walls). */
@@ -70,4 +74,13 @@ function holesBody(holes, holesWalls) {
  */
 export async function fetchOutlineMerge(projectId, goneNr, { page, kept_nr, polygon_pct, holes = null, holes_walls = null }, { signal } = {}) {
   return post(projectId, goneNr, 'outline-merge', { page, kept_nr, polygon_pct, ...holesBody(holes, holes_walls) }, signal);
+}
+
+/**
+ * „Atšaukti" (Pathon v3 W1-D): PUT a saving answer's `previous` back through the route that saved it
+ * (`action` = 'outline-set' | 'outline-merge' | 'split-space'). → the forward answer's shape:
+ * `{status: 'ok', rooms, kitu_angos: {}, sujungimas?, atsaukta}` — land it with roomsWithSplit (+ merge keys).
+ */
+export async function restoreOutline(projectId, roomNr, action, previous, { signal } = {}) {
+  return post(projectId, roomNr, action, { previous }, signal, 'PUT');
 }

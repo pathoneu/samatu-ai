@@ -60,3 +60,12 @@ test('fill and find-similar have their own pills', () => {
   assert.equal(modePillFor({ fill: { nr: '04', busy: true } }).detail, 'Ieškoma kontūro…');
   assert.deepEqual(ids(modePillFor({ symbolActive: true })), ['symbolClose']);
 });
+
+test('the room tool (W1-D): a proposal is reviewed in the pill — Išsaugoti / Atmesti — before it exists', () => {
+  assert.deepEqual(ids(modePillFor({ tool: 'room', roomPhase: 'idle' })), ['toolExit']);
+  const proposed = modePillFor({ tool: 'room', roomPhase: 'proposed' });
+  assert.deepEqual(ids(proposed), ['roomSave', 'roomDrop']);
+  assert.equal(proposed.actions[0].primary, true);
+  assert.equal(proposed.keys, 'Enter — išsaugoti · Esc — atmesti');
+  assert.match(modePillFor({ tool: 'room', roomPhase: 'reading' }).detail, /Skaitomas/);
+});
