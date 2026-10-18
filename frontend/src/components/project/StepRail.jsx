@@ -5,7 +5,6 @@
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Map as MapIcon, ClipboardCheck, ListChecks, Send } from 'lucide-react';
 import LearningJournal from '@/components/project/LearningJournal';
 
 // ── Step bar ──────────────────────────────────────────────────────────────────
@@ -22,11 +21,11 @@ import LearningJournal from '@/components/project/LearningJournal';
 
 export const STEPS = ['brezinys', 'patikra', 'samata', 'siusti'];
 
+// Pathon v3 frame (A5, audit B11): ONE cue per step — its number and its name; no icon beside them and no
+// coloured disc. The step he is on is in ink with a 2 px underline; the others are quieter, done ones a
+// little less quiet than the ones ahead.
 export function StepBar({ step, setStep, hasPdf, projectId = null }) {
   const { t } = useTranslation();
-  const icons = {
-    brezinys: MapIcon, patikra: ClipboardCheck, samata: ListChecks, siusti: Send,
-  };
   const currentIdx = STEPS.indexOf(step);
   return (
     <nav
@@ -35,7 +34,6 @@ export function StepBar({ step, setStep, hasPdf, projectId = null }) {
       style={{ paddingLeft: 12, paddingRight: 12, gap: 2 }}
     >
       {STEPS.map((id, i) => {
-        const Icon = icons[id];
         const isActive = step === id;
         const isDone = i < currentIdx;
         return (
@@ -49,28 +47,19 @@ export function StepBar({ step, setStep, hasPdf, projectId = null }) {
                 ? t('project.steps.brezinysAttachTitle')
                 : t(`project.steps.titles.${id}`)}
               aria-current={isActive ? 'step' : undefined}
+              data-testid={`step-${id}`}
               /* 44 px tall, 16 px label — the whole product is aimed at 35–60
                  year old eyes and hands (design §5). */
               className={`flex items-center shrink-0 whitespace-nowrap border-b-2 -mb-px transition-colors ${
                 isActive
-                  ? 'border-primary text-foreground font-semibold'
+                  ? 'border-foreground text-foreground font-semibold'
                   : isDone
                     ? 'border-transparent text-foreground/75 hover:text-foreground'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
               style={{ minHeight: 44, padding: '0 14px', gap: 8, fontSize: 16 }}
             >
-              <span
-                aria-hidden
-                className={`inline-flex items-center justify-center rounded-full shrink-0 ${
-                  isActive ? 'bg-primary text-primary-foreground'
-                           : 'bg-muted text-muted-foreground'
-                }`}
-                style={{ width: 22, height: 22, fontSize: 12, fontWeight: 600 }}
-              >
-                {i + 1}
-              </span>
-              <Icon className="w-4 h-4 shrink-0" aria-hidden />
+              <span aria-hidden className="tabular">{i + 1}</span>
               {t(`project.steps.${id}`)}
             </button>
           </React.Fragment>

@@ -308,6 +308,7 @@ function StepFooter({ step, setStep, nextLabel, nextTitle, onNext, children }) {
       <button
         type="button"
         onClick={() => prev && setStep(prev)}
+        data-testid="step-back"
         disabled={!prev}
         title={prev ? t('project.steps.backTitle', { step: t(`project.steps.${prev}`) }) : undefined}
         className="inline-flex items-center gap-2 rounded border border-border-strong bg-background text-foreground/85 hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:hover:bg-background"
@@ -322,6 +323,7 @@ function StepFooter({ step, setStep, nextLabel, nextTitle, onNext, children }) {
         <button
           type="button"
           onClick={onNext}
+          data-testid="step-next"
           title={nextTitle}
           className="inline-flex items-center gap-2 rounded font-semibold transition-colors"
           style={{

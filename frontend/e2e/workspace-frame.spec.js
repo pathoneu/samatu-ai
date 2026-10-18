@@ -8,6 +8,8 @@
  *  - Sąmata „Išskleisti" collapses the drawing to a 56 px strip without unmounting it;
  *  - the sheet list opens as a 56 px strip (name on click/focus, „Lapai"/T for the full rail);
  *  - the drawing's canvas takes ≥ 48 % of a 1440×900 window on Brėžinys;
+ *  - every view's main button is on screen (1440×900 and 1280×720), the page never scrolls, the top bar
+ *    is the same on all four, the step rail gives one cue per step;
  *
  * Written to merge into W0-A's Playwright suite (frontend/e2e): it uses relative URLs (the suite's
  * `baseURL`, e.g. http://localhost:5203 for the W1-A worktree) and needs the backend with auth off.
@@ -155,6 +157,33 @@ test.describe('workspace frame — one workspace, four views', () => {
     });
     expect(share).toBeGreaterThanOrEqual(0.48);
   });
+
+  for (const [w, h] of [[1440, 900], [1280, 720]]) {
+    test(`every view keeps its main button on screen and the same top bar, ${w}×${h}`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      await openProject(page);
+      await waitForDrawing(page);
+      for (const [label, view] of [['Brėžinys', 'brezinys'], ['Patikra', 'patikra'], ['Sąmata', 'samata'], ['Siųsti', 'siusti']]) {
+        await goToStep(page, label);
+        await expect.poll(() => workspaceView(page)).toBe(view);
+        // the step's one big button: „… — į patikrą / į sąmatą / siųsti"; on Siųsti the export itself
+        const primary = view === 'siusti'
+          ? page.locator('[data-testid="send-view"] button').first()
+          : page.locator('[data-testid="step-next"]');
+        await expect(primary).toBeVisible();
+        const box = await primary.boundingBox();
+        expect(box.y + box.height, `${view}: main button bottom`).toBeLessThanOrEqual(h);
+        // nothing scrolls the page: the frame is one screen high
+        expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), `${view}: page scroll`).toBe(true);
+        // the same top bar (name, totals, Prielaidos/Nustatymai, Versijos) on all four
+        await expect(page.locator('[data-testid="project-frame"] > div').first()).toContainText('Versijos');
+        // one cue per step: the active step is in ink with its number, no icon beside it
+        const active = page.locator(`${STEP_NAV} [aria-current="step"]`);
+        await expect(active).toHaveAttribute('data-testid', `step-${view}`);
+        expect(await active.locator('svg').count()).toBe(0);
+      }
+    });
+  }
 
   test('Sąmata „Išskleisti" gives the rows the width and keeps the drawing mounted behind a strip', async ({ page }) => {
     await openProject(page, `/project/${PROJECT}?step=samata`);
