@@ -145,6 +145,8 @@ const withoutComments = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(
 const RETIRED = [
   ['pasirinkite tipą dešinėje', 'the count types panel is on the left'],
   ['žr. „Peržiūra', 'that screen is gone — rooms are shown on the plan in the step „Patikra“'],
+  ['numerių žymekl', 'no number markers are drawn at rest since 2026-07-14 — a clean drawing and one ring'],
+  ['rodyti tik numerius', 'no number markers are drawn at rest since 2026-07-14'],
 ];
 
 test('components carry none of the retired screen phrases', () => {

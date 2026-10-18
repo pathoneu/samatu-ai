@@ -71,7 +71,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Uždaryti paiešką, išjungti įrankį, atsisakyti patalpos', combos: [{ keys: ['Escape'] }] },
 
   // ── Sluoksniai
-  { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpų zonas arba rodyti tik numerius', combos: [{ keys: ['u', 'U'] }] },
+  { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpas arba palikti brėžinį švarų', combos: [{ keys: ['u', 'U'] }] },
   { id: 'toggleWallsLayer', group: 'layers', bound: 'hotkeys', label: 'Sienų sluoksnis: sienos, kontūrai ir angos iš PDF', combos: [{ keys: ['s', 'S'] }] },
 ];
 

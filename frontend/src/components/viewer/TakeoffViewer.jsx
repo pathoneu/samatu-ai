@@ -216,8 +216,9 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       {onToggleZoneFills && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {/* Zone-fill layer toggle. Founder decision 2026-07-11: markers are the
-              default; this re-enables the filled room polygons.
+          {/* Zone-fill layer toggle. Founder decision 2026-07-14: a clean drawing is the
+              default (only the chosen room's ring); this re-enables the filled room polygons.
+              2026-10-18: the title still promised number markers, gone since 2026-07-14.
               2026-07-28: the old title named the CURRENT state and then the
               OTHER state's action in one breath ("užpildai: įjungta (rodyti
               žymeklius)") — both readings were wrong. Say only what the click
@@ -225,8 +226,8 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           <button
             className={zoneFillsVisible ? pressed : btn}
             title={zoneFillsVisible
-              ? 'Rodyti tik patalpų numerių žymeklius (dabar matomos nuspalvintos patalpų zonos)'
-              : 'Nuspalvinti patalpų zonas brėžinyje (dabar matomi tik numerių žymekliai)'}
+              ? 'Paslėpti nuspalvintas patalpas — brėžinys liks švarus, pasirinkta patalpa bus pažymėta žiedu ties jos numeriu'
+              : 'Nuspalvinti visas patalpas pagal jų kontūrus (dabar brėžinys švarus — pasirinkta patalpa pažymima žiedu ties jos numeriu)'}
             aria-pressed={!!zoneFillsVisible}
             onClick={onToggleZoneFills}
           ><Layers className="w-4 h-4" /></button>
