@@ -29,6 +29,15 @@ module.exports = {
   			title: ['24px', { lineHeight: '32px' }],
   			display: ['30px', { lineHeight: '36px' }]
   		},
+  		// v3 W1-C: one tinted slate shadow (--shadow-ink) instead of Tailwind's black; same geometry.
+  		boxShadow: {
+  			sm: '0 1px 2px 0 hsl(var(--shadow-ink) / 0.06)',
+  			DEFAULT: '0 1px 3px 0 hsl(var(--shadow-ink) / 0.1), 0 1px 2px -1px hsl(var(--shadow-ink) / 0.1)',
+  			md: '0 4px 6px -1px hsl(var(--shadow-ink) / 0.1), 0 2px 4px -2px hsl(var(--shadow-ink) / 0.1)',
+  			lg: '0 10px 15px -3px hsl(var(--shadow-ink) / 0.1), 0 4px 6px -4px hsl(var(--shadow-ink) / 0.1)',
+  			xl: '0 20px 25px -5px hsl(var(--shadow-ink) / 0.1), 0 8px 10px -6px hsl(var(--shadow-ink) / 0.1)',
+  			'2xl': '0 25px 50px -12px hsl(var(--shadow-ink) / 0.25)'
+  		},
   		// v3 W1-C stacking scale — the --z-* tokens in index.css.
   		zIndex: {
   			canvas: 'var(--z-canvas)',

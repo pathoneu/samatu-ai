@@ -170,11 +170,11 @@ function WorkRow({
   const sourceKind = getQuantitySourceKind(item);
   const sourceLabel = getQuantitySourceLabel(item);
   const sourceClass = {
-    manual: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    ai_symbol: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
-    assumption: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    formula_estimate: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    manual: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
+    verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
+    ai_symbol: 'border-red-500/30 bg-red-500/10 text-red-700',
+    assumption: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+    formula_estimate: 'border-blue-500/30 bg-blue-500/10 text-blue-700',
     formula: 'border-slate-500/20 bg-slate-500/10 text-muted-foreground',
   }[sourceKind] || 'border-slate-500/20 bg-slate-500/10 text-muted-foreground';
   const rowId = item._id || `${item.eil_nr}-${item.aprasymas}`;
@@ -275,12 +275,12 @@ function WorkRow({
         <td className="px-3 py-2 text-right">
           <button onClick={handleSave}
             title={t('project.mainView.saveRow')} aria-label={t('project.mainView.saveRow')}
-            className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded mr-1">
+            className="p-1 hover:bg-green-100 text-green-700 rounded mr-1">
             <Check className="w-3.5 h-3.5" />
           </button>
           <button onClick={handleCancel}
             title={t('project.mainView.cancelRow')} aria-label={t('project.mainView.cancelRow')}
-            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+            className="p-1 hover:bg-red-100 text-red-700 rounded">
             <X className="w-3.5 h-3.5" />
           </button>
         </td>
@@ -338,7 +338,7 @@ function WorkRow({
         {item._orphaned_after_rebuild && (
           <div className="mt-1 flex items-center gap-1.5">
             <span
-              className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-meta font-medium text-amber-700 dark:text-amber-300"
+              className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-meta font-medium text-amber-700"
               title={t('project.mainView.orphanTitle')}
             >
               <AlertCircle className="w-3 h-3" />
@@ -515,7 +515,7 @@ function WorkRow({
              control itself, otherwise a one-click delete of a priced position
              reads as permanent. (2026-07-28 explainability pass.) */
           <button onClick={() => onRemove(item)}
-            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1"
+            className="p-1 hover:bg-red-50 text-red-600 rounded ml-1"
             title={t('project.mainView.removeTitle')} aria-label={t('project.mainView.removeTitle')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -818,7 +818,7 @@ export default function ProjectMainView({
 
           {/* Trūksta kainų — perspėjimas */}
           {totals.viso === 0 && darbai.length > 0 && (
-            <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
+            <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <div>
                 <strong>{t('project.mainView.pricesMissingStrong')}</strong>{t('project.mainView.pricesMissingRest')}

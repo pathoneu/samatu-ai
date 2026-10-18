@@ -7,6 +7,7 @@ import { initAnalytics } from '@/lib/analytics'
 import { API_BASE } from '@/lib/apiBase'
 import '@/i18n' // side-effect: initialise react-i18next (LT default, EN additive)
 import '@/index.css'
+import '@/styles/marketing.css' // public pages' shared classes (moved out of index.css, v3 W1-C)
 
 // Sprint §24 (2026-04-29): localStorage error log so users can export
 // their last 100 errors via Settings → "Eksportuoti klaidų žurnalą".
