@@ -31,6 +31,12 @@ cp /Users/ignasgaldikas/samatu-ai/backend/.confidential-terms backend/.confident
 cd backend && SAMATU_AUTH_DISABLED=1 /Users/ignasgaldikas/samatu-ai/venv/bin/uvicorn main:app --port <BACKEND_PORT> --reload
 cd frontend && VITE_BACKEND_URL=http://localhost:<BACKEND_PORT> npm run dev -- --port <VITE_PORT>
 ```
+**Vite cache trap (found by W0-B, 2026-10-18):** because `node_modules` is a symlink to the main checkout, every worktree's Vite shares `node_modules/.vite/deps` and re-optimises it under the others; the browser then mixes two `@embedpdf` builds and the viewer hangs on „Kraunamas dokumentas…". Give each Vite its own cache with a wrapper config **outside the repo**, e.g. `<scratch>/vite.<worker>.config.mjs`:
+```js
+export default { ...(await import('<worktree>/frontend/vite.config.js')).default, cacheDir: '<scratch>/vite-cache' };
+```
+and run `VITE_BACKEND_URL=http://localhost:<BACKEND_PORT> ./node_modules/.bin/vite --port <VITE_PORT> --config <scratch>/vite.<worker>.config.mjs` from `frontend/` instead of `npm run dev`.
+
 Demo projects: `http://localhost:<VITE_PORT>/project/demo-objektas_h` (vector PDF, 11 rooms, 8 sheets) and `demo-objektas_g`. The live DB file is `backend/data/samatu.db` (not `backend/samatu.db`).
 
 | Worker | Branch | Backend | Vite | Wave |
