@@ -53,6 +53,7 @@ class Sheet:
     legend_style: str = "symbols"                           # "symbols" left of the text, "column" right of it, "swatches" (material boxes)
     table_title: str | None = None                          # the table's title (default TABLE_TITLE)…
     table_rows: tuple[tuple[str, ...], ...] | None = None   # …and its rows (default TABLE_ROWS)
+    table_tail_rows: tuple[tuple[str, ...], ...] | None = None   # rows ruled APART, TABLE_TAIL_GAP under the table (objektas_h p2's last legend row)
     rotate: int = 0                                         # the page's /Rotate — drawn unrotated, the viewer turns it
 
 
@@ -69,6 +70,7 @@ TABLE_TITLE = "DURŲ ŽINIARAŠTIS"
 TABLE_ROWS = (("Žymuo", "Dydis", "Kiekis"), ("D1", "900x2100", "3"), ("D2", "800x2100", "2"), ("D3", "700x2100", "1"))
 TABLE_COL_W = (40.0, 60.0, 40.0)
 TABLE_ROW_H = 14.0
+TABLE_TAIL_GAP = 4.5           # past pdfplumber's 3 pt snap, so the tail is a table of its own
 TITLE_BLOCK_BOX = (330.0, 740.0, 575.0, 822.0)                # x0, top, x1, bottom in points
 NOTES_LINES = ("Visus matmenis tikslinti vietoje prieš gaminant baldus",
                "Sienų apdailą derinti su projekto autoriumi ir užsakovu",
@@ -138,6 +140,20 @@ def _zone_blocks(c, sheet: "Sheet") -> None:
             for w, text in zip(TABLE_COL_W, row):
                 c.drawString(cx + 2, H - (top + i * TABLE_ROW_H) - 9, text)
                 cx += w
+        if sheet.table_tail_rows:
+            t2 = top + n * TABLE_ROW_H + TABLE_TAIL_GAP
+            m = len(sheet.table_tail_rows)
+            for i in range(m + 1):
+                c.line(x, H - (t2 + i * TABLE_ROW_H), x + width, H - (t2 + i * TABLE_ROW_H))
+            cx = x
+            for w in (0.0,) + TABLE_COL_W:
+                cx += w
+                c.line(cx, H - t2, cx, H - (t2 + m * TABLE_ROW_H))
+            for i, row in enumerate(sheet.table_tail_rows):
+                cx = x
+                for w, text in zip(TABLE_COL_W, row):
+                    c.drawString(cx + 2, H - (t2 + i * TABLE_ROW_H) - 9, text)
+                    cx += w
     if sheet.title_block:
         x0, top, x1, bottom = TITLE_BLOCK_BOX
         c.setStrokeGray(0.0)

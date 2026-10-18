@@ -87,6 +87,7 @@ GLYPH_REACH_PT = 70.0        # a row's glyph stands at most this far left of its
 LEGEND_MIN_ROWS = 2
 LEGEND_ROW_GAP_EM = 3.5      # rows of one legend follow each other within this many line heights
 LEGEND_MAX_ROWS = 60
+LEGEND_TABLE_GAP_PT = 6.0    # a ruled piece starting this close under a legend table continues it
 LEGEND_ALIGN_PT = 10.0       # the rows' text (glyph left) or glyphs (glyph right) start within this of the first row's
 NOTES_MIN_LINES = 3
 NOTES_MIN_LINES_UNHEADED = 4
@@ -746,8 +747,23 @@ def _detect(pdf_bytes: bytes, page: int, table_max_objects: int | None = None) -
             i, t = titled
             legend_tables.add(i)
             b = _union(_box(head), (t["x0"], t["top"], t["x1"], t["bottom"]))
+            n_rows = t["text_rows"]
+            # a ruled piece that goes on right under it is the same legend (objektas_h p2: its last row
+            # „T Termostatas" is ruled apart, a point below)
+            grew = True
+            while grew:
+                grew = False
+                for j, u in enumerate(tables):
+                    if j in legend_tables or (u["x1"] - u["x0"]) * (u["bottom"] - u["top"]) >= TABLE_MAX_PAGE_SHARE * W * H:
+                        continue
+                    overlap = min(u["x1"], b[2]) - max(u["x0"], b[0])
+                    if 0 <= u["top"] - b[3] <= LEGEND_TABLE_GAP_PT and overlap >= 0.7 * min(u["x1"] - u["x0"], b[2] - b[0]):
+                        legend_tables.add(j)
+                        b = _union(b, (u["x0"], u["top"], u["x1"], u["bottom"]))
+                        n_rows += u["text_rows"]
+                        grew = True
             zones.append(_zone("legenda", b, W, H, head["text"].rstrip(": "), "read", "lentele",
-                               f"antraštė „{head['text'][:40]}“ virš lentelės, {t['text_rows']} eil."))
+                               f"antraštė „{head['text'][:40]}“ virš lentelės, {n_rows} eil."))
             taken.append(b)
             continue
         if glyphs is None:

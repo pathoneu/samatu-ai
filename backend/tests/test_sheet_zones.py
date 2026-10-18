@@ -344,3 +344,16 @@ def test_zone_at_takes_a_legend_inside_the_title_band():
     assert sz.zone_at(zones, 0.7, 0.8)["kind"] == "legenda"
     assert sz.zone_at(zones, 0.2, 0.8)["kind"] == "antspaudas"
     assert sz.zone_at(zones, 0.6, 0.6)["kind"] == "planas"
+
+
+def test_a_legend_table_takes_the_row_ruled_apart_under_it():
+    """objektas_h p2: „SUTARTINIAI ŽYMĖJIMAI:" over a ruled table whose last row („T Termostatas") is a
+    separate ruled piece a point below — one legend, all its rows."""
+    rows = (("Žymėjimas", "Pavadinimas", "Kiekis"), ("A", "Interneto lizdas", "2"), ("B", "Rozetė", "6"), ("C", "Jungiklis", "3"))
+    s = _full_sheet(legend_block_at=None, table_title=LEGEND_HEADING, table_rows=rows,
+                    table_tail_rows=(("T", "Termostatas", "1"),))
+    legend = _one(sz.detect_zones(build_plan([s]), 1), "legenda")
+    x, top = TABLE_AT
+    _close(legend["bbox_pct"], _pct(x, top - 8, x + sum(TABLE_COL_W), top + 5 * TABLE_ROW_H + 4.5), tol=0.005)
+    assert "5 eil." in legend["evidence"]["detail"]
+    assert not [z for z in sz.detect_zones(build_plan([s]), 1) if z["kind"] == "lentele"]
