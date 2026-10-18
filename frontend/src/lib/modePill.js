@@ -80,7 +80,9 @@ export function modePillFor(state = {}) {
       id: tool,
       name: nameOf(tool),
       detail: null,
-      keys: drawing ? hintText(['draftFinish', 'draftUndoPoint', 'draftCancel'], { mac }) : 'Shift — tik tiesiai arba 45°',
+      keys: drawing
+        ? hintText(['draftFinish', 'draftStepBack'], { mac })
+        : (tool === 'distance' ? 'Antras spustelėjimas įrašo · Shift — tęsti, tik tiesiai arba 45°' : 'Shift — tik tiesiai arba 45°'),
       actions: drawing
         ? [
             {

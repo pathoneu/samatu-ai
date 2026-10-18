@@ -41,8 +41,10 @@ export function cursorHintFor(state = {}) {
     case 'pan':
       return 'Tempkite brėžinį';
     case 'distance':
+      // the second plain click ends a distance; Shift + click keeps the chain going (v3 W1-B B5)
       if (points === 0) return 'Spustelėkite pradžią';
-      return points === 1 ? 'Spustelėkite pabaigą' : 'Kitas taškas · dukart arba Enter — baigti';
+      if (shift) return 'Spustelėkite kitą tašką — atstumas tęsiamas';
+      return 'Spustelėkite pabaigą — atstumas įsirašys · su Shift — tęsti';
     case 'area':
       if (points === 0) return 'Spustelėkite pirmą kampą';
       if (points < 3) return 'Spustelėkite kitą kampą';

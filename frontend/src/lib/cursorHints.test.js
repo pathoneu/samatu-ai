@@ -19,7 +19,9 @@ test('every tool on the rail is a hint mode', () => {
 
 test('the sentence follows the state: the next point, then how to finish', () => {
   assert.equal(cursorHintFor({ mode: 'distance', points: 0 }), 'Spustelėkite pradžią');
-  assert.equal(cursorHintFor({ mode: 'distance', points: 1 }), 'Spustelėkite pabaigą');
+  assert.match(cursorHintFor({ mode: 'distance', points: 1 }), /^Spustelėkite pabaigą — atstumas įsirašys/);
+  assert.match(cursorHintFor({ mode: 'distance', points: 2 }), /su Shift — tęsti/);
+  assert.match(cursorHintFor({ mode: 'distance', points: 1, shift: true }), /tęsiamas/);
   assert.equal(cursorHintFor({ mode: 'area', points: 0 }), 'Spustelėkite pirmą kampą');
   assert.equal(cursorHintFor({ mode: 'area', points: 2 }), 'Spustelėkite kitą kampą');
   assert.match(cursorHintFor({ mode: 'area', points: 3 }), /dukart arba Enter — baigti/);

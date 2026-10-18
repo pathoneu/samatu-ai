@@ -28,7 +28,8 @@ test('a measurement being drawn: Baigti (only when it can finish) and Atšaukti 
   const three = modePillFor({ tool: 'area', draftPoints: 3, finishable: true });
   assert.equal(three.actions[0].disabled, false);
   assert.equal(three.actions[0].primary, true);
-  assert.match(three.keys, /Enter — baigti/);
+  assert.equal(three.keys, 'Enter — baigti · Esc — atgal');
+  assert.match(modePillFor({ tool: 'distance' }).keys, /Antras spustelėjimas įrašo/);
 });
 
 test('the pill shows only the active mode — outline edit wins over an armed tool', () => {

@@ -66,8 +66,10 @@ export const VIEWER_SHORTCUTS = [
   // ── Braižant matavimą
   { id: 'draftFinish', group: 'measure', bound: 'draft', label: 'Baigti braižomą matavimą', hint: 'baigti', combos: [{ keys: ['Enter'] }] },
   { id: 'draftFinishMouse', group: 'measure', bound: 'mouse', label: 'Baigti braižomą matavimą', display: 'Dukart spustelėti' },
+  { id: 'draftMenu', group: 'measure', bound: 'mouse', label: 'Braižant — „Baigti" arba „Atšaukti" prie žymeklio', display: 'Dešinysis pelės klavišas' },
   { id: 'draftStepBack', group: 'measure', bound: 'esc', label: 'Pašalinti paskutinį tašką; kai taškų nebėra — išeiti iš įrankio', hint: 'atgal', combos: [{ keys: ['Escape'] }] },
   { id: 'draftUndoPoint', group: 'measure', bound: 'draft', label: 'Pašalinti paskutinį nubrėžtą tašką', hint: 'atgal', combos: [{ keys: ['z', 'Z'] }, { keys: ['Backspace'] }] },
+  { id: 'distanceChain', group: 'measure', bound: 'mouse', label: 'Atstumas įsirašo antru spustelėjimu; su Shift — tęsiamas toliau', display: 'Shift + spustelėti' },
   { id: 'orthoLock', group: 'measure', bound: 'mouse', label: 'Brėžti tik horizontaliai, vertikaliai arba 45° kampu', display: 'Laikyti Shift' },
   { id: 'countRemove', group: 'measure', bound: 'mouse', label: 'Kiekio įrankiu — pašalinti tą žymę', display: 'Spustelėti ant žymės' },
 
