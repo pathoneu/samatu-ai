@@ -13,6 +13,7 @@ import {
 } from '@/lib/polygonGeometry.js';
 import { pickSnap } from '@/lib/drawingSnap.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
+import { flashCursorHint } from '@/lib/cursorHints.js';
 import {
   DASH, LABEL_FONT_PX, LABEL_STYLE, SELECTED_STROKE_PX, STROKE_PX, labelWidth, ov, paint,
 } from '@/lib/overlayTokens.js';
@@ -89,6 +90,8 @@ export default function MeasureLayer({
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
   const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
   const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
+  // Right-click while drawing (v3 W1-B B5, Kreo „Create / Reset"): „Baigti" / „Atšaukti" at the pointer.
+  const [finishMenu, setFinishMenu] = useState(null);   // {x, y} in SVG px, or null
   const selectedSet = useMemo(
     () => new Set(Array.isArray(selectedIds) ? selectedIds : (selectedId != null ? [selectedId] : [])),
     [selectedIds, selectedId],
@@ -210,6 +213,11 @@ export default function MeasureLayer({
       return;
     }
 
+    // Only the main button draws (a right-click used to drop a vertex or a mark under the menu).
+    if (e.button !== 0) return;
+    // The right-click pop-up is open: a click beside it closes it and adds nothing.
+    if (finishMenu) { setFinishMenu(null); return; }
+
     const { point } = applySnap(eventToPdf(e), e);
 
     if (tool === 'calibrate') {
@@ -218,7 +226,8 @@ export default function MeasureLayer({
       } else if (Math.hypot(point.x - calibA.x, point.y - calibA.y) <= SNAP_TOL_PX / (adapter?.scale || 1)) {
         // Second click landed ON the first one (audit P1: a double-click armed
         // the dialog with a zero-length line, whose Patvirtinti then threw and
-        // did nothing). Ignore it and keep waiting for a real B point.
+        // did nothing). Ignore it and keep waiting for a real B point — and say so at the pointer.
+        flashCursorHint('Taškai sutampa — spustelėkite kitą atkarpos galą');
         return;
       } else {
         onCalibrate?.(pageNr, calibA, point);
@@ -230,7 +239,7 @@ export default function MeasureLayer({
     }
 
     if (tool === 'count') {
-      if (!activeCountTypeId) return;
+      if (!activeCountTypeId) { flashCursorHint('Nieko nepažymėta: pirmiausia pasirinkite arba sukurkite tipą kairėje'); return; }
       // Place/remove toggle (founder 2026-07-12: "no way to delete them"):
       // clicking ON an existing count dot removes THAT dot instead of stacking
       // a new one next to it — no separate eraser or select-tool detour needed.
@@ -254,6 +263,12 @@ export default function MeasureLayer({
     }
 
     if (POLY_TOOLS.has(tool)) {
+      // Distance ends on its second click (v3 W1-B B5); Shift + click keeps the chain going instead, and the
+      // next plain click ends it there.
+      if (tool === 'distance' && draft.points.length >= 1 && !e.shiftKey) {
+        commitDraft([...draft.points, point]);
+        return;
+      }
       const closeTolerance = SNAP_TOL_PX / adapter.scale;
       const next = draftReducer(draft, { type: 'click', tool, point, closeTolerance });
       if (next.committed) {
@@ -262,7 +277,7 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu]);
 
   const handlePointerUp = useCallback((e) => {
     if (tool !== 'lasso' || !lasso) return;
@@ -284,6 +299,7 @@ export default function MeasureLayer({
     e.preventDefault();
     const finished = draftReducer(draft, { type: 'finish', tool });
     if (finished.committed) commitDraft(finished.points);
+    else if (draft.points.length) flashCursorHint(tool === 'area' ? 'Plotui reikia bent 3 taškų' : 'Reikia bent 2 taškų');
   }, [tool, draft, commitDraft]);
 
   // Explicit on-canvas Baigti/Atšaukti (founder 2026-07-25: "no buttons on how
@@ -300,9 +316,33 @@ export default function MeasureLayer({
   }, [dispatch]);
   const draftMinPoints = tool === 'area' ? 3 : 2;
   const draftFinishable = POLY_TOOLS.has(tool) && draft.points.length >= draftMinPoints;
+  const drafting = POLY_TOOLS.has(tool) && draft.points.length > 0;
+  // Right-click while drawing → „Baigti" / „Atšaukti" at the pointer. Off a draft the right-click stays the
+  // measurement menu (PageOverlayHost) — this handler lets it through.
+  const handleContextMenu = useCallback((e) => {
+    if (!drafting) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setFinishMenu(localPx(e));
+  }, [drafting, localPx]);
+  // The pop-up closes with the draft (finished, cancelled, stepped back to nothing, tool changed).
+  useEffect(() => { if (!drafting) setFinishMenu(null); }, [drafting]);
+  // Esc closes the pop-up only — the draft keeps its points (the viewer's Esc step never sees this press).
+  useEffect(() => {
+    if (!finishMenu) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setFinishMenu(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [finishMenu]);
 
-  // Keyboard: Enter = finish, Escape = reset, z = undo. Bound to window while a
-  // poly tool is active so the user need not focus the SVG.
+  // Keyboard: Enter = finish, z / Backspace = undo a point. Bound to window while a
+  // poly tool is active so the user need not focus the SVG. Esc is NOT here (v3 W1-B B4): the viewer's
+  // one Esc step (lib/escOrder) removes the last point, and leaves the tool only when none is left.
   // Bound ONLY on the page that owns a non-empty draft: this component is
   // mounted once per virtualized page, and with the draft lifted upstream every
   // mounted copy would otherwise apply the same undo/finish (5 pages = 5 undos).
@@ -313,10 +353,6 @@ export default function MeasureLayer({
       if (e.key === 'Enter') {
         const finished = draftReducer(draft, { type: 'finish', tool });
         if (finished.committed) commitDraft(finished.points);
-      } else if (e.key === 'Escape') {
-        dispatch({ type: 'reset' });
-        setCursor(null);
-        setSnapPt(null); setSnapKind(null);
       } else if (e.key === 'z' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         dispatch({ type: 'undo' });
       } else if (e.key === 'Backspace') {
@@ -327,22 +363,6 @@ export default function MeasureLayer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [tool, draft, dispatch, commitDraft]);
-
-  // Keyboard for the calibrate tool: Escape cancels an in-progress calibration.
-  // Same one-owner rule as the draft listener above.
-  useEffect(() => {
-    if (tool !== 'calibrate' || !calibA) return undefined;
-    const onKey = (e) => {
-      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
-      if (e.key === 'Escape') {
-        setCalibA(null);
-        setCursor(null);
-        setSnapPt(null); setSnapKind(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [tool, calibA, setCalibA]);
 
   // ---- render -------------------------------------------------------------
 
@@ -372,6 +392,7 @@ export default function MeasureLayer({
       onPointerCancel={() => setLasso(null)}
       onPointerLeave={() => setCursor(null)}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
     >
       {pageMeasurements.map((m) => (
         <CommittedMeasurement
@@ -396,14 +417,16 @@ export default function MeasureLayer({
         decimals={decimals}
       />
 
-      {POLY_TOOLS.has(tool) && draft.points.length > 0 && (
+      {/* „Baigti" / „Atšaukti" live in the mode pill at the bottom of the drawing (v3 W1-B B2), always visible
+          there; a right-click while drawing brings the same two to the pointer (B5). */}
+      {finishMenu && drafting && (
         <DraftActions
-          lastPt={adapter.toViewport(draft.points[draft.points.length - 1])}
+          lastPt={finishMenu}
           width={adapter.width}
           height={adapter.height}
           finishable={draftFinishable}
-          onFinish={finishDraft}
-          onCancel={cancelDraft}
+          onFinish={() => { setFinishMenu(null); finishDraft(); }}
+          onCancel={() => { setFinishMenu(null); cancelDraft(); }}
         />
       )}
 
@@ -428,7 +451,7 @@ export default function MeasureLayer({
   );
 }
 
-// Floating Baigti / Atšaukti buttons beside the draft's last vertex. SVG-native
+// The right-click pop-up while drawing: Baigti / Atšaukti beside the pointer (v3 W1-B B5). SVG-native
 // (this layer is an <svg>), stopPropagation on pointerdown+click so pressing a
 // button never adds a draft vertex underneath it. Clamped inside the page.
 function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel }) {
@@ -443,7 +466,7 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
       onPointerDown={stop}
       onDoubleClick={stop}
       onClick={(e) => { stop(e); if (enabled) onClick(); }}
-      role="button"
+      role="menuitem"
       aria-label={label}
       aria-disabled={!enabled}
     >
@@ -462,7 +485,7 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
     </g>
   );
   return (
-    <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
+    <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }} data-draft-menu role="menu" aria-label="Braižomas matavimas">
       <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={4}
         style={paint({ fill: ov('label-bg'), stroke: 'hsl(var(--border))' })} fillOpacity={0.96} strokeWidth={1} />
       {btn(0, 84, 'Baigti', finishable, onFinish, true,

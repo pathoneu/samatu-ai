@@ -9,7 +9,6 @@
  * zones go non-interactive so they can't swallow measure clicks.
  */
 import { useEffect, useMemo } from 'react';
-import { X } from 'lucide-react';
 import { RenderLayer } from '@embedpdf/plugin-render/react';
 import { TilingLayer } from '@embedpdf/plugin-tiling/react';
 import { SearchLayer } from '@embedpdf/plugin-search/react';
@@ -53,7 +52,7 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
   return null;
 }
 
-// Screen anchor for the selected measurement's delete affordance: centroid for
+// Screen anchor for the selected measurement (the selection bar stands above it): centroid for
 // areas (matches its label), middle vertex for lines, the dot for counts.
 function deleteAnchorFor(m, adapter) {
   if (!m?.points?.length) return null;
@@ -302,18 +301,14 @@ export default function PageOverlayHost({
             calibA={measureCalibA}
             onCalibAChange={onMeasureCalibAChange}
           />
-          {deleteAt && onMeasureDelete && (
-            <button
-              type="button"
-              title="Ištrinti matavimą (Delete)"
-              aria-label="Ištrinti matavimą"
-              onClick={(e) => { e.stopPropagation(); onMeasureDelete(selectedMeasurement.id); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              style={{ position: 'absolute', left: deleteAt.x + 10, top: deleteAt.y - 26, pointerEvents: 'auto' }}
-              className="w-5 h-5 rounded-full bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] shadow-sm flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground))] hover:bg-destructive hover:text-destructive-foreground hover:border-destructive"
-            >
-              <X className="w-3 h-3" />
-            </button>
+          {/* Where the selected mark is — the selection bar (v3 W1-B B6) stands right above it with
+              Pervadinti · Keisti tipą · Rodyti sąraše · Ištrinti (the old one-icon ✕ lived here). */}
+          {deleteAt && (
+            <span
+              aria-hidden="true"
+              data-measure-anchor={selectedMeasurement.id}
+              style={{ position: 'absolute', left: deleteAt.x - 12, top: deleteAt.y - 12, width: 24, height: 24, pointerEvents: 'none' }}
+            />
           )}
         </div>
       )}

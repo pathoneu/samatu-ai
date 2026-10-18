@@ -23,7 +23,7 @@ import { expect } from './pw.js';
 import { PROJECT, REPO, START_JSON, api, fingerprint, getProject, readJson, roomsByNr } from './state.js';
 import {
   PYTHON_HELPER, centroid, clickAt, dragBetween, escapeRe, expectKiekiai, focusRoom, insidePolygon, it, loadGeometry, note,
-  measRow, openProject, restoreStart, roomRow, sheetPoints, shot, toast, viewerReady,
+  measRow, moreItem, openProject, restoreStart, roomRow, sheetPoints, shot, toast, viewerReady,
 } from './helpers.js';
 
 const test = it;
@@ -121,7 +121,7 @@ test('1 coach marks + shortcuts guide', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: /^Įvadas:/ })).toHaveCount(0);
   note('coach 3 steps, once per browser');
 
-  await page.getByTestId('viewer-shortcuts-open').click();
+  await moreItem(page, 'viewer-shortcuts-open');
   const guide = page.getByTestId('shortcuts-guide');
   await expect(guide).toBeVisible();
   await expect(guide).toContainText('Spartieji klavišai');
@@ -226,7 +226,7 @@ test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', 
   const chip = page.getByTestId('scale-chip');
   await expect(chip).toHaveAttribute('data-scale-state', 'spejamas');
   await expect(chip).toContainText('1:115');
-  await page.getByTestId('scales-toggle').click();
+  await moreItem(page, 'scales-toggle');
   const panel = page.getByTestId('scale-overview');
   await expect(panel).toContainText('0 patvirtinti · 8 spėjami · 0 nenustatyti');
   await expect(panel).toContainText('8 lapai su tuo pačiu spėjamu masteliu 1:115: 1, 2, 3, 4, 5, 6, 7, 8');
@@ -238,14 +238,12 @@ test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', 
   await expect.poll(async () => fingerprint(await getProject()).confirmedScales, { timeout: 15_000 }).toBe(8);
   note('8 / 8 patvirtinti 1:115');
 
-  // Esc leaves tools but not this panel — its ✕ closes it
+  // v3 W1-B (audit F3): Esc closes this panel too — one step back: point → tool → panel → selection
   await page.keyboard.press('Escape');
-  await expect(panel).toBeVisible();
-  await page.getByRole('button', { name: 'Uždaryti mastelius' }).click();
   await expect(panel).toHaveCount(0);
   // „Patikrinti": two clicks on the drawn line of „996"
   await loadGeometry(page, 1);
-  await page.getByTestId('scales-toggle').click();
+  await moreItem(page, 'scales-toggle');
   await panel.locator('[data-scale-row="1"]').getByRole('button', { name: 'Patikrinti' }).click();
   await page.getByRole('button', { name: 'Uždaryti mastelius' }).click();
   for (const p of await sheetPoints(page, 1, DIM_996)) await clickAt(page, p);
@@ -374,8 +372,8 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   expect(Math.abs(mb.x + mb.width / 2 - pts[3].x)).toBeLessThan(1.5);
   expect(Math.abs(mb.y + mb.height / 2 - pts[3].y)).toBeLessThan(1.5);
   await clickAt(page, { x: pts[3].x + 2, y: pts[3].y - 2 });
+  // v3 W1-B: a distance is written on its second click — no „Baigti"
   await clickAt(page, { x: pts[2].x + 2, y: pts[2].y - 2 });
-  await page.getByRole('button', { name: /Baigti/ }).click();
   await expect(toast(page, 'Atstumas: 1,58 m')).toBeVisible();
 
   await page.getByRole('button', { name: 'Plotas', exact: true }).click();
@@ -419,7 +417,7 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   await menu.getByRole('menuitem', { name: 'Ištrinti visus (5)' }).click();
   await expect(measRow(page, 'Rozetės', '2 vnt.')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.getByTestId('viewer-history-toggle').click();
+  await moreItem(page, 'viewer-history-toggle');
   const hist = page.getByTestId('history-panel');
   await expect(hist).toContainText('Pašalinti 5 matavimai');
   await hist.getByRole('button', { name: 'Atšaukti', exact: true }).click();
@@ -427,10 +425,12 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   await expect(measRow(page, 'Rozetės', '2 vnt.')).toBeVisible();
   expect(await measureTexts()).toEqual(expect.arrayContaining(['1,58 m', '7,13 m²', '7,67 m']));
   await shot(page, '06-measure-lasso-history');
+  // v3 W1-B (audit F3): Esc closes Istorija too; its ✕ still does
   await page.keyboard.press('Escape');
-  await expect(hist, 'Esc does not close Istorija').toBeVisible();
-  await hist.getByRole('button', { name: 'Uždaryti istoriją' }).click();
-  await expect(hist).toHaveCount(0);
+  await expect(hist, 'Esc closes Istorija').toHaveCount(0);
+  await moreItem(page, 'viewer-history-toggle');
+  await page.getByTestId('history-panel').getByRole('button', { name: 'Uždaryti istoriją' }).click();
+  await expect(page.getByTestId('history-panel')).toHaveCount(0);
   note('lasso 3 matavimai + 2 žymės → ištrinta 5 → Istorija atšaukė');
 });
 

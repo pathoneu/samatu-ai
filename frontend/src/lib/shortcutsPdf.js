@@ -71,7 +71,9 @@ export function drawShortcutSheet(ctx, rows, { w, h, title, subtitle, font = 'IB
   const colGap = 50 * u;
   const colW = (w - 2 * margin - colGap) / 2;
   const keyW = colW * 0.42;
-  const lineH = 26 * u;
+  // The body shrinks (never below 70 %) when the list outgrows one A4 page — the sheet must stay one page.
+  const bottom = h - margin;
+  let s = 1;
 
   // Measure a group: header + wrapped rows.
   const wrap = (text, maxW, fontSpec) => {
@@ -86,39 +88,46 @@ export function drawShortcutSheet(ctx, rows, { w, h, title, subtitle, font = 'IB
     if (cur) lines.push(cur);
     return lines;
   };
-  const labelFont = `${19 * u}px ${font}`;
-  const keyFont = `500 ${18 * u}px ${mono}`;
+  const fonts = () => ({ labelFont: `${19 * u * s}px ${font}`, keyFont: `500 ${18 * u * s}px ${mono}`, lineH: 26 * u * s });
   const layoutGroup = (g) => {
+    const { labelFont, keyFont, lineH } = fonts();
     const items = g.items.map((it) => {
       const keyLines = wrap(it.keys.join(' · '), keyW - 12 * u, keyFont);
       const labelLines = wrap(it.label, colW - keyW, labelFont);
-      return { keyLines, labelLines, height: Math.max(keyLines.length, labelLines.length) * lineH + 10 * u };
+      return { keyLines, labelLines, height: Math.max(keyLines.length, labelLines.length) * lineH + 10 * u * s };
     });
-    return { g, items, height: 52 * u + items.reduce((s, it) => s + it.height, 0) + 24 * u };
+    return { g, items, height: (52 * u + 24 * u) * s + items.reduce((sum, it) => sum + it.height, 0) };
   };
-  const groups = rows.map(layoutGroup);
-
-  // Groups in order: the left column takes them while it stays near half the total, the rest go right.
-  const total = groups.reduce((s, g) => s + g.height, 0);
-  let acc = 0;
-  const cols = [[], []];
-  for (const g of groups) {
-    const left = cols[1].length === 0 && (cols[0].length === 0 || acc + g.height / 2 <= total / 2);
-    cols[left ? 0 : 1].push(g);
-    if (left) acc += g.height;
+  // Groups in order, split where the taller column is shortest.
+  const split = (groups) => {
+    let best = null;
+    for (let k = 1; k <= groups.length; k += 1) {
+      const left = groups.slice(0, k).reduce((sum, g) => sum + g.height, 0);
+      const right = groups.slice(k).reduce((sum, g) => sum + g.height, 0);
+      const tall = Math.max(left, right);
+      if (!best || tall < best.tall) best = { tall, cols: [groups.slice(0, k), groups.slice(k)] };
+    }
+    return best;
+  };
+  let laid = split(rows.map(layoutGroup));
+  if (laid.tall > bottom - top) {
+    s = Math.max(0.7, (bottom - top) / laid.tall);
+    laid = split(rows.map(layoutGroup));
   }
+  const { cols } = laid;
+  const { labelFont, keyFont, lineH } = fonts();
 
   cols.forEach((col, ci) => {
     const x = margin + ci * (colW + colGap);
     let y = top;
     for (const { g, items } of col) {
       ctx.fillStyle = accent;
-      ctx.font = `600 ${22 * u}px ${font}`;
+      ctx.font = `600 ${22 * u * s}px ${font}`;
       ctx.fillText(g.title.toUpperCase(), x, y);
-      y += 34 * u;
+      y += 34 * u * s;
       ctx.fillStyle = rule;
       ctx.fillRect(x, y, colW, 2 * u);
-      y += 14 * u;
+      y += 14 * u * s;
       for (const it of items) {
         ctx.fillStyle = ink;
         ctx.font = keyFont;
@@ -128,7 +137,7 @@ export function drawShortcutSheet(ctx, rows, { w, h, title, subtitle, font = 'IB
         it.labelLines.forEach((ln, i) => ctx.fillText(ln, x + keyW, y + i * lineH));
         y += it.height;
       }
-      y += 24 * u;
+      y += 24 * u * s;
     }
   });
 
