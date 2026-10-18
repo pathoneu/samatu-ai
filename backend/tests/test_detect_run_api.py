@@ -133,7 +133,8 @@ def test_the_stages_arrive_in_the_lanes_order_and_end_in_the_browser(tmp_path, m
     monkeypatch.setattr(dr._Job, "enter", spy)
     out = _run(TestClient(app), {"pages": [1]})
     order = [s for i, s in enumerate(entered) if s not in entered[:i]]
-    assert order == ["mastelis", "tekstas", "planas", "konturai", "angos", "sienos", "grindys", "kiekiai"]
+    # „lentelės" (Pathon v3 W3-A) is read while the lane turns from the text to the plan
+    assert order == ["mastelis", "tekstas", "lenteles", "planas", "konturai", "angos", "sienos", "grindys", "kiekiai"]
     assert [s["id"] for s in out["stages"]] == list(dr.STAGE_IDS)
     assert all(s["label_lt"] and s["about_lt"] for s in out["stages"])
     for sid in dr.LANE_STAGES:
