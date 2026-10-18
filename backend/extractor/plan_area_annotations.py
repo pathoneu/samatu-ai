@@ -245,6 +245,8 @@ def _iter_pages_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None):
     import pypdfium2 as pdfium
     import pypdfium2.raw as C
 
+    from .pdf_vectors import check_content_frame, page_frames
+
     doc = pdfium.PdfDocument(pdf_bytes)
     try:
         for idx in range(len(doc)):
@@ -254,15 +256,14 @@ def _iter_pages_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None):
             page = doc[idx]
             tp = None
             try:
-                # Which frame do the character boxes live in? PDFium's `get_size`
-                # is the unrotated page for some files and the /Rotate-d one for
-                # others (objektas_a's /Rotate 270 sheets: size 1191×842, boxes
-                # up to y = 945 — so 842×1191 — and every label crop landed off
-                # the page, 2026-09-10). The boxes themselves settle it: the
-                # frame that contains them is theirs; `to_display` then turns
-                # them into the displayed frame Wd×Hd.
-                Ws, Hs = (float(v) for v in page.get_size())
-                rotation = int(page.get_rotation() or 0) % 360
+                # The character boxes live in the page BEFORE /Rotate (W×H);
+                # `get_size` is the page as displayed (Wd×Hd), and `to_display`
+                # turns the boxes into it (pdf_vectors.page_frames). objektas_a's
+                # /Rotate 270 sheets: displayed 1191×842, boxes up to y = 945 of
+                # 842×1191 (2026-09-10). The boxes no longer settle the frame:
+                # on objektas_e's turned sheets they stay inside the short side,
+                # fit both frames, and the guess put 17 sheets' text elsewhere.
+                W, H, Wd, Hd, rotation = page_frames(page)
                 tp = page.get_textpage()
                 n = tp.count_chars()
                 boxes: list[tuple[str, tuple[float, float, float, float], int]] = []
@@ -275,12 +276,8 @@ def _iter_pages_pdfium_unlocked(pdf_bytes: bytes, wanted: set[int] | None):
                     boxes.append((t, tp.get_charbox(i, loose=True), k))   # advance box: one top/bottom per line, like pdfplumber
                     if not t.isspace():
                         turns[k] += 1
-                xmax = max((bx[2] for _, bx, _ in boxes), default=0.0)
-                ymax = max((bx[3] for _, bx, _ in boxes), default=0.0)
-                W, H = Ws, Hs
-                if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
-                    W, H = Hs, Ws
-                Wd, Hd = (H, W) if rotation in (90, 270) else (W, H)
+                check_content_frame(W, H, max((bx[2] for _, bx, _ in boxes), default=0.0),
+                                    max((bx[3] for _, bx, _ in boxes), default=0.0), "text", pn)
                 raw: list[tuple[str, list[float], int]] = []
                 for t, (l, b, r, tt), k in boxes:
                     raw.append((t, [l, H - tt, r, H - b], k))

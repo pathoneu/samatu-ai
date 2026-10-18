@@ -220,7 +220,24 @@ def _rotated_page(c):
     c.drawString(120, 900, "37.86 m2")
     c.drawString(420, 900, "14.26 m2")
     c.drawString(120, 700, "3.52 m2")
-    c.setPageRotation(90)
+
+
+def _with_rotate(pdf: bytes, rotate: int) -> bytes:
+    """/Rotate set on the page itself, the MediaBox kept as drawn — the way a CAD export turns a sheet.
+    reportlab's setPageRotation also swaps the MediaBox, which leaves the drawing outside its page (not a
+    real file; until 2026-10-18 this test used it and the content-guessed frame hid the difference)."""
+    import pypdfium2 as pdfium
+
+    from extractor.pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf)
+        try:
+            doc[0].set_rotation(rotate)
+            out = BytesIO()
+            doc.save(out)
+            return out.getvalue()
+        finally:
+            doc.close()
 
 
 def test_a_rotated_sheet_is_read_upright_and_cropped_in_the_display_frame():
@@ -229,7 +246,7 @@ def test_a_rotated_sheet_is_read_upright_and_cropped_in_the_display_frame():
     rotated sheet (that is where the crop is cut — pdf2image applies /Rotate).
     The bbox must therefore be in the ROTATED frame: page dims swapped, the
     label taller than wide, everything inside the page."""
-    ann = read_area_annotations(_pdf(_rotated_page))
+    ann = read_area_annotations(_with_rotate(_pdf(_rotated_page), 90))
     by = {a["value_m2"]: a for a in ann}
     assert set(by) == {37.86, 14.26, 3.52}, "rotation must not lose a single label"
     a = by[37.86]
