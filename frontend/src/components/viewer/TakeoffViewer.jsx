@@ -43,6 +43,7 @@ import { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from './MeasureLaye
 import CalibrateDialog from './CalibrateDialog';
 import { ScaleOverviewDock, ScaleGateChip } from './ScaleOverviewPanel';
 import ScaleCheckCard from './ScaleCheckCard';
+import ScaleChip from './ScaleChip';
 import CountLegendPanel from './CountLegendPanel';
 import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
@@ -463,7 +464,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, onCalibrateClick = null, outlineEdit = null, projectId = null, symbolHint = null }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -496,15 +497,11 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
       ) : (
         <>
           {snapNote && <span className="ml-auto min-w-0 truncate" title={snapNote}>{snapNote}</span>}
-          {/* The scale readout doubles as the calibration entry point. */}
-          <button
-            type="button"
-            onClick={onCalibrateClick || undefined}
-            title={scaleStatusTitle(pageScale)}
-            className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
-          >
-            {scaleText}
-          </button>
+          {/* The scale readout and its way in are the scale chip on the drawing (Pathon v3 W1-D, ScaleChip);
+              without one (a viewer with no project, the check view) the sentence stays here, read-only. */}
+          {!scaleChipShown && (
+            <span title={scaleStatusTitle(pageScale)} className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap`}>{scaleText}</span>
+          )}
         </>
       )}
     </div>
@@ -1592,6 +1589,21 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               />
             )}
             {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
+            {/* The sheet's scale, confirmed in one click (Pathon v3 W1-D, D4) — bottom-left of the drawing. */}
+            {!check && project && (
+              <ScaleChip
+                documentId={activeDocumentId}
+                scales={effectiveScales}
+                project={project}
+                durable={measureScales}
+                totalPages={totalPages}
+                left={panelLeft}
+                onConfirm={confirmScales}
+                onCalibrate={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
+                onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
+                onOverview={() => setScalesOpen(true)}
+              />
+            )}
             {(scalesOpen || scaleCheck) && !check && project && (
               <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-2">
                 {scaleCheck && (
@@ -1663,7 +1675,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             fillBusy={fillBusy}
             measureScales={effectiveScales}
             measureTool={measureTool}
-            onCalibrateClick={() => armMeasureTool('calibrate')}
+            scaleChipShown={!check && !!project}
             outlineEdit={outlineEdit}
             projectId={projectId}
             symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
