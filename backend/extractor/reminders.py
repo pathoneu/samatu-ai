@@ -248,7 +248,8 @@ def _commonly_missed(project: dict, rooms: list[dict], rows: list[dict]) -> list
         out.append(_reminder(
             "hidroizoliacija",
             f"Drėgnose patalpose ({_join_lt([_label(r) for r in wet[:4]])}) sąmatoje nėra hidroizoliacijos — "
-            "grindims, sienų purslų zonai ir dušo zonai iki lubų ji paprastai reikalinga; pridėkite, jei taip.",
+            "grindims, sienų apačiai (0,3 m nuo grindų) ir dušo sienoms iki lubų ji paprastai reikalinga; "
+            "pridėkite, jei taip.",
             rooms=wet, tone="warning"))
     if painted and not _has_row(rows, "gruntav", "gruntas"):
         out.append(_reminder("gruntas", "Sąmatoje yra dažymas, bet nėra gruntavimo — gruntas prieš dažymą "
@@ -389,7 +390,9 @@ def build_reminders(project: dict, *, fire_hits: list[dict] | None = None) -> di
             out.extend(x for x in build() if x)
         except Exception as exc:  # noqa: BLE001 — one malformed field never takes the list down
             _log.warning("reminder skipped: %r", exc)
-    out.sort(key=lambda r: ORDER.index(r["kind"]))
+    # the general fire reminder (nothing in the drawing's text) says the least — it goes last
+    out.sort(key=lambda r: len(ORDER) if (r["kind"] == "ugniai_atsparios" and not r.get("specific"))
+             else ORDER.index(r["kind"]))
     return {"reminders": out, "count": len(out)}
 
 

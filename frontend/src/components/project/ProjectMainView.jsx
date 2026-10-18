@@ -50,6 +50,7 @@ import { ApplyAssembliesButton, KodasChip, priceSplitTitle, useAssemblies } from
 import { effectiveKodas } from '@/lib/kodas';
 import { materialPriceNotes } from '@/lib/assemblyPricing';
 import SanityWarningsBanner from './SanityWarningsBanner';
+import RemindersNotice from './RemindersNotice';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
 import { LAYOUT_PATHON, LAYOUT_TEMPLATE, hasLayoutChoice, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
@@ -853,6 +854,8 @@ export default function ProjectMainView({
             }}
           />
         )}
+        {/* what is commonly forgotten (v3 W5-E) — notices only, never a row */}
+        <RemindersNotice projectId={project.id} where="samata" onJumpToPage={onJumpToPage} className="mt-2 w-full" />
       </div>
 
       {/* PATALPŲ SUVESTINĖ — collapsible */}

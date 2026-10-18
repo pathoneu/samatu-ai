@@ -653,6 +653,13 @@
       "showAll": "Show all ({{count}})",
       "collapse": "Collapse"
     },
+    "reminders": {
+      "title": "Anything forgotten? {{count}} {{word}}",
+      "sub": "These are not estimate rows — only what is worth checking before sending.",
+      "showAll": "Show all ({{count}})",
+      "collapse": "Collapse",
+      "reveal": "Show on the drawing (sheet {{page}})"
+    },
     "section": {
       "rows": "({{count}} rows)"
     },

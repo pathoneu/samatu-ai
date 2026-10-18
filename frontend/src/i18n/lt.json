@@ -662,6 +662,13 @@
       "showAll": "Rodyti visus ({{count}})",
       "collapse": "Suskleisti"
     },
+    "reminders": {
+      "title": "Ar nepamiršote? {{count}} {{word}}",
+      "sub": "Tai ne sąmatos eilutės — tik tai, ką verta patikrinti prieš siunčiant.",
+      "showAll": "Rodyti visus ({{count}})",
+      "collapse": "Suskleisti",
+      "reveal": "Rodyti brėžinyje ({{page}} lapas)"
+    },
     "section": {
       "rows": "({{count}} eil.)"
     },

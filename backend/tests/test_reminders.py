@@ -8,6 +8,7 @@ otherwise general), the touch-up buffer on rough walls, and two room outlines ly
 from __future__ import annotations
 
 import copy
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -68,7 +69,11 @@ def test_nothing_is_ever_a_quantity_row_and_every_sentence_is_plain():
                               "hidroizoliacija", "gruntas", "glaistymas", "kampu_profiliai", "gk_sandarinimas",
                               "led_transformatoriai", "dumu_davikliai"}
     assert out["count"] == len(out["reminders"])
-    assert [r["kind"] for r in out["reminders"]] == sorted((r["kind"] for r in out["reminders"]), key=ORDER.index)
+    kinds = [r["kind"] for r in out["reminders"]]
+    assert kinds[-1] == "ugniai_atsparios"                          # the general one says the least: last
+    assert kinds[:-1] == sorted(kinds[:-1], key=ORDER.index)
+    for r in out["reminders"]:
+        assert not re.search(r"zon(a|os|ą|ų|ai|oje)\b", r["sentence"], re.I), r["sentence"]   # lt.json's guard word
     for r in out["reminders"]:
         assert "kiekis" not in r and "vnt" not in r                # a notice, not a row
         assert r["sentence"].endswith(".") and not user_text.is_banned(r["sentence"]), r["sentence"]
