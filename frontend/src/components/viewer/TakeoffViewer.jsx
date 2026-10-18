@@ -52,6 +52,8 @@ import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
 import ModePill from './ModePill';
 import CursorHint from './CursorHint';
 import { cursorHintFor } from '@/lib/cursorHints';
+import { escStep, openLayerInDocument } from '@/lib/escOrder';
+import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
@@ -405,7 +407,7 @@ function RailHost({ documentId, compact, activeTool, onTool, available, layers, 
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onRoomTool = null }) {
+function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -454,13 +456,12 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
       undo: () => (onUndo ? (onUndo(), true) : false),
       redo: () => (onRedo ? (onRedo(), true) : false),
-      escape: () => {
-        if (onSearchEscape?.()) return true;
-        if (onMeasureEscape?.()) return true;
-        if (fillArmed) { onCancelFill?.(); return true; }
-        onClearFocus?.();
-        return false;
-      },
+      // One Esc = one step back (lib/escOrder): a point, the tool, a panel, then the selection.
+      escape: () => (onEscape ? onEscape() : false),
+      frameSelection: () => (onFrameSelection ? onFrameSelection() : false),
+      roomEditOutline: () => (onRoomEdit ? (onRoomEdit(), true) : false),
+      roomMerge: () => (onRoomMerge ? (onRoomMerge(), true) : false),
+      roomSubtract: () => (onRoomSubtract ? (onRoomSubtract(), true) : false),
       toggleZoneFills: () => (onToggleZoneFills ? (onToggleZoneFills(), true) : false),
       toggleWallsLayer: () => (onToggleWallsLayer ? (onToggleWallsLayer(), true) : false),
       // HOTKEY-HANDLERS:end
@@ -473,7 +474,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onCancelFill, onClearFocus, onToggleThumbs, onMeasureToolKey, onMeasureEscape, canDeleteSelected, onDeleteSelected, onOpenSearch, onSearchEscape, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onRoomTool]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract]);
   return null;
 }
 
@@ -719,7 +720,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   };
   // Focus moving to another room abandons an unsaved edit (the editor is bound to the focused room).
   useEffect(() => { setOutlineEdit(null); }, [focusedRoomNr]);
-  // Keyboard while editing: Enter saves, Z undoes (Esc is in ViewerHotkeys' chain via measureEscape).
+  // Keyboard while editing: Enter saves, Z undoes (Esc is a step of ViewerHotkeys' lib/escOrder: leaves without saving).
   const saveOutlineEditRef = useRef(saveOutlineEdit);
   useEffect(() => { saveOutlineEditRef.current = saveOutlineEdit; });
   useEffect(() => {
@@ -938,26 +939,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const set = new Set(ids);
     setMeasurements((prev) => prev.map((m) => (set.has(m.id) && m.kind !== 'count' && m.color !== color ? { ...m, color } : m)));
   };
-  // Esc chain, measure segment: close the calibration dialog first, then drop
-  // the active tool (MeasureLayer resets its own draft when the tool changes).
-  const measureEscape = () => {
-    if (symbol.active) { symbol.close(); return true; }
-    if (outlineEdit) { setOutlineEdit(null); return true; }
-    if (outlineTools.tool) { outlineTools.cancel(); return true; }
-    if (calibRequest) { setCalibRequest(null); return true; }
-    if (scaleCheck && measureTool !== 'scalecheck') { setScaleCheck(null); return true; }
-    if (measureTool === 'scalecheck') { setScaleCheck(null); }
-    if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
-    return false;
-  };
   // ---- Text search (Task 4.1) ----------------------------------------------
   // Open/closed only — query + results live in SearchBox (its unmount ends the
   // plugin search session, clearing highlights).
   const [searchOpen, setSearchOpen] = useState(false);
-  const searchEscape = () => {
-    if (searchOpen) { setSearchOpen(false); return true; }
-    return false;
-  };
   // The project workspace lends this one viewer to Patikra's check view and takes it back (Pathon v3,
   // InteriorWorkspace): when `check` arrives every tool stands down, so a click on the sheet reaches the
   // check's own pick and nothing else. (A viewer born in check mode has nothing armed — a no-op there.)
@@ -1159,7 +1144,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
 
   // ---- Click model chrome (Pathon v3 W1-B) ----------------------------------
   // The hand („Rankutė", H): a drag scrolls the drawing; no layer under it sees the pointer.
-  useDragPan({ rootRef: tvRootRef, armed: measureTool === 'pan' && active && !check });
+  const { panning } = useDragPan({ rootRef: tvRootRef, armed: measureTool === 'pan' && active && !check, space: active && !check });
   // The tool cards keep their labels while the canvas is tall enough for them, icons only below that.
   const [chromeHeight, setChromeHeight] = useState(0);
   const chromeObserver = useRef(null);
@@ -1236,11 +1221,78 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     }
   };
 
+  // Esc (W1-B B4): one press, one step back — lib/escOrder says which, this does it.
+  const handleEscape = () => {
+    const step = escStep({
+      popoverOpen: !!measureMenu || !!calibRequest || guideOpen || openLayerInDocument(),
+      draftPoints,
+      calibPoint: calibSlot.point != null,
+      outlineEdit: !!outlineEdit,
+      outlineTool: !!outlineTools.tool,
+      outlineToolSteps: outlineTools.tool?.history?.length || 0,
+      symbolSearch: symbol.active,
+      fillArmed: fillFor != null,
+      measureSelection: measureTool === 'select' || measureTool === 'lasso' ? selectedMeasureIds.length : 0,
+      tool: measureTool,
+      panelOpen: searchOpen || scalesOpen || historyOpen || !!scaleCheck,
+      roomSelected: !check && focusedRoomNr != null,
+    });
+    switch (step) {
+      case 'popover': return true;           // the menu / dialog closes itself (Radix); nothing under it moves
+      case 'draftPoint': dispatchDraft(draftSlot.pageNr, { type: 'undo' }); return true;
+      case 'calibPoint': setCalibSlot({ pageNr: null, point: null }); return true;
+      case 'outlineEdit': setOutlineEdit(null); return true;
+      case 'outlineToolStep': outlineTools.undo(); return true;
+      case 'outlineTool': outlineTools.cancel(); return true;
+      case 'symbolSearch': symbol.close(); return true;
+      case 'fill': setFillFor(null); return true;
+      case 'measureSelection': setSelectedMeasureIds([]); return true;
+      case 'tool':
+        if (measureTool === 'scalecheck') setScaleCheck(null);
+        setMeasureTool(null);
+        setSelectedMeasureId(null);
+        return true;
+      case 'panel':
+        setSearchOpen(false); setScalesOpen(false); setHistoryOpen(false); setScaleCheck(null);
+        return true;
+      case 'room': onClearFocus?.(); return true;
+      default: return false;
+    }
+  };
+  // Shift+F / „." — the selection in the whole window: the selected marks, else the selected room.
+  const frameNonce = useRef(0);
+  const [frameFocus, setFrameFocus] = useState(null);
+  const docPagesRef = useRef(null);
+  const frameSelection = () => {
+    const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+    const room = focusedRoom ? (rooms || []).find((r) => String(r?.nr) === String(focusedRoom.nr)) || focusedRoom : null;
+    const pages = docPagesRef.current || [];
+    const target = marks.length
+      ? frameForMeasurements(marks, {
+        pageSizeOf: (p) => pages[p - 1]?.size || null,
+        rotationOf: (p) => pages[p - 1]?.rotation ?? 0,
+      })
+      : frameForRoom(room);
+    if (!target) {
+      toast.info(room ? `Patalpa ${room.nr} brėžinyje nepažymėta — nėra ką parodyti` : 'Pirmiausia pažymėkite patalpą ar matavimą');
+      return true;
+    }
+    frameNonce.current += 1;
+    setFrameFocus({ page: target.page, rect: target.rect, nonce: `frame-${frameNonce.current}` });
+    return true;
+  };
+  // E / M / X act on the selected room — never in the middle of a drawing or another outline action.
+  const roomKeysFree = !check && focusedRoomNr != null && !outlineEdit && !outlineTools.tool && draftPoints === 0 && fillFor == null;
+  const onRoomEdit = roomKeysFree && onRoomOutlineEdit ? startOutlineEdit : null;
+  const onRoomMerge = roomKeysFree && onOutlineTool ? () => outlineTools.start('merge') : null;
+  const onRoomSubtract = roomKeysFree && onOutlineTool ? () => outlineTools.start('subtract') : null;
+
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
       {({ isLoaded, documentState }) => {
         if (!isLoaded) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
+        docPagesRef.current = documentState?.document?.pages || null;
         const totalPages = documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null;
         // No explicit user choice yet → open by default on multi-page documents.
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
@@ -1279,20 +1331,19 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
+          {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
+          {frameFocus && <FocusZoomer documentId={activeDocumentId} focus={frameFocus} pages={documentState?.document?.pages} />}
           {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
               „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}
           {active && <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
-            onCancelFill={() => setFillFor(null)}
-            onClearFocus={onClearFocus}
+            onEscape={handleEscape}
             onToggleThumbs={toggleRail}
             onMeasureToolKey={armMeasureTool}
-            onMeasureEscape={measureEscape}
             canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
             onDeleteSelected={() => deleteMeasurement(selectedMeasureIds)}
             onOpenSearch={() => setSearchOpen(true)}
-            onSearchEscape={searchEscape}
             onUndo={check ? null : undoMeasure}
             onRedo={check ? null : redoMeasure}
             onOpenGuide={() => setGuideOpen((v) => !v)}
@@ -1300,8 +1351,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
             onToggleSymbolSearch={check ? null : toggleSymbolSearch}
             onRoomTool={check ? null : onRoomTool}
+            onFrameSelection={check ? null : frameSelection}
+            onRoomEdit={onRoomEdit}
+            onRoomMerge={onRoomMerge}
+            onRoomSubtract={onRoomSubtract}
           />}
-          {measureTool === 'pan' && <style>{PAN_CURSOR_CSS}</style>}
+          {panning && <style>{PAN_CURSOR_CSS}</style>}
           <div className="relative flex flex-1 min-h-0">
             {sheetRail
               ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />

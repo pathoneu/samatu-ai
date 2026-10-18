@@ -2,24 +2,72 @@
  * useDragPan — drag the drawing with the hand (Pathon v3 click model, W1-B; Togal §2b „Pan (Q / hold
  * Space)", Kreo §3 „Space + left drag").
  *
- * While `armed` (the „Rankutė" tool, key H) a left or middle drag on the drawing scrolls the viewport.
- * It listens in the CAPTURE phase on the viewport itself and stops the pointer events there, so no page
- * layer under it — a measurement draft, the outline editor, a room click — ever sees the drag: the tool
- * that was armed keeps its points and continues when the hand is put away. Clicks are swallowed for the
- * same reason. The cursor says what a drag does (grab / grabbing) over the whole drawing.
+ * The hand is out while `armed` (the „Rankutė" tool, key H) or while Space is held over the drawing
+ * (`space`, from any tool — the key comes from lib/viewerShortcuts' panHold entry). Then a left or middle
+ * drag on the drawing scrolls the viewport. It listens in the CAPTURE phase on the viewport itself and
+ * stops the pointer events there, so no page layer under it — a measurement draft, the outline editor, a
+ * room click — ever sees the drag: the tool that was armed keeps its points and goes on when Space is let
+ * go. Clicks are swallowed for the same reason. The cursor says what a drag does (grab / grabbing).
  *
- * Returns { dragging }.
+ * Space is taken only while the pointer is over the drawing and no text field has the focus — elsewhere
+ * Space keeps its usual job (pressing a focused button, scrolling a list). Over the drawing it is the hand
+ * even when a button outside still holds the focus (a room row just clicked): the key down and up are both
+ * stopped, so that button is not pressed again.
+ *
+ * Returns { panning, dragging }.
  */
 import { useEffect, useRef, useState } from 'react';
+import { isPanHoldKey } from '@/lib/viewerShortcuts';
 
-export default function useDragPan({ rootRef, armed = false }) {
+const isTyping = (t) => !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+
+export default function useDragPan({ rootRef, armed = false, space = false }) {
   const [dragging, setDragging] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const dragRef = useRef(null);
+  const overCanvasRef = useRef(false);
+  const spaceHeldRef = useRef(false);
+  const panning = armed || spaceHeld;
+
+  // Space held over the drawing → the hand, until it is let go (or the window loses focus).
+  useEffect(() => {
+    if (!space) { setSpaceHeld(false); return undefined; }
+    const canvasOf = () => rootRef?.current?.querySelector('[data-testid="viewer-canvas"]') || null;
+    const onMove = (e) => {
+      const c = canvasOf();
+      overCanvasRef.current = !!(c && e.target instanceof Node && c.contains(e.target));
+    };
+    const down = (e) => {
+      if (!isPanHoldKey(e) || isTyping(e.target)) return;
+      if (!overCanvasRef.current) return;
+      e.preventDefault();                       // no page scroll, no button press
+      if (!spaceHeldRef.current) { spaceHeldRef.current = true; setSpaceHeld(true); }
+    };
+    const up = (e) => {
+      if (!isPanHoldKey(e) || !spaceHeldRef.current) return;
+      e.preventDefault();
+      spaceHeldRef.current = false;
+      setSpaceHeld(false);
+    };
+    const release = () => { spaceHeldRef.current = false; setSpaceHeld(false); };
+    window.addEventListener('pointermove', onMove, { capture: true, passive: true });
+    window.addEventListener('keydown', down, true);
+    window.addEventListener('keyup', up, true);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('pointermove', onMove, { capture: true });
+      window.removeEventListener('keydown', down, true);
+      window.removeEventListener('keyup', up, true);
+      window.removeEventListener('blur', release);
+      spaceHeldRef.current = false;
+      setSpaceHeld(false);
+    };
+  }, [space, rootRef]);
 
   useEffect(() => {
     const root = rootRef?.current;
     const el = root?.querySelector('[data-testid="viewer-canvas"]');
-    if (!armed || !el) return undefined;
+    if (!panning || !el) return undefined;
     root.setAttribute('data-pan', '1');
     const stop = (e) => { e.stopPropagation(); };
     const down = (e) => {
@@ -68,9 +116,9 @@ export default function useDragPan({ rootRef, armed = false }) {
       dragRef.current = null;
       setDragging(false);
     };
-  }, [armed, rootRef]);
+  }, [panning, rootRef]);
 
-  return { dragging };
+  return { panning, dragging };
 }
 
 /** The cursor rule while the hand is out — every layer of the drawing shows grab / grabbing. */

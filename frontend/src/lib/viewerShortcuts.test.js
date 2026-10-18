@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   VIEWER_SHORTCUTS, SHORTCUT_GROUPS, matchViewerHotkey, formatCombo, keyText, withKey,
-  hintText, shortcutGuideRows, isMacPlatform,
+  hintText, shortcutGuideRows, isMacPlatform, isPanHoldKey,
 } from './viewerShortcuts.js';
 
 const ev = (key, mods = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
@@ -80,6 +80,14 @@ test('matchViewerHotkey: plain keys, modifiers and shift', () => {
   // plain F is „Rasti panašius"; text search keeps Ctrl+F and /
   assert.equal(matchViewerHotkey(ev('f')), 'toolFindSimilar');
   assert.equal(matchViewerHotkey(ev('/')), 'openSearch');
+  // frame the selection: Shift+F or „."; room actions E / M / X
+  assert.equal(matchViewerHotkey(ev('F', { shiftKey: true })), 'frameSelection');
+  assert.equal(matchViewerHotkey(ev('.')), 'frameSelection');
+  assert.equal(matchViewerHotkey(ev('e')), 'roomEditOutline');
+  assert.equal(matchViewerHotkey(ev('m')), 'roomMerge');
+  assert.equal(matchViewerHotkey(ev('x')), 'roomSubtract');
+  // Space is the held pan, not a hotkey
+  assert.equal(matchViewerHotkey(ev(' ')), null);
   // plain Z is the draft / outline undo, not the global one
   assert.equal(matchViewerHotkey(ev('z')), null);
   // browser combos stay with the browser
@@ -111,4 +119,18 @@ test('guide rows cover every entry exactly once, in group order', () => {
   assert.deepEqual(rows.map((r) => r.group), SHORTCUT_GROUPS.map((g) => g.id));
   assert.equal(rows.reduce((n, r) => n + r.items.length, 0), VIEWER_SHORTCUTS.length);
   for (const r of rows) for (const it of r.items) assert.ok(it.keys.length > 0, it.id);
+});
+
+test('Space held pans from any tool; with a modifier it stays the browser\'s', () => {
+  assert.equal(isPanHoldKey(ev(' ')), true);
+  assert.equal(isPanHoldKey(ev(' ', { ctrlKey: true })), false);
+  assert.equal(isPanHoldKey(ev('a')), false);
+  assert.equal(isPanHoldKey(null), false);
+});
+
+test('Esc is one key with one meaning: a step back (lib/escOrder), listed where it acts', () => {
+  const esc = VIEWER_SHORTCUTS.filter((s) => (s.combos || []).some((c) => c.keys.includes('Escape')));
+  assert.deepEqual(esc.filter((s) => s.bound === 'hotkeys').map((s) => s.id), ['escape']);
+  for (const s of esc.filter((x) => x.bound !== 'hotkeys')) assert.equal(s.bound, 'esc', s.id);
+  assert.equal(hintText(['draftStepBack'], { mac: false }), 'Esc — atgal');
 });

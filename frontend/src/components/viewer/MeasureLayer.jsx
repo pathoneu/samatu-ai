@@ -301,8 +301,9 @@ export default function MeasureLayer({
   const draftMinPoints = tool === 'area' ? 3 : 2;
   const draftFinishable = POLY_TOOLS.has(tool) && draft.points.length >= draftMinPoints;
 
-  // Keyboard: Enter = finish, Escape = reset, z = undo. Bound to window while a
-  // poly tool is active so the user need not focus the SVG.
+  // Keyboard: Enter = finish, z / Backspace = undo a point. Bound to window while a
+  // poly tool is active so the user need not focus the SVG. Esc is NOT here (v3 W1-B B4): the viewer's
+  // one Esc step (lib/escOrder) removes the last point, and leaves the tool only when none is left.
   // Bound ONLY on the page that owns a non-empty draft: this component is
   // mounted once per virtualized page, and with the draft lifted upstream every
   // mounted copy would otherwise apply the same undo/finish (5 pages = 5 undos).
@@ -313,10 +314,6 @@ export default function MeasureLayer({
       if (e.key === 'Enter') {
         const finished = draftReducer(draft, { type: 'finish', tool });
         if (finished.committed) commitDraft(finished.points);
-      } else if (e.key === 'Escape') {
-        dispatch({ type: 'reset' });
-        setCursor(null);
-        setSnapPt(null); setSnapKind(null);
       } else if (e.key === 'z' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         dispatch({ type: 'undo' });
       } else if (e.key === 'Backspace') {
@@ -327,22 +324,6 @@ export default function MeasureLayer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [tool, draft, dispatch, commitDraft]);
-
-  // Keyboard for the calibrate tool: Escape cancels an in-progress calibration.
-  // Same one-owner rule as the draft listener above.
-  useEffect(() => {
-    if (tool !== 'calibrate' || !calibA) return undefined;
-    const onKey = (e) => {
-      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
-      if (e.key === 'Escape') {
-        setCalibA(null);
-        setCursor(null);
-        setSnapPt(null); setSnapKind(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [tool, calibA, setCalibA]);
 
   // ---- render -------------------------------------------------------------
 

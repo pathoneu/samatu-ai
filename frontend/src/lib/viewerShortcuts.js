@@ -10,6 +10,8 @@
 //
 // `bound` says who listens for the entry:
 //   'hotkeys' — ViewerHotkeys in TakeoffViewer.jsx (tested: every id has a handler)
+//   'esc'     — ViewerHotkeys' Esc step (lib/escOrder decides what one Esc undoes)
+//   'pan'     — useDragPan: held Space drags the drawing from any tool
 //   'draft'   — MeasureLayer, while a measurement is being drawn
 //   'outline' — TakeoffViewer's outline-edit listener
 //   'search'  — the search box
@@ -25,6 +27,7 @@ export const SHORTCUT_GROUPS = [
   { id: 'tools', title: 'Įrankiai' },
   { id: 'navigation', title: 'Naršymas' },
   { id: 'measure', title: 'Braižant matavimą' },
+  { id: 'room', title: 'Pažymėta patalpa' },
   { id: 'outline', title: 'Kontūro taisymas' },
   { id: 'selection', title: 'Žymėjimas ir istorija' },
   { id: 'layers', title: 'Sluoksniai' },
@@ -35,6 +38,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'toolSelect', tool: 'select', group: 'tools', bound: 'hotkeys', label: 'Žymėti — pažymėti nubrėžtą matavimą ar žymę', combos: [{ keys: ['1'] }, { keys: ['v', 'V'] }] },
   { id: 'toolLasso', tool: 'lasso', group: 'tools', bound: 'hotkeys', label: 'Laso — apvesti kelis matavimus ir žymes', combos: [{ keys: ['l', 'L'] }] },
   { id: 'toolPan', tool: 'pan', group: 'tools', bound: 'hotkeys', label: 'Rankutė — tempti brėžinį', combos: [{ keys: ['h', 'H'] }] },
+  { id: 'panHold', group: 'tools', bound: 'pan', label: 'Laikyti tarpą ir tempti — brėžinys juda su bet kuriuo įrankiu, braižomas matavimas lieka', combos: [{ keys: [' '] }] },
   { id: 'toolDistance', tool: 'distance', group: 'tools', bound: 'hotkeys', label: 'Atstumas — matuoti metrais', combos: [{ keys: ['2'] }] },
   { id: 'toolArea', tool: 'area', group: 'tools', bound: 'hotkeys', label: 'Plotas — matuoti m²', combos: [{ keys: ['3'] }] },
   { id: 'toolPerimeter', tool: 'perimeter', group: 'tools', bound: 'hotkeys', label: 'Perimetras — kontūro ilgis metrais', combos: [{ keys: ['4'] }] },
@@ -48,6 +52,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'zoomOut', group: 'navigation', bound: 'hotkeys', label: 'Tolinti', combos: [{ keys: ['-'] }] },
   { id: 'fitPage', group: 'navigation', bound: 'hotkeys', label: 'Sutalpinti visą puslapį', combos: [{ keys: ['0'] }] },
   { id: 'fitWidth', group: 'navigation', bound: 'hotkeys', label: 'Sutalpinti per visą plotį', combos: [{ keys: ['w', 'W'] }] },
+  { id: 'frameSelection', group: 'navigation', bound: 'hotkeys', label: 'Parodyti pažymėtą patalpą ar matavimą per visą langą', combos: [{ keys: ['F', 'f'], shift: true }, { keys: ['.'] }] },
   { id: 'nextPage', group: 'navigation', bound: 'hotkeys', label: 'Kitas puslapis', combos: [{ keys: ['PageDown'] }, { keys: [']'] }] },
   { id: 'prevPage', group: 'navigation', bound: 'hotkeys', label: 'Ankstesnis puslapis', combos: [{ keys: ['PageUp'] }, { keys: ['['] }] },
   { id: 'toggleThumbs', group: 'navigation', bound: 'hotkeys', label: 'Lapų juosta: plati arba siaura', combos: [{ keys: ['t', 'T'] }] },
@@ -61,10 +66,15 @@ export const VIEWER_SHORTCUTS = [
   // ── Braižant matavimą
   { id: 'draftFinish', group: 'measure', bound: 'draft', label: 'Baigti braižomą matavimą', hint: 'baigti', combos: [{ keys: ['Enter'] }] },
   { id: 'draftFinishMouse', group: 'measure', bound: 'mouse', label: 'Baigti braižomą matavimą', display: 'Dukart spustelėti' },
-  { id: 'draftCancel', group: 'measure', bound: 'draft', label: 'Atsisakyti braižomo matavimo', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
+  { id: 'draftStepBack', group: 'measure', bound: 'esc', label: 'Pašalinti paskutinį tašką; kai taškų nebėra — išeiti iš įrankio', hint: 'atgal', combos: [{ keys: ['Escape'] }] },
   { id: 'draftUndoPoint', group: 'measure', bound: 'draft', label: 'Pašalinti paskutinį nubrėžtą tašką', hint: 'atgal', combos: [{ keys: ['z', 'Z'] }, { keys: ['Backspace'] }] },
   { id: 'orthoLock', group: 'measure', bound: 'mouse', label: 'Brėžti tik horizontaliai, vertikaliai arba 45° kampu', display: 'Laikyti Shift' },
   { id: 'countRemove', group: 'measure', bound: 'mouse', label: 'Kiekio įrankiu — pašalinti tą žymę', display: 'Spustelėti ant žymės' },
+
+  // ── Pažymėta patalpa (the selection bar's actions)
+  { id: 'roomEditOutline', group: 'room', bound: 'hotkeys', label: 'Taisyti kontūrą — tempti kampus, prilimpa prie sienų', combos: [{ keys: ['e', 'E'] }] },
+  { id: 'roomMerge', group: 'room', bound: 'hotkeys', label: 'Sujungti su gretima patalpa', combos: [{ keys: ['m', 'M'] }] },
+  { id: 'roomSubtract', group: 'room', bound: 'hotkeys', label: 'Atimti koloną, spintą ar šachtą iš patalpos', combos: [{ keys: ['x', 'X'] }] },
 
   // ── Kontūro taisymas
   { id: 'outlineDrag', group: 'outline', bound: 'mouse', label: 'Perkelti viršūnę (prilimpa prie sienų)', display: 'Tempti kampą' },
@@ -72,7 +82,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'outlineRemove', group: 'outline', bound: 'mouse', label: 'Pašalinti viršūnę', display: 'Dukart spustelėti kampą' },
   { id: 'outlineUndo', group: 'outline', bound: 'outline', label: 'Atšaukti paskutinį viršūnės pakeitimą', hint: 'atgal', combos: [{ keys: ['z', 'Z'] }] },
   { id: 'outlineSave', group: 'outline', bound: 'outline', label: 'Išsaugoti kontūrą', hint: 'išsaugoti', combos: [{ keys: ['Enter'] }] },
-  { id: 'outlineCancel', group: 'outline', bound: 'outline', label: 'Atšaukti redagavimą (niekas neišsaugoma)', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
+  { id: 'outlineCancel', group: 'outline', bound: 'esc', label: 'Atšaukti redagavimą (niekas neišsaugoma)', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
 
   // ── Žymėjimas ir istorija
   { id: 'deleteSelected', group: 'selection', bound: 'hotkeys', label: 'Ištrinti pažymėtus matavimus („Žymėti" arba „Laso" įrankiu)', hint: 'ištrinti pažymėtus', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
@@ -80,7 +90,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'contextMenu', group: 'selection', bound: 'mouse', label: 'Matavimo meniu: pervadinti, keisti tipą, ištrinti, rodyti sąraše; su laso — veiksmai su visais pažymėtais', display: 'Dešinysis pelės klavišas ant matavimo' },
   { id: 'undo', group: 'selection', bound: 'hotkeys', label: 'Atšaukti paskutinį veiksmą su matavimais ir žymėmis', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: false }] },
   { id: 'redo', group: 'selection', bound: 'hotkeys', label: 'Grąžinti atšauktą veiksmą', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: true }, { keys: ['y', 'Y'], mod: 'primary' }] },
-  { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Uždaryti paiešką, išjungti įrankį, atsisakyti patalpos', combos: [{ keys: ['Escape'] }] },
+  { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Žingsnis atgal: taškas → įrankis → skydelis → pažymėjimas (patalpa lieka, kol atidarytas skydelis)', combos: [{ keys: ['Escape'] }] },
 
   // ── Sluoksniai
   { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpas arba palikti brėžinį švarų', combos: [{ keys: ['u', 'U'] }] },
@@ -99,6 +109,11 @@ export function toolShortcut(toolId) {
   return BY_TOOL.get(toolId) || null;
 }
 
+/** True for the key event that starts or ends a Space-held pan (the table's `panHold` entry). */
+export function isPanHoldKey(e) {
+  if (!e || e.metaKey || e.ctrlKey || e.altKey) return false;
+  return (shortcutById('panHold')?.combos || []).some((c) => c.keys.includes(e.key));
+}
 
 export function isMacPlatform(nav = (typeof navigator !== 'undefined' ? navigator : null)) {
   const p = nav?.userAgentData?.platform || nav?.platform || nav?.userAgent || '';

@@ -9,10 +9,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CURSOR_HINT_EVENT, CURSOR_HINT_FLASH_MS } from '@/lib/cursorHints';
+import { OPEN_LAYER_SELECTOR } from '@/lib/escOrder';
 
 const OFFSET_X = 18;
 const OFFSET_Y = 16;
-const OPEN_LAYER = '[role="menu"], [role="dialog"], [role="alertdialog"], [data-draft-menu]';
 
 export default function CursorHint({ rootRef, resolve, enabled = true, mode = null }) {
   const [pos, setPos] = useState(null);          // { x, y, shift } while the pointer is on the drawing
@@ -32,7 +32,7 @@ export default function CursorHint({ rootRef, resolve, enabled = true, mode = nu
         const canvas = root?.querySelector('[data-testid="viewer-canvas"]');
         const t = ev?.target;
         const over = !!(canvas && t instanceof Node && canvas.contains(t));
-        if (!over || document.querySelector(OPEN_LAYER)) { setPos(null); return; }
+        if (!over || document.querySelector(OPEN_LAYER_SELECTOR)) { setPos(null); return; }
         setPos({ x: ev.clientX, y: ev.clientY, shift: !!ev.shiftKey });
       });
     };
