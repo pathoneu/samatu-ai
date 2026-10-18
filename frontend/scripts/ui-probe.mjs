@@ -200,7 +200,8 @@ function measureInPage() {
     const bg = htmlBg(el);
     return { ratio: Math.round(ratio(over({ ...fg, a: fg.a * opacityOf(el) }, bg), bg) * 100) / 100, size: parseFloat(cs.fontSize), fg: hex(fg), bg: hex(bg), text: (el.textContent || '').trim().slice(0, 40) };
   };
-  named.mainText = textRatio(first('[data-testid="room-row-name"], .text-foreground'));
+  named.mainText = textRatio(first('[data-testid="room-row-name"]')
+    || first('.text-foreground', (e) => (e.textContent || '').trim().length > 1));
   named.mutedText = textRatio(first('.text-muted-foreground', (e) => (e.textContent || '').trim().length > 1));
   named.units = textRatio(first('[data-testid="room-row-unit"]') || first('span', (e) => (e.textContent || '').trim() === 'm²'));
   named.provenance = textRatio(first('[data-testid^="provenance-chip-"] button'));
