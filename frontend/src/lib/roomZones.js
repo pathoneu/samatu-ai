@@ -16,6 +16,7 @@
 
 import { computeAreaConfidence } from './areaConfidence.js';
 import { getPolygonPctPoints } from './planOverlayGeometry.js';
+import { ltCount, ltPlural } from './ltPlural.js';
 
 // paskirtis → hex. Moved verbatim from AiRoomOverlay (industry takeoff tools per-category hues)
 // so a glance reveals functional zones without reading labels.
@@ -420,6 +421,16 @@ export function buildPageRoomZones(rooms, { renderedWidth, renderedHeight, page 
     .filter((r) => !losers.has(String(r.nr)))
     .map((r) => buildRoomZone(r, { renderedWidth, renderedHeight }))
     .filter(Boolean);
+}
+
+/**
+ * The "rooms we could not place" chip's sentence. It names the real place to fix it: the step „Patikra",
+ * where the question list asks for a room the walls gave no outline and every room's sheet has
+ * „Parodyti patalpą" (2026-10-18 audit side finding D — it sent him to „Peržiūra", a screen that is gone).
+ */
+export function missingRoomsText(count) {
+  return `${ltCount(count, 'patalpa', 'patalpos', 'patalpų')} be vietos plane — `
+    + `parodykite ${ltPlural(count, 'ją', 'jas', 'jas')} žingsnyje „Patikra“`;
 }
 
 /**

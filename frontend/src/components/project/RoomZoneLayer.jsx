@@ -27,10 +27,9 @@
 
 import { useMemo, useState } from 'react';
 import {
-  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers,
+  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers, missingRoomsText,
   ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 } from '@/lib/roomZones';
-import { ltCount } from '@/lib/ltPlural';
 
 function centroidOf(geometry) {
   if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
@@ -326,14 +325,16 @@ export default function RoomZoneLayer({
   );
 }
 
-// Honest disclosure chip, identical in both presentation modes.
+// Honest disclosure chip, identical in both presentation modes. Its width follows the sentence
+// (~6,2 px a character at 11 px) — the old fixed 250 px only fitted the old, shorter text.
 function MissingRoomsChip({ count }) {
+  const text = missingRoomsText(count);
   return (
-    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }}>
-      <rect x={0} y={0} width={250} height={24} rx={5}
+    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }} data-testid="missing-rooms-chip">
+      <rect x={0} y={0} width={Math.ceil(20 + text.length * 6.2)} height={24} rx={5}
         fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
       <text x={10} y={16} fontSize={11} fill="#b45309">
-        {ltCount(count, 'patalpa', 'patalpos', 'patalpų')} be vietos plane — žr. „Peržiūra“
+        {text}
       </text>
     </g>
   );

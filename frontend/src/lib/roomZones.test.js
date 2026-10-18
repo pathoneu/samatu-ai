@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  roomZoneColor, confidenceHex, ROOM_ZONE_COLORS, CONFIDENCE_HEX,
+  roomZoneColor, confidenceHex, ROOM_ZONE_COLORS, CONFIDENCE_HEX, missingRoomsText,
 } from './roomZones.js';
 
 test('roomZoneColor: known paskirtis → its hue', () => {
@@ -372,4 +372,13 @@ test('countRoomsMissingGeometry: a room with no polygon and no anchor feeds the 
   const size = { renderedWidth: 100, renderedHeight: 100, page: 2 };
   assert.equal(buildPageRoomZones(rooms, size).length, 1);
   assert.equal(countRoomsMissingGeometry(rooms, size), 1);
+});
+
+// 2026-10-18 audit side finding D: the chip sent him to „Peržiūra", a screen that no longer exists.
+test('missingRoomsText names the step where a room is shown on the plan, in the right number', () => {
+  assert.equal(missingRoomsText(1), '1 patalpa be vietos plane — parodykite ją žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(3), '3 patalpos be vietos plane — parodykite jas žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(11), '11 patalpų be vietos plane — parodykite jas žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(21), '21 patalpa be vietos plane — parodykite ją žingsnyje „Patikra“');
+  assert.doesNotMatch(missingRoomsText(2), /Peržiūr/);
 });
