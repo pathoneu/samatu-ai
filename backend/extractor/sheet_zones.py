@@ -43,9 +43,11 @@ THE THREE FRAMES (inventory 2026-10-18, gap 7) — every bbox_pct here is in the
      over (page.width, page.height) IS a display fraction once the page box origin is subtracted.
   2. PDFium DISPLAY frame — PDF points, origin top-left, y down, /Rotate applied (pdf_vectors, the
      character reader, room `polygon_pct`, `_vieta`, evidence crops). `bbox_pct` = display points / the page
-     size as displayed (PDFium's `get_size`, which has /Rotate applied — `display_frame`). Two readers of
-     this frame settle it from where the content lies and can be wrong on a turned sheet; their output is
-     then not used (see `read_phrases`, `_detect`).
+     size as displayed (PDFium's `get_size`, which has /Rotate applied — `display_frame`). The wall and
+     character readers take this frame from the page too (pdf_vectors.page_frames, 2026-10-18); until then
+     they guessed it from where the content lay and were wrong on objektas_e's turned sheets. A reader whose
+     frame still disagrees with the page is not used (`read_phrases`, `_detect`) — a guard that should no
+     longer fire.
   3. Unrotated MEDIABOX points, origin top-left — the viewer's measurement space (cv_tools `box_pt`;
      clicks arrive in it). `zone_to_mediabox_pt` turns a zone into it; `cv_match._rotate_pct` is the
      same turn the other way (mediabox → display).
@@ -67,7 +69,7 @@ from typing import Iterable, Sequence
 
 log = logging.getLogger("samatu.sheet_zones")
 
-ZONES_VERSION = 1
+ZONES_VERSION = 2            # 2 (2026-10-18): the readers take the frame from the page — turned sheets keep their text and plan
 KINDS = ("planas", "legenda", "lentele", "antspaudas", "pastabos", "kita")
 SOURCES = ("teksto_sluoksnis", "vektoriai", "lentele", "antspaudo_kirpimas")
 NO_TEXT = "nėra teksto sluoksnio"
@@ -185,10 +187,11 @@ def read_phrases(pdf_bytes: bytes, page: int, frame: tuple[float, float] | None 
     Phrase: {text, fold, n_words, x0, top, x1, bottom (display points), h (glyph height in its own frame),
     first (its first word), turn (the direction's quarter turns)}.
 
-    `frame` is the page's true display size (`display_frame`). The character reader settles its frame from
-    where the characters lie, which fails on a /Rotate 270 sheet whose text does not reach past the short
-    side (objektas_e, 17 of 45 sheets): its boxes are then in another frame. Such a direction is NOT used —
-    `frame_ok` is False — rather than placing zones where nothing is."""
+    `frame` is the page's true display size (`display_frame`). The character reader takes the same frame
+    from the page (pdf_vectors.page_frames); until 2026-10-18 it guessed it from where the characters lay and
+    put objektas_e's turned sheets (17 of 45) in another frame. A direction whose frame still disagrees is
+    NOT used — `frame_ok` is False — rather than placing zones where nothing is (a guard, no longer expected
+    to fire)."""
     from .plan_area_annotations import _iter_pages, _words
     out: list[dict] = []
     n_chars = 0
@@ -711,7 +714,7 @@ def _detect(pdf_bytes: bytes, page: int, table_max_objects: int | None = None) -
     phrases, n_chars, text_ok = read_phrases(pdf_bytes, page, (W, H))
     if not text_ok:
         notes.append("dalies teksto lapo rėmas nesutampa su lapo pasukimu — tas tekstas nenaudotas")
-    # the wall reader settles its frame from where the paths lie (pdf_vectors) — the same trap as the text
+    # the wall reader takes its frame from the page (pdf_vectors.page_frames); a disagreement is a guard only
     Wv, Hv, _ = page_geometry(pdf_bytes, page)
     groups: list[dict] = []
     if abs(Wv - W) <= 1.0 and abs(Hv - H) <= 1.0:
