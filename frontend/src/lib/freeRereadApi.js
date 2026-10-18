@@ -59,7 +59,14 @@ export async function landFreeRereadResult(base, result) {
     _overrides: merged._overrides,
     _apimtis: merged._apimtis,
     _per_room_overrides: merged._per_room_overrides,
-    _meta: { ...(merged._meta || {}), ...(re._meta || {}), geometrija: merged._meta?.geometrija },
+    // the lane's records as the re-read merged them — a recompute answer carrying an older copy never wins
+    _meta: {
+      ...(merged._meta || {}),
+      ...(re._meta || {}),
+      geometrija: merged._meta?.geometrija,
+      ...(merged._meta?.lenteles !== undefined ? { lenteles: merged._meta.lenteles } : {}),
+      ...(merged._meta?.zonos !== undefined ? { zonos: merged._meta.zonos } : {}),
+    },
     _reread_diff: diff,
     _geometrija_perskaityta_at: merged._geometrija_perskaityta_at,
     darbu_sarasas: mergeDarbuSarasasEdits(re.darbu_sarasas, base.darbu_sarasas, notes),

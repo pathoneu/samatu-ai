@@ -10,7 +10,7 @@ const stages = (statuses) => STAGE_IDS.map((id, i) => ({
 }));
 
 test('the stage ids are the server\'s, in the lane\'s order (openings before walls)', () => {
-  assert.deepEqual(STAGE_IDS, ['mastelis', 'tekstas', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
+  assert.deepEqual(STAGE_IDS, ['mastelis', 'tekstas', 'lenteles', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
 });
 
 test('ticking walls ticks the outlines they are added along; unticking outlines unticks what needs them', () => {
@@ -39,18 +39,18 @@ test('the request body: one sheet or the set, every feature named', () => {
 });
 
 test('a running snapshot: the current stage, its education text, the progress', () => {
-  const v = viewOf({ job: 'j', stages: stages(['done', 'done', 'done', 'running']) });
+  const v = viewOf({ job: 'j', stages: stages(['done', 'done', 'done', 'done', 'running']) });
   assert.equal(v.current.id, 'konturai');
   assert.equal(v.current.about, 'apie konturai');
-  assert.equal(v.progress, 3 / 8);
+  assert.equal(v.progress, 4 / 9);
   assert.equal(v.terminal, false);
-  assert.equal(headline(v, [1]), 'Konturai… 4/8 · pritaikoma lapui 1');
-  assert.equal(headline(v, [3], [[1, 2, 3, 4, 5, 6, 7], [8]]), 'Konturai… 4/8 · pritaikoma planui (lapai 1–7)');
+  assert.equal(headline(v, [1]), 'Konturai… 5/9 · pritaikoma lapui 1');
+  assert.equal(headline(v, [3], [[1, 2, 3, 4, 5, 6, 7], [8]]), 'Konturai… 5/9 · pritaikoma planui (lapai 1–7)');
   assert.equal(needsPolling({ job: 'j', result_ready: false, failed: false }), true);
 });
 
 test('the server leaves „kiekiai" running; the browser\'s landing finishes it', () => {
-  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'skipped', 'perduota']) };
+  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'skipped', 'perduota']) };
   assert.equal(needsPolling(snap), false);
   const handed = viewOf(snap);
   assert.equal(handed.current.id, 'kiekiai');
@@ -68,12 +68,12 @@ test('the server leaves „kiekiai" running; the browser\'s landing finishes it'
 });
 
 test('a failure is named by its stage, never a generic error', () => {
-  const v = viewOf({ job: 'j', failed: true, stages: stages(['done', 'done', 'done', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']) });
+  const v = viewOf({ job: 'j', failed: true, stages: stages(['done', 'done', 'done', 'done', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']) });
   assert.equal(v.failed, true);
   assert.equal(v.failedStage.id, 'konturai');
   assert.equal(headline(v, [1]), 'Nepavyko: Konturai · pritaikoma lapui 1');
   // the browser's own step can fail too — after the server finished
-  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'running']) };
+  const snap = { job: 'j', result_ready: true, stages: stages(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'running']) };
   const v2 = viewOf(snap, { status: 'failed', note: 'Kiekių perskaičiuoti nepavyko' });
   assert.equal(v2.failedStage.id, 'kiekiai');
 });
@@ -135,4 +135,10 @@ test('a run lands on the whole plan its sheet belongs to, and says so', () => {
   assert.equal(appliedTo([1], [[1, 3, 5]]), 'planui (lapai 1, 3, 5)');
   assert.equal(appliedTo([2, 9], [[1, 2], [4, 5]]), 'planui (lapai 1, 2, 9)');
   assert.equal(appliedTo([8, 9], [[8]]), 'lapams 8, 9');
+});
+
+test('the „lentelės" stage sits between the text and the plan, named before the server answers', () => {
+  assert.equal(STAGE_IDS.indexOf('lenteles'), STAGE_IDS.indexOf('tekstas') + 1);
+  const v = viewOf(null, null);
+  assert.equal(v.stages.find((s) => s.id === 'lenteles')?.label, 'Lentelės');
 });
