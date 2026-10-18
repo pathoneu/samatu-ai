@@ -39,6 +39,7 @@ import { ltPlural } from '@/lib/ltPlural';
 import { cleanUserText } from '@/lib/userText';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import { StepBar } from '@/components/project/StepRail';
+import { PANEL_TWO_COLUMNS_MIN, useWorkspaceHost } from '@/components/project/workspaceHost';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
@@ -60,8 +61,15 @@ export default function PatikraQuestions() {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
+  // Inside the project workspace's right panel (Pathon v3): no step rail of its own (the frame has it), laid
+  // out for the panel's width, and every saved state handed back to the frame for its top bar.
+  const host = useWorkspaceHost();
+  const embedded = Boolean(host);
+  const twoColumns = !embedded || (host.panelWidth || 0) >= PANEL_TWO_COLUMNS_MIN;
 
   const [project, setProject] = useState(() => getProject(id));
+  const hostProjectChange = host?.onProjectChange;
+  useEffect(() => { if (project) hostProjectChange?.(project); }, [project, hostProjectChange]);
   const [pulled, setPulled] = useState(false);
   const [data, setData] = useState(null);                       // {questions, asked, read, rooms}
   const [loadState, setLoadState] = useState('loading');       // loading | ready | failed
@@ -390,12 +398,14 @@ export default function PatikraQuestions() {
 
   return (
     <div ref={topRef} className="flex min-h-full flex-col bg-background text-[16px]" data-testid="patikra-questions">
-      <StepBar
-        step="patikra"
-        hasPdf
-        projectId={id}
-        setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
-      />
+      {!embedded && (
+        <StepBar
+          step="patikra"
+          hasPdf
+          projectId={id}
+          setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-[hsl(var(--primary))] px-4 py-3 text-white">
         <div className="min-w-0 flex-1">
@@ -429,9 +439,9 @@ export default function PatikraQuestions() {
         </div>
       )}
 
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
+      <div className={`flex flex-1 gap-4 p-4 ${embedded ? (twoColumns ? 'flex-row items-start' : 'flex-col') : 'flex-col lg:flex-row lg:items-start'}`}>
         {/* the questions, top to bottom in the order that lets one answer settle the next */}
-        <nav className="w-full shrink-0 lg:w-[300px]" aria-label={t('project.questions.title')}>
+        <nav className={`shrink-0 ${embedded ? (twoColumns ? 'w-[260px]' : 'w-full') : 'w-full lg:w-[300px]'}`} aria-label={t('project.questions.title')}>
           <ol className="flex flex-col gap-1.5">
             {questions.map((q, i) => {
               const isCurrent = q.id === currentId;
@@ -506,9 +516,9 @@ export default function PatikraQuestions() {
           )}
 
           {loadState === 'ready' && current && (
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+            <div className={`flex flex-col gap-4 ${embedded ? '' : 'xl:flex-row xl:items-start'}`}>
               <section
-                className={`min-w-0 rounded-[2px] border border-border bg-card p-4 ${WITH_DRAWING.has(current.answer) ? (current.answer === 'choices' ? 'xl:w-[540px] xl:shrink-0' : 'xl:w-[440px] xl:shrink-0') : 'max-w-[760px] flex-1'}`}
+                className={`min-w-0 rounded-[2px] border border-border bg-card p-4 ${embedded ? '' : WITH_DRAWING.has(current.answer) ? (current.answer === 'choices' ? 'xl:w-[540px] xl:shrink-0' : 'xl:w-[440px] xl:shrink-0') : 'max-w-[760px] flex-1'}`}
                 data-testid={`question-card-${current.id}`}
               >
                 <h2 className="text-[20px] font-semibold leading-snug">{cleanUserText(current.title)}</h2>

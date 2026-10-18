@@ -62,6 +62,7 @@ import { ltNumber } from '@/lib/ledger';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/components/project/StepRail';
+import { useWorkspaceHost } from '@/components/project/workspaceHost';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 
@@ -75,8 +76,14 @@ export default function RoomSheet() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  // Inside the project workspace's right panel (Pathon v3): no step rail of its own (the frame has it), one
+  // column (the drawing is the workspace's), and every saved state handed back to the frame's top bar.
+  const host = useWorkspaceHost();
+  const embedded = Boolean(host);
 
   const [project, setProject] = useState(() => getProject(id));
+  const hostProjectChange = host?.onProjectChange;
+  useEffect(() => { if (project) hostProjectChange?.(project); }, [project, hostProjectChange]);
   const [pulled, setPulled] = useState(false);
   const [facts, setFacts] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -449,12 +456,14 @@ export default function RoomSheet() {
   return (
     <div className="flex min-h-full flex-col bg-background text-[16px]">
       {/* The same four steps as the project page — this sheet IS step 2. */}
-      <StepBar
-        step="patikra"
-        hasPdf
-        projectId={id}
-        setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
-      />
+      {!embedded && (
+        <StepBar
+          step="patikra"
+          hasPdf
+          projectId={id}
+          setStep={(s) => navigate(s === 'patikra' ? `/project/${id}/patikra` : `/project/${id}?step=${s}`)}
+        />
+      )}
       <RoomSheetStrip
         onQuestions={() => navigate(`/project/${id}/patikra`)}
         title={roomTitle(room) || String(roomNr)}
@@ -485,9 +494,9 @@ export default function RoomSheet() {
       />
       <RereadRoomNote project={project} roomNr={roomNr} />
 
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
+      <div className={`flex flex-1 flex-col gap-4 p-4 ${embedded ? '' : 'lg:flex-row lg:items-start'}`}>
         {/* Left — the drawing, framed on this room. */}
-        <div className="min-w-0 flex-1 lg:sticky lg:top-4 lg:basis-[52%]">
+        <div className={`min-w-0 ${embedded ? '' : 'flex-1 lg:sticky lg:top-4 lg:basis-[52%]'}`}>
           {facts?.room
             ? (
               <RoomDrawingPane
@@ -513,7 +522,7 @@ export default function RoomSheet() {
         </div>
 
         {/* Right — the two layers. */}
-        <div className="min-w-0 flex-1 rounded-[2px] border border-border bg-card lg:basis-[48%]">
+        <div className={`min-w-0 flex-1 rounded-[2px] border border-border bg-card ${embedded ? '' : 'lg:basis-[48%]'}`}>
           {loading && !keepFacts && (
             <p className="flex items-center gap-2 p-4 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

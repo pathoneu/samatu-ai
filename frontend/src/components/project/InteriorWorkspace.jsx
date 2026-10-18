@@ -19,7 +19,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Layers, Upload, Map as MapIcon } from 'lucide-react';
+import { Layers, Upload, Map as MapIcon, Maximize2, Minimize2 } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import DetectRunButton from '@/components/viewer/DetectRunButton';
@@ -29,6 +29,7 @@ import { useDetectRun } from '@/lib/useDetectRun';
 import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import RightPanelHost from './RightPanelHost';
+import { WorkspaceHostContext } from './workspaceHost';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { laneScalesOf } from '@/lib/durableScale';
@@ -39,7 +40,8 @@ import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
-  PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth, selectTab, tabForView,
+  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth,
+  selectTab, tabForView, writePanelWidth,
 } from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
@@ -620,7 +622,9 @@ export default function InteriorWorkspace({
     if (canvasColRef.current) ro.observe(canvasColRef.current);
     return () => ro.disconnect();
   }, []);
-  const [storedWidths] = useState(() => ({
+  // The panel's width, as he dragged it: one for the drawing view (300–480 px, `samatu_panel_width`), one
+  // for the wide Patikra / Sąmata panel. Remembered per browser when a drag ends.
+  const [storedWidths, setStoredWidths] = useState(() => ({
     full: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'full') : null,
     split: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'split') : null,
   }));
@@ -628,7 +632,26 @@ export default function InteriorWorkspace({
     workspaceWidth,
     stored: canvasMode === 'split' ? storedWidths.split : storedWidths.full,
   });
+  const widthMode = canvasMode === 'split' ? 'split' : 'full';
+  const panelMin = PANEL_LIMITS[widthMode].min;
+  const panelMax = widthMode === 'split' && workspaceWidth > 0
+    ? Math.max(panelMin, Math.min(PANEL_LIMITS.split.max, workspaceWidth - MIN_SPLIT_CANVAS))
+    : PANEL_LIMITS[widthMode].max;
+  const handlePanelWidth = useCallback((width, { final } = {}) => {
+    setStoredWidths((prev) => ({ ...prev, [widthMode]: width }));
+    if (final && typeof window !== 'undefined') writePanelWidth(window.localStorage, widthMode, width);
+  }, [widthMode]);
   const hiddenViewerWidth = canvasWidth || Math.max(480, (workspaceWidth || 1200) - (panelWidthFor('full', { workspaceWidth }) || 340));
+
+  // What the panel's contents get from the frame (components/project/workspaceHost): its width, and a way
+  // to hand Patikra's saved project back to the top bar.
+  const patikraProjectRef = useRef(onPatikraProject);
+  patikraProjectRef.current = onPatikraProject;
+  const hostProjectChange = useCallback((next) => patikraProjectRef.current?.(next), []);
+  const hostValue = useMemo(() => ({
+    panelWidth: panelWidth ?? workspaceWidth,
+    onProjectChange: hostProjectChange,
+  }), [panelWidth, workspaceWidth, hostProjectChange]);
 
   const panelLabel = (id) => PANEL_TABS.find((tab) => tab.id === id)?.label || id;
 
@@ -799,14 +822,35 @@ export default function InteriorWorkspace({
       id: 'patikra',
       scroll: true,
       node: view === 'patikra' ? (
-        <Suspense fallback={<p className="p-4 text-[14px] text-muted-foreground">{t('project.roomSheet.loading')}</p>}>
-          <PatikraEntry onProjectChange={onPatikraProject} />
-        </Suspense>
+        <WorkspaceHostContext.Provider value={hostValue}>
+          <Suspense fallback={<p className="p-4 text-[14px] text-muted-foreground">{t('project.roomSheet.loading')}</p>}>
+            <PatikraEntry />
+          </Suspense>
+        </WorkspaceHostContext.Provider>
       ) : null,
     },
-    { id: 'samata', scroll: true, node: samataContent },
+    { id: 'samata', scroll: true, node: samataContent ? <div className="px-3 pb-3">{samataContent}</div> : null },
     { id: 'pokalbis', keepMounted: true, node: drawingPanels.pokalbis },
   ];
+
+  // Sąmata: „Išskleisti" gives the rows the whole width (the drawing waits behind a 56 px strip);
+  // „Rodyti brėžinį" brings it back beside them. Nothing to bring back without a drawing.
+  const samataToggle = view === 'samata' && !pdfMissing ? (
+    <button
+      type="button"
+      data-testid="samata-expand"
+      aria-pressed={samataExpanded}
+      onClick={() => onSamataExpandedChange?.(!samataExpanded)}
+      title={samataExpanded
+        ? 'Rodyti brėžinį šalia sąmatos eilučių'
+        : 'Išskleisti sąmatą per visą plotį — brėžinys susitrauks į juostą kairėje'}
+      className="inline-flex items-center gap-1.5 min-h-[32px] px-2.5 rounded-[2px] border border-border-strong bg-card text-[14px] text-foreground/85 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {samataExpanded
+        ? <><Minimize2 className="w-4 h-4" aria-hidden /> Rodyti brėžinį</>
+        : <><Maximize2 className="w-4 h-4" aria-hidden /> Išskleisti</>}
+    </button>
+  ) : null;
 
   return (
     <div
@@ -884,7 +928,11 @@ export default function InteriorWorkspace({
           onTabChange={setRightTab}
           width={isMobile ? null : panelWidth}
           grow={strip || isMobile}
+          minWidth={panelMin}
+          maxWidth={panelMax}
+          onWidthChange={isMobile || strip ? null : handlePanelWidth}
           notices={notices}
+          tabBarExtra={samataToggle}
           panels={panels}
         />
       )}

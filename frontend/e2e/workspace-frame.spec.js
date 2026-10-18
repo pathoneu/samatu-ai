@@ -4,6 +4,8 @@
  * Asserts the frame contract on the demo project (demo-objektas_h, 8 sheets, 11 rooms):
  *  - the drawing is mounted ONCE and kept across all four views (same DOM element, still connected);
  *  - today's URLs land on the right view;
+ *  - the right panel is 340 px, resizable 300–480, remembered in localStorage `samatu_panel_width`;
+ *  - Sąmata „Išskleisti" collapses the drawing to a 56 px strip without unmounting it;
  *
  * Written to merge into W0-A's Playwright suite (frontend/e2e): it uses relative URLs (the suite's
  * `baseURL`, e.g. http://localhost:5203 for the W1-A worktree) and needs the backend with auth off.
@@ -74,5 +76,57 @@ test.describe('workspace frame — one workspace, four views', () => {
 
     await page.goto(`/project/${PROJECT}?step=siusti`);
     await expect.poll(() => workspaceView(page)).toBe('siusti');
+  });
+
+  test('the right panel is 340 px, resizable 300–480, and its width is remembered', async ({ page }) => {
+    await openProject(page);
+    await page.evaluate(() => { try { localStorage.removeItem('samatu_panel_width'); } catch { /* */ } });
+    await page.reload();
+    await waitForDrawing(page);
+    const panel = page.locator('[data-testid="right-panel"]');
+    const width = async () => Math.round((await panel.boundingBox()).width);
+    expect(await width()).toBe(340);
+
+    // drag the panel's left edge 60 px to the left → 400 px
+    const handle = page.locator('[data-testid="right-panel-resizer"]');
+    const hb = await handle.boundingBox();
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 - 30, hb.y + hb.height / 2, { steps: 4 });
+    await page.mouse.move(hb.x + hb.width / 2 - 60, hb.y + hb.height / 2, { steps: 4 });
+    await page.mouse.up();
+    expect(await width()).toBe(400);
+    expect(await page.evaluate(() => localStorage.getItem('samatu_panel_width'))).toBe('400');
+
+    // the keyboard works on the focused handle, and both limits hold
+    await handle.focus();
+    await page.keyboard.press('ArrowLeft');
+    expect(await width()).toBe(416);
+    for (let i = 0; i < 10; i += 1) await page.keyboard.press('ArrowLeft');
+    expect(await width()).toBe(480);
+    for (let i = 0; i < 20; i += 1) await page.keyboard.press('ArrowRight');
+    expect(await width()).toBe(300);
+
+    // remembered across a reload
+    await page.keyboard.press('ArrowLeft');
+    await page.reload();
+    await waitForDrawing(page);
+    expect(await width()).toBe(316);
+    await page.evaluate(() => { try { localStorage.removeItem('samatu_panel_width'); } catch { /* */ } });
+  });
+
+  test('Sąmata „Išskleisti" gives the rows the width and keeps the drawing mounted behind a strip', async ({ page }) => {
+    await openProject(page, `/project/${PROJECT}?step=samata`);
+    await waitForDrawing(page);
+    await page.evaluate(() => { window.__w1aViewer = document.querySelector('[data-takeoff-viewer]'); });
+    const mode = () => page.locator('[data-testid="workspace"]').getAttribute('data-canvas-mode');
+    expect(await mode()).toBe('split');
+    await page.locator('[data-testid="samata-expand"]').click();
+    expect(await mode()).toBe('strip');
+    const strip = await page.locator('[data-testid="viewer-root"]').boundingBox();
+    expect(Math.round(strip.width)).toBe(56);
+    await page.locator('[data-testid="canvas-strip"]').click();
+    expect(await mode()).toBe('split');
+    expect(await page.evaluate(() => window.__w1aViewer === document.querySelector('[data-takeoff-viewer]'))).toBe(true);
   });
 });

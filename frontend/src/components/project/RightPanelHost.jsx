@@ -13,6 +13,7 @@
  *  - `onWidthChange(width, { final })`: when given, the panel's left edge is a resize handle (mouse drag,
  *    or arrow keys on the focused handle); `final` marks the end of a drag, when the owner stores it.
  *  - `notices`: shown above the tabs — outside the drawing's column, so a notice never takes its height.
+ *  - `tabBarExtra`: one control at the right end of the tab strip.
  */
 
 import { useRef } from 'react';
@@ -30,6 +31,8 @@ export default function RightPanelHost({
   maxWidth = 960,
   onWidthChange = null,
   notices = null,
+  // One control at the right end of the tab strip (the Sąmata „Išskleisti" switch).
+  tabBarExtra = null,
   className = '',
 }) {
   const dragRef = useRef(null);
@@ -117,6 +120,7 @@ export default function RightPanelHost({
             {label}
           </button>
         ))}
+        {tabBarExtra && <div className="ml-auto flex items-center px-2 shrink-0">{tabBarExtra}</div>}
       </div>
 
       {panels.map(({ id, node, keepMounted = false, scroll = false }) => {

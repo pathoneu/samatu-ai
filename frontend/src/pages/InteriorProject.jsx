@@ -1132,6 +1132,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
             focusSanityNonce={sanityFocus}
             priceFocus={priceFocus}
             onPriceFocusDone={() => setPriceFocus(null)}
+            compact={!samataExpanded}
           />
         ) : null}
         sendContent={step === 'siusti' ? (
