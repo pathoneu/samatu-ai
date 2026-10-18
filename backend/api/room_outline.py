@@ -27,6 +27,7 @@ from __future__ import annotations
 import copy
 import logging
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -87,6 +88,9 @@ class OutlineAt(BaseModel):
     y_pct: float = Field(ge=0.0, le=1.0)
     pritarta: bool = False            # the point is inside the outline the lane proposed and he said „Tinka"
     klausimas: str | None = Field(default=None, max_length=64)   # the Patikra question answered (journal note)
+    # The viewer's room tool R (Pathon v3 W1-D): the outline is only PROPOSED — he reviews it and his next
+    # click or Enter saves it through `outline-set` (`kaip: "parodyta"`). A preview is not an act: no journal row.
+    perziura: bool = False
 
 
 class PagePoint(BaseModel):
@@ -112,6 +116,10 @@ class OutlineSet(BaseModel):
     # „Kas atimama?" per hole: True — a column / shaft, its faces are painted walls (the default); False — a floor
     # opening or anything else with no walls. Missing or shorter than `holes` → True for the rest.
     holes_walls: list[bool] | None = Field(default=None, max_length=50)
+    # „parodyta": the ring is the wall face he POINTED at with the room tool (`outline-at` with `perziura`, then
+    # saved) — the outline is said to be the one he showed, and, like „Parodyti patalpą", an unread perimeter is
+    # left to the walls rather than replaced by the ring's length. Absent: a ring he drew or edited.
+    kaip: Literal["parodyta"] | None = None
 
 
 class OutlineMerge(OutlineSet):
@@ -216,8 +224,8 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             cut = propose_split(pdf_bytes, body.page, seats2, areas2, float(scale), (W, H), face_pct=union)
             if cut.get("status") == "ok":
                 if body.pritarta:
-                    return _remembered(project_id, _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut),
-                                       klausimas=body.klausimas)
+                    divided = _divided(parsed, pdf_bytes, dims, rooms, [_nr(room), other], body.page, cut)
+                    return divided if body.perziura else _remembered(project_id, divided, klausimas=body.klausimas)
                 return {"status": "shared", "su": other, "page": body.page, "line_pct": cut["line_pct"], "pagal": cut["pagal"],
                         "rooms": {nr: {**part, "plotas_uzrasas_m2": areas2.get(nr)} for nr, part in cut["rooms"].items()}}
         return hit
@@ -241,12 +249,13 @@ def api_room_outline_at(request: Request, project_id: str, room_nr: str, body: O
             room.pop(stale, None)
     apply_geometry(parsed, pdf_bytes, dims)
 
-    return _remembered(project_id, {
+    answer = {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},
         "kitu_angos": {_nr(r): r["_angos_sienose"] for r in rooms
                        if r is not room and isinstance(r.get("_angos_sienose"), dict)},
-    }, _nr(room), klausimas=body.klausimas)
+    }
+    return answer if body.perziura else _remembered(project_id, answer, _nr(room), klausimas=body.klausimas)
 
 
 def _ring_of(raw: list[list[float]], what: str) -> list[tuple[float, float]]:
@@ -310,9 +319,10 @@ def _convex_corners(hole, scale: float) -> int:
 
 def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], scale: float,
                  *, table_m2: float | None = None, extra: dict | None = None,
-                 holes_walls: list[bool] | None = None) -> float:
+                 holes_walls: list[bool] | None = None, saltinis: str = DRAWN) -> float:
     """Write the person's ring (and holes) onto `room` as its corrected outline → the drawn perimeter.
-    `table_m2`: the printed area the drawn one is compared with (default: the room's own)."""
+    `table_m2`: the printed area the drawn one is compared with (default: the room's own). `saltinis`: what he
+    did — drew it (`nubrezta`, the default) or pointed at the wall face with the room tool (`parodyta`)."""
     m = _measured(ring, holes, size, scale)
     if table_m2 is None:
         table = room.get("plotas_m2")
@@ -328,7 +338,7 @@ def _set_outline(room: dict, ring, holes, page: int, size: tuple[float, float], 
     own = room.get("plotas_m2")
     room["_konturas"] = {"page": page, "plotas_m2": m["plotas_m2"], "perimetras_m": m["perimetras_m"],
                          "plotas_uzrasas_m2": own if isinstance(own, (int, float)) and not isinstance(own, bool) and own > 0 else None,
-                         "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": DRAWN}
+                         "paklaida": paklaida, "plotas_nesutampa": False, "saltinis": saltinis}
     if holes:
         walls = list(holes_walls or [])
         skyles = [{**h, "sienos": bool(walls[i]) if i < len(walls) else True} for i, h in enumerate(m["skyles"])]
@@ -369,9 +379,12 @@ def api_room_outline_set(request: Request, project_id: str, room_nr: str, body: 
     _project_for(request, project_id)
     ring, holes = _drawn_rings(body)
     pdf_bytes, (W, H), parsed, dims, geo, scale, rooms, room = _todays_reading(request, project_id, room_nr, body.page, "room_outline")
-    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale, holes_walls=body.holes_walls)
+    pointed = body.kaip == "parodyta"
+    perimetras = _set_outline(room, ring, holes, body.page, (W, H), scale, holes_walls=body.holes_walls,
+                              saltinis=POINTED_AT if pointed else DRAWN)
     apply_geometry(parsed, pdf_bytes, dims)
-    _drawn_perimeter_if_unread(room, perimetras)
+    if not pointed:
+        _drawn_perimeter_if_unread(room, perimetras)
     return _remembered(project_id, {
         "status": "ok",
         "room": {k: room.get(k) for k in GEOMETRY_ROOM_KEYS},

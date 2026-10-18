@@ -28,6 +28,7 @@ import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
 import OutlineToolLayer from './OutlineToolLayer';
 import CalloutLayer from './CalloutLayer';
+import RoomProposalLayer from './RoomProposalLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -125,6 +126,8 @@ export default function PageOverlayHost({
   sheetLinks = null,
   // A later edition of the drawing over this sheet (togal-v2 W10): {rid, record, mode, opacity} or null.
   revisionOverlay = null,
+  // The room tool R's state (useRoomTool) while it is armed, else null — its proposal is drawn on its sheet.
+  roomTool = null,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -256,6 +259,12 @@ export default function PageOverlayHost({
           onRoomClick={onPagePoint ? () => {} : (zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
+      )}
+      {/* The room tool's proposal (Pathon v3 W1-D) — over the zones, under the measurements; pointer-transparent. */}
+      {!checkMode && roomTool && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <RoomProposalLayer page={layout.pageNumber} state={roomTool} renderedSize={{ width, height }} />
+        </div>
       )}
       {!checkMode && sheetLinks && projectId && (
         <CalloutLayer

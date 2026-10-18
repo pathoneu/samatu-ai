@@ -36,7 +36,7 @@ import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject, flushProjectSaves } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
 import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
-import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
+import { fetchOutlineAt, fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
@@ -379,8 +379,7 @@ export default function InteriorWorkspace({
   // roomsWithOutline applies them to the rooms and nothing else. Saving dispatches
   // samatu:project-recompute, which InteriorProject routes through /recompute-interior — the one path
   // every other room edit takes.
-  const handleRoomOutlineEdit = async (roomNr, page, points, holes = null) => {
-    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points, holes });
+  const landOutlineAnswer = (roomNr, answer, reason) => {
     const fresh = getProject(project.id) || project;
     const rooms = roomsWithOutline(fresh, roomNr, answer);
     if (!rooms) throw new Error(typeof answer?.detail === 'string' ? answer.detail : 'Kontūras nepriimtas');
@@ -393,9 +392,28 @@ export default function InteriorWorkspace({
     if (updated) onProjectChange?.(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('samatu:project-recompute', {
-        detail: { projectId: project.id, reason: 'outline-edited', roomNr },
+        detail: { projectId: project.id, reason, roomNr },
       }));
     }
+  };
+  const handleRoomOutlineEdit = async (roomNr, page, points, holes = null) => {
+    const answer = await fetchOutlineSet(project.id, roomNr, { page, polygon_pct: points, holes });
+    landOutlineAnswer(roomNr, answer, 'outline-edited');
+  };
+
+  // The viewer's room tool R (Pathon v3 W1-D): one click → the wall-exact outline PROPOSED (outline-at with
+  // `perziura` — read, nothing saved, no journal row), then saved once he has seen it through outline-set
+  // (`kaip: 'parodyta'`) — the walls and openings read again and the sheet recomputed on the same path as
+  // every outline save. The stored project is brought up to date first, so the server reads what he sees.
+  const handleRoomToolPreview = async (roomNr, point) => {
+    await flushProjectSaves().catch(() => null);
+    return fetchOutlineAt(project.id, roomNr, point, { perziura: true });
+  };
+  const handleRoomToolCommit = async (roomNr, body) => {
+    await flushProjectSaves().catch(() => null);
+    const answer = await fetchOutlineSet(project.id, roomNr, body);
+    landOutlineAnswer(roomNr, answer, 'outline-pointed');
+    return {};
   };
 
   // Outline tools (2026-10-16): „Padalyti" / „Sujungti" / „Atimti" — lib/outlineToolSave builds ONE patch
@@ -716,6 +734,8 @@ export default function InteriorWorkspace({
         onRoomPolygonFill={handleRoomPolygonFill}
         onRoomOutlineEdit={handleRoomOutlineEdit}
         onOutlineTool={handleOutlineTool}
+        onRoomToolPreview={handleRoomToolPreview}
+        onRoomToolCommit={handleRoomToolCommit}
         fillRequest={fillRequest}
         exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
         initialMeasurements={project?.measurements || []}

@@ -19,7 +19,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch, ListChecks, Lasso } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, MousePointer2, Ruler, Pentagon, Spline, Hash, Scaling, Search, Printer, Download, Layers, BrickWall, Undo2, History, ScanSearch, ListChecks, Lasso, SquareDashedMousePointer } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -52,6 +52,8 @@ import OutlineToolButtons from './OutlineToolButtons';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
+import useRoomTool from './useRoomTool';
+import { RoomPickPanel } from './RoomProposalLayer';
 import { matchViewerHotkey, withKey, hintText, keyText } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
@@ -66,6 +68,8 @@ import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floa
 const MEASURE_TOOLS = [
   { id: 'select', Icon: MousePointer2, label: 'Žymėti', title: 'Pažymėti jau nubrėžtą matavimą — po to Delete jį ištrina' },
   { id: 'lasso', Icon: Lasso, label: 'Laso', title: withKey('Apvesti kelis matavimus ir žymes — visi apvesti pažymimi; Shift — pridėti; dešinysis klavišas — veiksmai su visais', 'toolLasso') },
+  // Pathon v3 W1-D: one click inside a room → its outline off the drawing's walls, proposed, then saved.
+  { id: 'room', Icon: SquareDashedMousePointer, label: 'Patalpa', title: withKey('Patalpa: spustelėkite patalpos viduje — kontūras pagal brėžinio sienas; peržiūrėkite ir išsaugokite (Enter), Esc — atmesti', 'toolRoom') },
   { id: 'distance', Icon: Ruler, label: 'Atstumas', title: withKey('Matuoti atstumą tarp dviejų taškų, rezultatas metrais', 'toolDistance') },
   { id: 'area', Icon: Pentagon, label: 'Plotas', title: withKey('Matuoti plotą apvedant kontūrą, rezultatas m²', 'toolArea') },
   { id: 'perimeter', Icon: Spline, label: 'Perimetras', title: withKey('Matuoti kontūro ilgį, rezultatas metrais', 'toolPerimeter') },
@@ -92,6 +96,8 @@ const MEASURE_HINTS = {
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
   // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
   scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
+  // Pathon v3 W1-D, the room tool R: the proposal's own label says what saving changes.
+  room: 'Patalpa: spustelėkite patalpos viduje — kontūras pagal sienas · Enter arba kitas spustelėjimas — išsaugoti · Esc — atmesti',
 };
 // Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
 // Key names come from lib/viewerShortcuts, the table the „?" guide prints.
@@ -467,7 +473,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const scaleText = scaleStatusText(pageScale);
   // Whether the visible sheet has wall geometry to snap to — same cache the page hosts fill, so this
   // costs no extra request; `select` and `count` do not snap, the others do.
-  const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
+  const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count' && measureTool !== 'room';
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
   // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
   // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
@@ -593,6 +599,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
       toolPerimeter: () => tool('perimeter'),
       toolCount: () => tool('count'),
       toolLasso: () => tool('lasso'),
+      toolRoom: () => tool('room'),
       deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
       undo: () => (onUndo ? (onUndo(), true) : false),
       redo: () => (onRedo ? (onRedo(), true) : false),
@@ -764,7 +771,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -926,6 +933,35 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // Measurements + per-page scales in PDF-point space (see MeasureLayer);
   // hydrated from the project, persisted back via onMeasureDataChange.
   const [measureTool, setMeasureTool] = useState(null);
+  // ---- The room tool R (Pathon v3 W1-D, D2) -------------------------------
+  // Armed as the measure tool 'room' (one pointer owner at a time, the same Esc and tool switching); its
+  // state, the requests and the save live in useRoomTool, the host (InteriorWorkspace) does the network.
+  const roomToolArmed = measureTool === 'room' && !check;
+  const roomTool = useRoomTool({
+    active: roomToolArmed,
+    rooms,
+    projectId,
+    sutapdinimas: project?._meta?.geometrija?.sutapdinimas || null,
+    onPreview: onRoomToolPreview,
+    onCommit: onRoomToolCommit,
+    // No vector walls on the sheet: the raster click-fill is the fallback, shown first like every proposal.
+    onRasterPreview: onRoomPolygonFill ? async (nr, where) => {
+      const data = await clickToFill({ projectId, pageNr: where.page, clickXPct: where.x_pct, clickYPct: where.y_pct, sensitivity: 0.7, pdfBlob });
+      const pw = Number(data?.page_width_pdf);
+      const ph = Number(data?.page_height_pdf);
+      const ring = Array.isArray(data?.polygon_pdf) && pw > 0 && ph > 0 ? data.polygon_pdf.map(([x, y]) => [x / pw, y / ph]) : null;
+      return ring && ring.length >= 3 ? { ring, data } : null;
+    } : null,
+    onRasterCommit: onRoomPolygonFill ? (nr, data) => onRoomPolygonFill(nr, data) : null,
+    // The room he just outlined becomes the selected one, so he sees it (the drawing stays where it is).
+    onCommitted: (nr) => applyRoomSelection({ focused: String(nr), extra: [] }),
+  });
+  // The room tool owns the pointer alone: an outline being edited or a split/merge/subtract in progress stands down.
+  useEffect(() => {
+    if (!roomToolArmed) return;
+    setOutlineEdit(null);
+    outlineTools.cancel();
+  }, [roomToolArmed]); // eslint-disable-line react-hooks/exhaustive-deps
   // Committed measurements + count marks live in a history (lib/measureHistory, 2026-10-16): every
   // change goes through setMeasurements(update) and becomes one undoable entry in „Istorija".
   const [measureHist, dispatchMeasureHist] = useReducer(historyReducer, initialMeasurements || [], initHistory);
@@ -1124,6 +1160,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (outlineEdit) { setOutlineEdit(null); return true; }
     if (outlineTools.tool) { outlineTools.cancel(); return true; }
     if (calibRequest) { setCalibRequest(null); return true; }
+    if (roomToolArmed && roomTool.escape()) return true;   // the room tool: drop the proposal first, then exit
     if (scaleCheck && measureTool !== 'scalecheck') { setScaleCheck(null); return true; }
     if (measureTool === 'scalecheck') { setScaleCheck(null); }
     if (measureTool != null) { setMeasureTool(null); setSelectedMeasureId(null); return true; }
@@ -1234,6 +1271,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
 
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
+    if (roomToolArmed) { roomTool.click(pt); return; }   // the room tool R (Pathon v3 W1-D)
     if (fillFor == null) {
       // Plain canvas click (no fill, no measure tool) — Pathon v3 W1-D: the room under the click is SELECTED
       // (Shift adds or removes one), empty paper clears the selection (the audit P2 sticky-chip rule still
@@ -1446,7 +1484,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onOutlineToolChange={outlineTools.change}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
-                      measureTool={measureTool === 'scalecheck' ? 'calibrate' : measureTool}
+                      measureTool={measureTool === 'scalecheck' ? 'calibrate' : (measureTool === 'room' ? null : measureTool)}
                       measurements={measurements}
                       measureScale={effectiveScales[layout.pageNumber] || null}
                       snapEnabled={snapEnabled}
@@ -1497,6 +1535,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                         point ? { pageNr: layout.pageNumber, point } : { pageNr: null, point: null })}
                       sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
                       revisionOverlay={check ? null : revisionOverlay}
+                      roomTool={roomToolArmed ? roomTool.state : null}
                     />
                   )}
                 />
@@ -1508,6 +1547,14 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-panel px-3.5 py-1.5 rounded-panel border border-border bg-card text-ui text-foreground shadow-md pointer-events-none w-max max-w-[calc(100%-1rem)] text-center`}>
                 {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
+            )}
+            {roomToolArmed && (
+              <RoomPickPanel
+                picking={roomTool.state.phase === 'picking' ? roomTool.state.picking : null}
+                onPick={roomTool.pick}
+                onCancel={roomTool.cancelPick}
+                left={panelLeft}
+              />
             )}
             <OutlineToolPanel
               tool={outlineTools.tool}
@@ -1666,6 +1713,10 @@ export default function TakeoffViewer({
   onRoomOutlineEdit = null,
   // (op) => Promise — saves an outline tool's result: split / merge / subtract (lib/outlineToolSave, 2026-10-16).
   onOutlineTool = null,
+  // The room tool R (Pathon v3 W1-D): (nr, {page, x_pct, y_pct}) => the outline-at answer, read only („perziura");
+  // (nr, outline-set body) => Promise<{undo?}> — saves the outline he reviewed.
+  onRoomToolPreview = null,
+  onRoomToolCommit = null,
   rooms = [],
   focusedRoom = null,
   focusedPage = null,
@@ -1729,6 +1780,8 @@ export default function TakeoffViewer({
           renderToolbarAddon={renderToolbarAddon}
           onRoomOutlineEdit={onRoomOutlineEdit}
           onOutlineTool={onOutlineTool}
+          onRoomToolPreview={onRoomToolPreview}
+          onRoomToolCommit={onRoomToolCommit}
           check={check}
           focus={focus}
           rooms={rooms}
