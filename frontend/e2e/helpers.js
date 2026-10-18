@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './pw.js';
-import { PROJECT, START_JSON, fingerprint, getProject, readJson, restoreDb, restoreStore, START_DB } from './state.js';
+import { PROJECT, START_JSON, diffDb, fingerprint, getProject, readJson, restoreDb, restoreStore, START_DB } from './state.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SCREENS = path.join(HERE, '__screens__');
@@ -21,6 +21,7 @@ export function note(text) {
 
 export async function shot(page, name) {
   fs.mkdirSync(SCREENS, { recursive: true });
+  await page.waitForTimeout(400); // let colour transitions (chips, toasts) settle before the picture
   await page.screenshot({ path: path.join(SCREENS, `${name}.png`) });
 }
 
@@ -30,6 +31,8 @@ export const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export async function restoreStart() {
   restoreDb(START_DB);
   restoreStore();
+  const differs = diffDb(START_DB);
+  if (differs.length) throw new Error(`start state not restored, tables differ: ${differs.join(', ')}`);
   const want = readJson(START_JSON);
   const got = fingerprint(await getProject());
   for (const k of Object.keys(got)) {
@@ -195,9 +198,9 @@ export function kiekiaiRow(page, label, qty) {
 }
 
 export async function expectKiekiai(page, rows) {
-  await page.getByRole('tab', { name: 'Kiekiai' }).click();
+  await page.getByTestId('right-tab-kiekiai').click();
   for (const [label, qty] of rows) await expect(kiekiaiRow(page, label, qty)).toBeVisible();
-  await page.getByRole('tab', { name: 'Patalpos ir eilutės' }).click();
+  await page.getByTestId('right-tab-patalpos').click();
 }
 
 export function centroid(ring) {

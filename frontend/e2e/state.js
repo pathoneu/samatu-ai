@@ -60,6 +60,25 @@ export function restoreDb(from) {
   if (check !== 'ok') throw new Error(`database check after restore failed: ${check}`);
 }
 
+/**
+ * Tables whose rows differ between the live database and `other` (rows in one and not the other, by
+ * every column, blobs included). An empty list proves the restore: the live file holds exactly the
+ * snapshot's content, table for table.
+ */
+export function diffDb(other) {
+  const tables = sqlite([other, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"])
+    .split('\n').map((t) => t.trim()).filter(Boolean);
+  const q = (t) => `"${t.replace(/"/g, '""')}"`;
+  const sql = [`ATTACH ${quoted(other)} AS snap;`];
+  for (const t of tables) {
+    sql.push(`SELECT '${t}', (SELECT count(*) FROM (SELECT * FROM main.${q(t)} EXCEPT SELECT * FROM snap.${q(t)}))`
+      + ` + (SELECT count(*) FROM (SELECT * FROM snap.${q(t)} EXCEPT SELECT * FROM main.${q(t)}));`);
+  }
+  const out = sqlite([DB, '.timeout 15000', '.separator |', ...sql]);
+  return out.split('\n').map((l) => l.trim()).filter(Boolean)
+    .map((l) => l.split('|')).filter(([, n]) => Number(n) !== 0).map(([t, n]) => `${t} (${n} rows)`);
+}
+
 // ── pdf_store ──────────────────────────────────────────────────────────────────────────────────────
 
 function walk(dir, base = dir, out = new Map()) {

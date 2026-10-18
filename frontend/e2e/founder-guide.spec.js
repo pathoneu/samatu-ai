@@ -6,8 +6,9 @@
  * The servers must already be up (this suite starts nothing):
  *   cd backend  && SAMATU_AUTH_DISABLED=1 ../venv/bin/uvicorn main:app --port 8121
  *   cd frontend && VITE_BACKEND_URL=http://localhost:8121 npm run dev -- --port 5201
+ *   (in a worktree whose node_modules is a symlink, give that Vite its own cacheDir — v3 programme doc)
  * then:
- *   cd frontend && npm run test:e2e
+ *   cd frontend && npm run test:e2e        (runs workspace-frame.spec.js too)
  * Other ports: E2E_BASE_URL / E2E_API_URL. Another data folder: E2E_DATA_DIR. Start version: E2E_START_VERSION.
  *
  * State: global-setup.js takes a pristine snapshot of backend/data/samatu.db + pdf_store (SQLite backup
@@ -31,6 +32,8 @@ test.beforeEach(async () => { await restoreStart(); });
 
 // The written dimension „996" on sheet 1 (room 01's wall; ends of its drawn line, display frame).
 const DIM_996 = [[0.41482, 0.40998], [0.45765, 0.40998]];
+// Room 08's wall corner nearest 02 (its vector outline) — a snap target for the vertex editor.
+const ROOM_08_CORNER = [0.47435, 0.39031];
 // Room 02 Katilinė's wall corners (its vector outline).
 const ROOM_02 = [[0.39086, 0.25178], [0.4564, 0.25164], [0.4564, 0.38361], [0.39086, 0.38361]];
 // A pendant lamp on sheet 3 (APŠVIETIMO PLANAS) and the box half-size in points.
@@ -103,8 +106,8 @@ test('1 coach marks + shortcuts guide', async ({ page }) => {
     const card = page.getByRole('dialog', { name: `Įvadas: ${title}` });
     await expect(card).toBeVisible({ timeout: 15_000 });
     await expect(card).toContainText(`Žingsnis ${i + 1} iš 3`);
+    await expect(card.getByTestId('viewer-coach-next')).toHaveText(next);
     await card.getByTestId('viewer-coach-next').click();
-    expect(next).toBe(i === 2 ? 'Supratau' : 'Toliau');
   }
   await expect(page.getByTestId('viewer-coach-mark')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('samatu_viewer_onboarded'))).toBe('1');
@@ -128,9 +131,18 @@ test('1 coach marks + shortcuts guide', async ({ page }) => {
   await shot(page, '01-coach-shortcuts');
 });
 
-test('2 sheet rail: groups, rename + undo, restore auto name, search LED', async ({ page }) => {
+test('2 sheet rail: strip, groups, rename + undo, restore auto name, search LED', async ({ page }) => {
   await openProject(page);
   const rail = page.getByRole('complementary', { name: 'Brėžinio lapai' });
+  // W1-A: the rail opens as a strip of numbered thumbnails; a click names the sheet beside it
+  await expect(page.getByTestId('sheet-rail')).toHaveAttribute('data-mode', 'strip');
+  await expect(rail.locator('li[data-sheet-page]')).toHaveCount(8);
+  await expect(rail.locator('li[data-sheet-page="3"] button')).toHaveAccessibleName('3 · APŠVIETIMO PLANAS — Elektra, lapas 3');
+  await rail.locator('li[data-sheet-page="5"] button').click();
+  await expect(page.getByTestId('sheet-strip-label')).toContainText('lapas 5');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('sheet-rail-expand').click();
+  await expect(page.getByTestId('sheet-rail')).not.toHaveAttribute('data-mode', 'strip');
   const groups = [['Architektūra ir interjeras', 5], ['Elektra', 2], ['Vandentiekis ir nuotekos', 1]];
   for (const [name, n] of groups) await expect(rail.getByRole('button', { name: `${name} ${n}` })).toBeVisible();
   const sheets = [
@@ -140,7 +152,7 @@ test('2 sheet rail: groups, rename + undo, restore auto name, search LED', async
     ['3', 'APŠVIETIMO PLANAS', 'Elektros planas'], ['4', 'VANDENS ĮVADŲ PLANAS', 'Santechnikos planas'],
   ];
   for (const [n, name, type] of sheets) await expect(rail.getByRole('button', { name: `${n} ${name} ${type}`, exact: true })).toBeVisible();
-  note('groups 5 / 2 / 1, 8 sheets named + typed');
+  note('strip of 8 → full rail: groups 5 / 2 / 1, 8 sheets named + typed');
 
   // rename → toast „Atšaukti" → back
   await rail.getByRole('button', { name: 'Pervadinti lapą 5' }).click();
@@ -213,8 +225,12 @@ test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', 
   await expect.poll(async () => fingerprint(await getProject()).confirmedScales, { timeout: 15_000 }).toBe(8);
   note('8 / 8 patvirtinti 1:115');
 
-  // „Patikrinti": two clicks on the drawn line of „996" — the panel stays open on Esc, close it with ✕
+  // Esc leaves tools but not this panel — its ✕ closes it
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeVisible();
   await page.getByRole('button', { name: 'Uždaryti mastelius' }).click();
+  await expect(panel).toHaveCount(0);
+  // „Patikrinti": two clicks on the drawn line of „996"
   await loadGeometry(page, 1);
   await page.getByTestId('scales-toggle').click();
   await panel.locator('[data-scale-row="1"]').getByRole('button', { name: 'Patikrinti' }).click();
@@ -269,14 +285,28 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await page.getByTestId('outline-edit-start').click();
   const readout = pg1.locator('svg text').filter({ hasText: /· lentelėje 6,90 m²$/ });
   await expect(readout).toHaveText('7,13 m² · 12,18 m · lentelėje 6,90 m²');
-  const [corner] = await sheetPoints(page, 1, [ROOM_02[2]]);
-  await dragBetween(page, corner, { x: corner.x + 25, y: corner.y + 18 });
+  // the snap target: the wall-solid corner (page geometry) next to room 08's outline corner
+  const { walls_pct: walls } = await api(`/api/projects/${PROJECT}/pages/1/geometry`);
+  const wallCorner = walls.flat().reduce((best, v) => (
+    Math.hypot((v[0] - ROOM_08_CORNER[0]) * 595, (v[1] - ROOM_08_CORNER[1]) * 842)
+      < Math.hypot((best[0] - ROOM_08_CORNER[0]) * 595, (best[1] - ROOM_08_CORNER[1]) * 842) ? v : best));
+  const [corner, other] = await sheetPoints(page, 1, [ROOM_02[2], wallCorner]);
+  // drag the corner to 3 px off that wall corner: the orange marker sits on the corner, the vertex lands on it
+  await page.mouse.move(corner.x, corner.y, { steps: 4 });
+  await page.mouse.down();
+  await page.mouse.move(other.x + 3, other.y + 3, { steps: 14 });
+  const snapMark = pg1.locator('rect[stroke="#ea580c"]');
+  await expect(snapMark).toHaveCount(1);
+  const sb = await snapMark.boundingBox();
+  expect(Math.abs(sb.x + sb.width / 2 - other.x), 'vertex snaps to the wall corner (x)').toBeLessThan(1.5);
+  expect(Math.abs(sb.y + sb.height / 2 - other.y), 'vertex snaps to the wall corner (y)').toBeLessThan(1.5);
+  await page.mouse.up();
   await expect(readout).not.toHaveText('7,13 m² · 12,18 m · lentelėje 6,90 m²');
   await page.keyboard.press('z');
   await expect(readout).toHaveText('7,13 m² · 12,18 m · lentelėje 6,90 m²');
   await page.keyboard.press('Escape');
   await expect(readout).toHaveCount(0);
-  note('vertex drag → Z → 7,13 m² again');
+  note('vertex snapped to a wall corner → Z → 7,13 m² again');
 
   // „Padalyti": a chord across 02 → parts measured → cancelled
   await focusRoom(page, '02');
@@ -300,6 +330,12 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveText('sujungta į 04');
   await expectKiekiai(page, [['Dažymo kampų montavimas', '489,76 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
   note('merge: 04 = 26,31 + 35,50 = 61,81 m² · lubos 143,27 · kampai 475,66 → 489,76');
+  // Recorded, not asserted (reported to the manager as an app bug): after the merge the room list's header and
+  // the server's floor-ratio checks add the absorbed 05 (35,50 m²) on top of 04's 61,81 m² — 178,77 m² of
+  // floor against 143,27 m² of ceiling, hence a false „Lubų plotas 0,80× grindų ploto".
+  const header = (await page.getByRole('button', { name: /^Patalpos 11 / }).innerText()).replace(/\s+/g, ' ');
+  const ratios = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
+  note(`[bug, recorded] after merge: „${header}" · ${ratios.join(' · ')}`);
 
   // „Atimti" (saved): a 2,06 m² column, „Kas atimama?" = kolona → 4 corners × 2,82 m
   await subtractColumn(page, await getProject());
@@ -346,11 +382,11 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   await page.getByTestId('clegend-new-type-input').press('Enter');
   for (const p of await sheetPoints(page, 1, [[0.42, 0.30], [0.43, 0.34]])) await clickAt(page, p);
   await expect(page.getByTestId('count-legend-panel')).toContainText(/Rozetės\s*2/);
+  await expect(pg1.locator('[data-ai-mark]'), 'hand-placed marks are not drawn hollow').toHaveCount(0);
   await expect(measRow(page, 'Rozetės', '2 vnt.')).toBeVisible();
-  await expect.poll(async () => fingerprint(await getProject()), { timeout: 15_000 }).toMatchObject({ countTypes: 1 });
-  const saved = (await getProject()).measurements;
-  expect(saved.length).toBeGreaterThanOrEqual(3);
-  note(`Kiekis Rozetės 2 · saved measurements ${saved.length}`);
+  // saved: 3 measurements + 2 count marks, 1 count type
+  await expect.poll(async () => fingerprint(await getProject()), { timeout: 15_000 }).toMatchObject({ countTypes: 1, measurements: 5 });
+  note('Kiekis Rozetės 2 · saved 3 measurements + 2 marks');
   await page.keyboard.press('Escape');
 
   // Laso (L): a real loop around the marks → right-click → batch delete → Istorija → undo
@@ -377,6 +413,8 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
   await expect(measRow(page, 'Rozetės', '2 vnt.')).toBeVisible();
   expect(await measureTexts()).toEqual(expect.arrayContaining(['1,58 m', '7,13 m²', '7,67 m']));
   await shot(page, '06-measure-lasso-history');
+  await page.keyboard.press('Escape');
+  await expect(hist, 'Esc does not close Istorija').toBeVisible();
   await hist.getByRole('button', { name: 'Uždaryti istoriją' }).click();
   await expect(hist).toHaveCount(0);
   note('lasso 3 matavimai + 2 žymės → ištrinta 5 → Istorija atšaukė');
@@ -384,7 +422,7 @@ test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async (
 
 test('7 Rasti panašius → count with automatically-found marks', async ({ page }) => {
   await openProject(page);
-  await page.getByRole('complementary', { name: 'Brėžinio lapai' }).getByRole('button', { name: /^3 APŠVIETIMO PLANAS/ }).click();
+  await page.getByTestId('sheet-rail').locator('li[data-sheet-page="3"] button').click();
   await page.getByTestId('viewer-symbol-search').click();
   const project = await getProject();
   const W = 595; const H = 842; // the sheet in points (A4, display frame) — checked below
@@ -413,6 +451,7 @@ test('7 Rasti panašius → count with automatically-found marks', async ({ page
   const legend = page.getByTestId('count-legend-panel');
   await expect(legend).toContainText('Pakabinami šviestuvai');
   await expect(legend).toContainText('2 rasta automatiškai');
+  await expect(page.locator('div[data-page-number="3"] [data-ai-mark]'), 'found marks are drawn hollow').toHaveCount(2);
   await expect(page.getByTestId('clegend-ai-note')).toContainText('Tuščiavidurė žymė — rasta automatiškai, patikrinkite; pilna — pažymėta ranka.');
   await expect.poll(async () => fingerprint(await getProject()).countTypes, { timeout: 15_000 }).toBe(1);
   note('2 added as a count · legend „2 rasta automatiškai" (hollow marks)');
@@ -423,11 +462,11 @@ test('8 right panel tabs: Patalpos ir eilutės, Kiekiai, Pokalbis (no message se
   let chatCalls = 0;
   page.on('request', (r) => { if (r.url().includes('/chat-project')) chatCalls += 1; });
   await openProject(page);
-  await expect(page.getByRole('tab', { name: 'Patalpos ir eilutės' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('right-tab-patalpos')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
   await expect(page.locator('[title^="Atidaryti psl."]')).toHaveCount(11);
 
-  await page.getByRole('tab', { name: 'Kiekiai' }).click();
+  await page.getByTestId('right-tab-kiekiai').click();
   const tree = page.getByRole('tree', { name: 'Kiekiai pagal darbus ir patalpas' });
   await expect(tree.getByRole('button', { name: 'Sienų glaistymas dažymas 7' })).toBeVisible();
   await expect(tree.getByRole('button', { name: 'Lubų glaistymas dažymas 2' })).toBeVisible();
@@ -440,6 +479,10 @@ test('8 right panel tabs: Patalpos ir eilutės, Kiekiai, Pokalbis (no message se
   const areas = (await roomsOfLubos.allInnerTexts()).map((t) => Number(/([\d ]+,\d\d) m²/.exec(t)[1].replace(/\s/g, '').replace(',', '.')));
   expect(Math.round(areas.reduce((s, x) => s + x, 0) * 100) / 100).toBe(143.27);
   note(`Kiekiai: lubos 143,27 = Σ ${areas.length} rooms · kampai 475,66`);
+  // click a room under the row ↔ that room is focused on the drawing (its room tools appear)
+  await expect(page.getByTestId('outline-edit-start')).toHaveCount(0);
+  await page.getByRole('treeitem', { name: /^03 Koridorius/ }).click();
+  await expect(page.getByTestId('outline-edit-start')).toBeVisible();
   // eye toggle on a room under the row
   const eye = roomsOfLubos.first().getByRole('button', { name: 'Slėpti kontūrą' });
   await eye.click();
@@ -452,7 +495,7 @@ test('8 right panel tabs: Patalpos ir eilutės, Kiekiai, Pokalbis (no message se
     await expect(menu.getByRole('menuitem', { name: item })).toBeVisible();
   }
   await menu.getByRole('menuitem', { name: 'Klausti pokalbyje apie šią eilutę' }).click();
-  await expect(page.getByRole('tab', { name: 'Pokalbis' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('right-tab-pokalbis')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Atsakymai pagal programos perskaitytus duomenis, ne iš brėžinio tiesiogiai.', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Eilutė: Lubų glaistymas/dažymas' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Klausimas apie projektą' })).toBeVisible();
@@ -606,7 +649,7 @@ test('Sąmata: Eksportuoti — Excel grouping preview and „PDF su žymėjimais
   let downloads = 0;
   page.on('download', () => { downloads += 1; });
   await openProject(page);
-  await page.getByRole('button', { name: 'Sąmata', exact: true }).click();
+  await page.getByTestId('step-samata').click();
   await page.getByRole('button', { name: 'Eksportuoti', exact: true }).click();
   for (const item of ['Excel (.xlsx)', 'PDF pasiūlymas', 'PDF su žymėjimais']) await expect(page.getByText(item, { exact: true })).toBeVisible();
   await page.getByText('Excel (.xlsx)', { exact: true }).click();
