@@ -8,6 +8,7 @@ import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
 import { ensureSettingsPulled } from '@/lib/projectStore';
+import { csvSafe } from '@/lib/csvSafe';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -175,7 +176,9 @@ function exportErrors(project) {
   lines.push(['Nr.', 'Aprašymas', 'Skyrius', 'Problema'].join(';'));
   problematic.forEach(r => {
     const issue = r.warning || (normalizeConfidence(r.confidence) === CONF_RAUDONA ? confidenceLabel(r.confidence) : 'Trūksta kainos');
-    lines.push([r.nr || '', `"${(r.aprasymas || '').replace(/"/g, '""')}"`, r.skyrius || '', issue].join(';'));
+    // csvSafe (audit backend-security-4): row text never runs as a spreadsheet formula.
+    const cell = (v) => `"${csvSafe(v).replace(/"/g, '""')}"`;
+    lines.push([cell(r.nr), cell(r.aprasymas), cell(r.skyrius), cell(issue)].join(';'));
   });
 
   if (problematic.length === 0) {

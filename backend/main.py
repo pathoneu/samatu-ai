@@ -969,7 +969,7 @@ def api_register(payload: RegisterPayload, request: Request):
                            "patvirtintumėte el. paštą, tada prisijunkite."}
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
-    return {"user": user, "is_first_admin": is_admin}
+    return {"user": _auth.public_user(user), "is_first_admin": is_admin}
 
 
 @app.post("/api/auth/login")
@@ -1003,7 +1003,7 @@ def api_login(payload: LoginPayload, request: Request):
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     user.pop("password_hash", None)
-    return {"user": user}
+    return {"user": _auth.public_user(user)}
 
 
 @app.post("/api/auth/logout")
@@ -1028,7 +1028,7 @@ async def api_me(request: Request):
     user = _auth.get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Nesate prisijungę")
-    return {"user": user}
+    return {"user": _auth.public_user(user)}
 
 
 class PasswordChangePayload(BaseModel):
@@ -1117,7 +1117,7 @@ async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
     for _k in ("password_hash", "google_sub", "stripe_customer_id",
                "session_version"):
         _u.pop(_k, None)
-    return {"user": _u}
+    return {"user": _auth.public_user(_u)}
 
 
 # ── M4: Google OAuth (2026-05-06) ──────────────────────────────────────
@@ -1655,6 +1655,12 @@ async def api_extract_room_material_specs(
 
     if not files:
         raise HTTPException(status_code=400, detail="PDF file required")
+    # Audit backend-security-5 (fixed 2026-10-18): a paid Vision call behind a
+    # plain login — no spend cap, no reservation, no rate limit. Ownership was
+    # checked above; the cache answered for free; only a real read is charged.
+    _check_rate_limit(_client_key(request), "material-specs")
+    _check_user_spend_cap(user["id"])
+    _reserve_billable(user["id"], request.url.path)
     pdf_bytes = await files[0].read()
     # Mirror every other upload endpoint (2026-07-28 audit): this one skipped
     # _validate_pdf_upload entirely, so a non-PDF / 300 MB / 1000-page file went
@@ -5368,7 +5374,11 @@ def generate_excel(request: Request, data: dict):
                     # P3: cols 1-3 are user/AI text (nr, aprašymas, mato_vnt) —
                     # neutralise formula injection; cols 4-5 (kiekis, kaina) stay
                     # numeric and MUST NOT be quoted.
-                    cell_val = _safe_cell(val) if col in (1, 2, 3) else val
+                    # Audit backend-security-4 (2026-10-18): an UNPARSEABLE
+                    # kiekis/kaina comes back from _excel_number as the raw
+                    # string — it is text then, and gets the same neutralising.
+                    cell_val = (_safe_cell(val)
+                                if col in (1, 2, 3) or isinstance(val, str) else val)
                     c = ws.cell(row=r, column=col, value=cell_val)
                     c.fill      = fill
                     c.border    = border
@@ -5833,7 +5843,9 @@ def generate_pdf(request: Request, data: dict):
         if v is None or (isinstance(v, str) and not v.strip()):
             return ""
         if not isinstance(v, (int, float)):
-            return str(v)
+            # Audit backend-security-4 (2026-10-18): this lands in a Paragraph,
+            # which parses markup — the unparseable value prints as text.
+            return _esc(v)
         return f"{v:,.2f}".replace(",", _NB).replace(".", ",")
 
     def _money(v):
@@ -7335,6 +7347,18 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     return _user_text.scrub_prose(parsed)
 
 
+def _v9_error(exc: Exception, where: str) -> dict:
+    """Audit backend-security-21 (fixed 2026-10-18): the v9 symbol routes
+    echoed the exception text (module paths, file names) to the browser. Log
+    it under a short reference and answer with a plain sentence that carries
+    the same reference, so a report can be matched to the log line."""
+    import uuid
+    ref = uuid.uuid4().hex[:8]
+    log.warning("v9 symbols %s failed [ref %s]: %r", where, ref, exc)
+    return {"status": "error",
+            "error": f"Simbolių nepavyko suskaičiuoti. Bandykite dar kartą (klaidos nr. {ref})."}
+
+
 @app.post("/v9/symbols/detect")
 async def v9_symbols_detect(
     request: Request,
@@ -7354,7 +7378,7 @@ async def v9_symbols_detect(
     try:
         from interior_v9 import detect_symbols
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     import asyncio
     loop = asyncio.get_running_loop()
@@ -7364,7 +7388,7 @@ async def v9_symbols_detect(
             lambda: detect_symbols(pdf_bytes, symbol_type, page_nr),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     return {"status": "ok", **result}
 
@@ -7394,7 +7418,7 @@ async def v9_symbols_detect_page(
             SYMBOL_TYPES,
         )
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     symbol_types = list_symbol_types_for_page_type(page_type)
     if not symbol_types:
@@ -7413,7 +7437,7 @@ async def v9_symbols_detect_page(
             lambda: detect_symbols_bundled(pdf_bytes, page_nr, symbol_types),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     if isinstance(by_type, dict) and by_type.get("_error"):
         return {"status": "error", "error": by_type["_error"]}
@@ -7449,7 +7473,7 @@ async def v9_symbols_count_by_template(
     try:
         from interior_v9 import count_symbols_by_template
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     import asyncio
     loop = asyncio.get_running_loop()
@@ -7462,7 +7486,7 @@ async def v9_symbols_count_by_template(
             ),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     return {"status": "ok", **result}
 

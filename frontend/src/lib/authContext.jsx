@@ -81,9 +81,26 @@ export function AuthProvider({ children }) {
   const USER_SCOPED_KEYS = ['samatu_projects', 'samatu_settings', 'samatu_price_lists',
     'samatu_settings_owner', 'samatu_cache_owner'];
 
-  const purgeLocalUserData = async () => {
+  // Audit backend-security-15 (2026-10-18): on logout, and when a DIFFERENT
+  // person signs in, the per-project keys (measurements, export picks, held
+  // runs) and the cached drawings in IndexedDB go too. A same-person re-login
+  // keeps them — they live only in this browser.
+  const purgeLocalUserData = async ({ full = false, nextUserId = null } = {}) => {
+    let prevOwner = null;
+    try { prevOwner = localStorage.getItem('samatu_cache_owner'); } catch { /* ignore */ }
+    const switching = full || (!!prevOwner && !!nextUserId && prevOwner !== String(nextUserId));
     for (const key of USER_SCOPED_KEYS) {
       try { localStorage.removeItem(key); } catch { /* ignore */ }
+    }
+    if (switching) {
+      try {
+        const { userScopedKeysIn } = await import('@/lib/userStorage');
+        for (const key of userScopedKeysIn(localStorage)) localStorage.removeItem(key);
+      } catch { /* ignore */ }
+      try {
+        const { clearAllPdfs } = await import('@/lib/pdfStore');
+        await clearAllPdfs();
+      } catch { /* ignore */ }
     }
     try {
       const { resetPullCache } = await import('@/lib/projectStore');
@@ -118,7 +135,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    await purgeLocalUserData();
+    await purgeLocalUserData({ nextUserId: d.user?.id });
     if (d.user) await claimCacheFor(d.user.id);
     setUser(d.user);
     if (d.user) pullUserSettings(d.user.id);
@@ -134,7 +151,7 @@ export function AuthProvider({ children }) {
     if (d.verification_required) {
       return { user: null, isFirstAdmin: false, verificationRequired: true, message: d.message || '' };
     }
-    await purgeLocalUserData();
+    await purgeLocalUserData({ nextUserId: d.user?.id });
     if (d.user) await claimCacheFor(d.user.id);
     setUser(d.user);
     if (d.user) pullUserSettings(d.user.id);
@@ -147,7 +164,7 @@ export function AuthProvider({ children }) {
     // Same purge as login/register (projects + settings + price lists) and the
     // pull cache, so the next user's first request actually fetches from the
     // backend instead of reusing the previous user's pull.
-    await purgeLocalUserData();
+    await purgeLocalUserData({ full: true });
   };
 
   const value = {

@@ -112,7 +112,7 @@ Config, not code — the app is safe only when the environment is correct:
 ## 9. Response headers (production only — `ENV=production`)
 
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-- `Content-Security-Policy` — restrictive `default-src 'self'`, allows Google OAuth domains for the OAuth flow only.
+- `Content-Security-Policy` — restrictive `default-src 'self'`, allows Google OAuth domains for the OAuth flow only. **These headers are on the API's responses (api.pathon.eu).** The app itself is served by Vercel from `frontend/vercel.json`, which sets nosniff / X-Frame-Options / Referrer-Policy but **no CSP yet** (audit backend-security-17, still open 2026-10-18: a CSP for the SPA must be tried on a production build first — EmbedPDF's wasm and workers, blob: URLs for drawings, Google Fonts and analytics all need their sources listed).
 - `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()` (all always on).
 
 ## 10. Accepted / residual risk
@@ -140,3 +140,24 @@ Config, not code — the app is safe only when the environment is correct:
 - Re-run `pip-audit` + `npm audit` before each release; the FastAPI/starlette bump is the one to test carefully.
 
 *Full engagement findings: `docs/superpowers/research/2026-07-04-security-pentest-findings.md`.*
+
+## 13. Re-audit of the 2026-09-29 findings (v3 W7-A, 2026-10-18)
+
+The twelve `backend-security-*` items the coverage matrix listed as "unknown", plus -14 and -21, checked against the code on `v3/market-readiness`. Tests: `backend/tests/test_security_reaudit_2026_10_18.py`, `test_auth_email.py`, `test_billing_payment_status.py`.
+
+| Id | State | What |
+|---|---|---|
+| -4 | fixed now | Unparseable kiekis/kaina: Excel cell goes through `sanitize_spreadsheet_cell`, PDF `_n` escapes; the two frontend CSV builders use `lib/csvSafe.js` |
+| -5 | fixed now | `/api/projects/{id}/material-specs`: rate bucket, spend cap and reservation after ownership and the free cache hit (actual tokens still not recorded — reservation only) |
+| -6 | fixed now | An `SAMATU_ADMIN_EMAIL` address becomes admin only once its inbox is verified (our link or Google) |
+| -8 | half fixed | Buyer fields escaped before reportlab. The VAT rule is unchanged and needs the accountant (DEVELOPING.md › Deploy / billing) |
+| -10 | fixed now | `room_recalc ?fixture=` ignored when `ENV=production` |
+| -11 | fixed now | `/api/telemetry/session`: login, owned project (404), ≤ 2000 gestures, rate bucket, log under `SAMATU_DATA_DIR` |
+| -12 | fixed now | `auth.public_user` on /register, /login, /me, /profile |
+| -14 | W2-A's | Architect legend routes — fixed in `api/legends.py` by worker W2-A, not here |
+| -15 | fixed now | Logout and a different person's sign-in clear the per-project keys (`lib/userStorage.js`) and the IndexedDB drawings (`pdfStore.clearAllPdfs`); a same-person re-login keeps them |
+| -16 | fixed earlier | The chat's help text says the client link shows the sąmata (prices included) |
+| -17 | still open | CORS is env-driven (`SAMATU_CORS_ORIGINS`; the prod value is the founder's). The SPA has no CSP (§9 corrected); needs a production-build trial |
+| -18 | still open | Register answers 409 for a taken address; no per-account login throttle, no admin TOTP |
+| -19 | still open | No ASGI body cap before parsing; some `dpi` inputs unclamped; page-size check reads page 1 only |
+| -21 | fixed now | `calibrate` no longer returns `stored_at`; v9 symbol routes log the exception under a reference and answer a plain sentence |
