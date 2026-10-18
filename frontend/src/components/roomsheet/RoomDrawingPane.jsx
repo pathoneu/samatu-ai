@@ -14,12 +14,17 @@
  * Hovering a fact lights its mark; it never moves the drawing — a jump is
  * always something he asked for.
  *
+ * Pathon v3 (workspace frame, A6): inside the project workspace the pane is HOSTED — the check is drawn on
+ * the workspace's own drawing (components/project/workspaceHost: setCanvasCheck, pointRef,
+ * onRevealEvidence) and this pane's controls are portalled right above it; no second viewer is mounted.
+ *
  * The raster RoomPlanPane stays as the fallback: phones (the viewer is not
  * shown there in step 1 either), a PDF that is not in storage, an engine that
  * fails. It is the exception now, and the pane says why it is shown.
  */
 
 import { Component, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Maximize2, MousePointerClick, ScanSearch, Scissors, X } from 'lucide-react';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
@@ -29,6 +34,7 @@ import { buildCheckOverlay } from '@/lib/checkOverlay';
 import { displayPointOf } from '@/lib/roomOutline';
 import { checkViewerScales } from '@/lib/pageScales';
 import { cleanUserText } from '@/lib/userText';
+import { useWorkspaceHost } from '@/components/project/workspaceHost';
 
 const WALL_LEGEND = [
   ['read', '#15803d', null, 'legendWallRead'],
@@ -60,6 +66,11 @@ export default function RoomDrawingPane({
   const nonce = useRef(0);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined'
     && window.matchMedia('(max-width: 767px)').matches);
+  // Inside the project workspace (Pathon v3): the check is drawn on the workspace's own drawing — the one
+  // viewer that stays mounted across the steps — instead of a second viewer in the panel. This pane's
+  // controls (caption, „Į patalpą", what to click, the legend) go right above that drawing.
+  const host = useWorkspaceHost();
+  const hosted = Boolean(host?.canvasReady && host?.canvasSlot);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -69,8 +80,9 @@ export default function RoomDrawingPane({
     return () => mq.removeEventListener('change', on);
   }, []);
 
-  // The PDF, once per project.
+  // The PDF, once per project (not needed when the workspace's drawing is used).
   useEffect(() => {
+    if (hosted) return undefined;
     let alive = true;
     let url = null;
     setPdfState('loading');
@@ -83,7 +95,7 @@ export default function RoomDrawingPane({
       })
       .catch(() => { if (alive) setPdfState('failed'); });
     return () => { alive = false; if (url) URL.revokeObjectURL(url); };
-  }, [projectId]);
+  }, [projectId, hosted]);
 
   const sutapdinimas = project?._meta?.geometrija?.sutapdinimas || null;
   const pickFirst = pick?.first || null;
@@ -100,15 +112,39 @@ export default function RoomDrawingPane({
     if (!target?.page) return;
     nonce.current += 1;
     setFocus({ page: target.page, rect: target.rect, nonce: nonce.current });
+    // on the workspace's drawing: through its „show me this place" hook (A6)
+    if (hosted) host.onRevealEvidence?.({ page: target.page, rect_pct: target.rect });
   };
+
+  // Hosted: what the drawing shows (this room's check) and where a click goes while he is picking. The
+  // overlay is rebuilt on every parent render (new arrays), so it is handed over only when its content
+  // changes — otherwise the frame's re-render would hand it over again, forever.
+  const pickOn = Boolean(pick?.active && !pick.busy);
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
+  const checkRef = useRef(check);
+  checkRef.current = check;
+  const checkSig = useMemo(() => JSON.stringify(check), [check]);
+  const setCanvasCheck = host?.setCanvasCheck;
+  const pointRef = host?.pointRef;
+  useEffect(() => {
+    if (!hosted || !setCanvasCheck) return undefined;
+    if (pointRef) pointRef.current = pickOn ? (pt) => pickRef.current?.onPoint?.(displayPointOf(pt)) : null;
+    setCanvasCheck({ check: checkRef.current, pickActive: pickOn });
+    return () => {
+      if (pointRef) pointRef.current = null;
+      setCanvasCheck(null);
+    };
+  }, [hosted, checkSig, pickOn, setCanvasCheck, pointRef]);
 
   // A new room → look at it. (Facts arrive a moment after the room changes; the
   // outline is in them, so this waits for the room focus to exist.)
   const roomKey = room?.nr != null ? String(room.nr) : null;
   // …and look again when the SAME room's place changes — a free re-read or a corrected
   // outline gives it a new frame; a fixed height or floor covering does not.
+  // (and once more when the workspace's drawing takes over from a viewer of its own — `hosted` in the key)
   const focusKey = roomKey && overlay.roomFocus
-    ? `${roomKey}|${overlay.roomFocus.page}|${(overlay.roomFocus.rect || []).join(',')}` : null;
+    ? `${hosted ? 'h' : 's'}|${roomKey}|${overlay.roomFocus.page}|${(overlay.roomFocus.rect || []).join(',')}` : null;
   const focusedFor = useRef(null);
   useEffect(() => {
     if (!focusKey || focusedFor.current === focusKey) return;
@@ -126,7 +162,7 @@ export default function RoomDrawingPane({
     // a request is its nonce — the same fact asked for twice is two requests
   }, [requestNonce]);
 
-  if (isMobile || pdfState === 'failed') {
+  if (!hosted && (isMobile || pdfState === 'failed')) {
     return (
       <div className="flex min-w-0 flex-col gap-2">
         {pdfState === 'failed' && !isMobile && (
@@ -145,8 +181,8 @@ export default function RoomDrawingPane({
   const reason = cleanUserText(overlay.outlineReason || '');
   const noOutline = !space && !Object.values(overlay.pages).some((p) => p.outline);
 
-  return (
-    <div className="flex min-w-0 flex-col gap-2" data-testid="room-drawing-pane">
+  const body = (
+    <div className="flex min-w-0 flex-col gap-2" data-testid="room-drawing-pane" data-hosted={hosted ? '1' : undefined}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mono text-[13px] text-muted-foreground">
           {t('project.roomSheet.drawCaption', { room: roomKey ?? '' })}
@@ -248,6 +284,7 @@ export default function RoomDrawingPane({
         </div>
       )}
 
+      {!hosted && (
       <div
         className={`h-[68vh] min-h-[460px] overflow-hidden rounded-[2px] border bg-card
           ${pick?.active ? 'border-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : 'border-border'}`}
@@ -268,6 +305,7 @@ export default function RoomDrawingPane({
           <p className="p-4 text-[14px] text-muted-foreground">{t('project.roomSheet.drawLoading')}</p>
         )}
       </div>
+      )}
 
       {space && (
         <p className="text-[13px] leading-snug text-[hsl(var(--ink-2))]">
@@ -312,4 +350,5 @@ export default function RoomDrawingPane({
       )}
     </div>
   );
+  return hosted ? createPortal(body, host.canvasSlot) : body;
 }

@@ -30,14 +30,17 @@ const DISCIPLINE_BY_KEY = Object.fromEntries(DISCIPLINES.map((d) => [d.key, d]))
 // them in step with those classes.
 export const SHEET_RAIL_WIDTH = 232;
 export const THUMBNAIL_RAIL_WIDTH = 148;
+// SheetRail mode="strip" (`w-14`)
+export const SHEET_STRIP_WIDTH = 56;
 const PANEL_GAP = 8;
 
 /**
  * Where a panel floating at the drawing's top-left starts („Rasti panašius", the count types): right of the
  * open rail, never over it (2026-10-18 audit §4.6 item 4 — the review panel covered ~76 px of the sheet list).
  */
-export function floatingPanelLeft({ railOpen, sheetRail }) {
-  if (!railOpen) return PANEL_GAP;
+export function floatingPanelLeft({ railOpen, sheetRail, strip = false }) {
+  // Pathon v3 frame (A4): with the full rail shut a sheet set still shows its 56 px strip
+  if (!railOpen) return sheetRail && strip ? SHEET_STRIP_WIDTH + PANEL_GAP : PANEL_GAP;
   return (sheetRail ? SHEET_RAIL_WIDTH : THUMBNAIL_RAIL_WIDTH) + PANEL_GAP;
 }
 
@@ -183,4 +186,37 @@ export function lapuForma(n) {
   if (d === 1 && t !== 11) return 'lapas';
   if (d >= 2 && d <= 9 && (t < 12 || t > 19)) return 'lapai';
   return 'lapų';
+}
+
+// ── The 56 px strip (Pathon v3 workspace frame) ───────────────────────────────────────────────────
+// The rail opens on a strip of thumbnails so the drawing gets the room; the full rail is one click
+// („Lapai") or T away. Remembered per browser: 'full' | anything else = the strip.
+export const SHEET_RAIL_KEY = 'samatu_viewer_sheet_rail';
+
+export function readSheetRailFull(storage) {
+  try { return storage?.getItem?.(SHEET_RAIL_KEY) === 'full'; } catch { return false; }
+}
+
+export function writeSheetRailFull(storage, full) {
+  try { storage?.setItem?.(SHEET_RAIL_KEY, full ? 'full' : 'strip'); } catch { /* private mode */ }
+}
+
+/** The tag under a strip thumbnail: the sheet's short number („B.01"), else its page number. */
+export function stripTag(sheet) {
+  const tag = String(sheet?.shortNumber || '').trim();
+  if (tag && tag.length <= 6) return tag;
+  return String(sheet?.page ?? '');
+}
+
+/**
+ * What the strip says about a sheet when it is focused or clicked (never on hover alone):
+ * „B.01 · Išdėstymo planas — Architektūra ir interjeras, lapas 1".
+ */
+export function stripLabel(sheet, groupLabel = '') {
+  if (!sheet) return '';
+  const tag = stripTag(sheet);
+  const name = String(sheet.name || sheet.fullName || '').trim();
+  const head = name && name !== tag ? `${tag} · ${name}` : tag;
+  const where = [String(groupLabel || '').trim(), `lapas ${sheet.page}`].filter(Boolean).join(', ');
+  return `${head} — ${where}`;
 }

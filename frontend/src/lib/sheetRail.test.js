@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildSheetRail, splitSheetName, disciplineOf, setSheetOverride, clearSheetOverride, overrideFor,
   searchHitsByPage, calloutHoverText, lapuForma, DISCIPLINES,
-  floatingPanelLeft, SHEET_RAIL_WIDTH, THUMBNAIL_RAIL_WIDTH,
+  SHEET_RAIL_KEY, readSheetRailFull, writeSheetRailFull, stripTag, stripLabel,
+  floatingPanelLeft, SHEET_RAIL_WIDTH, SHEET_STRIP_WIDTH, THUMBNAIL_RAIL_WIDTH,
 } from './sheetRail.js';
 
 // The stored classification of the 8-sheet demo project (types and names as the blob carries them).
@@ -104,6 +105,40 @@ test('Lithuanian plural of lapas', () => {
     ['lapas', 'lapai', 'lapai', 'lapų', 'lapų', 'lapų', 'lapas', 'lapai']);
 });
 
+test('the strip tags a thumbnail with the short sheet number, else the page', () => {
+  const { sheets } = buildSheetRail({
+    puslapiai: [{ nr: 1, tipas: 'floor_plan', pavadinimas: 'IN.1A.-B.01 1A. BALDŲ PLANAS M 1:50' }, ...H.slice(1)],
+    pageCount: 8,
+  });
+  assert.equal(stripTag(sheets[0]), 'B.01');
+  assert.equal(stripTag(sheets[1]), '2', 'no sheet number on the drawing → the page');
+  assert.equal(stripTag({ page: 4, shortNumber: 'VERY-LONG-CODE' }), '4', 'a tag too long for 56 px → the page');
+  assert.equal(stripTag(null), '');
+});
+
+test('the strip says what a sheet is when it is focused or clicked', () => {
+  const { sheets, groups } = buildSheetRail({ puslapiai: H, pageCount: 8 });
+  const arch = groups.find((g) => g.sheets.some((s) => s.page === 1));
+  assert.equal(stripLabel(sheets[0], arch.label), `1 · IŠDĖSTYMO PLANAS (su patalpų eksplikacija) — ${arch.label}, lapas 1`);
+  assert.equal(stripLabel({ page: 3, name: '3' }), '3 — lapas 3', 'no name beyond the tag → the tag once');
+  assert.equal(stripLabel(null), '');
+});
+
+test('the full rail or the strip is remembered per browser; the strip is the default', () => {
+  const m = new Map();
+  const storage = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v) };
+  assert.equal(SHEET_RAIL_KEY, 'samatu_viewer_sheet_rail');
+  assert.equal(readSheetRailFull(storage), false);
+  writeSheetRailFull(storage, true);
+  assert.equal(m.get(SHEET_RAIL_KEY), 'full');
+  assert.equal(readSheetRailFull(storage), true);
+  writeSheetRailFull(storage, false);
+  assert.equal(readSheetRailFull(storage), false);
+  const broken = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('x'); } };
+  assert.equal(readSheetRailFull(broken), false);
+  writeSheetRailFull(broken, true);
+});
+
 test('legacy v8_pages rows name and type a sheet too', () => {
   const { sheets } = buildSheetRail({ puslapiai: [{ page: 1, type: 'ceiling_plan', label: 'Lubos' }], pageCount: 1 });
   assert.equal(sheets[0].name, 'Lubos');
@@ -118,4 +153,12 @@ test('a floating panel starts right of whichever rail is open', () => {
   assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true }), 8);
   assert.ok(floatingPanelLeft({ railOpen: true, sheetRail: true }) > SHEET_RAIL_WIDTH);
   assert.ok(floatingPanelLeft({ railOpen: true, sheetRail: false }) > THUMBNAIL_RAIL_WIDTH);
+});
+
+// Pathon v3 frame (A4): a sheet set shows the 56 px strip when the full rail is shut — panels clear it too.
+test('a floating panel clears the 56 px sheet strip', () => {
+  assert.equal(SHEET_STRIP_WIDTH, 56);
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true, strip: true }), 64);
+  assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: true, strip: true }), 240, 'the full rail wins');
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: false, strip: true }), 8, 'no sheets → no strip');
 });
