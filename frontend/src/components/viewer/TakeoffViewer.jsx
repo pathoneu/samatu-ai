@@ -95,7 +95,7 @@ const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti
 // What the status bar adds to a measure hint about snapping, by the sheet's wall geometry status.
 const SNAP_NOTE = {
   ok: ' · prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)',
-  no_walls: ' · šiame lape vektorinių sienų nėra — prilimpa tik prie matavimų',
+  no_walls: ' · šiame lape sienų programa neperskaitė — prilimpa tik prie matavimų',
 };
 
 // visiblePageOf moved to lib/visiblePage (2026-10-16): the scale panel reads the same page.
@@ -239,7 +239,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               className={wallsLayerVisible ? pressed : btn}
               title={wallsLayerVisible
                 ? 'Paslėpti sienų sluoksnį'
-                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš vektorinio PDF'}
+                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš brėžinio'}
               aria-pressed={!!wallsLayerVisible}
               aria-label="Sienų sluoksnis"
               data-testid="viewer-walls-layer"
@@ -1446,7 +1446,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {/* Walls-layer legend (2026-10-16): the three things the layer draws, named once, where the layer is. */}
             {wallsLayerVisible && !check && (
               <div className="absolute bottom-2 right-2 z-30 px-3 py-1.5 rounded border border-border bg-card/95 text-[11px] text-foreground shadow-md pointer-events-none flex items-center gap-3" data-testid="walls-legend">
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(71,85,105,0.5)' }} />Sienos (iš vektorinio PDF)</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(71,85,105,0.5)' }} />Sienos, kurias programa perskaitė</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#2f6b4f' }} />Kontūras, rastas automatiškai</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-2" style={{ borderColor: '#2f6b4f' }} />Kontūras, patvirtintas jūsų</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block w-5 border-t-4" style={{ borderColor: '#7c3aed' }} />Angos (D — durys, L — langas)</span>

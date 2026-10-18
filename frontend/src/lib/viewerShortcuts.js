@@ -72,7 +72,7 @@ export const VIEWER_SHORTCUTS = [
 
   // ── Sluoksniai
   { id: 'toggleZoneFills', group: 'layers', bound: 'hotkeys', label: 'Nuspalvinti patalpas arba palikti brėžinį švarų', combos: [{ keys: ['u', 'U'] }] },
-  { id: 'toggleWallsLayer', group: 'layers', bound: 'hotkeys', label: 'Sienų sluoksnis: sienos, kontūrai ir angos iš PDF', combos: [{ keys: ['s', 'S'] }] },
+  { id: 'toggleWallsLayer', group: 'layers', bound: 'hotkeys', label: 'Sienų sluoksnis: sienos, kontūrai ir angos, kurias programa perskaitė', combos: [{ keys: ['s', 'S'] }] },
 ];
 
 const BY_ID = new Map(VIEWER_SHORTCUTS.map((s) => [s.id, s]));
