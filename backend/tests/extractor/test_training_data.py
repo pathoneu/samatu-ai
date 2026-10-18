@@ -23,11 +23,13 @@ def test_record_writes_image_and_jsonl_row(tmp_path, monkeypatch):
         meta={"project_id": "p1", "page": 5, "bbox": [100, 200, 30, 30],
               "confidence": 0.92},
     )
-    cls_dir = tmp_path / "rozete"
+    # v3 M8: a label that names its project lives in that project's folder,
+    # so deleting the project deletes its crops.
+    cls_dir = tmp_path / "p1" / "rozete"
     assert cls_dir.exists()
     pngs = list(cls_dir.glob("*.png"))
     assert len(pngs) == 1
-    log = (tmp_path / "labels.jsonl").read_text(encoding="utf-8")
+    log = (tmp_path / "p1" / "labels.jsonl").read_text(encoding="utf-8")
     rows = [json.loads(line) for line in log.strip().splitlines()]
     assert len(rows) == 1
     assert rows[0]["klass"] == "rozete"

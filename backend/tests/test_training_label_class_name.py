@@ -96,4 +96,5 @@ def test_api_rejects_unsafe_class(api, root, tmp_path, klass):
 def test_api_records_a_normal_class(api, root):
     r = _post(api, "rozete")
     assert r.status_code == 200, r.text
-    assert len(list((root / "rozete").glob("*.png"))) == 1
+    # v3 M8: kept in the project's own folder, so it goes with the project
+    assert len(list((root / "klass-p" / "rozete").glob("*.png"))) == 1

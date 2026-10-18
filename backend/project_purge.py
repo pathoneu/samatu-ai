@@ -18,9 +18,9 @@ Purged: the stored PDF and its later editions (api/pdf_revisions), the in-memory
 crops), the CV page renders of that PDF, annotations, calibrations, the symbol
 legend, the evidence crops on disk, the F2/F3 line override and any re-read
 the server holds for the project on its extraction job row (2026-10-03: it
-otherwise stayed for the 3-day hold). Not purged (see the audit report): symbol-training
-crops (append-only corpus keyed by class, the id is only in its log) and the
-per-architect legend aggregate (keyed by architect, not by project).
+otherwise stayed for the 3-day hold), and (v3 M8, 2026-10-18) the
+symbol-training crops of the project. Account deletion additionally runs
+`purge_account_files`: the per-owner architect legends.
 """
 from __future__ import annotations
 
@@ -117,6 +117,29 @@ def purge_project_files(project_id: str) -> list[str]:
         evidence.CACHE_ROOT, evidence.CACHE_ROOT / project_id))
     step("exports", lambda: _rmtree_inside(
         exports_v2.PROJECTS_DIR, exports_v2.PROJECTS_DIR / project_id))
+    # v3 M8 (2026-10-18): the symbol-training crops of this project — its own
+    # folder, plus legacy root-level crops whose log line names it.
+    from extractor import training_data
+    step("symbol_training", lambda: training_data.purge_project(project_id))
+    return failed
+
+
+def purge_account_files(user_id: str) -> list[str]:
+    """Files keyed by the ACCOUNT, not by a project: the per-owner architect
+    legends (`<legends>/architect/<user id>/`, W2-A's layout in api/legends.py,
+    read here through its ARCHITECT_DIR so the two never drift). Runs after the
+    account deletion committed; best-effort, safe to repeat. Returns the steps
+    that failed."""
+    failed: list[str] = []
+    if not _plain_id(user_id):
+        return failed
+    try:
+        from api import legends
+        root = Path(getattr(legends, "ARCHITECT_DIR", Path(legends.LEGENDS_DIR) / "architect"))
+        _rmtree_inside(root, root / user_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("account purge: architect legends failed for %s: %r", user_id, exc)
+        failed.append("architect_legends")
     return failed
 
 
