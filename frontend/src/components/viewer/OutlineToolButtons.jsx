@@ -27,7 +27,7 @@ export default function OutlineToolButtons({ focusedRoomNr, active = null, onSta
           onClick={() => (active === id ? onCancel?.() : onStart(id))}
         >
           <Icon className="w-3.5 h-3.5" />
-          <span className="text-[11px] leading-none hidden lg:inline">{label}</span>
+          <span className="text-meta leading-none hidden lg:inline">{label}</span>
         </button>
       ))}
     </span>

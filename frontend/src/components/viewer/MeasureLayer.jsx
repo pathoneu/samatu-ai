@@ -13,6 +13,17 @@ import {
 } from '@/lib/polygonGeometry.js';
 import { pickSnap } from '@/lib/drawingSnap.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
+import {
+  DASH, LABEL_FONT_PX, LABEL_STYLE, SELECTED_STROKE_PX, STROKE_PX, labelWidth, ov, paint,
+} from '@/lib/overlayTokens.js';
+
+// v3 overlay vocabulary (lib/overlayTokens): his own measurement keeps the colour he chose (default
+// --ov-user); the selection is the heavy neutral ink; a draft's not-yet-placed segment is the one
+// dash (proposed); the calibration line and every snap mark are the tool-at-work orange — red is
+// left for errors; readouts are white label pills in the app's sans.
+const USER = ov('user');
+const INK = ov('selected');
+const EDITING = ov('editing');
 
 // Tools that build a multi-vertex draft (polyline for line tools, polygon for area).
 const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
@@ -399,7 +410,7 @@ export default function MeasureLayer({
       {lasso && lasso.px.length > 1 && (
         <polygon
           points={lasso.px.map((p) => `${p.x},${p.y}`).join(' ')}
-          fill="#1d4ed8" fillOpacity={0.06} stroke="#1d4ed8" strokeWidth={1.5} strokeDasharray="5 4"
+          style={paint({ fill: INK, stroke: INK })} fillOpacity={0.06} strokeOpacity={0.7} strokeWidth={1.5}
           pointerEvents="none" data-lasso
         />
       )}
@@ -421,7 +432,7 @@ export default function MeasureLayer({
 // (this layer is an <svg>), stopPropagation on pointerdown+click so pressing a
 // button never adds a draft vertex underneath it. Clamped inside the page.
 function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel }) {
-  const W = 168, H = 30;
+  const W = 168, H = 32;
   const x = Math.min(Math.max(lastPt.x + 14, 4), Math.max(4, width - W - 4));
   const y = Math.min(Math.max(lastPt.y - H - 12, 4), Math.max(4, height - H - 4));
   const stop = (e) => { e.stopPropagation(); };
@@ -440,19 +451,20 @@ function DraftActions({ lastPt, width, height, finishable, onFinish, onCancel })
           until the shape has enough points and said nothing about why —
           the hint now names the missing step. (2026-07-28.) */}
       <title>{hint}</title>
-      <rect width={bw} height={H} rx={6}
-        fill={primary ? (enabled ? '#1d4ed8' : '#93a8e8') : '#ffffff'}
-        stroke={primary ? 'none' : '#cbd5e1'} strokeWidth={1} />
+      <rect width={bw} height={H} rx={2}
+        style={primary
+          ? { fill: 'hsl(var(--primary))', opacity: enabled ? 1 : 0.45 }
+          : paint({ fill: ov('label-bg'), stroke: 'hsl(var(--border-strong))' })}
+        strokeWidth={primary ? 0 : 1} />
       <text x={bw / 2} y={H / 2 + 1} textAnchor="middle" dominantBaseline="central"
-        fontSize={12} fontWeight={600}
-        fill={primary ? '#ffffff' : '#334155'}
-        style={{ pointerEvents: 'none', userSelect: 'none' }}>{label}</text>
+        fontSize={14} fontWeight={600}
+        style={{ ...LABEL_STYLE, fill: primary ? 'hsl(var(--primary-foreground))' : ov('label-fg'), pointerEvents: 'none', userSelect: 'none' }}>{label}</text>
     </g>
   );
   return (
     <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
-      <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={8}
-        fill="#ffffff" fillOpacity={0.92} stroke="#e2e8f0" strokeWidth={1} />
+      <rect x={-4} y={-4} width={W + 8} height={H + 8} rx={4}
+        style={paint({ fill: ov('label-bg'), stroke: 'hsl(var(--border))' })} fillOpacity={0.96} strokeWidth={1} />
       {btn(0, 84, 'Baigti', finishable, onFinish, true,
         finishable
           ? 'Užbaigti matavimą ir įrašyti rezultatą (arba dukart spustelėkite)'
@@ -514,22 +526,26 @@ function CommittedMeasurement({ m, adapter, scale, countTypes, selected, decimal
     ? (() => { const c = polygonCentroid(m.points); return c ? adapter.toViewport(c) : sp[0]; })()
     : midOf(sp);
 
-  const stroke = selected ? '#1d4ed8' : (m.color || '#2a6fb5');
-  const strokeWidth = selected ? 3 : 2;
+  // his colour stays his; the selection lays the heavy neutral ink under it (a casing), so both read
+  const stroke = m.color || USER;
 
   return (
-    <g pointerEvents="none">
+    <g pointerEvents="none" data-measurement={m.id}>
+      {selected && (
+        <path d={d} fill="none" style={paint({ stroke: INK })} strokeWidth={SELECTED_STROKE_PX + 3} strokeLinejoin="round" strokeLinecap="round" />
+      )}
       <path
         d={d}
-        fill={closed ? stroke : 'none'}
+        style={paint({ fill: closed ? stroke : null, stroke })}
+        fill={closed ? undefined : 'none'}
         fillOpacity={closed ? 0.12 : 0}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
+        strokeWidth={STROKE_PX}
+        strokeLinejoin="round"
       />
       {sp.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={selected ? 4 : 3} fill={stroke} />
+        <circle key={i} cx={p.x} cy={p.y} r={selected ? 4 : 3} style={paint({ fill: stroke, stroke: selected ? INK : null })} strokeWidth={selected ? 1.5 : 0} />
       ))}
-      <ReadoutChip x={labelAt.x} y={labelAt.y} text={label} />
+      <ReadoutChip x={labelAt.x} y={labelAt.y} text={label} selected={selected} />
     </g>
   );
 }
@@ -539,36 +555,36 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   if (!p0) return null;
   const { x, y } = adapter.toViewport(p0);
   const type = countTypes.find((t) => t.id === m.typeId) || {};
-  const color = m.color || type.color || '#2a6fb5';
+  const color = m.color || type.color || USER;
   const shape = type.shape || 'circle';
   const r = selected ? 8 : 6;
-  const stroke = selected ? '#1d4ed8' : color;
+  const stroke = selected ? INK : color;
   // „Rasti panašius" marks are found by shape, not checked: same type colour, drawn
   // hollow (white fill, thick outline) so they never pass for hand-placed ones.
   if (m.source === 'symbol_search') {
     const w = selected ? 2.5 : 2;
     const hollow = shape === 'square'
-      ? <rect x={x - r} y={y - r} width={r * 2} height={r * 2} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />
+      ? <rect x={x - r} y={y - r} width={r * 2} height={r * 2} style={paint({ fill: ov('label-bg'), stroke })} fillOpacity={0.85} strokeWidth={w} />
       : shape === 'diamond'
-        ? <path d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />
-        : <circle cx={x} cy={y} r={r} fill="#fff" fillOpacity={0.85} stroke={stroke} strokeWidth={w} />;
+        ? <path d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`} style={paint({ fill: ov('label-bg'), stroke })} fillOpacity={0.85} strokeWidth={w} />
+        : <circle cx={x} cy={y} r={r} style={paint({ fill: ov('label-bg'), stroke })} fillOpacity={0.85} strokeWidth={w} />;
     return <g pointerEvents="none" data-ai-mark>{hollow}</g>;
   }
 
   let mark;
   if (shape === 'square') {
-    mark = <rect x={x - r} y={y - r} width={r * 2} height={r * 2} fill={color} stroke={stroke} strokeWidth={selected ? 2 : 1} />;
+    mark = <rect x={x - r} y={y - r} width={r * 2} height={r * 2} style={paint({ fill: color, stroke })} strokeWidth={selected ? 2 : 1} />;
   } else if (shape === 'diamond') {
-    mark = <path d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`} fill={color} stroke={stroke} strokeWidth={selected ? 2 : 1} />;
+    mark = <path d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`} style={paint({ fill: color, stroke })} strokeWidth={selected ? 2 : 1} />;
   } else if (shape === 'check') {
     mark = (
       <g>
-        <circle cx={x} cy={y} r={r} fill="none" stroke={color} strokeWidth={selected ? 2 : 1.5} />
-        <path d={`M ${x - r * 0.5} ${y} L ${x - r * 0.1} ${y + r * 0.45} L ${x + r * 0.6} ${y - r * 0.5}`} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x} cy={y} r={r} fill="none" style={paint({ stroke: selected ? INK : color })} strokeWidth={selected ? 2 : 1.5} />
+        <path d={`M ${x - r * 0.5} ${y} L ${x - r * 0.1} ${y + r * 0.45} L ${x + r * 0.6} ${y - r * 0.5}`} fill="none" style={paint({ stroke: color })} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
       </g>
     );
   } else {
-    mark = <circle cx={x} cy={y} r={r} fill={color} stroke={stroke} strokeWidth={selected ? 2 : 1} />;
+    mark = <circle cx={x} cy={y} r={r} style={paint({ fill: color, stroke })} strokeWidth={selected ? 2 : 1} />;
   }
   return <g pointerEvents="none">{mark}</g>;
 }
@@ -607,8 +623,8 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
         <polyline
           points={sp.map((p) => `${p.x},${p.y}`).join(' ')}
           fill="none"
-          stroke="#2a6fb5"
-          strokeWidth={2}
+          style={paint({ stroke: USER })}
+          strokeWidth={STROKE_PX}
         />
       )}
       {/* rubber-band from last vertex to cursor */}
@@ -618,9 +634,9 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
           y1={liveScreen[liveScreen.length - 2].y}
           x2={liveScreen[liveScreen.length - 1].x}
           y2={liveScreen[liveScreen.length - 1].y}
-          stroke="#2a6fb5"
+          style={paint({ stroke: USER })}
           strokeWidth={1.5}
-          strokeDasharray="5 4"
+          strokeDasharray={DASH}
         />
       )}
       {/* faint closing segment back to the first vertex (area only) */}
@@ -630,14 +646,14 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
           y1={cur.y}
           x2={sp[0].x}
           y2={sp[0].y}
-          stroke="#2a6fb5"
+          style={paint({ stroke: USER })}
           strokeWidth={1}
-          strokeDasharray="3 4"
-          strokeOpacity={0.4}
+          strokeDasharray={DASH}
+          strokeOpacity={0.5}
         />
       )}
       {sp.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#2a6fb5" />
+        <circle key={i} cx={p.x} cy={p.y} r={3} style={paint({ fill: USER })} />
       ))}
       {snapPt && <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} />}
       {chip && cur && <ReadoutChip x={cur.x + 12} y={cur.y - 12} text={chip} anchor="start" />}
@@ -645,8 +661,8 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
   );
 }
 
-// Calibration draft: a distinct RED 2-point line (visually separate from the
-// blue measurement drafts). First point A is fixed; a rubber-band follows the
+// Calibration draft: a distinct 2-point line in the tool-at-work orange (visually separate from the
+// measurement drafts; red is for errors only). First point A is fixed; a rubber-band follows the
 // cursor until the second click, which is handled upstream via onCalibrate.
 function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) {
   const a = calibA ? adapter.toViewport(calibA) : null;
@@ -659,51 +675,53 @@ function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) 
           y1={a.y}
           x2={c.x}
           y2={c.y}
-          stroke="#dc2626"
-          strokeWidth={2}
-          strokeDasharray="5 4"
+          style={paint({ stroke: EDITING })}
+          strokeWidth={STROKE_PX}
         />
       )}
-      {a && <circle cx={a.x} cy={a.y} r={4} fill="#dc2626" />}
-      {c && <circle cx={c.x} cy={c.y} r={3} fill="#dc2626" fillOpacity={0.7} />}
+      {a && <circle cx={a.x} cy={a.y} r={4} style={paint({ fill: EDITING })} />}
+      {c && <circle cx={c.x} cy={c.y} r={3} style={paint({ fill: EDITING })} fillOpacity={0.7} />}
       {snapPt && <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} />}
     </g>
   );
 }
 
 function SnapDot({ p, kind = null }) {
-  // A wall corner of the DRAWING is an orange square, a wall face an orange diamond; the user's own
-  // measurement stays the green circle — so the person sees WHAT the click will land on.
+  // One colour for every snap mark (the tool-at-work orange) — the SHAPE says what the click will land
+  // on: a wall corner of the DRAWING is a square, a wall face a diamond, his own measurement a circle.
   if (kind === 'drawing-vertex' || kind === 'drawing-edge') {
     const r = kind === 'drawing-vertex' ? 6 : 5;
     return (
       <rect
         x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
-        fill="none" stroke="#ea580c" strokeWidth={2} pointerEvents="none"
+        fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none"
         transform={kind === 'drawing-edge' ? `rotate(45 ${p.x} ${p.y})` : undefined}
       />
     );
   }
   return (
-    <circle cx={p.x} cy={p.y} r={5} fill="none" stroke="#16a34a" strokeWidth={2} pointerEvents="none" />
+    <circle cx={p.x} cy={p.y} r={5} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" />
   );
 }
 
-function ReadoutChip({ x, y, text, anchor = 'middle' }) {
-  // Approximate width so the background rect frames the text. Monospace-ish guess.
-  const w = text.length * 6.2 + 12;
-  const h = 18;
+function ReadoutChip({ x, y, text, anchor = 'middle', selected = false }) {
+  // A neutral label pill (white, slate ink, the app's sans, tabular numbers) — the overlay vocabulary's
+  // one label; a selected measurement's pill takes the selection's ink border.
+  const w = labelWidth(text);
+  const h = 20;
   const rx = anchor === 'start' ? x - 6 : x - w / 2;
   return (
     <g pointerEvents="none">
-      <rect x={rx} y={y - h + 4} width={w} height={h} rx={3} fill="#1f2937" fillOpacity={0.92} />
+      <rect x={rx} y={y - h + 5} width={w} height={h} rx={2}
+        style={paint({ fill: ov('label-bg'), stroke: selected ? INK : ov('selected', 0.35) })}
+        fillOpacity={0.96} strokeWidth={selected ? 1.5 : 1} />
       <text
-        x={anchor === 'start' ? x : x}
-        y={y - 3}
+        x={anchor === 'start' ? x + 1 : x}
+        y={y - 1}
         textAnchor={anchor}
-        fontSize={11}
-        fontFamily="system-ui, sans-serif"
-        fill="#ffffff"
+        fontSize={LABEL_FONT_PX}
+        fontWeight={500}
+        style={{ ...LABEL_STYLE, ...paint({ fill: ov('label-fg') }) }}
       >
         {text}
       </text>

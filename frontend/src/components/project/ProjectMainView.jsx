@@ -170,11 +170,11 @@ function WorkRow({
   const sourceKind = getQuantitySourceKind(item);
   const sourceLabel = getQuantitySourceLabel(item);
   const sourceClass = {
-    manual: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    ai_symbol: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
-    assumption: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    formula_estimate: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    manual: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
+    verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
+    ai_symbol: 'border-red-500/30 bg-red-500/10 text-red-700',
+    assumption: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+    formula_estimate: 'border-blue-500/30 bg-blue-500/10 text-blue-700',
     formula: 'border-slate-500/20 bg-slate-500/10 text-muted-foreground',
   }[sourceKind] || 'border-slate-500/20 bg-slate-500/10 text-muted-foreground';
   const rowId = item._id || `${item.eil_nr}-${item.aprasymas}`;
@@ -275,12 +275,12 @@ function WorkRow({
         <td className="px-3 py-2 text-right">
           <button onClick={handleSave}
             title={t('project.mainView.saveRow')} aria-label={t('project.mainView.saveRow')}
-            className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded mr-1">
+            className="p-1 hover:bg-green-100 text-green-700 rounded mr-1">
             <Check className="w-3.5 h-3.5" />
           </button>
           <button onClick={handleCancel}
             title={t('project.mainView.cancelRow')} aria-label={t('project.mainView.cancelRow')}
-            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+            className="p-1 hover:bg-red-100 text-red-700 rounded">
             <X className="w-3.5 h-3.5" />
           </button>
         </td>
@@ -323,13 +323,13 @@ function WorkRow({
         {/* Medžiagos rows say which work they belong to — without it a bare
             "Gruntas" line in the shopping list is unreadable. (2026-09-02) */}
         {item.susijes_darbas && (
-          <div className="text-[11px] text-muted-foreground truncate mt-0.5"
+          <div className="text-meta text-muted-foreground truncate mt-0.5"
                title={item.susijes_darbas}>
             {t('project.mainView.materialFor', { work: item.susijes_darbas })}
           </div>
         )}
         {materialNote && (
-          <div className="text-[11px] text-muted-foreground mt-0.5">{materialNote}</div>
+          <div className="text-meta text-muted-foreground mt-0.5">{materialNote}</div>
         )}
         {/* A row the last recompute could not reproduce is CARRIED, not deleted
             — its quantity is the old one. The flag existed since 2026-07-28 and
@@ -338,7 +338,7 @@ function WorkRow({
         {item._orphaned_after_rebuild && (
           <div className="mt-1 flex items-center gap-1.5">
             <span
-              className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+              className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-meta font-medium text-amber-700"
               title={t('project.mainView.orphanTitle')}
             >
               <AlertCircle className="w-3 h-3" />
@@ -348,7 +348,7 @@ function WorkRow({
               <button
                 type="button"
                 onClick={() => onRemove(item)}
-                className="text-[10px] underline decoration-dotted underline-offset-2 text-muted-foreground hover:text-red-600"
+                className="text-meta underline decoration-dotted underline-offset-2 text-muted-foreground hover:text-red-600"
                 title={t('project.mainView.removeTitle')}
               >
                 {t('project.mainView.orphanRemove')}
@@ -397,7 +397,7 @@ function WorkRow({
               <span>{fmt(item.kiekis)}</span>
               {isManualQty && (
                 <span
-                  className="text-[9px] uppercase font-semibold text-emerald-500 border border-emerald-500/30 rounded px-1"
+                  className="text-meta font-semibold text-[hsl(var(--accent-2))]"
                   title={t('project.mainView.manualShortTitle')}
                 >
                   {t('project.mainView.manualShort')}
@@ -417,7 +417,7 @@ function WorkRow({
           </span>
         )}
         {isManualQty && item.ai_kiekis_original != null && (
-          <div className="text-[10px] text-muted-foreground leading-tight">
+          <div className="text-meta text-muted-foreground leading-tight">
             {t('project.mainView.aiOriginal', { value: fmt(item.ai_kiekis_original) })}
           </div>
         )}
@@ -515,7 +515,7 @@ function WorkRow({
              control itself, otherwise a one-click delete of a priced position
              reads as permanent. (2026-07-28 explainability pass.) */
           <button onClick={() => onRemove(item)}
-            className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 rounded ml-1"
+            className="p-1 hover:bg-red-50 text-red-600 rounded ml-1"
             title={t('project.mainView.removeTitle')} aria-label={t('project.mainView.removeTitle')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -783,13 +783,13 @@ export default function ProjectMainView({
             {/* Left: totals — Be PVM (compact) | Su PVM (emphasized) */}
             <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-baseline gap-2">
-                <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.mainView.beVat')}</span>
-                <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
+                <span className="skyrius-header" style={{ fontSize: 12 }}>{t('project.mainView.beVat')}</span>
+                <span className="mono tabular text-foreground/70" style={{ fontSize: 14 }}>
                   {fmtEur(totals.viso)}
                 </span>
               </div>
               <div className="flex items-baseline gap-2 border-l border-border pl-6">
-                <span className="skyrius-header" style={{ fontSize: 10 }}>
+                <span className="skyrius-header" style={{ fontSize: 12 }}>
                   {reverseVat ? t('project.mainView.totalReverse') : t('project.mainView.withVat', { pct: vatPct })}
                 </span>
                 <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
@@ -821,7 +821,7 @@ export default function ProjectMainView({
 
           {/* Trūksta kainų — perspėjimas */}
           {totals.viso === 0 && darbai.length > 0 && (
-            <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
+            <div className="mt-3 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <div>
                 <strong>{t('project.mainView.pricesMissingStrong')}</strong>{t('project.mainView.pricesMissingRest')}
@@ -878,7 +878,7 @@ export default function ProjectMainView({
           <div className="border-t border-border p-3">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-xs uppercase text-muted-foreground border-b border-border">
+                <thead className="text-xs text-muted-foreground border-b border-border">
                   <tr>
                     <th className="px-2 py-1.5 text-left font-medium">{t('project.mainView.colNr')}</th>
                     <th className="px-2 py-1.5 text-left font-medium">{t('project.mainView.colName')}</th>
@@ -988,7 +988,7 @@ export default function ProjectMainView({
                         ? 'bg-foreground text-background'
                         : 'bg-card text-foreground/80 hover:bg-muted/60'
                     }`}
-                    style={{ minHeight: 44, fontSize: 15 }}
+                    style={{ minHeight: 44, fontSize: 16 }}
                   >
                     {label}
                   </button>
@@ -1004,7 +1004,7 @@ export default function ProjectMainView({
                 aria-label={t('project.mainView.searchPositions')}
                 title={t('project.mainView.searchPositionsTitle')}
                 className="w-48 sm:w-60 pl-9 pr-3 rounded-md border border-border bg-background outline-none focus:border-primary"
-                style={{ minHeight: 44, fontSize: 15 }}
+                style={{ minHeight: 44, fontSize: 16 }}
               />
             </div>
             <Button
@@ -1012,7 +1012,7 @@ export default function ProjectMainView({
               onClick={handleAddRow}
               title={t('project.mainView.addRowTitle')}
               className="gap-1.5"
-              style={{ minHeight: 44, fontSize: 15 }}
+              style={{ minHeight: 44, fontSize: 16 }}
             >
               <Plus className="w-4 h-4" />
               {t('project.mainView.addRow')}
@@ -1056,7 +1056,7 @@ export default function ProjectMainView({
                 headings stay small: they are labels read once, not numbers
                 read all evening. */}
             <table className="w-full" style={{ fontSize: 16 }}>
-              <thead className="text-xs uppercase text-muted-foreground border-b border-border bg-muted/20">
+              <thead className="text-xs text-muted-foreground border-b border-border bg-muted/20">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium w-12">{t('project.mainView.colNr')}</th>
                   <th className="px-3 py-2 text-left font-medium">{t('project.mainView.colDescription')}</th>
@@ -1079,7 +1079,7 @@ export default function ProjectMainView({
                   return categories.map(cat => (
                     <React.Fragment key={`cat-${cat}`}>
                       <tr className="bg-muted/40">
-                        <td colSpan={7} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground">
+                        <td colSpan={7} className="px-3 py-1 text-xs font-semibold text-foreground">
                           <span className="flex items-center justify-between gap-2">
                             {cat}
                             <button
@@ -1124,7 +1124,7 @@ export default function ProjectMainView({
               </tbody>
               <tfoot className="border-t-2 border-border bg-muted/20">
                 <tr>
-                  <td colSpan={5} className="px-3 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  <td colSpan={5} className="px-3 py-2.5 text-right text-sm font-semibold text-muted-foreground">
                     {t('project.mainView.totalNoVat')}
                   </td>
                   <td className="px-3 py-2.5 text-right text-base font-bold tabular-nums text-foreground">
@@ -1143,7 +1143,7 @@ export default function ProjectMainView({
         {darbai.length > 0 && (
           <div
             className="px-4 py-3 border-t border-border text-foreground/85"
-            style={{ fontSize: 15 }}
+            style={{ fontSize: 16 }}
           >
             {t('project.mainView.rowSummary', {
               count: rowSummary.fromDrawing,
@@ -1168,13 +1168,13 @@ export default function ProjectMainView({
             variant="outline"
             onClick={onShowDrawing}
             className="gap-2"
-            style={{ minHeight: 44, fontSize: 15 }}
+            style={{ minHeight: 44, fontSize: 16 }}
           >
             <Eye className="w-4 h-4" />
             {t('project.mainView.viewDrawing')}
           </Button>
         )}
-        <p className="text-muted-foreground" style={{ fontSize: 13 }}>
+        <p className="text-muted-foreground" style={{ fontSize: 14 }}>
           {t('project.mainView.accuracyNote')}
         </p>
       </div>
@@ -1273,7 +1273,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
         variant="outline"
         disabled
         title={t('project.mainView.priceListNotLoaded')}
-        style={{ minHeight: 44, fontSize: 15 }}
+        style={{ minHeight: 44, fontSize: 16 }}
       >
         <Sliders className="w-4 h-4 mr-2" />
         {t('project.mainView.applyPriceList')}
@@ -1287,7 +1287,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
         variant="outline"
         onClick={() => setOpen(v => !v)}
         title={t('project.mainView.applyPriceListTitle')}
-        style={{ minHeight: 44, fontSize: 15 }}
+        style={{ minHeight: 44, fontSize: 16 }}
       >
         <Sliders className="w-4 h-4 mr-2" />
         {t('project.mainView.applyPriceList')}
@@ -1317,7 +1317,7 @@ function ApplyPriceListButton({ project, onProjectChange }) {
               </span>
             </button>
           ))}
-          <div className="px-3 pt-1.5 pb-1 text-[10px] text-muted-foreground border-t border-border mt-1">
+          <div className="px-3 pt-1.5 pb-1 text-meta text-muted-foreground border-t border-border mt-1">
             {t('project.mainView.manualPricesKept')}
           </div>
         </div>

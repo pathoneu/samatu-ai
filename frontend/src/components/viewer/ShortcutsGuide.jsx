@@ -38,7 +38,7 @@ export default function ShortcutsGuide({ open, onOpenChange }) {
             type="button"
             onClick={download}
             disabled={busy}
-            className="mt-2 self-start inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] border border-border text-[12px] text-foreground hover:bg-muted disabled:opacity-60"
+            className="mt-2 self-start inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] border border-border text-meta text-foreground hover:bg-muted disabled:opacity-60"
             title="Vieno puslapio A4 PDF su visais klavišais — atsispausdinkite ir laikykite šalia"
             data-testid="shortcuts-guide-pdf"
           >
@@ -49,15 +49,15 @@ export default function ShortcutsGuide({ open, onOpenChange }) {
         <div className="px-5 py-4 space-y-5">
           {rows.map((g) => (
             <section key={g.group}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-primary mb-1.5">{g.title}</h3>
+              <h3 className="text-meta font-semibold text-primary mb-1.5">{g.title}</h3>
               <ul className="divide-y divide-border/60 border-t border-border">
                 {g.items.map((it) => (
-                  <li key={it.id} className="flex items-start gap-3 py-1.5 text-[12.5px]" data-shortcut-id={it.id}>
+                  <li key={it.id} className="flex items-start gap-3 py-1.5 text-ui" data-shortcut-id={it.id}>
                     <span className="w-[42%] shrink-0 flex flex-wrap gap-1">
                       {it.mouse ? (
-                        <span className="text-[11.5px] italic text-muted-foreground leading-snug">{it.keys[0]}</span>
+                        <span className="text-meta italic text-muted-foreground leading-snug">{it.keys[0]}</span>
                       ) : it.keys.map((k) => (
-                        <kbd key={k} className="mono text-[11px] px-1.5 py-0.5 rounded-[2px] border border-border bg-muted text-foreground whitespace-nowrap">{k}</kbd>
+                        <kbd key={k} className="mono text-meta px-1.5 py-0.5 rounded-[2px] border border-border bg-muted text-foreground whitespace-nowrap">{k}</kbd>
                       ))}
                     </span>
                     <span className="flex-1 text-foreground leading-snug">{it.label}</span>

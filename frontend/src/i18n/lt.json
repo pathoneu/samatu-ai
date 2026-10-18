@@ -658,7 +658,9 @@
       "groupHead": "{{label}} ({{count}})",
       "hideAllTitle": "Paslėpti visus šios kategorijos įspėjimus",
       "hideAll": "paslėpti visus",
-      "hideOneTitle": "Paslėpti šį įspėjimą"
+      "hideOneTitle": "Paslėpti šį įspėjimą",
+      "showAll": "Rodyti visus ({{count}})",
+      "collapse": "Suskleisti"
     },
     "section": {
       "rows": "({{count}} eil.)"
@@ -922,6 +924,21 @@
         "other": "kitas kontūras"
       },
       "dismiss": "Supratau",
+      "show": "Rodyti",
+      "hide": "Slėpti",
+      "chipNothing": "skaičiai nepasikeitė",
+      "chipChanged_one": "pasikeitė {{count}} patalpa",
+      "chipChanged_few": "pasikeitė {{count}} patalpos",
+      "chipChanged_other": "pasikeitė {{count}} patalpų",
+      "chipKept_one": "{{count}} palikta kaip buvo",
+      "chipKept_few": "{{count}} paliktos kaip buvo",
+      "chipKept_other": "{{count}} palikta kaip buvo",
+      "chipAdded_one": "{{count}} nauja patalpa",
+      "chipAdded_few": "{{count}} naujos patalpos",
+      "chipAdded_other": "{{count}} naujų patalpų",
+      "chipRemoved_one": "{{count}} nerasta",
+      "chipRemoved_few": "{{count}} nerastos",
+      "chipRemoved_other": "{{count}} nerasta",
       "roomNote": "Perskaičius brėžinį iš naujo:",
       "roomKept": "Palikta"
     },

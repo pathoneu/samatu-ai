@@ -5,14 +5,46 @@ module.exports = {
   theme: {
   	extend: {
   		fontFamily: {
-  			sans: ['var(--font-sans)', 'Hanken Grotesk', 'system-ui', 'sans-serif'],
-  			mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
-  			display: ['var(--font-display)', 'Sora', 'Hanken Grotesk', 'sans-serif'],
+  			// IBM Plex only (index.css --font-*); the dead Hanken/JetBrains/Sora fallbacks are gone (v3 W1-C)
+  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+  			mono: ['var(--font-mono)', 'monospace'],
+  			display: ['var(--font-display)', 'sans-serif'],
   		},
+  		// v3 W1-C: one corner for controls (2 px — the old md/sm calc() fell to 0 px and plain
+  		// `rounded` was Tailwind's 4 px), 4 px for floating panels. xl/2xl/full stay Tailwind's.
   		borderRadius: {
+  			DEFAULT: 'var(--radius)',
+  			sm: 'var(--radius)',
+  			md: 'var(--radius)',
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			panel: 'var(--radius-panel)'
+  		},
+  		// v3 W1-C type scale (design §6): 12 metadata only · 14 interface · 16 body · 18 · 24 · 30.
+  		// The same six sizes as Tailwind's xs/sm/base/lg/2xl/3xl; the names say what each is for.
+  		fontSize: {
+  			meta: ['12px', { lineHeight: '16px' }],
+  			ui: ['14px', { lineHeight: '20px' }],
+  			body: ['16px', { lineHeight: '24px' }],
+  			lead: ['18px', { lineHeight: '26px' }],
+  			title: ['24px', { lineHeight: '32px' }],
+  			display: ['30px', { lineHeight: '36px' }]
+  		},
+  		// v3 W1-C: one tinted slate shadow (--shadow-ink) instead of Tailwind's black; same geometry.
+  		boxShadow: {
+  			sm: '0 1px 2px 0 hsl(var(--shadow-ink) / 0.06)',
+  			DEFAULT: '0 1px 3px 0 hsl(var(--shadow-ink) / 0.1), 0 1px 2px -1px hsl(var(--shadow-ink) / 0.1)',
+  			md: '0 4px 6px -1px hsl(var(--shadow-ink) / 0.1), 0 2px 4px -2px hsl(var(--shadow-ink) / 0.1)',
+  			lg: '0 10px 15px -3px hsl(var(--shadow-ink) / 0.1), 0 4px 6px -4px hsl(var(--shadow-ink) / 0.1)',
+  			xl: '0 20px 25px -5px hsl(var(--shadow-ink) / 0.1), 0 8px 10px -6px hsl(var(--shadow-ink) / 0.1)',
+  			'2xl': '0 25px 50px -12px hsl(var(--shadow-ink) / 0.25)'
+  		},
+  		// v3 W1-C stacking scale — the --z-* tokens in index.css.
+  		zIndex: {
+  			canvas: 'var(--z-canvas)',
+  			panel: 'var(--z-panel)',
+  			popover: 'var(--z-popover)',
+  			modal: 'var(--z-modal)',
+  			coach: 'var(--z-coach)'
   		},
   		colors: {
   			background: 'hsl(var(--background))',

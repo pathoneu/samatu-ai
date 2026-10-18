@@ -295,7 +295,7 @@ export default function CalibrateDialog({
           {/* The tip said "X/Y" while the control right above it says
               „Vienoda / Tik horizontali / Tik vertikali" — match the words the
               user can actually click. (2026-07-28.) */}
-          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Skenuoti brėžiniai dažnai būna ištempti į vieną pusę. Tokiu atveju ašyje rinkitės „Tik horizontali" arba „Tik vertikali" ir kalibruokite du kartus.
           </div>
 

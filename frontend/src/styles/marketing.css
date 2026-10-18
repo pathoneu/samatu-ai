@@ -1,0 +1,277 @@
+/**
+ * marketing.css — the shared classes of the public pages (marketing, legal, login/register brand
+ * panel, cookie banner): .pathon-landing, .blueprint-grid, .btn-primary, .btn-ghost, .link-draw,
+ * .product-frame, .mono-tick … Moved verbatim out of src/index.css (Pathon v3 W1-C, audit A#13) so
+ * the app stylesheet holds only the app's tokens and helpers. Imported right after index.css in
+ * main.jsx, so the cascade order is unchanged. The landing itself styles from pages/landing/landing.css.
+ */
+
+/* ══════════════════════════════════════════════════════════════════════
+   Landing page — Pathon DARK GRAPHITE identity (2026-07-05).
+   Orange-on-graphite. Serious, technical, premium construction-AI.
+   Deep graphite surfaces, blueprint hairlines on dark, orange radial
+   glow, top-lit panel borders. Sora display, JetBrains Mono numerals.
+   Reference bar: dark product-led takeoff SaaS (dark, product-led) — distinct via orange.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Root wrapper for the landing — establishes the dark base. A subtle
+   vignette + faint grain gives depth so surfaces never read flat. */
+.pathon-landing {
+  position: relative;
+  isolation: isolate;
+  background: hsl(var(--background));
+}
+.pathon-landing::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1, 0 0 0 0 1, 0 0 0 0 1, 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.pathon-landing > * { position: relative; z-index: 1; }
+
+/* Highlighted noun — orange ink, no filled box (editorial). */
+.h-accent {
+  color: hsl(var(--primary));
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Blueprint hairline grid on dark — cool light lines, radial-masked so
+   the grid fades toward the edges instead of tiling flat to the frame.
+   Two scales: fine 56px cells + a heavier 224px major line. */
+.blueprint-grid {
+  background-image:
+    linear-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, #000 55%, transparent 100%);
+          mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, #000 55%, transparent 100%);
+}
+.blueprint-grid-major {
+  background-image:
+    linear-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.05) 1px, transparent 1px),
+    linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+  background-size: 224px 224px, 224px 224px, 56px 56px, 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 50%, transparent 100%);
+          mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 50%, transparent 100%);
+}
+
+/* Primary CTA — solid orange, dark depth + inner top-light, precise press. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow:
+    0 1px 2px hsl(220 30% 4% / 0.55),
+    0 8px 22px -10px hsl(var(--primary) / 0.55),
+    inset 0 1px 0 hsl(0 0% 100% / 0.28);
+  transition: transform 150ms cubic-bezier(.16,1,.3,1),
+              box-shadow 150ms cubic-bezier(.16,1,.3,1),
+              background 150ms ease;
+}
+.btn-primary:hover {
+  background: hsl(var(--accent-2));
+  box-shadow:
+    0 2px 4px hsl(220 30% 4% / 0.6),
+    0 14px 34px -10px hsl(var(--primary) / 0.7),
+    inset 0 1px 0 hsl(0 0% 100% / 0.32);
+  transform: translateY(-1.5px);
+}
+.btn-primary:active { transform: translateY(0.5px) scale(0.99); }
+
+/* Secondary / ghost button — cool graphite border, panel fill, top-lit. */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow:
+    0 1px 2px hsl(220 30% 4% / 0.4),
+    inset 0 1px 0 hsl(0 0% 100% / 0.04);
+  transition: border-color 150ms ease, background 150ms ease,
+              transform 150ms cubic-bezier(.16,1,.3,1),
+              box-shadow 150ms ease;
+}
+.btn-ghost:hover {
+  border-color: hsl(var(--primary) / 0.6);
+  background: hsl(var(--surface-2));
+  transform: translateY(-1.5px);
+  box-shadow: 0 10px 26px -14px hsl(220 40% 2% / 0.7);
+}
+.btn-ghost:active { transform: translateY(0.5px); }
+
+/* Underline-draw link — hairline sweeps in from the left on hover. */
+.link-draw {
+  position: relative;
+  transition: color 150ms ease;
+}
+.link-draw::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -2px;
+  height: 1.5px; width: 100%;
+  background: hsl(var(--primary));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms cubic-bezier(.16,1,.3,1);
+}
+.link-draw:hover { color: hsl(var(--foreground)); }
+.link-draw:hover::after { transform: scaleX(1); }
+
+/* Product frame — the hero visual "device" chrome. Dark elevated panel,
+   deep layered shadow, top-lit border. */
+.product-frame {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.05),
+    0 2px 4px hsl(220 40% 2% / 0.5),
+    0 24px 60px -24px hsl(220 40% 2% / 0.75),
+    0 40px 90px -50px hsl(var(--primary) / 0.25);
+}
+
+/* Card lift — tactile hover for feature / step / pricing cards. */
+.card-lift {
+  transition: transform 200ms cubic-bezier(.16,1,.3,1),
+              box-shadow 200ms cubic-bezier(.16,1,.3,1),
+              border-color 200ms ease;
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.45);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.05),
+    0 18px 40px -20px hsl(220 40% 2% / 0.8);
+}
+
+/* Anchor offset for sticky nav */
+section[id] { scroll-margin-top: 84px; }
+
+/* Ghost numeral — large decorative index in a card corner */
+.ghost-numeral {
+  position: absolute;
+  right: -4px;
+  bottom: -34px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 150px;
+  line-height: 1;
+  color: hsl(var(--primary));
+  opacity: 0.10;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+/* Mono coordinate tick — tiny signature annotation (e.g. 01 / HERO). */
+.mono-tick {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Hero centerpiece — "AI aptinka kiekius" detection panel (SVG + CSS).
+
+   ROBUSTNESS CONTRACT: the base rules (no `.play`) render the FINAL state —
+   floor plan visible, all detection boxes + labels present, scan line
+   hidden. JSX only ADDS `.play` when JS runs, motion is allowed, and the
+   panel scrolls into view. If JS never runs, or prefers-reduced-motion is
+   set, `.play` is never added → the panel shows fully-detected + static.
+   The animation classes never emit a stuck opacity:0 base.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Base = fully detected. */
+.hero-plan .scan-line { opacity: 0; }
+.hero-plan .det-box,
+.hero-plan .det-label,
+.hero-plan .plan-line { opacity: 1; }
+.hero-plan .plan-line { stroke-dashoffset: 0; }
+
+/* On play: faint plan hairlines draw in first. */
+.hero-plan.play .plan-line {
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  animation: heroDraw 900ms cubic-bezier(.16,1,.3,1) 120ms forwards;
+}
+@keyframes heroDraw { to { stroke-dashoffset: 0; } }
+
+/* Scan line — an orange sweep that crosses the plan top→bottom once. */
+.hero-plan.play .scan-line {
+  animation: heroScan 1500ms cubic-bezier(.45,0,.25,1) 700ms 1;
+}
+@keyframes heroScan {
+  0%   { opacity: 0; transform: translateY(0); }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(232px); }
+}
+
+/* Detection boxes — SNAP on one-by-one as the scan line passes. A quick
+   scale-from-95% + opacity pop, staggered top→bottom to track the sweep. */
+.hero-plan.play .det-box {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroSnap 340ms cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes heroSnap {
+  0%   { opacity: 0; transform: scale(0.94); }
+  60%  { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.hero-plan.play .det-label {
+  opacity: 0;
+  animation: heroFade 320ms ease both;
+}
+@keyframes heroFade { to { opacity: 1; } }
+
+/* Stagger — boxes + their labels share timing, tracking the scan sweep. */
+.hero-plan.play .d1 { animation-delay: 900ms; }
+.hero-plan.play .d2 { animation-delay: 1040ms; }
+.hero-plan.play .d3 { animation-delay: 1180ms; }
+.hero-plan.play .d4 { animation-delay: 1320ms; }
+.hero-plan.play .d5 { animation-delay: 1460ms; }
+.hero-plan.play .d6 { animation-delay: 1600ms; }
+
+/* Extracted-quantities table rows — staggered fade, robust default.
+   Base = visible (opacity 1). Only the `.play` parent animates from 0. */
+.qty-row { opacity: 1; }
+.qty-table.play .qty-row {
+  opacity: 0;
+  animation: fadeRow 520ms cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes fadeRow {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Trade tabs under the panel — active ones pulse-in on play. */
+.trade-tab { transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+
+/* ── Reduced motion: everything final + static ── */
+@media (prefers-reduced-motion: reduce) {
+  .hero-plan .plan-line { stroke-dashoffset: 0 !important; animation: none !important; }
+  .hero-plan .scan-line { display: none !important; }
+  .hero-plan .det-box,
+  .hero-plan .det-label { opacity: 1 !important; animation: none !important; transform: none !important; }
+  .qty-row { opacity: 1 !important; animation: none !important; transform: none !important; }
+  .pathon-landing::before { display: none; }
+  .card-lift, .btn-primary, .btn-ghost { transition: none !important; }
+}

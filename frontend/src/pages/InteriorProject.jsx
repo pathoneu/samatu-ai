@@ -159,11 +159,11 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
             }}
             aria-label={t('project.interior.renameLabel')}
             className="font-semibold text-foreground bg-background border border-border rounded px-1.5 focus:outline-none focus:border-primary"
-            style={{ fontSize: 13, height: 24, minWidth: 180 }}
+            style={{ fontSize: 14, height: 24, minWidth: 180 }}
           />
         ) : (
           <span className="flex items-center gap-1 min-w-0">
-            <span className="font-semibold text-foreground truncate" style={{ fontSize: 13 }}>
+            <span className="font-semibold text-foreground truncate" style={{ fontSize: 14 }}>
               {project.name || t('project.interior.untitled')}
             </span>
             {onRename && (
@@ -183,14 +183,14 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
           </span>
         )}
         {project.company_name && (
-          <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: 11 }}>
+          <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: 12 }}>
             {project.company_name}
           </span>
         )}
         <span
-          className="font-medium uppercase tracking-wide whitespace-nowrap"
+          className="font-medium whitespace-nowrap"
           style={{
-            fontSize: 10, padding: '2px 7px', borderRadius: 3,
+            fontSize: 12, padding: '2px 7px', borderRadius: 3,
             border: '1px solid hsl(var(--border-strong))',
             color: 'hsl(var(--muted-foreground))',
             background: 'hsl(var(--card))',
@@ -214,13 +214,13 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
         ) : (
           <>
             <div className="flex items-baseline" style={{ gap: 6 }}>
-              <span className="skyrius-header" style={{ fontSize: 10 }}>{t('project.interior.beVat')}</span>
-              <span className="mono tabular text-foreground/70" style={{ fontSize: 13 }}>
+              <span className="skyrius-header" style={{ fontSize: 12 }}>{t('project.interior.beVat')}</span>
+              <span className="mono tabular text-foreground/70" style={{ fontSize: 14 }}>
                 {totalNet.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
               </span>
             </div>
             <div className="flex items-baseline" style={{ gap: 6 }}>
-              <span className="skyrius-header" style={{ fontSize: 10 }}>
+              <span className="skyrius-header" style={{ fontSize: 12 }}>
                 {reverseVat ? t('project.mainView.totalReverse') : t('project.interior.suVat')}
               </span>
               <span className="mono tabular font-semibold text-foreground" style={{ fontSize: 18 }}>
@@ -389,7 +389,7 @@ function CalcCard({ color, title, mainValue, mainUnit, breakdown, extra, note, c
     <Card className="border border-border bg-card hover:border-foreground/20 transition-colors">
       <CardContent className="p-4">
         <div className="flex items-center gap-1.5 mb-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             {title}
           </p>
           <ConfidenceDot level={confidence} />
@@ -608,7 +608,7 @@ function DarbuSarasas({ items }) {
         {grouped.map(group => (
           <div key={group.skyrius}>
             <div className="px-4 py-2 bg-muted/20">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-semibold text-muted-foreground">
                 {group.label}
               </span>
               <span className="ml-2 text-xs text-muted-foreground">
@@ -1171,7 +1171,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
             className="relative h-full overflow-y-auto bg-background border-l border-border shadow-xl w-full sm:w-[520px] p-4 space-y-4"
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-foreground" style={{ fontSize: 17 }}>
+              <h2 className="font-semibold text-foreground" style={{ fontSize: 18 }}>
                 {t('project.interior.assumptionsTitle')}
               </h2>
               <button
@@ -1835,10 +1835,10 @@ function SendStep({ project, onProjectChange, onGoToPrices }) {
   return (
     <div className="border border-border rounded-xl bg-card p-6 space-y-5">
       <div>
-        <h2 className="font-semibold text-foreground" style={{ fontSize: 17 }}>
+        <h2 className="font-semibold text-foreground" style={{ fontSize: 18 }}>
           {t('project.send.title')}
         </h2>
-        <p className="text-muted-foreground mt-1" style={{ fontSize: 15 }}>
+        <p className="text-muted-foreground mt-1" style={{ fontSize: 16 }}>
           {t('project.send.subtitle')}
         </p>
       </div>
@@ -1848,7 +1848,7 @@ function SendStep({ project, onProjectChange, onGoToPrices }) {
         role="status"
         className="rounded border px-3 py-2.5 space-y-2"
         style={{
-          fontSize: 15,
+          fontSize: 16,
           borderColor: (noQty || noPrice)
             ? 'hsl(var(--conf-med) / 0.45)' : 'hsl(var(--border))',
           background: (noQty || noPrice)
@@ -1867,7 +1867,7 @@ function SendStep({ project, onProjectChange, onGoToPrices }) {
                 onClick={() => onGoToPrices(excluded)}
                 title={t('project.send.goToPricesTitle')}
                 className="inline-flex items-center gap-2 shrink-0 rounded border border-border-strong bg-background text-foreground hover:bg-muted/50 transition-colors"
-                style={{ minHeight: 44, padding: '0 16px', fontSize: 15 }}
+                style={{ minHeight: 44, padding: '0 16px', fontSize: 16 }}
               >
                 {t('project.send.goToPrices')}
                 <ArrowRight className="w-4 h-4" aria-hidden />

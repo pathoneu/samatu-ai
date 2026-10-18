@@ -209,7 +209,7 @@ export default function QuantitiesPanel({
           aria-label="Rikiuoti"
           title="Rikiuoti eilutes ir patalpas"
           className="bg-card border border-border rounded text-foreground px-1.5 outline-none focus:border-primary"
-          style={{ fontSize: 11, height: 28 }}
+          style={{ fontSize: 12, height: 28 }}
         >
           {Object.entries(SORT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
@@ -219,7 +219,7 @@ export default function QuantitiesPanel({
 
       {/* Sheet → panel: which room is selected and how many lines it is in. */}
       {focusedNr && (
-        <div className="shrink-0 flex items-center gap-2 px-2.5 py-1 border-b border-border/60 bg-primary/5 text-foreground/85" style={{ fontSize: 11 }}>
+        <div className="shrink-0 flex items-center gap-2 px-2.5 py-1 border-b border-border/60 bg-primary/5 text-foreground/85" style={{ fontSize: 12 }}>
           <span className="truncate">
             Pasirinkta <span className="mono">{focusedNr}</span> {focusedRoom?.pavadinimas || ''}
             {' '}— {focusedLineCount} eil.
@@ -343,7 +343,7 @@ export default function QuantitiesPanel({
               <ContextMenuItem onSelect={() => onOpenAssumptions?.()} disabled={!onOpenAssumptions}>
                 Keisti nustatymus…
               </ContextMenuItem>
-              <p className="px-2 pb-1.5 pt-0.5 text-muted-foreground" style={{ fontSize: 10, lineHeight: '14px' }}>
+              <p className="px-2 pb-1.5 pt-0.5 text-muted-foreground" style={{ fontSize: 12, lineHeight: '14px' }}>
                 Eilutes skaičiuoja programa — perkelti kiekio į kitą darbą čia negalima.
               </p>
             </>

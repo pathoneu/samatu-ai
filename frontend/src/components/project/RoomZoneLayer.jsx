@@ -2,7 +2,7 @@
  * RoomZoneLayer — the AI Takeoff Viewer's first visible layer (Phase 1).
  *
  * FOUNDER DECISION (2026-07-14): the DEFAULT is a CLEAN drawing — nothing is
- * drawn at rest. Selecting a room in the panel draws ONE red ring around that
+ * drawn at rest. Selecting a room in the panel draws ONE ring around that
  * room's own printed number (labelAnchor = the verified plan-label position),
  * checked-drawing style. One ring at a time → no de-overlap fanning → the
  * ring always lands exactly on the printed number. This replaced the
@@ -12,10 +12,15 @@
  * is true (viewer toolbar Layers toggle) — the QA/verification view.
  *
  * Declutter contract (2026-07-02): at rest a shape is quiet — NO label chip.
- * The chip (name + area + confidence dot) appears on hover, and stays pinned
- * while the room is focused; a focused marker also gets a pulsing halo (the
- * "Rodyti brėžinyje" flash). Synthesized/bbox geometry stays DASHED +
- * "apytikslė" so the viewer never fakes a precise outline (design spec §9).
+ * The chip (name, then area · room type · how the outline was found) appears on
+ * hover, and stays pinned while the room is focused; a focused room pulses twice
+ * (the "Rodyti brėžinyje" flash), then holds still.
+ *
+ * v3 overlay vocabulary (2026-10-18, founder decision 2; lib/overlayTokens):
+ * the selection is a heavy NEUTRAL ring/outline plus the label — never red (red
+ * means an error); every zone shares ONE neutral tint and the room type is a word
+ * in the label; an outline read off the walls or confirmed by him is SOLID, an
+ * estimated one (flood fill, a box) DASHED. Every zone carries a hover sentence.
  *
  * A FACE over the engine — no quantity math here. Geometry + confidence come
  * from lib/roomZones (which reuses planOverlayGeometry + areaConfidence).
@@ -31,6 +36,11 @@ import {
   ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 } from '@/lib/roomZones';
 import { areaConfidenceSentence } from '@/lib/confidence';
+import {
+  FILL_ALPHA, FILL_ALPHA_HOVER, LABEL_FONT_PX, LABEL_STYLE, OUTLINE_SENTENCE, SELECTED_STROKE_PX, STROKE_PX,
+  labelWidth, lineStyle, ov, paint,
+} from '@/lib/overlayTokens';
+import OverlayLabel from '@/components/viewer/OverlayLabel';
 
 function centroidOf(geometry) {
   if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
@@ -48,22 +58,32 @@ function centroidOf(geometry) {
   };
 }
 
-// Chip sizing: dynamic width so room names no longer truncate at 12 chars.
-// 14px left pad-with-dot + 8px gap + ~6.4px/char at fontSize 11.
-const CHIP_MAX_W = 200;
-function chipWidthFor(label) {
-  return Math.min(CHIP_MAX_W, Math.max(90, 14 + 8 + label.length * 6.4));
-}
+// Chip text: line 1 the name (ellipsized past CHIP_MAX_CHARS), line 2 what the drawing says about it.
+const CHIP_MAX_CHARS = 30;
 function chipLabelFor(label) {
-  // Only ellipsize when the name exceeds even the clamped max width.
-  const maxChars = Math.floor((CHIP_MAX_W - 22) / 6.4);
-  return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
+  return label.length > CHIP_MAX_CHARS ? `${label.slice(0, CHIP_MAX_CHARS - 1)}…` : label;
+}
+function chipSubFor(z) {
+  return [z.areaLabel, z.typeWord, z.confidenceText].filter(Boolean).join(' · ');
+}
+// The outline's kind in a few words, for the chip of an outline that is NOT read off the walls.
+function outlineNote(z) {
+  if (z.outline === 'estimated') return 'kontūras apytikslis';
+  if (z.outline === 'marker') return 'tik numeris, be kontūro';
+  return null;
+}
+// The whole sentence — the hover title of an interactive zone.
+function zoneSentence(z) {
+  return [`${z.nr} ${z.label}`, chipSubFor(z), OUTLINE_SENTENCE[z.outline]].filter(Boolean).join(' · ')
+    + (z.areaLabel ? `. ${areaConfidenceSentence(z.confidence)}` : '');
 }
 
 // Marker aesthetics: professional "clean number marker" — white/paper fill,
 // ink stroke + ink number, constant screen size at every zoom (map-pin style).
 const MARKER_R = 13;
-const MARKER_INK = '#1f2937';
+const INK = ov('selected');
+// A focused room pulses twice, then holds still (the endless 1.6 s pulse read as an alarm).
+const PULSE_TIMES = 2;
 
 export default function RoomZoneLayer({
   rooms = [],
@@ -142,53 +162,45 @@ export default function RoomZoneLayer({
     if (active.length === 0 && missingCount === 0) return null;
     // Ring sized to enclose the printed label plate; scales with the render.
     const ringR = Math.min(44, Math.max(16, width * 0.02));
-    const RED = '#dc2626';
     return (
       <svg
         width={width}
         height={height}
         className="absolute left-0 top-0 z-[16]"
         style={{ pointerEvents: 'none' }}
+        data-room-zone-layer="simple"
       >
         <style>{`
           @keyframes rz-ring-pulse {
-            0% { transform: scale(1); opacity: 0.65; }
-            100% { transform: scale(1.9); opacity: 0; }
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.8); opacity: 0; }
           }
           .rz-ring-pulse {
-            animation: rz-ring-pulse 1.6s ease-out infinite;
+            animation: rz-ring-pulse 1.4s ease-out ${PULSE_TIMES} forwards;
             transform-box: fill-box;
             transform-origin: center;
           }
+          @media (prefers-reduced-motion: reduce) { .rz-ring-pulse { animation: none; opacity: 0; } }
         `}</style>
         {active.map((z) => {
           const isFocused = isFocusedZone(z);
           const a = z.labelAnchor || z.marker;
-          const w = chipWidthFor(z.label);
-          const half = w / 2;
           return (
-            <g key={z.nr} transform={`translate(${a.cx}, ${a.cy})`}>
+            <g key={z.nr} transform={`translate(${a.cx}, ${a.cy})`} data-room-ring={z.nr}>
               {isFocused && (
                 <circle className="rz-ring-pulse" r={ringR} fill="none"
-                  stroke={RED} strokeWidth={2} />
+                  style={paint({ stroke: INK })} strokeWidth={STROKE_PX} />
               )}
-              <circle r={ringR} fill="none" stroke={RED}
-                strokeWidth={isFocused ? 2.5 : 1.75}
-                opacity={isFocused ? 1 : 0.65} />
+              {/* the selection: a heavy neutral ring on a white casing, so it reads on any sheet */}
               {isFocused && (
-                <g transform={`translate(0, ${-ringR - 21})`}>
-                  <rect x={-half} y={-17} width={w} height={34} rx={4}
-                    fill="white" stroke={RED} strokeWidth={1} opacity={0.96} />
-                  <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
-                    <title>{areaConfidenceSentence(z.confidence)}</title>
-                  </circle>
-                  <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
-                    {chipLabelFor(z.label)}
-                  </text>
-                  <text x={-half + 18} y={11} fontSize={10} fill="#4b5563">
-                    {z.areaLabel}
-                  </text>
-                </g>
+                <circle r={ringR} fill="none" style={paint({ stroke: ov('label-bg') })}
+                  strokeWidth={SELECTED_STROKE_PX + 3} opacity={0.9} />
+              )}
+              <circle r={ringR} fill="none" style={paint({ stroke: INK })}
+                strokeWidth={isFocused ? SELECTED_STROKE_PX : 1.5}
+                opacity={isFocused ? 1 : 0.6} />
+              {isFocused && (
+                <OverlayLabel x={0} y={-ringR - 24} text={chipLabelFor(z.label)} sub={chipSubFor(z)} border={INK} />
               )}
             </g>
           );
@@ -210,23 +222,28 @@ export default function RoomZoneLayer({
       height={height}
       className="absolute left-0 top-0 z-[16]"
       style={{ pointerEvents: 'none' }}
+      data-room-zone-layer="fills"
     >
-      {/* Focus pulse for markers ("Rodyti brėžinyje" flash). r is a CSS
+      {/* Focus pulse for markers ("Rodyti brėžinyje" flash), twice. r is a CSS
           geometry property — animatable in all evergreen browsers. */}
       <style>{`
         @keyframes rz-marker-pulse {
-          0% { r: ${MARKER_R}px; opacity: 0.75; }
+          0% { r: ${MARKER_R}px; opacity: 0.7; }
           100% { r: ${MARKER_R * 2.2}px; opacity: 0; }
         }
-        .rz-marker-pulse { animation: rz-marker-pulse 1.5s ease-out infinite; }
+        .rz-marker-pulse { animation: rz-marker-pulse 1.4s ease-out ${PULSE_TIMES} forwards; }
+        @media (prefers-reduced-motion: reduce) { .rz-marker-pulse { animation: none; opacity: 0; } }
       `}</style>
-      {/* Pass 1: shapes only — fill-quiet at rest, brighter on hover/focus. */}
+      {/* Pass 1: shapes only — one neutral tint, quiet at rest, a little denser on hover/focus;
+          the line says how the outline was found (solid read/confirmed, dashed estimated). */}
       {visibleZones.map((z) => {
         const isFocused = isFocusedZone(z);
         const isHovered = isHoveredZone(z);
-        const strokeW = isFocused ? 3.5 : isHovered ? 2.5 : 1.5;
-        const fillOpacity = isFocused ? 0.34 : isHovered ? 0.30 : 0.16;
-        const dash = z.approximate ? '6 4' : undefined;
+        const line = lineStyle(z.outline === 'marker' ? 'read' : z.outline);
+        const stroke = isFocused ? INK : line.stroke;
+        const strokeW = isFocused ? SELECTED_STROKE_PX : STROKE_PX;
+        const fillOpacity = isFocused || isHovered ? FILL_ALPHA_HOVER : FILL_ALPHA;
+        const dash = line.dash || undefined;
 
         return (
           <g
@@ -238,31 +255,33 @@ export default function RoomZoneLayer({
             onClick={(e) => { e.stopPropagation(); onRoomClick?.(z); }}
             onMouseEnter={() => setHoverNr(String(z.nr))}
             onMouseLeave={() => setHoverNr((cur) => (cur === String(z.nr) ? null : cur))}
+            data-room-zone={z.nr}
+            data-outline={z.outline}
           >
+            <title>{zoneSentence(z)}</title>
             {rendersAsMarker(z) ? (
               <g transform={`translate(${(markerAt.get(String(z.nr)) || z.marker).cx}, ${(markerAt.get(String(z.nr)) || z.marker).cy})`}>
                 {isFocused && (
                   <circle className="rz-marker-pulse" r={MARKER_R} fill="none"
-                    stroke={MARKER_INK} strokeWidth={2} style={{ pointerEvents: 'none' }} />
+                    style={{ ...paint({ stroke: INK }), pointerEvents: 'none' }} strokeWidth={STROKE_PX} />
                 )}
-                <circle r={MARKER_R} fill="#ffffff" fillOpacity={0.95}
-                  stroke={MARKER_INK}
-                  strokeWidth={isFocused ? 2.5 : isHovered ? 2 : 1.25}
-                  strokeDasharray={z.approximate ? '4 3' : undefined} />
+                <circle r={MARKER_R} fillOpacity={0.95}
+                  style={paint({ fill: ov('label-bg'), stroke: INK })}
+                  strokeWidth={isFocused ? SELECTED_STROKE_PX : isHovered ? STROKE_PX : 1.5} />
                 <text x={0} y={0} textAnchor="middle" dominantBaseline="central"
-                  fontSize={11} fontWeight="700" fill={MARKER_INK}
-                  style={{ pointerEvents: 'none' }}>
+                  fontSize={LABEL_FONT_PX} fontWeight="600"
+                  style={{ ...LABEL_STYLE, ...paint({ fill: INK }), pointerEvents: 'none' }}>
                   {z.nr}
                 </text>
               </g>
             ) : z.geometry.type === 'polygon' ? (
               <polygon
                 points={z.geometry.points.map((p) => `${p[0]},${p[1]}`).join(' ')}
-                fill={z.color}
+                style={paint({ fill: ov('zone-fill'), stroke })}
                 fillOpacity={fillOpacity}
-                stroke={z.color}
                 strokeWidth={strokeW}
                 strokeDasharray={dash}
+                strokeLinejoin="round"
               />
             ) : (
               <rect
@@ -270,10 +289,9 @@ export default function RoomZoneLayer({
                 y={z.geometry.top}
                 width={z.geometry.width}
                 height={z.geometry.height}
-                rx={3}
-                fill={z.color}
+                rx={2}
+                style={paint({ fill: ov('zone-fill'), stroke })}
                 fillOpacity={fillOpacity}
-                stroke={z.color}
                 strokeWidth={strokeW}
                 strokeDasharray={dash}
               />
@@ -292,30 +310,16 @@ export default function RoomZoneLayer({
         const asMarker = rendersAsMarker(z);
         const anchor = asMarker ? (markerAt.get(String(z.nr)) || z.marker) : null;
         const { cx, cy } = asMarker
-          ? { cx: anchor.cx, cy: anchor.cy - MARKER_R - 21 }
+          ? { cx: anchor.cx, cy: anchor.cy - MARKER_R - 24 }
           : centroidOf(z.geometry);
-        const w = chipWidthFor(z.label);
-        const half = w / 2;
         return (
-          <g
+          <OverlayLabel
             key={`chip-${z.nr}`}
-            transform={`translate(${cx}, ${cy})`}
-            style={{ pointerEvents: 'none' }}
-          >
-            <rect
-              x={-half} y={-17} width={w} height={34} rx={4}
-              fill="white" stroke={asMarker ? MARKER_INK : z.color} strokeWidth={1} opacity={0.96}
-            />
-            <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
-              <title>{areaConfidenceSentence(z.confidence)}</title>
-            </circle>
-            <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
-              {chipLabelFor(z.label)}
-            </text>
-            <text x={-half + 18} y={11} fontSize={10} fill={asMarker ? '#4b5563' : z.color}>
-              {z.areaLabel}{z.approximate ? ' · apytikslė vieta' : ''}
-            </text>
-          </g>
+            x={cx} y={cy}
+            text={chipLabelFor(z.label)}
+            sub={[chipSubFor(z), outlineNote(z)].filter(Boolean).join(' · ')}
+            border={isFocused ? INK : undefined}
+          />
         );
       })}
 
@@ -329,12 +333,13 @@ export default function RoomZoneLayer({
 // Honest disclosure chip, identical in both presentation modes. Its width follows the sentence
 // (~5,6 px a character at 11 px, measured 4,9) — the old fixed 250 px only fitted the old, shorter text.
 function MissingRoomsChip({ count }) {
+  // the sentence names the real place to fix it — „Patikra" (W0-B, lib/roomZones.missingRoomsText)
   const text = missingRoomsText(count);
   return (
     <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }} data-testid="missing-rooms-chip">
-      <rect x={0} y={0} width={Math.ceil(20 + text.length * 5.6)} height={24} rx={5}
-        fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
-      <text x={10} y={16} fontSize={11} fill="#b45309">
+      <rect x={0} y={0} width={labelWidth(text)} height={24} rx={2}
+        style={paint({ fill: ov('label-bg'), stroke: ov('estimated') })} strokeWidth={1} />
+      <text x={7} y={16} fontSize={LABEL_FONT_PX} style={{ ...LABEL_STYLE, ...paint({ fill: ov('label-fg') }) }}>
         {text}
       </text>
     </g>

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { boxFromDrag, formatScore } from '@/lib/symbolSearch';
+import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
 
 /**
  * SymbolSearchLayer — one page's part of „Rasti panašius": drag a box around a
@@ -11,6 +12,10 @@ import { boxFromDrag, formatScore } from '@/lib/symbolSearch';
  * screen⇄PDF boundary, so the box is right on /Rotate pages and at any zoom.
  * State lives in useSymbolSearch (TakeoffViewer) — this page host unmounts when
  * it scrolls out of the virtualization buffer.
+ *
+ * v3 overlay vocabulary (lib/overlayTokens): a candidate is a PROPOSAL until he reviews it — the one
+ * dash in the proposal slate blue, its number and score on a neutral label pill; his own example is
+ * solid (he drew it); the box being dragged is the tool-at-work orange.
  */
 export default function SymbolSearchLayer({
   adapter,
@@ -63,8 +68,8 @@ export default function SymbolSearchLayer({
   };
 
   const dragBox = drag ? boxFromDrag(drag.a, drag.b, 0) : null;
-  const AI = 'hsl(var(--conf-med))';
-  const SOURCE = 'hsl(var(--viewer-chrome-active))';
+  const FOUND = ov('proposed');
+  const SOURCE = ov('read');
 
   return (
     <svg
@@ -80,15 +85,15 @@ export default function SymbolSearchLayer({
     >
       {templateBox && (() => {
         const r = rectOf(templateBox);
-        return <rect x={r.x - 2} y={r.y - 2} width={r.w + 4} height={r.h + 4} fill="none" stroke={SOURCE} strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none" />;
+        return <rect x={r.x - 2} y={r.y - 2} width={r.w + 4} height={r.h + 4} fill="none" style={paint({ stroke: SOURCE })} strokeWidth={STROKE_PX} pointerEvents="none" />;
       })()}
       {candidates.map((c) => {
         const r = rectOf(c.box);
         const hot = c.id === hoveredId;
-        const colour = c.isSource ? SOURCE : AI;
+        const colour = c.isSource ? SOURCE : FOUND;
         const n = numbers[c.id];
         const tag = `${n ?? ''} · ${formatScore(c.score)}`;
-        const tagW = 8 + tag.length * 5.6;
+        const tagW = labelWidth(tag);
         return (
           <g
             key={c.id}
@@ -102,16 +107,18 @@ export default function SymbolSearchLayer({
             <title>{c.isSource
               ? `Jūsų pavyzdys · panašumas ${formatScore(c.score)} · spustelėkite — pašalinti`
               : `Nr. ${n} · panašumas ${formatScore(c.score)} · spustelėkite, jei tai ne tas simbolis — pašalinti`}</title>
-            <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={colour} fillOpacity={hot ? 0.22 : 0.04}
-              stroke={colour} strokeWidth={hot ? 2.5 : 1.5} />
-            <rect x={r.x} y={r.y - 13} width={tagW} height={12} rx={2} fill={colour} />
-            <text x={r.x + 4} y={r.y - 4} fontSize={9.5} fontFamily="IBM Plex Mono, monospace" fill="#fff">{tag}</text>
+            <rect x={r.x} y={r.y} width={r.w} height={r.h} style={paint({ fill: colour, stroke: colour })} fillOpacity={hot ? 0.22 : 0.06}
+              strokeWidth={hot ? 2.5 : STROKE_PX} strokeDasharray={c.isSource ? undefined : DASH} />
+            <rect x={r.x} y={r.y - 19} width={tagW} height={17} rx={2}
+              style={paint({ fill: ov('label-bg'), stroke: colour })} fillOpacity={0.96} strokeWidth={hot ? 1.5 : 1} />
+            <text x={r.x + 7} y={r.y - 6} fontSize={LABEL_FONT_PX} fontWeight={500}
+              style={{ ...LABEL_STYLE, ...paint({ fill: ov('label-fg') }) }}>{tag}</text>
           </g>
         );
       })}
       {dragBox && (() => {
         const r = rectOf(dragBox);
-        return <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={SOURCE} fillOpacity={0.08} stroke={SOURCE} strokeWidth={1.5} strokeDasharray="5 3" pointerEvents="none" />;
+        return <rect x={r.x} y={r.y} width={r.w} height={r.h} style={paint({ fill: ov('editing'), stroke: ov('editing') })} fillOpacity={0.08} strokeWidth={1.5} pointerEvents="none" />;
       })()}
     </svg>
   );

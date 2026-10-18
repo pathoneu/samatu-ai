@@ -11,7 +11,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test:units": "node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js"
+    "test:units": "node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js",
+    "probe:ui": "npm exec --yes --package=playwright@1.55.1 -- node scripts/ui-probe.mjs"
   },
   "dependencies": {
     "@embedpdf/core": "^2.14.4",
