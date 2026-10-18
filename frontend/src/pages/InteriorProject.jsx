@@ -1000,7 +1000,9 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       };
       updateProject(project.id, merged);
       setProject(merged);
-      toast.success(t('project.interior.toastRecomputed'));
+      // `opts.quiet`: the edit's own toast already says the quantities are being recomputed and carries its
+      // „Atšaukti" (outline saves, Pathon v3 W1-D) — a second toast on top would bury that button.
+      if (!opts?.quiet) toast.success(t('project.interior.toastRecomputed'));
       notifyCarriedOrphans(newlyCarriedOrphans(notes, project.darbu_sarasas).map((n) => n.aprasymas), t);
     } catch (e) {
       console.error('Edit cascade failed:', e);
@@ -1021,7 +1023,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       if (!e?.detail || e.detail.projectId !== project.id) return;
       const fresh = getProject(project.id);
       if (fresh?.patalpos) {
-        handleRoomsChange(fresh.patalpos, { stored: fresh });
+        handleRoomsChange(fresh.patalpos, { stored: fresh, quiet: !!e.detail.quiet });
       }
     };
     window.addEventListener('samatu:project-recompute', onRecompute);

@@ -18,6 +18,8 @@
 export const LEARNING_SOURCES = Object.freeze([
   'eilute_teisinga', 'eilute_kiekis', 'patalpa_patvirtinta', 'klausimas_tinka', 'klausimas_netinka',
   'konturas', 'simbolis', 'pokalbis_taip', 'pokalbis_ne', 'prielaidos', 'patalpa_pertvaros',
+  // written by the server when an outline save is undone („Atšaukti", Pathon v3 W1-D; api/room_outline.py)
+  'atsaukta',
 ]);
 
 /** The row's id in the app's own vocabulary: the stable hash first, then the legacy keys. */

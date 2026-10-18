@@ -6,11 +6,11 @@
 
 import { API_BASE } from './apiBase.js';
 
-async function post(projectId, roomNr, action, payload, signal) {
+async function post(projectId, roomNr, action, payload, signal, method = 'POST') {
   const res = await fetch(
     `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/rooms/${encodeURIComponent(roomNr)}/${action}`,
     {
-      method: 'POST',
+      method,
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -74,4 +74,13 @@ function holesBody(holes, holesWalls) {
  */
 export async function fetchOutlineMerge(projectId, goneNr, { page, kept_nr, polygon_pct, holes = null, holes_walls = null }, { signal } = {}) {
   return post(projectId, goneNr, 'outline-merge', { page, kept_nr, polygon_pct, ...holesBody(holes, holes_walls) }, signal);
+}
+
+/**
+ * „Atšaukti" (Pathon v3 W1-D): PUT a saving answer's `previous` back through the route that saved it
+ * (`action` = 'outline-set' | 'outline-merge' | 'split-space'). → the forward answer's shape:
+ * `{status: 'ok', rooms, kitu_angos: {}, sujungimas?, atsaukta}` — land it with roomsWithSplit (+ merge keys).
+ */
+export async function restoreOutline(projectId, roomNr, action, previous, { signal } = {}) {
+  return post(projectId, roomNr, action, { previous }, signal, 'PUT');
 }

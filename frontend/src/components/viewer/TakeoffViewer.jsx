@@ -80,6 +80,13 @@ const MEASURE_TOOLS = [
 // Empty measurement draft (shape of measureOverlayReducer's state).
 const EMPTY_DRAFT = { points: [], committed: false };
 
+// „Atšaukti" in a save's toast (Pathon v3 W1-D, D3): the host's save resolves to `{undo}`; the toast keeps the
+// button for 10 s. A save with nothing to undo gets the plain toast.
+function undoAction(saved) {
+  const undo = typeof saved?.undo === 'function' ? saved.undo : null;
+  return undo ? { duration: 10_000, action: { label: 'Atšaukti', onClick: () => { undo(); } } } : {};
+}
+
 // One-line instruction per armed tool (status bar) — the tools LOOK similar,
 // the hint says what each one is doing right now.
 // 2026-07-28 explainability pass: every draft has a „Baigti" / „Atšaukti"
@@ -641,7 +648,11 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   // zone layer and this scroller must never disagree about a room's page.
   const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
   const doneRef = useRef(null);
-  useEffect(() => { doneRef.current = null; }, [focusedRoom, focusedPage]);
+  // Re-armed when the focus moves to another ROOM or page (Pathon v3 W1-D) — not when the same room comes back
+  // as a new object: every outline save re-derives the focused room from the saved project, and the old
+  // identity rule threw the view to the page's top-left after each save.
+  const focusKey = `${focusedRoom?.nr ?? ''}|${focusedPage ?? ''}`;
+  useEffect(() => { doneRef.current = null; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || !scrollApi?.scrollToPage) return;
     if (doneRef.current === targetPage) return; // one jump per target — never re-yank
@@ -666,7 +677,7 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   // user who scrolls anywhere during that first second has left page 1, so this
   // can never fight him (founder bug 2026-07-25 "scrolls by itself").
   const retriesRef = useRef(0);
-  useEffect(() => { retriesRef.current = 0; }, [focusedRoom, focusedPage]);
+  useEffect(() => { retriesRef.current = 0; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || targetPage <= 1 || !scrollApi?.scrollToPage) return;
     if (retriesRef.current >= 8) return;
@@ -894,8 +905,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (outlineInvalid) { toast.error('Kontūras kertasi pats su savimi — pataisykite viršūnes prieš išsaugant'); return; }
     setOutlineSaving(true);
     try {
-      await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points, outlineEdit.holes);
-      toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`);
+      const saved = await onRoomOutlineEdit(outlineEdit.nr, outlineEdit.page, outlineEdit.points, outlineEdit.holes);
+      // „Atšaukti" for 10 s (Pathon v3 W1-D): the host PUTs the room's previous geometry back.
+      toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`, undoAction(saved));
       setOutlineEdit(null);
     } catch (e) {
       toast.error(e?.userMessage || e?.message || 'Nepavyko išsaugoti kontūro');
@@ -1315,12 +1327,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         sensitivity: 0.7,
         pdfBlob,
       });
-      onRoomPolygonFill?.(fillFor, data);
+      const saved = onRoomPolygonFill?.(fillFor, data);
       // The AREA stays table-read (eksplikacija beats a traced polygon for
       // accuracy) — say so, or redrawing "because the area looked wrong"
       // reads as a silent no-op. (final-regression finding 2, 2026-07-28)
       toast.success(`Patalpos ${fillFor} kontūras pažymėtas`, {
         description: 'Plotas ir kiekiai lieka iš eksplikacijos — kontūro pataisymas naudojamas žymėjimui ir tikslumo mokymui.',
+        ...undoAction(saved),
       });
       setFillFor(null);
     } catch (e) {
