@@ -32,9 +32,12 @@ without the label returns `defined=False`.
 from __future__ import annotations
 
 import collections
+import hashlib
 import io
 import math
 import re
+import threading
+import time
 
 # a legend LABEL in the nominative — the same rule symbol_legend.py uses to tell a legend row from prose
 DIFFUSER_LABEL_RE = re.compile(r"(?<!\w)dif[uū]zori(?:us|ai)(?!\w)", re.IGNORECASE)
@@ -389,3 +392,422 @@ def scan_vector_symbols(pdf_bytes: bytes) -> dict:
     else:
         dif["sakinys"] = "Difuzorių ženklo legendoje neradau — iš brėžinio kelių nesuskaičiuota."
     return {"difuzoriai": dif}
+
+
+# ── generalised: any coloured legend glyph, every sheet, instances with boxes (Pathon v3, W2-A A2) ──────────
+#
+# `count_legend_symbols` above stays the diffusers' entry (a label regex, the first 4 sheets that carry the
+# label, point instances) — the free re-read and the paid pass read it, its numbers do not move. The entry
+# below takes the TEMPLATE from a legend row instead (extractor/legend_rows.py: a glyph box on a sheet), so any
+# coloured symbol a legend explains can be counted, on every sheet, with each instance's box:
+#   * the glyphs inside the row's glyph box are the template — the largest is the anchor, the rest its parts,
+#     a second symbol on the row a second anchor (objektas_d), exactly the rules above;
+#   * a sheet is read only when PDFium sees a path painted in one of the template's colours on it (a cheap
+#     pass — pdfplumber's full read of a heavy sheet costs seconds, PDFium's look at its paths a tenth of one);
+#   * a sheet whose reader frame disagrees with the page as displayed (sheet_zones.display_frame) is not used
+#     and said so — the counter never places a mark where nothing is;
+#   * no instance inside a legend, a table or the title block (sheet_zones zones, `zone_at`), inside the
+#     template's own glyph or legend box, or with the row's first word right beside it (the same legend
+#     printed on another sheet);
+#   * a sheet whose instances stand where an earlier sheet's do repeats that plan (`kartojasi`) and adds
+#     nothing — the rule above;
+#   * a time budget: what is not read in time is listed, and the answer says it is partial.
+
+GLYPH_CACHE_MAX = 48
+TIME_BUDGET_S = 40.0
+_COLOUR_TOL = 4                 # 0–255 — pdfplumber rounds colours to two decimals
+_BOX_PAD_PT = 1.5
+ZONE_KINDS_WITHOUT_MARKS = ("legenda", "lentele", "antspaudas")
+_COPY_GAP_PT = 30.0             # a legend copy's first word starts this close right of its glyph
+_glyph_cache: "collections.OrderedDict[tuple, dict]" = collections.OrderedDict()
+_glyph_lock = threading.Lock()
+
+
+def clear_glyph_cache() -> None:
+    """Drop the per-sheet glyph cache (tests)."""
+    with _glyph_lock:
+        _glyph_cache.clear()
+
+
+def _page_glyphs(pdf, digest: bytes, pg: int) -> dict:
+    """{W, H, ox, oy, glyphs} of a 1-based page through pdfplumber — cached per PDF digest and page."""
+    key = (digest, pg)
+    with _glyph_lock:
+        hit = _glyph_cache.get(key)
+        if hit is not None:
+            _glyph_cache.move_to_end(key)
+            return hit
+    page = pdf.pages[pg - 1]
+    x0, top, _x1, _bottom = (float(v) for v in page.bbox)
+    res = {"W": float(page.width), "H": float(page.height), "ox": x0, "oy": top, "glyphs": _glyphs(page)}
+    with _glyph_lock:
+        _glyph_cache[key] = res
+        _glyph_cache.move_to_end(key)
+        while len(_glyph_cache) > GLYPH_CACHE_MAX:
+            _glyph_cache.popitem(last=False)
+    return res
+
+
+def _rgb255(col: tuple) -> tuple[int, ...] | None:
+    if len(col) != 3 or not all(isinstance(v, (int, float)) for v in col):
+        return None
+    return tuple(int(round(float(v) * 255)) for v in col)
+
+
+def _colour_pages(pdf_bytes: bytes, classes: list[tuple[tuple, float]], pages: list[int]) -> list[int] | None:
+    """The pages (of `pages`) on which PDFium sees a path painted in one of the template classes' colours and
+    of about its size — `classes` = [(pdfplumber colour tuple, the anchor's longest side in pt)]; a wall or a
+    dimension line drawn in the same colour does not make a sheet worth reading. None when a colour is not
+    plain RGB, or PDFium cannot read the file — then every page is read."""
+    want = [(_rgb255(c), float(size)) for c, size in classes]
+    if not want or any(w is None for w, _ in want):
+        return None
+    from .pdfium_guard import PDFIUM_LOCK
+    try:
+        import ctypes
+
+        import pypdfium2 as pdfium
+        import pypdfium2.raw as C
+    except ImportError:
+        return None
+
+    def near(rgb, long: float) -> bool:
+        # a symbol's parts are at most its size (a ring's petal is smaller); a form scaled in its container is
+        # rare enough that the size window stays wide
+        return any(all(abs(a - b) <= _COLOUR_TOL for a, b in zip(rgb, w)) and 0.15 * size <= long <= 1.6 * size + 1.0
+                   for w, size in want)
+    out: list[int] = []
+    with PDFIUM_LOCK:
+        try:
+            doc = pdfium.PdfDocument(pdf_bytes)
+        except Exception:  # noqa: BLE001
+            return None
+        try:
+            r, g, b, a = (ctypes.c_uint() for _ in range(4))
+            fillmode, stroke_on = ctypes.c_int(), ctypes.c_int()
+            for pg in pages:
+                if not (1 <= pg <= len(doc)):
+                    continue
+                page = doc[pg - 1]
+                try:
+                    for obj in page.get_objects(max_depth=4):
+                        if obj.type != C.FPDF_PAGEOBJ_PATH:
+                            continue
+                        h = obj.raw
+                        if not C.FPDFPath_GetDrawMode(h, fillmode, stroke_on):
+                            continue
+                        try:
+                            left, bottom, right, top = obj.get_bounds()
+                        except Exception:  # noqa: BLE001
+                            continue
+                        long = max(right - left, top - bottom)
+                        if ((fillmode.value and C.FPDFPageObj_GetFillColor(h, r, g, b, a) and near((r.value, g.value, b.value), long))
+                                or (stroke_on.value and C.FPDFPageObj_GetStrokeColor(h, r, g, b, a)
+                                    and near((r.value, g.value, b.value), long))):
+                            out.append(pg)
+                            break
+                finally:
+                    page.close()
+        except Exception:  # noqa: BLE001
+            return None
+        finally:
+            doc.close()
+    return out
+
+
+def _templates_in_box(glyphs: list[dict], box: tuple) -> list[dict]:
+    """The symbols inside a legend row's glyph box (pdfplumber points): anchors with their parts."""
+    x0, y0, x1, y1 = box
+    pool = [g for g in glyphs if x0 - _BOX_PAD_PT <= g["cx"] <= x1 + _BOX_PAD_PT and y0 - _BOX_PAD_PT <= g["cy"] <= y1 + _BOX_PAD_PT]
+    return [{"anchor": a, "radius": _radius(a), "parts": [g for g in pool if _is_part(a, g)]} for a in _row_anchors(list(pool))]
+
+
+def _instance_box(g: dict, template: dict, glyphs: list[dict]) -> tuple[float, float, float, float]:
+    """An instance's box: its anchor glyph and the parts of the template's classes around it."""
+    x0, y0 = g["cx"] - g["w"] / 2, g["cy"] - g["h"] / 2
+    x1, y1 = g["cx"] + g["w"] / 2, g["cy"] + g["h"] / 2
+    for o in glyphs:
+        if o is g or not _is_part(g, o) or not any(_same_class(p, o) for p in template["parts"]):
+            continue
+        x0, y0 = min(x0, o["cx"] - o["w"] / 2), min(y0, o["cy"] - o["h"] / 2)
+        x1, y1 = max(x1, o["cx"] + o["w"] / 2), max(y1, o["cy"] + o["h"] / 2)
+    return x0, y0, x1, y1
+
+
+def _first_word(text: str | None) -> str | None:
+    from .sheet_zones import fold
+    words = fold(text or "").split()
+    return words[0] if words and len(words[0]) >= 3 else None
+
+
+def _legend_copy(box: tuple, words: list[dict], first: str) -> bool:
+    """The same legend row printed on another sheet: the row's first word starts right of the glyph."""
+    from .sheet_zones import fold
+    cy = (box[1] + box[3]) / 2
+    return any(abs((w["top"] + w["bottom"]) / 2 - cy) <= 4.0 and 0 <= w["x0"] - box[2] <= _COPY_GAP_PT
+               and fold(w["text"]).startswith(first) for w in words)
+
+
+def _answer(t: dict) -> dict:
+    return {"row_id": t.get("row_id"), "status": "ok", "defined": False, "count": 0, "anchors": 0, "parts": 0,
+            "per_page": [], "instances": [], "kiti": [], "fallback": False, "legend_copies": 0, "partial": False,
+            "pages_not_read": [],
+            "pages_skipped": [], "detail": None}
+
+
+def count_glyph_instances_many(pdf_bytes: bytes, templates: list[dict], pages: list[int] | None = None, *,
+                               zones: bool = True, exclude: dict | None = None, other_sheets: bool = False,
+                               time_budget_s: float | None = None) -> list[dict]:
+    """Count several legend rows at once (each sheet read once). `templates`: [{page, glyph_bbox_pct, text?,
+    legend_bbox_pct?, row_id?}] — boxes in DISPLAY fractions (legend_rows). `pages`: 1-based sheets to count
+    on (default: every sheet). `zones`: drop instances in a legend / table / title-block zone (sheet_zones);
+    `exclude`: {page: [bbox_pct, …]} more boxes to drop; `other_sheets`: also read the sheets that do not carry
+    the row's legend text (their instances go to `kiti`, not into the count). One answer per template:
+    {row_id, status: ok|nera_zenklo|no_page|failed, defined, count, anchors, parts,
+     per_page: [{page, count, kartojasi, legenda_lape}], instances: [{page, box_pct, x_pct, y_pct}] (DISPLAY
+     fractions; a repeated sheet's are not listed), kiti: [instance] (sheets without the legend, not counted),
+     legend_copies, partial, pages_not_read, pages_skipped: [{page, reason}], detail}. `nera_zenklo`: the row's
+     glyph is no coloured path — the shape search counts it. Never raises."""
+    answers = [_answer(t) for t in templates]
+    if not templates:
+        return answers
+    budget = TIME_BUDGET_S if time_budget_s is None else float(time_budget_s)
+    try:
+        return _count_many(pdf_bytes, templates, pages, zones, exclude or {}, other_sheets, budget,
+                           time.monotonic(), answers)
+    except Exception:  # noqa: BLE001 — a count never sinks its caller
+        import logging
+        logging.getLogger("samatu.vector_symbols").warning("glyph count failed", exc_info=True)
+        for a in answers:
+            a.update(status="failed", detail="ženklų suskaičiuoti nepavyko", instances=[], count=0)
+        return answers
+
+
+def _count_many(pdf_bytes, templates, pages, zones, exclude, other_sheets, budget, started, answers) -> list[dict]:
+    import pdfplumber
+
+    from .sheet_zones import REREAD_TABLE_MAX_OBJECTS, display_frame, read_zones, zone_at
+    digest = hashlib.blake2b(pdf_bytes, digest_size=16).digest()
+    frames: dict[int, tuple | None] = {}
+    zone_cache: dict[int, list] = {}
+
+    def frame_ok(pg: int, info: dict) -> bool:
+        if pg not in frames:
+            frames[pg] = display_frame(pdf_bytes, pg)
+        f = frames[pg]
+        return bool(f) and abs(info["W"] - f[0]) <= 1.0 and abs(info["H"] - f[1]) <= 1.0
+
+    def page_zones(pg: int) -> list:
+        if pg not in zone_cache:
+            zone_cache[pg] = read_zones(pdf_bytes, pg, table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
+        return zone_cache[pg]
+
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        n_pages = len(pdf.pages)                # not pdf_page_cache.page_count: that reads every sheet's text
+        wanted = sorted({int(p) for p in (pages or range(1, n_pages + 1)) if 1 <= int(p) <= n_pages})
+        # 1. the templates, each from its row's own sheet
+        groups: list[list[dict] | None] = []
+        for t, ans in zip(templates, answers):
+            pg = int(t.get("page") or 0)
+            if not 1 <= pg <= n_pages:
+                ans.update(status="no_page", detail="tokio lapo brėžinyje nėra")
+                groups.append(None)
+                continue
+            info = _page_glyphs(pdf, digest, pg)
+            if not frame_ok(pg, info):
+                ans.update(status="nera_zenklo", detail="lapo rėmas nesutampa su lapo pasukimu — ženklas imamas pagal formą")
+                groups.append(None)
+                continue
+            gx0, gy0, gx1, gy1 = (float(v) for v in t["glyph_bbox_pct"])
+            box = (info["ox"] + gx0 * info["W"], info["oy"] + gy0 * info["H"],
+                   info["ox"] + gx1 * info["W"], info["oy"] + gy1 * info["H"])
+            tpls = _templates_in_box(info["glyphs"], box)
+            if not tpls:
+                ans.update(status="nera_zenklo", detail="legendos ženklas nespalvotas — skaičiuojama pagal jo formą")
+                groups.append(None)
+                continue
+            ans.update(defined=True, anchors=len(tpls), parts=sum(len(x["parts"]) for x in tpls))
+            groups.append(tpls)
+        live = [i for i, g in enumerate(groups) if g]
+        if not live:
+            return answers
+        # 2. which sheets carry one of the colours at all (cheap), and which of those carry the row's own legend
+        # text (PDFium's text, cheap): a legend explains the sheet it stands on. objektas_b p10, a sheet with no
+        # ventilation legend, draws red circles of the extract diffuser's size for something else — counted
+        # there they would be 3 diffusers too many. Sheets without the legend are read only when asked
+        # (`other_sheets`) or when the legend's sheets hold no instance (a legend printed on a sheet of its own).
+        classes = sorted({(tp["anchor"]["col"], round(tp["anchor"]["long"], 1)) for i in live for tp in groups[i]}, key=str)
+        coloured = _colour_pages(pdf_bytes, classes, wanted)
+        own_pages = {int(templates[i]["page"]) for i in live} & set(wanted)
+        candidates = wanted if coloured is None else sorted(set(coloured) | own_pages)
+        texts = _folded_texts(pdf_bytes, digest, candidates)
+        keys = {i: _row_key(templates[i].get("text")) for i in live}
+
+        def legend_sheet(i: int, pg: int) -> bool:
+            return keys[i] is None or keys[i] in texts.get(pg, "")
+        own = {int(templates[i]["page"]) for i in live}
+        first = [p for p in candidates if any(legend_sheet(i, p) for i in live)]
+        first = [p for p in first if p in own] + [p for p in first if p not in own]
+        rest = [p for p in candidates if p not in first]
+        counted: dict[int, list[dict]] = {i: [] for i in live}
+        others: dict[int, list[dict]] = {i: [] for i in live}
+
+        def read(seq: list[int]) -> None:
+            for k, pg in enumerate(seq):
+                if time.monotonic() - started > budget:
+                    for i in live:
+                        answers[i]["partial"] = True
+                        answers[i]["pages_not_read"] = sorted(set(answers[i]["pages_not_read"]) | set(seq[k:]))
+                    return
+                info = _page_glyphs(pdf, digest, pg)
+                if not frame_ok(pg, info):
+                    for i in live:
+                        answers[i]["pages_skipped"].append({"page": pg, "reason": "lapo rėmas nesutampa su lapo pasukimu — lapas neskaičiuotas"})
+                    continue
+                words = None
+                for i in live:
+                    found, copies, words = _instances_on(pdf, pg, info, templates[i], groups[i], exclude, zones,
+                                                         page_zones, words, zone_at)
+                    answers[i]["legend_copies"] += copies
+                    if not found:
+                        continue
+                    if legend_sheet(i, pg):
+                        repeats = _repeats_earlier(found, counted[i])
+                        answers[i]["per_page"].append({"page": pg, "count": len(found), "kartojasi": repeats,
+                                                       "legenda_lape": True})
+                        if not repeats:
+                            counted[i].extend(found)
+                    else:
+                        others[i].append({"page": pg, "found": found})
+                pdf.pages[pg - 1].close()               # its glyphs are cached; free the layout of a heavy sheet
+
+        read(first)
+        if rest and (other_sheets or any(not counted[i] for i in live)):
+            read(rest)
+        for i in live:
+            a = answers[i]
+            fallback = not counted[i] and bool(others[i])
+            for o in others[i]:
+                repeats = _repeats_earlier(o["found"], counted[i]) if fallback else False
+                a["per_page"].append({"page": o["page"], "count": len(o["found"]), "kartojasi": repeats,
+                                      "legenda_lape": False})
+                if fallback and not repeats:
+                    counted[i].extend(o["found"])
+                elif not fallback:
+                    a["kiti"].extend(o["found"])
+            a["per_page"].sort(key=lambda r: r["page"])
+            a["fallback"] = fallback
+            a["instances"] = counted[i]
+            a["count"] = len(counted[i])
+            notes = []
+            if fallback:
+                notes.append("legendos eilutė stovi kitame lape nei ženklai — suskaičiuota visuose lapuose")
+            if a["kiti"]:
+                pages_k = sorted({x["page"] for x in a["kiti"]})
+                notes.append(f"panašių ženklų yra ir lapuose be šios legendos ({', '.join(map(str, pages_k))}) — "
+                             f"jie neįskaičiuoti; patikrinkite, ar tai tas pats ženklas")
+            if a["partial"]:
+                notes.append("ne visi lapai perskaityti per skirtą laiką — suskaičiuota tik dalis")
+            a["detail"] = "; ".join(notes) or None
+    return answers
+
+
+def _instances_on(pdf, pg, info, t, tpls, exclude, zones, page_zones, words, zone_at):
+    """(instances, legend copies dropped, words) of one template on one read sheet."""
+    glyphs = info["glyphs"]
+    W, H, ox, oy = info["W"], info["H"], info["ox"], info["oy"]
+    drop = [tuple(float(v) for v in b) for b in (exclude.get(pg) or exclude.get(str(pg)) or [])]
+    if int(t["page"]) == pg:
+        drop.append(tuple(float(v) for v in t["glyph_bbox_pct"]))
+        if t.get("legend_bbox_pct"):
+            drop.append(tuple(float(v) for v in t["legend_bbox_pct"]))
+    first = _first_word(t.get("text"))
+    found: list[dict] = []
+    copies = 0
+    for tp in tpls:
+        for g in _count_instances(tp, glyphs, (0.0, 0.0, -1.0, -1.0)):
+            cx, cy = (g["cx"] - ox) / W, (g["cy"] - oy) / H
+            if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in drop):
+                continue
+            if zones:
+                z = zone_at(page_zones(pg), cx, cy)
+                if z is not None and z.get("kind") in ZONE_KINDS_WITHOUT_MARKS:
+                    continue
+            bx = _instance_box(g, tp, glyphs)
+            if first:
+                if words is None:
+                    words = pdf.pages[pg - 1].extract_words()
+                if _legend_copy(bx, words, first):
+                    copies += 1
+                    continue
+            found.append({"page": pg, "box_pct": [round(min(max(v, 0.0), 1.0), 5) for v in
+                                                  ((bx[0] - ox) / W, (bx[1] - oy) / H, (bx[2] - ox) / W, (bx[3] - oy) / H)],
+                          "x_pct": round(cx, 4), "y_pct": round(cy, 4)})
+    return found, copies, words
+
+
+_text_cache: "collections.OrderedDict[tuple, str]" = collections.OrderedDict()
+
+
+def _folded_texts(pdf_bytes: bytes, digest: bytes, pages: list[int]) -> dict[int, str]:
+    """{page: its text, folded} through PDFium's text page (cheap — no layout), cached per PDF and page."""
+    from .pdfium_guard import PDFIUM_LOCK
+    from .sheet_zones import fold
+    out: dict[int, str] = {}
+    missing = []
+    with _glyph_lock:
+        for pg in pages:
+            hit = _text_cache.get((digest, pg))
+            if hit is None:
+                missing.append(pg)
+            else:
+                out[pg] = hit
+    if not missing:
+        return out
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        return out
+    with PDFIUM_LOCK:
+        try:
+            doc = pdfium.PdfDocument(pdf_bytes)
+        except Exception:  # noqa: BLE001
+            return out
+        try:
+            for pg in missing:
+                if not (1 <= pg <= len(doc)):
+                    continue
+                page = doc[pg - 1]
+                try:
+                    tp = page.get_textpage()
+                    try:
+                        out[pg] = fold(tp.get_text_range())
+                    finally:
+                        tp.close()
+                except Exception:  # noqa: BLE001
+                    out[pg] = ""
+                finally:
+                    page.close()
+        finally:
+            doc.close()
+    with _glyph_lock:
+        for pg in missing:
+            if pg in out:
+                _text_cache[(digest, pg)] = out[pg]
+        while len(_text_cache) > 4 * GLYPH_CACHE_MAX:
+            _text_cache.popitem(last=False)
+    return out
+
+
+def _row_key(text: str | None) -> str | None:
+    """The first three words of a legend row's text, folded — what the row's sheets carry."""
+    from .sheet_zones import fold
+    words = [w for w in fold(text or "").split() if any(ch.isalpha() for ch in w)]
+    if not words or len("".join(words[:3])) < 4:
+        return None
+    return " ".join(words[:3])
+
+
+def count_glyph_instances(pdf_bytes: bytes, template_glyph: dict, pages: list[int] | None = None, **kw) -> dict:
+    """One legend row's glyph counted on every sheet — see `count_glyph_instances_many`."""
+    return count_glyph_instances_many(pdf_bytes, [template_glyph], pages, **kw)[0]
