@@ -214,6 +214,23 @@ test.describe('click model and chrome', () => {
     await shot(page, 'w1b-selection-bar');
   });
 
+  test('Shift+click picks the second room; M proposes the merge with it at once; Esc leaves without saving', async ({ page }) => {
+    await openProject(page);
+    const [in04, in05] = await sheetPoints(page, 1, [[0.5715, 0.5435], [0.80, 0.62]]);
+    await clickAt(page, in04);
+    await page.keyboard.down('Shift');
+    await clickAt(page, in05);
+    await page.keyboard.up('Shift');
+    const bar = page.getByTestId('selection-bar');
+    await expect(bar).toContainText('04 + 05');
+    await page.keyboard.press('m');
+    const panel = page.getByTestId('outline-tool-panel');
+    await expect(panel).toContainText('04 + 05 → 60,31 m² · lentelėje 26,31 + 35,50 = 61,81 m²');
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    note('Shift+click 05, M → 04 + 05 proposed without a click on 05');
+  });
+
   test('the cursor hint follows the pointer and changes per mode', async ({ page }) => {
     await openProject(page);
     const c = await box(page.getByTestId('viewer-canvas'));
