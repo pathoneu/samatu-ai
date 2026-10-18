@@ -10,34 +10,18 @@
  *  - „Atimti" on 06 → „Atšaukti" → the hole is gone;
  *  - the scale chip: „1:115 · spėjamas" → one click „Patvirtinti" → „patvirtintas"; „Kalibruoti" arms the tool.
  *
- * WRITES to the project (outline saves, merges, a confirmed scale): run it against a COPY of the database (a
- * worktree's backend/data). It starts from the stored version that is the founder guide's start state (04 not
- * merged, no scale confirmed — the same rule W0-A's global setup uses) and restores that version again at the
- * end. Relative URLs: the suite's `baseURL` (e.g. http://localhost:5206), backend with auth off.
+ * WRITES to the project (outline saves, merges, a confirmed scale) — part of `npm run test:e2e`: every test
+ * starts from the guide's start state (04 not merged, no scale confirmed) and the suite's teardown puts the
+ * pristine database back. Other ports: E2E_BASE_URL / E2E_API_URL (W1-D: 5206 / 8126); backend with auth off.
  */
-import { test, expect } from '@playwright/test';
+// Runs under the founder-guide suite's runner (npm run test:e2e): Playwright is resolved by ./pw.js, and the
+// suite's global setup derives the guide's start state (.state/start.db) that every test here restores first
+// (W0-A helpers: a SQLite-backup restore, proven through the API; the fixture waits for this test's writes).
+import { expect } from './pw.js';
+import { PROJECT, api } from './state.js';
+import { it, restoreStart } from './helpers.js';
 
-const PROJECT = process.env.PATHON_E2E_PROJECT || 'demo-objektas_h';
-
-const isStart = (p) => {
-  const rooms = Object.fromEntries((p.patalpos || []).map((r) => [String(r.nr), r]));
-  const confirmed = Object.values(p.pageScalesDurable || {}).filter((s) => s && s.confirmed).length;
-  return rooms['04']?.plotas_m2 === 26.31 && !rooms['05']?._sujungta_i && confirmed === 0;
-};
-
-/** Restore the newest stored version that is the guide's start state; → its id. */
-async function restoreStart(request) {
-  const { versions } = await (await request.get(`/api/projects/${PROJECT}/versions`)).json();
-  for (const v of versions) {
-    const full = await (await request.get(`/api/projects/${PROJECT}/versions/${v.id}`)).json();
-    if (isStart(full.data || {})) {
-      const res = await request.post(`/api/projects/${PROJECT}/versions/${v.id}/restore`);
-      expect(res.ok()).toBeTruthy();
-      return v.id;
-    }
-  }
-  throw new Error(`no stored version of ${PROJECT} is the start state (04 = 26,31 m², 05 not merged, no confirmed scale)`);
-}
+const test = it;
 
 async function openProject(page) {
   await page.addInitScript(() => {
@@ -83,11 +67,8 @@ const roomsInBrowser = (page) => page.evaluate((id) => {
 const zoneLabels = (page) => page.locator('[data-room-zone-layer] text').evaluateAll((els) => els.map((e) => e.textContent));
 const toast = (page, text) => page.locator('[data-sonner-toast]').filter({ hasText: text });
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('room click, room tool, Undo, scale chip', () => {
-  test.beforeAll(async ({ request }) => { await restoreStart(request); });
-  test.afterAll(async ({ request }) => { await restoreStart(request); });
+  test.beforeEach(async () => { await restoreStart(); });
 
   test('a click on a room selects it, Shift+click adds one, empty paper clears', async ({ page }) => {
     await openProject(page);
@@ -151,7 +132,7 @@ test.describe('room click, room tool, Undo, scale chip', () => {
     await expect(page.locator('[data-coach="room"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('Sujungti 04 + 05, then Atšaukti: 04 back to 26,31 m², 05 its own room, journal rows „atsaukta"', async ({ page, request }) => {
+  test('Sujungti 04 + 05, then Atšaukti: 04 back to 26,31 m², 05 its own room, journal rows „atsaukta"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, 0.56);
     await clickSheet(page, 0.5715, 0.5435);
@@ -170,7 +151,7 @@ test.describe('room click, room tool, Undo, scale chip', () => {
     const rooms = await roomsInBrowser(page);
     expect(rooms['05']._sujungta_i ?? null).toBe(null);
     expect(rooms['05'].polygon_pct?.length).toBeGreaterThan(2);
-    const journal = await (await request.get(`/api/projects/${PROJECT}/corrections`)).json();
+    const journal = await api(`/api/projects/${PROJECT}/corrections`);
     const rows = (journal.corrections || journal.items || journal).filter((c) => c.source === 'atsaukta');
     expect(rows.map((c) => c.room_nr)).toEqual(expect.arrayContaining(['04', '05']));
   });

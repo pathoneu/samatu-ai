@@ -945,7 +945,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // ---- The room tool R (Pathon v3 W1-D, D2) -------------------------------
   // Armed as the measure tool 'room' (one pointer owner at a time, the same Esc and tool switching); its
   // state, the requests and the save live in useRoomTool, the host (InteriorWorkspace) does the network.
-  const roomToolArmed = measureTool === 'room' && !check;
+  const roomToolArmed = measureTool === 'room' && !check && Boolean(onRoomToolPreview && onRoomToolCommit);
   const roomTool = useRoomTool({
     active: roomToolArmed,
     rooms,
