@@ -64,8 +64,8 @@ export default function OutlineToolPanel({
   const Icon = ICON[tool.mode];
   const room = byNr.get(tool.nr);
   const name = room?.pavadinimas ? ` ${room.pavadinimas}` : '';
-  const btn = 'inline-flex items-center gap-1 px-2 py-1 rounded-[2px] border border-border text-[12px] hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent';
-  const primary = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-[12px] hover:bg-primary/90 disabled:opacity-50';
+  const btn = 'inline-flex items-center gap-1 px-2 py-1 rounded-[2px] border border-border text-meta hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent';
+  const primary = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-meta hover:bg-primary/90 disabled:opacity-50';
 
   let body = null;
   if (tool.mode === 'split') {
@@ -93,7 +93,7 @@ export default function OutlineToolPanel({
             <select
               value={tool.otherNr || ''}
               onChange={(e) => onChange((cur) => ({ ...cur, otherNr: e.target.value }))}
-              className="h-7 px-1.5 rounded-[2px] border border-input bg-background text-[12px] max-w-[260px]"
+              className="h-7 px-1.5 rounded-[2px] border border-input bg-background text-meta max-w-[260px]"
               data-testid="split-other-room"
               aria-label="Kam priskirti kitą dalį"
             >
@@ -185,7 +185,7 @@ export default function OutlineToolPanel({
                 <label className="inline-flex items-center gap-1">
                   <span className="text-muted-foreground">Kas atimama?</span>
                   <select
-                    className="h-6 rounded-[2px] border border-border bg-card px-1 text-[12px]"
+                    className="h-6 rounded-[2px] border border-border bg-card px-1 text-meta"
                     value={holeHasWalls(h, tool.holeWalls) ? 'sienos' : 'be'}
                     onChange={(e) => answer(h, e.target.value === 'sienos')}
                     aria-label={`Kas atimama: ${i + 1} išpjova`}
@@ -218,7 +218,7 @@ export default function OutlineToolPanel({
 
   return (
     <div
-      className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(560px,calc(100%-16px))] rounded-[2px] border border-border bg-card text-[12px] text-foreground shadow-md"
+      className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-[min(560px,calc(100%-16px))] rounded-[2px] border border-border bg-card text-meta text-foreground shadow-md"
       data-testid="outline-tool-panel"
       data-mode={tool.mode}
     >

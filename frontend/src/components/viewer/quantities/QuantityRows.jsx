@@ -10,9 +10,9 @@ import { ltNumber, ltQuantity } from '@/lib/ledger';
 import { cleanUserText } from '@/lib/userText';
 
 const SOURCE_CLASS = {
-  user: 'text-primary border-primary/40',
-  walls: 'text-foreground/80 border-border',
-  approx: 'text-amber-700 border-amber-500/40',
+  user: 'text-foreground border-[hsl(var(--ov-read))]',
+  walls: 'text-foreground border-[hsl(var(--ov-read))]',
+  approx: 'text-foreground border-dashed border-[hsl(var(--ov-estimated))]',
   marker: 'text-muted-foreground border-border',
   none: 'text-muted-foreground border-border',
 };
@@ -46,7 +46,7 @@ export function SectionRow({ section, collapsed, active, onToggle }) {
         ? <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
         : <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />}
       <span className="skyrius-header truncate">{section.label}</span>
-      <span className="ml-auto mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
+      <span className="ml-auto mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
         {section.families.length}
       </span>
     </button>
@@ -73,9 +73,9 @@ export function FamilyRow({ family, expanded, active, containsFocused, onToggle,
         : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
       <span className={`dot ${dot}`} title={confTitle} aria-label={confTitle} />
       <span className="text-foreground/90 truncate" title={family.label}>{family.label}</span>
-      <span className="mono tabular whitespace-nowrap text-foreground" style={{ fontSize: 11 }}>
+      <span className="mono tabular whitespace-nowrap text-foreground" style={{ fontSize: 12 }}>
         {family.overridden && (
-          <span className="mr-1 rounded border border-primary/40 px-1 text-primary" style={{ fontSize: 9, lineHeight: '14px' }} title="Kiekį įrašėte ranka">
+          <span className="mr-1 rounded border border-primary/40 px-1 text-primary" style={{ fontSize: 12, lineHeight: '14px' }} title="Kiekį įrašėte ranka">
             ranka
           </span>
         )}
@@ -101,25 +101,25 @@ export function RoomRow({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={`grid items-center cursor-pointer border-b border-border/40 hover:bg-muted/50 transition-colors ${room.hidden ? 'opacity-50' : ''} ${rowStateClass({ active, focused })}`}
-      style={{ gridTemplateColumns: '22px 1fr auto auto 18px', gap: 6, padding: '4px 10px 4px 34px', fontSize: 11.5 }}
+      style={{ gridTemplateColumns: '22px 1fr auto auto 18px', gap: 6, padding: '4px 10px 4px 34px', fontSize: 12 }}
       title={[
         room.includedBecause ? cleanUserText(room.includedBecause) : null,
         room.page ? `Lapas ${room.page} — spustelėkite, kad parodytų brėžinyje` : 'Spustelėkite, kad parodytų brėžinyje',
       ].filter(Boolean).join(' · ')}
     >
-      <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>{room.nr}</span>
+      <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>{room.nr}</span>
       <span className="text-foreground/85 truncate">{room.name}</span>
       <span
         className={`rounded border px-1 whitespace-nowrap ${SOURCE_CLASS[sourceKind] || SOURCE_CLASS.none}`}
-        style={{ fontSize: 9, lineHeight: '14px' }}
+        style={{ fontSize: 12, lineHeight: '14px' }}
         title={SOURCE_TITLE[sourceKind]}
       >
         {room.source.label}
       </span>
-      <span className="mono tabular whitespace-nowrap text-foreground/90" style={{ fontSize: 11 }}>
+      <span className="mono tabular whitespace-nowrap text-foreground/90" style={{ fontSize: 12 }}>
         {ltQuantity(room.value, room.unit)}
         {share != null && (
-          <span className="text-muted-foreground ml-1" style={{ fontSize: 9 }}>{share} %</span>
+          <span className="text-muted-foreground ml-1" style={{ fontSize: 12 }}>{share} %</span>
         )}
       </span>
       <button
@@ -146,7 +146,7 @@ export function RoomRow({
 export function FamilyFooter({ family, onOpenAssumptions }) {
   const noRooms = family.rooms.length === 0;
   return (
-    <div className="border-b border-border/50 bg-muted/20 text-muted-foreground" style={{ padding: '5px 10px 6px 34px', fontSize: 10.5, lineHeight: '15px' }}>
+    <div className="border-b border-border/50 bg-muted/20 text-muted-foreground" style={{ padding: '5px 10px 6px 34px', fontSize: 12, lineHeight: '15px' }}>
       {family.rollUpAuthoritative && (
         <p className="text-foreground/80">
           <Info className="inline w-3 h-3 mr-1 -mt-0.5" />
@@ -202,7 +202,7 @@ export function TotalsFooter({ totals, shown, all }) {
   return (
     <div
       className="shrink-0 border-t border-border bg-card px-2.5 py-1.5 text-muted-foreground"
-      style={{ fontSize: 10.5 }}
+      style={{ fontSize: 12 }}
       title="Rodomų eilučių kiekių suma pagal mato vienetą. Skirtingi darbai su tuo pačiu vienetu sudedami — tai apžvalga, ne viena sąmatos eilutė."
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">

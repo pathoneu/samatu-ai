@@ -8,6 +8,8 @@
  * (api/free_reread.py, lib/freeReread.js). It is an OFFER, never automatic: a
  * re-read moves quantities, and that is an event he has to see. What changed
  * is then shown by RereadDiffBanner / RereadRoomNote, as after any re-read.
+ *
+ * v3 W1-C: drawn by the one Notice (info tone) like every other notice of the workspace.
  */
 
 import { useEffect, useState } from 'react';
@@ -15,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, ScanLine, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import Notice from '@/components/ui/Notice';
 import { fetchFreeRereadStatus, runFreeReread } from '@/lib/freeRereadApi';
 import { freeRereadDoneText, freeRereadState } from '@/lib/freeReread';
 import { flushProjectSaves, getProject, updateProject } from '@/lib/projectStore';
@@ -46,9 +49,9 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
     // run added, which read „0" for walls an earlier read had already taken from the dimensions; only the parts
     // with something in them are said (freeRereadDoneText)
     return (
-      <div className={`rounded-[2px] border border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.06)] px-3 py-2 text-[14px] ${className}`} role="status" data-testid="free-reread-done">
-        {freeRereadDoneText(done, t)}
-      </div>
+      <Notice tone="info" icon={ScanLine} className={className} data-testid="free-reread-done">
+        <p>{freeRereadDoneText(done, t)}</p>
+      </Notice>
     );
   }
   if (!offer) return null;
@@ -81,22 +84,19 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
   };
 
   return (
-    <div
-      className={`rounded-[2px] border border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.06)] px-3 py-3 ${className}`}
+    <Notice
+      tone="info"
+      icon={ScanLine}
+      className={className}
+      title={t('project.freeReread.title')}
       data-testid="free-reread-banner"
-    >
-      <div className="flex flex-wrap items-start gap-3">
-        <ScanLine className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--accent-2))]" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-foreground">{t('project.freeReread.title')}</p>
-          <p className="mt-0.5 max-w-[80ch] text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.freeReread.body')}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      action={(
+        <>
           <button
             type="button"
             disabled={busy}
             onClick={run}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[15px] font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-body font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {busy ? t('project.freeReread.running') : t('project.freeReread.cta')}
@@ -112,8 +112,10 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    >
+      <p className="max-w-[80ch] leading-snug text-[hsl(var(--ink-2))]">{t('project.freeReread.body')}</p>
+    </Notice>
   );
 }

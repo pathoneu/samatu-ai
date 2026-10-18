@@ -43,6 +43,142 @@ class Sheet:
     texts: list[tuple[str, float, float, tuple[float, float, float]]] = field(default_factory=list)   # text, x, y (metres), rgb — Lithuanian letters survive
     hatches: list[tuple[float, float, float, float, tuple[float, float, float], float]] = field(default_factory=list)   # x0, y0, x1, y1 (metres), rgb, grid step — a floor covering's hatch
     legend: list[tuple[str, tuple[float, float, float]]] = field(default_factory=list)                # coloured lines beside the drawing
+    # Sheet zones (2026-10-18, extractor/sheet_zones.py) — every position is in POINTS from the sheet's
+    # top-left (the display frame the zones are given in), so a test can predict each zone's box.
+    legend_block_at: tuple[float, float] | None = None      # „SUTARTINIAI ŽYMĖJIMAI:" + 3 glyph rows (LEGEND_ROWS)
+    table_at: tuple[float, float] | None = None             # „DURŲ ŽINIARAŠTIS" over a ruled 4-row × 3-column table
+    title_block: str | None = None                          # a ruled title block in the lower right, carrying this document code
+    notes_at: tuple[float, float] | None = None             # „PASTABOS:" + NOTES_LINES prose lines
+    legend_glyphs: bool = True                              # False: the rows are plain text (a heading with no legend under it)
+    legend_style: str = "symbols"                           # "symbols" left of the text, "column" right of it, "swatches" (material boxes)
+    table_title: str | None = None                          # the table's title (default TABLE_TITLE)…
+    table_rows: tuple[tuple[str, ...], ...] | None = None   # …and its rows (default TABLE_ROWS)
+    table_tail_rows: tuple[tuple[str, ...], ...] | None = None   # rows ruled APART, TABLE_TAIL_GAP under the table (objektas_h p2's last legend row)
+    rotate: int = 0                                         # the page's /Rotate — drawn unrotated, the viewer turns it
+
+
+# What the zone blocks draw — the tests predict boxes from these.
+LEGEND_HEADING = "SUTARTINIAI ŽYMĖJIMAI:"
+LEGEND_ROWS = ("Šviestuvas lubose", "Elektros rozetė", "Vėdinimo difuzorius")   # coloured square, hairline circle, black cross
+LEGEND_ROW_STEP = 12.0
+LEGEND_TEXT_DX = 14.0          # the row text starts this far right of the block's left edge (the glyph is left of it)
+LEGEND_WIDTH = 120.0
+LEGEND_COLUMN_DX = 100.0       # "column" style: the glyphs stand in a column this far right of the block's left edge
+SWATCH = (40.0, 10.0)          # "swatches" style: a grey material box this big, the text right of it
+SWATCH_TEXT_DX = 48.0
+TABLE_TITLE = "DURŲ ŽINIARAŠTIS"
+TABLE_ROWS = (("Žymuo", "Dydis", "Kiekis"), ("D1", "900x2100", "3"), ("D2", "800x2100", "2"), ("D3", "700x2100", "1"))
+TABLE_COL_W = (40.0, 60.0, 40.0)
+TABLE_ROW_H = 14.0
+TABLE_TAIL_GAP = 4.5           # past pdfplumber's 3 pt snap, so the tail is a table of its own
+TITLE_BLOCK_BOX = (330.0, 740.0, 575.0, 822.0)                # x0, top, x1, bottom in points
+NOTES_LINES = ("Visus matmenis tikslinti vietoje prieš gaminant baldus",
+               "Sienų apdailą derinti su projekto autoriumi ir užsakovu",
+               "Grindų plyteles kloti nuo patalpos centro į kraštus",
+               "Elektros taškų aukščius tikslinti pagal baldų brėžinius")
+NOTES_STEP = 9.0
+
+
+def _zone_blocks(c, sheet: "Sheet") -> None:
+    """The legend, table, title block and notes of a sheet (only those asked for)."""
+    _, H = A4
+    if sheet.legend_block_at:
+        x, top = sheet.legend_block_at
+        c.setFillGray(0.0)
+        c.setFont(LT_FONT, 6)
+        c.drawString(x, H - top - 6, LEGEND_HEADING)
+        for i, text in enumerate(LEGEND_ROWS):
+            row_top = top + 12 + i * LEGEND_ROW_STEP
+            cy = H - row_top - 3                                  # the row's centre line
+            gx = x                                                # where the glyph is drawn
+            tx = x + LEGEND_TEXT_DX                               # where the row's text starts
+            if sheet.legend_style == "column":
+                gx, tx = x + LEGEND_COLUMN_DX, x
+            if not sheet.legend_glyphs:
+                pass
+            elif sheet.legend_style == "swatches":
+                c.setFillGray(0.6 - 0.2 * i)
+                c.setStrokeGray(0.0)
+                c.setLineWidth(0.3)
+                c.rect(x, cy - SWATCH[1] / 2, SWATCH[0], SWATCH[1], stroke=1, fill=1)
+                tx = x + SWATCH_TEXT_DX
+            elif i == 0:                                            # a coloured square
+                c.setFillColorRGB(0.9, 0.2, 0.1)
+                c.rect(gx, cy - 3, 6, 6, stroke=0, fill=1)
+            elif i == 1:                                          # a hairline circle
+                c.setStrokeGray(0.0)
+                c.setLineWidth(0.25)
+                c.circle(gx + 3, cy, 3, stroke=1, fill=0)
+            else:                                                 # a black cross
+                c.setStrokeGray(0.0)
+                c.setLineWidth(0.4)
+                c.line(gx, cy - 3, gx + 6, cy + 3)
+                c.line(gx, cy + 3, gx + 6, cy - 3)
+            c.setFillGray(0.0)
+            c.setFont(LT_FONT, 5)
+            c.drawString(tx, cy - 1.8, text)
+    if sheet.table_at:
+        x, top = sheet.table_at
+        c.setFillGray(0.0)
+        c.setFont(LT_FONT, 6)
+        table_rows = sheet.table_rows or TABLE_ROWS
+        c.drawString(x, H - top + 3, sheet.table_title or TABLE_TITLE)    # just above the table
+        c.setStrokeGray(0.0)
+        c.setLineWidth(0.5)
+        width = sum(TABLE_COL_W)
+        n = len(table_rows)
+        for i in range(n + 1):
+            y = H - (top + i * TABLE_ROW_H)
+            c.line(x, y, x + width, y)
+        cx = x
+        for w in (0.0,) + TABLE_COL_W:
+            cx += w
+            c.line(cx, H - top, cx, H - (top + n * TABLE_ROW_H))
+        c.setFont(LT_FONT, 5)
+        for i, row in enumerate(table_rows):
+            cx = x
+            for w, text in zip(TABLE_COL_W, row):
+                c.drawString(cx + 2, H - (top + i * TABLE_ROW_H) - 9, text)
+                cx += w
+        if sheet.table_tail_rows:
+            t2 = top + n * TABLE_ROW_H + TABLE_TAIL_GAP
+            m = len(sheet.table_tail_rows)
+            for i in range(m + 1):
+                c.line(x, H - (t2 + i * TABLE_ROW_H), x + width, H - (t2 + i * TABLE_ROW_H))
+            cx = x
+            for w in (0.0,) + TABLE_COL_W:
+                cx += w
+                c.line(cx, H - t2, cx, H - (t2 + m * TABLE_ROW_H))
+            for i, row in enumerate(sheet.table_tail_rows):
+                cx = x
+                for w, text in zip(TABLE_COL_W, row):
+                    c.drawString(cx + 2, H - (t2 + i * TABLE_ROW_H) - 9, text)
+                    cx += w
+    if sheet.title_block:
+        x0, top, x1, bottom = TITLE_BLOCK_BOX
+        c.setStrokeGray(0.0)
+        c.setLineWidth(0.5)
+        rows = 4
+        step = (bottom - top) / rows
+        for i in range(rows + 1):
+            c.line(x0, H - (top + i * step), x1, H - (top + i * step))
+        for xx in (x0, x0 + 80, x1):
+            c.line(xx, H - top, xx, H - bottom)
+        c.setFillGray(0.0)
+        c.setFont(LT_FONT, 6)
+        cells = (("Projektas", "Buto interjeras"), ("Lapas", "1"), ("Laida", "0"), ("Dokumento žymuo", sheet.title_block))
+        for i, (a, b) in enumerate(cells):
+            y = H - (top + i * step) - step / 2 - 2
+            c.drawString(x0 + 3, y, a)
+            c.drawString(x0 + 83, y, b)
+    if sheet.notes_at:
+        x, top = sheet.notes_at
+        c.setFillGray(0.0)
+        c.setFont(LT_FONT, 6)
+        c.drawString(x, H - top - 6, "PASTABOS:")
+        c.setFont(LT_FONT, 5)
+        for i, text in enumerate(NOTES_LINES):
+            c.drawString(x, H - top - 6 - (i + 1) * NOTES_STEP, text)
 
 
 def _pt(x_m: float, y_m: float, sheet: Sheet) -> tuple[float, float]:
@@ -129,9 +265,34 @@ def build_plan(sheets: list[Sheet]) -> bytes:
         if sheet.title:
             c.setFont(LT_FONT, 7)
             c.drawString(ORIGIN[0], 30, sheet.title)             # in the title block, the lowest part of the sheet
+        _zone_blocks(c, sheet)
         c.showPage()
     c.save()
+    if any(sheet.rotate for sheet in sheets):
+        return _with_rotation(buf.getvalue(), [sheet.rotate for sheet in sheets])
     return buf.getvalue()
+
+
+def _with_rotation(pdf: bytes, rotations: list[int]) -> bytes:
+    """Set each page's /Rotate and nothing else — the MediaBox and the drawing stay as built, the way a CAD
+    export turns a sheet (objektas_a: an 842×1191 mediabox with /Rotate 270). reportlab's own
+    setPageRotation swaps the MediaBox too, which leaves the drawing outside its page."""
+    import pypdfium2 as pdfium
+
+    from extractor.pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf)
+        try:
+            for i, rot in enumerate(rotations):
+                if rot:
+                    page = doc[i]
+                    page.set_rotation(int(rot) % 360)
+                    page.close()
+            out = io.BytesIO()
+            doc.save(out)
+            return out.getvalue()
+        finally:
+            doc.close()
 
 
 def two_rooms() -> Sheet:

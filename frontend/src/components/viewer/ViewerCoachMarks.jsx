@@ -86,7 +86,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
           />
         )}
         <div className="flex items-start justify-between mb-1.5">
-          <span className="mono tabular text-[10px] font-semibold uppercase tracking-wide text-primary">
+          <span className="mono tabular text-meta font-semibold text-primary">
             Žingsnis {step + 1} iš {COACH_STEPS.length}
           </span>
           <button type="button" onClick={finish} title="Praleisti įvadą (Esc)" aria-label="Praleisti įvadą" className="p-0.5 -m-0.5 rounded-[2px] text-muted-foreground hover:bg-muted">
@@ -94,20 +94,20 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
           </button>
         </div>
         <h3 className="text-[14px] font-semibold text-foreground mb-1">{current.title}</h3>
-        <p className="text-[12.5px] text-muted-foreground leading-relaxed">{current.body}</p>
+        <p className="text-ui text-muted-foreground leading-relaxed">{current.body}</p>
         {!rect && current.missingAnchorNote && (
-          <p className="mt-1.5 text-[12px] text-foreground">{current.missingAnchorNote}</p>
+          <p className="mt-1.5 text-meta text-foreground">{current.missingAnchorNote}</p>
         )}
         <div className="mt-3 flex items-center justify-between">
-          <button type="button" onClick={finish} className="text-[12px] text-muted-foreground hover:text-foreground hover:underline">Praleisti</button>
+          <button type="button" onClick={finish} className="text-meta text-muted-foreground hover:text-foreground hover:underline">Praleisti</button>
           <div className="flex items-center gap-1.5">
             {step > 0 && (
-              <button type="button" onClick={() => setStep((s) => s - 1)} className="px-2.5 py-1 rounded-[2px] border border-border text-[12px] hover:bg-muted">Atgal</button>
+              <button type="button" onClick={() => setStep((s) => s - 1)} className="px-2.5 py-1 rounded-[2px] border border-border text-meta hover:bg-muted">Atgal</button>
             )}
             <button
               type="button"
               onClick={() => (last ? finish() : setStep((s) => s + 1))}
-              className="px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-[12px] hover:bg-primary/90"
+              className="px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-meta hover:bg-primary/90"
               data-testid="viewer-coach-next"
             >{last ? 'Supratau' : 'Toliau'}</button>
           </div>

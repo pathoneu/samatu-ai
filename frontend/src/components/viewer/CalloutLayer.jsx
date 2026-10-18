@@ -71,17 +71,18 @@ export default function CalloutLayer({ documentId, projectId, page, version = ''
             }}
             className="group/callout focus:outline-none"
           >
-            {/* the words themselves: a faint evergreen tint and a 2 px underline (dashed when several
-                sheets could be meant) — visible on a busy plan, quiet on a clean one */}
+            {/* the words themselves: a faint evergreen tint and a 2 px underline — solid when the sheet was
+                read for sure, the one dash when several sheets could be meant (an estimate; v3 overlay
+                vocabulary) — visible on a busy plan, quiet on a clean one */}
             <span
               style={{ position: 'absolute', left: (w - textW) / 2, width: textW, top: (hitH - textH) / 2, height: textH + 1 }}
-              className={`block rounded-[1px] border-b-2 ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-active)/0.10)] group-hover/callout:bg-[hsl(var(--viewer-chrome-active)/0.22)] group-focus-visible/callout:bg-[hsl(var(--viewer-chrome-active)/0.22)]`}
+              className={`block rounded-[1px] border-b-2 ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} ${c.confidence === 'low' ? 'border-[hsl(var(--ov-estimated))]' : 'border-[hsl(var(--ov-read))]'} bg-[hsl(var(--ov-read)/0.10)] group-hover/callout:bg-[hsl(var(--ov-read)/0.22)] group-focus-visible/callout:bg-[hsl(var(--ov-read)/0.22)]`}
             />
             {hover === i && (
               <span
                 role="tooltip"
                 style={{ position: 'absolute', left: 0, top: hitH + 4 }}
-                className="z-40 whitespace-nowrap rounded-[2px] border border-border bg-card px-2 py-1 text-[11px] text-foreground shadow-md"
+                className="z-popover whitespace-nowrap rounded-[2px] border border-border bg-card px-2 py-1 text-meta text-foreground shadow-md"
               >
                 {label}
               </span>

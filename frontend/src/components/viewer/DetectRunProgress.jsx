@@ -25,7 +25,7 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
   if (!run) return null;
   if (run.startError) {
     return (
-      <div className={`pointer-events-auto w-[320px] rounded-[2px] border border-destructive/40 bg-card px-3 py-2 text-[12px] shadow-md ${className}`} role="alert" data-testid="detect-run-progress">
+      <div className={`pointer-events-auto w-[320px] rounded-[2px] border border-destructive/40 bg-card px-3 py-2 text-meta shadow-md ${className}`} role="alert" data-testid="detect-run-progress">
         <div className="flex items-start gap-2">
           <span className="text-destructive">✕</span>
           <span className="flex-1 text-foreground">{run.startError}</span>
@@ -39,7 +39,7 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
   const summary = done ? stages.at(-1)?.note : null;
   return (
     <div
-      className={`pointer-events-auto w-[340px] max-w-[calc(100vw-32px)] rounded-[2px] border bg-card text-[12px] shadow-md ${failed ? 'border-destructive/40' : 'border-[hsl(var(--accent-2)/0.4)]'} ${className}`}
+      className={`pointer-events-auto w-[340px] max-w-[calc(100vw-32px)] rounded-[2px] border bg-card text-meta shadow-md ${failed ? 'border-destructive/40' : 'border-[hsl(var(--accent-2)/0.4)]'} ${className}`}
       role="status"
       aria-live="polite"
       data-testid="detect-run-progress"
@@ -66,7 +66,7 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
         <div className={`h-full transition-[width] duration-300 ${failed ? 'bg-destructive' : 'bg-[hsl(var(--accent-2))]'}`} style={{ width: `${Math.round(progress * 100)}%` }} />
       </div>
       {run.snapshot?.skaitoma_lt && (
-        <p className="px-3 pt-1.5 text-[11px] leading-snug text-muted-foreground" data-testid="detect-run-scope">{run.snapshot.skaitoma_lt}</p>
+        <p className="px-3 pt-1.5 text-meta leading-snug text-muted-foreground" data-testid="detect-run-scope">{run.snapshot.skaitoma_lt}</p>
       )}
       {!terminal && current?.about && (
         <p className="px-3 pt-1.5 leading-snug text-[hsl(var(--ink-2))]" data-testid="detect-run-about">{current.about}</p>
@@ -80,8 +80,8 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
               <span className={`w-3 shrink-0 text-center ${MARK_CLASS[s.status] || MARK_CLASS.pending}`} aria-hidden="true">{statusMark(s.status)}</span>
               <span className="min-w-0 flex-1">
                 <span className={s.status === 'pending' ? 'text-muted-foreground' : 'text-foreground'}>{s.label}</span>
-                {s.note && s.id !== 'kiekiai' && <span className="block text-[11px] leading-snug text-muted-foreground">{s.note}</span>}
-                {s.note && s.id === 'kiekiai' && s.status !== 'done' && <span className="block text-[11px] leading-snug text-muted-foreground">{s.note}</span>}
+                {s.note && s.id !== 'kiekiai' && <span className="block text-meta leading-snug text-muted-foreground">{s.note}</span>}
+                {s.note && s.id === 'kiekiai' && s.status !== 'done' && <span className="block text-meta leading-snug text-muted-foreground">{s.note}</span>}
               </span>
             </li>
           ))}

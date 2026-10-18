@@ -174,7 +174,7 @@ export default function RoomPlanPane({
         {marks.map((m) => (
           <span
             key={`lbl-${m.key}`}
-            className={`pointer-events-none absolute -translate-y-full rounded-[2px] px-1 font-mono text-[11px] uppercase leading-tight tracking-wide
+            className={`pointer-events-none absolute -translate-y-full rounded-[2px] px-1 font-mono text-meta uppercase leading-tight tracking-wide
               ${m.key === activeFactKey ? 'bg-[hsl(var(--destructive))] text-white' : 'bg-card/90 text-[hsl(var(--destructive))]'}`}
             style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}
           >

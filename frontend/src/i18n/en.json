@@ -649,7 +649,9 @@
       "groupHead": "{{label}} ({{count}})",
       "hideAllTitle": "Hide all warnings in this category",
       "hideAll": "hide all",
-      "hideOneTitle": "Hide this warning"
+      "hideOneTitle": "Hide this warning",
+      "showAll": "Show all ({{count}})",
+      "collapse": "Collapse"
     },
     "section": {
       "rows": "({{count}} rows)"
@@ -910,6 +912,17 @@
         "other": "another outline"
       },
       "dismiss": "Got it",
+      "show": "Show",
+      "hide": "Hide",
+      "chipNothing": "nothing changed",
+      "chipChanged_one": "{{count}} room changed",
+      "chipChanged_other": "{{count}} rooms changed",
+      "chipKept_one": "{{count}} kept as it was",
+      "chipKept_other": "{{count}} kept as they were",
+      "chipAdded_one": "{{count}} new room",
+      "chipAdded_other": "{{count}} new rooms",
+      "chipRemoved_one": "{{count}} not found",
+      "chipRemoved_other": "{{count}} not found",
       "roomNote": "After the drawing was read again:",
       "roomKept": "Kept"
     },

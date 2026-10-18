@@ -39,7 +39,7 @@ export function StepBar({ step, setStep, hasPdf, projectId = null }) {
         return (
           <React.Fragment key={id}>
             {i > 0 && (
-              <span aria-hidden className="text-muted-foreground/50 shrink-0" style={{ fontSize: 15 }}>›</span>
+              <span aria-hidden className="text-muted-foreground/50 shrink-0" style={{ fontSize: 16 }}>›</span>
             )}
             <button
               onClick={() => setStep(id)}

@@ -203,7 +203,7 @@ export default function Sidebar({ onNavigate = null }) {
         {user && (
           <div
             title={t('layout.nav.signedInAs', { email: user.email })}
-            className="flex items-center justify-center text-[10px] font-semibold border"
+            className="flex items-center justify-center text-meta font-semibold border"
             style={{
               width: 28, height: 28, borderRadius: 6,
               background: 'hsl(var(--surface-2))',

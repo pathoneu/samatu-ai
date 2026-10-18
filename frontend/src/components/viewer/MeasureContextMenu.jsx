@@ -66,7 +66,7 @@ export default function MeasureContextMenu({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={2} className="w-56" data-testid="measure-context-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
-          <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground truncate">{heading}</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-meta font-normal text-muted-foreground truncate">{heading}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => { setRenaming({ id: measurement.id, value: measurement.name || '' }); onClose?.(); }}>
             <Pencil className="w-3.5 h-3.5 mr-2" />Pervadinti
@@ -153,7 +153,7 @@ function BatchMenu({ target, selection, countTypes, onClose, onDeleteMany, onCha
         <span aria-hidden style={{ position: 'fixed', left: target.clientX, top: target.clientY, width: 1, height: 1, pointerEvents: 'none' }} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={2} className="w-60" data-testid="measure-batch-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
-        <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">Pažymėta: {parts.join(', ')}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-meta font-normal text-muted-foreground">Pažymėta: {parts.join(', ')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {marks.length > 0 && countTypes.length > 0 && (
           <DropdownMenuSub>

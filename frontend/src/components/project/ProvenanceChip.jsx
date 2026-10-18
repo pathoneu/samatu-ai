@@ -19,36 +19,37 @@
 import { useTranslation } from 'react-i18next';
 import AiBadge from './AiBadge';
 
-// Dark graphite palette (2026-07-05): -300 text on a /15 fill of the same hue
-// reads clearly and passes AA on graphite; the previous -700-on-(-50) treatment
-// (light-paper era) rendered as bright pastel pills on the dark background.
+// v3 W1-C: a quiet 12 px text link in sentence case — it was a 9 px uppercase pill, blue-300 on
+// blue-500/15 (a dark-theme leftover: 1,47:1 on parchment, 11 times per screen). The words say where
+// the number came from; the colour only marks a link: the drawing's table or text = the evergreen
+// link colour, his own outline = ink, the drawing's picture (worth a look) = the estimate amber.
 // label/title resolve against i18n at render (project.provenance.*).
 const SOURCE_META = {
   eksplikacija: {
     labelKey: 'project.provenance.eksplikacijaLabel',
-    cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    cls: 'text-[hsl(var(--accent-2))]',
     titleKey: 'project.provenance.eksplikacijaTitle',
   },
   manual_polygon: {
     labelKey: 'project.provenance.manualLabel',
-    cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    cls: 'text-foreground',
     titleKey: 'project.provenance.manualTitle',
   },
   vision: {
     labelKey: 'project.provenance.visionLabel',
-    cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    cls: 'text-[hsl(var(--ov-estimated))]',
     titleKey: 'project.provenance.visionTitle',
   },
   // 2026-09-06: the designer's own room area written on the plan („37.86 m²"
   // inside the room), read from the PDF text layer — deterministic, exact.
   plano_uzrasas: {
     labelKey: 'project.provenance.planoUzrasasLabel',
-    cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+    cls: 'text-[hsl(var(--accent-2))]',
     titleKey: 'project.provenance.planoUzrasasTitle',
   },
   dimension: {
     labelKey: 'project.provenance.dimensionLabel',
-    cls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+    cls: 'text-[hsl(var(--accent-2))]',
     titleKey: 'project.provenance.dimensionTitle',
   },
 };
@@ -67,7 +68,7 @@ export default function ProvenanceChip({ source, onClick }) {
       <button
         onClick={onClick}
         title={t(meta.titleKey)}
-        className={`inline-flex items-center px-1.5 py-[1px] rounded border text-[9px] font-medium uppercase tracking-wide ${meta.cls}`}
+        className={`inline-flex items-center whitespace-nowrap text-meta font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid ${meta.cls}`}
       >
         {t(meta.labelKey)}
       </button>

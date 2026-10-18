@@ -34,13 +34,16 @@ import { buildCheckOverlay } from '@/lib/checkOverlay';
 import { displayPointOf } from '@/lib/roomOutline';
 import { checkViewerScales } from '@/lib/pageScales';
 import { cleanUserText } from '@/lib/userText';
+import { WALL_STATE_STYLE } from '@/components/viewer/CheckLayer';
+import { ov, paint } from '@/lib/overlayTokens';
 import { useWorkspaceHost } from '@/components/project/workspaceHost';
 
+// The check layer's own line styles (viewer/CheckLayer) — the legend cannot drift from the drawing.
 const WALL_LEGEND = [
-  ['read', '#15803d', null, 'legendWallRead'],
-  ['borrowed', '#b45309', null, 'legendWallBorrowed'],
-  ['outline', '#64748b', null, 'legendWallOutline'],
-  ['missing', '#dc2626', '5 4', 'legendWallMissing'],
+  ['read', 'legendWallRead'],
+  ['borrowed', 'legendWallBorrowed'],
+  ['outline', 'legendWallOutline'],
+  ['missing', 'legendWallMissing'],
 ];
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border border-border bg-card px-3 '
@@ -166,7 +169,7 @@ export default function RoomDrawingPane({
     return (
       <div className="flex min-w-0 flex-col gap-2">
         {pdfState === 'failed' && !isMobile && (
-          <p className="text-[13px] text-muted-foreground">{t('project.roomSheet.drawFallback')}</p>
+          <p className="text-ui text-muted-foreground">{t('project.roomSheet.drawFallback')}</p>
         )}
         <RoomPlanPane {...fallback} />
       </div>
@@ -184,7 +187,7 @@ export default function RoomDrawingPane({
   const body = (
     <div className="flex min-w-0 flex-col gap-2" data-testid="room-drawing-pane" data-hosted={hosted ? '1' : undefined}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mono text-[13px] text-muted-foreground">
+        <p className="font-mono text-ui text-muted-foreground">
           {t('project.roomSheet.drawCaption', { room: roomKey ?? '' })}
         </p>
         <div className="flex items-center gap-2">
@@ -246,7 +249,7 @@ export default function RoomDrawingPane({
               ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
               : pick.mode === 'split'
                 ? (
-                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-[13px] font-bold text-[hsl(var(--accent-2))]">
+                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-ui font-bold text-[hsl(var(--accent-2))]">
                     {pick.first ? '2 / 2' : '1 / 2'}
                   </span>
                 )
@@ -308,24 +311,25 @@ export default function RoomDrawingPane({
       )}
 
       {space && (
-        <p className="text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
           {t('project.roomSheet.drawOpenSpace', { rooms: others.join(', ') })}
         </p>
       )}
       {noOutline && (
-        <p className="text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
           {reason
             ? t('project.roomSheet.drawNoOutline', { reason: reason.replace(/\.$/, '') })
             : t('project.roomSheet.drawNoOutlinePlain')}
         </p>
       )}
       {(states.size > 0 || hasOpenings) && (
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
-          <li className="font-semibold uppercase tracking-wide">{t('project.roomSheet.legendWallsTitle')}</li>
-          {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, colour, dash, key]) => (
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ui text-muted-foreground" data-testid="check-legend">
+          <li className="font-semibold">{t('project.roomSheet.legendWallsTitle')}</li>
+          {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, key]) => (
             <li key={state} className="flex items-center gap-1.5">
-              <svg width="22" height="8" aria-hidden="true">
-                <line x1="1" y1="4" x2="21" y2="4" stroke={colour} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={dash || undefined} />
+              <svg width="24" height="8" aria-hidden="true">
+                <line x1="1" y1="4" x2="23" y2="4" style={paint({ stroke: WALL_STATE_STYLE[state].stroke })} strokeWidth="3.5"
+                  strokeLinecap={WALL_STATE_STYLE[state].dash ? 'butt' : 'round'} strokeDasharray={WALL_STATE_STYLE[state].dash || undefined} />
               </svg>
               {t(`project.roomSheet.${key}`)}
             </li>
@@ -333,7 +337,7 @@ export default function RoomDrawingPane({
           {hasStrings && (
             <li className="flex items-center gap-1.5">
               <svg width="22" height="8" aria-hidden="true">
-                <line x1="1" y1="4" x2="21" y2="4" stroke="#15803d" strokeOpacity="0.55" strokeWidth="6" strokeLinecap="round" />
+                <line x1="1" y1="4" x2="21" y2="4" style={paint({ stroke: ov('read') })} strokeOpacity="0.45" strokeWidth="6" strokeLinecap="round" />
               </svg>
               {t('project.roomSheet.legendStrings')}
             </li>
@@ -341,7 +345,7 @@ export default function RoomDrawingPane({
           {hasOpenings && (
             <li className="flex items-center gap-1.5">
               <svg width="22" height="8" aria-hidden="true">
-                <line x1="2" y1="4" x2="20" y2="4" stroke="#7c3aed" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="2" y1="4" x2="20" y2="4" style={paint({ stroke: ov('opening') })} strokeWidth="4.5" strokeLinecap="round" />
               </svg>
               {t('project.roomSheet.legendOpenings')}
             </li>
