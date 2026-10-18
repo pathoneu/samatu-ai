@@ -55,6 +55,9 @@ class Sheet:
     table_rows: tuple[tuple[str, ...], ...] | None = None   # …and its rows (default TABLE_ROWS)
     table_tail_rows: tuple[tuple[str, ...], ...] | None = None   # rows ruled APART, TABLE_TAIL_GAP under the table (objektas_h p2's last legend row)
     rotate: int = 0                                         # the page's /Rotate — drawn unrotated, the viewer turns it
+    # Legend counting (2026-10-18, W2-A): instances of the legend's glyphs on the plan — (LEGEND_ROWS index,
+    # centre x, centre y) in POINTS from the sheet's top-left, drawn exactly as the legend row draws its glyph.
+    symbol_marks: list[tuple[int, float, float]] = field(default_factory=list)
 
 
 # What the zone blocks draw — the tests predict boxes from these.
@@ -266,6 +269,7 @@ def build_plan(sheets: list[Sheet]) -> bytes:
             c.setFont(LT_FONT, 7)
             c.drawString(ORIGIN[0], 30, sheet.title)             # in the title block, the lowest part of the sheet
         _zone_blocks(c, sheet)
+        _symbol_marks(c, sheet)
         c.showPage()
     c.save()
     if any(sheet.rotate for sheet in sheets):
@@ -354,3 +358,29 @@ def pocket_and_room() -> Sheet:
         ("3000", 1 + 2 * t + o, t, 1 + 2 * t + o, 3 + t),                # room 2 left (the partition)
     ]
     return Sheet(walls=walls, badges=badges, dims=dims)
+
+
+# ── legend counting (2026-10-18, W2-A) ─────────────────────────────────────
+
+
+def _symbol_marks(c, sheet: "Sheet") -> None:
+    """The legend's glyphs drawn on the plan at `sheet.symbol_marks` — the same paths _zone_blocks draws in
+    the legend rows: 0 a red filled 6 pt square, 1 a hairline 3 pt-radius circle, 2 a black 6 pt cross."""
+    if not sheet.symbol_marks:
+        return
+    _, H = A4
+    for kind, x, y in sheet.symbol_marks:
+        cy = H - y
+        if kind == 0:
+            c.setFillColorRGB(0.9, 0.2, 0.1)
+            c.rect(x - 3, cy - 3, 6, 6, stroke=0, fill=1)
+        elif kind == 1:
+            c.setStrokeGray(0.0)
+            c.setLineWidth(0.25)
+            c.circle(x, cy, 3, stroke=1, fill=0)
+        else:
+            c.setStrokeGray(0.0)
+            c.setLineWidth(0.4)
+            c.line(x - 3, cy - 3, x + 3, cy + 3)
+            c.line(x - 3, cy + 3, x + 3, cy - 3)
+    c.setFillGray(0.0)

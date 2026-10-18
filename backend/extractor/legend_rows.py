@@ -205,16 +205,26 @@ def _row_glyphs(phrases: list[dict], clusters: list[dict], side: str) -> dict[in
     for pi, ph in sorted(enumerate(phrases), key=lambda t: (t[1]["top"], t[1]["x0"])):
         lo, hi = _band(ph)
         others = [o for oi, o in enumerate(phrases) if oi != pi and _same_line(o, ph)]
+        in_band = [ci for ci, c in enumerate(clusters) if ci not in used and lo <= (c["top"] + c["bottom"]) / 2 <= hi]
         if side == "left":
-            limit = max([ph["x0"] - GLYPH_REACH_PT] + [o["x1"] for o in others if o["x1"] <= ph["x0"] + 0.5])
-            pick = [ci for ci, c in enumerate(clusters) if ci not in used
-                    and lo <= (c["top"] + c["bottom"]) / 2 <= hi
-                    and c["x1"] <= ph["x0"] + 1.5 and c["x0"] >= limit - 0.5]
+            text_wall = max([-1e9] + [o["x1"] for o in others if o["x1"] <= ph["x0"] + 0.5])
+            limit = max(ph["x0"] - GLYPH_REACH_PT, text_wall)
+            pick = [ci for ci in in_band if clusters[ci]["x1"] <= ph["x0"] + 1.5 and clusters[ci]["x1"] >= limit
+                    and clusters[ci]["x0"] >= text_wall - 0.5]
+            # a symbol drawn just left of one already taken belongs to the row too (objektas_d: two rings side
+            # by side, the first reaching past the window)
+            grew = bool(pick)
+            while grew:
+                left_edge = min(clusters[ci]["x0"] for ci in pick)
+                more = [ci for ci in in_band if ci not in pick and clusters[ci]["x1"] >= left_edge - 8.0
+                        and clusters[ci]["x1"] <= left_edge + 0.5 and clusters[ci]["x0"] >= text_wall - 0.5]
+                pick += more
+                grew = bool(more)
         else:
-            limit = min([ph["x1"] + GLYPH_REACH_PT] + [o["x0"] for o in others if o["x0"] >= ph["x1"] - 0.5])
-            pick = [ci for ci, c in enumerate(clusters) if ci not in used
-                    and lo <= (c["top"] + c["bottom"]) / 2 <= hi
-                    and c["x0"] >= ph["x1"] - 1.5 and c["x1"] <= limit + 0.5]
+            text_wall = min([1e9] + [o["x0"] for o in others if o["x0"] >= ph["x1"] - 0.5])
+            limit = min(ph["x1"] + GLYPH_REACH_PT, text_wall)
+            pick = [ci for ci in in_band if clusters[ci]["x0"] >= ph["x1"] - 1.5 and clusters[ci]["x0"] <= limit
+                    and clusters[ci]["x1"] <= text_wall + 0.5]
         if pick:
             used.update(pick)
             got[pi] = pick
