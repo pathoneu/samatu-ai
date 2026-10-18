@@ -34,7 +34,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
   const btn = 'w-full inline-flex items-center gap-2 px-3 py-2 rounded text-ui text-left text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
   const guessed = chip.state === 'spejamas';
   return (
-    <div ref={rootRef} className="absolute bottom-2 z-panel" style={{ left }} data-testid="scale-chip-root">
+    <div ref={rootRef} className="absolute bottom-2 z-panel flex items-center" style={{ left }} data-testid="scale-chip-root">
       {open && (
         <div
           role="dialog"
@@ -96,6 +96,18 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
           </>
         )}
       </button>
+      {/* A guessed scale is confirmed in ONE click, right on the chip (Togal's chip; audit act „Confirm scale" 4 → 1). */}
+      {chip.canConfirm && !open && (
+        <button
+          type="button"
+          onClick={() => onConfirm?.([chip.page])}
+          title={`Patvirtinti, kad lapo ${chip.page} mastelis ${chip.label} teisingas — jis taps jūsų`}
+          className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-panel border border-border bg-card text-ui font-semibold text-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="scale-chip-confirm-inline"
+        >
+          <Check className="w-4 h-4 shrink-0" aria-hidden="true" />Patvirtinti
+        </button>
+      )}
     </div>
   );
 }
