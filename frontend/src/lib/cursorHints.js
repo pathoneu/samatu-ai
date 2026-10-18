@@ -34,10 +34,11 @@ export function cursorHintFor(state = {}) {
   const { mode = null, points = 0, shift = false, calibPoint = false, countType = null, symbolPhase = 'box',
     fill = null, selectionCount = 0, outlineTool = null } = state;
   switch (mode) {
+    // with a selection the keys are in the pill and the actions in the bar above it — the hint says what a click does
     case 'select':
-      return selectionCount ? 'Delete — ištrinti pažymėtą · dešinysis klavišas — meniu' : 'Spustelėkite matavimą ar žymę';
+      return selectionCount ? 'Spustelėkite kitą matavimą arba tuščią vietą — atžymėti' : 'Spustelėkite matavimą ar žymę';
     case 'lasso':
-      return selectionCount ? 'Dešinysis klavišas — veiksmai su pažymėtais · Delete — ištrinti' : 'Apveskite matavimus ir žymes (Shift — pridėti)';
+      return selectionCount ? 'Apveskite kitus (su Shift — pridėti) · dešinysis klavišas — meniu' : 'Apveskite matavimus ir žymes (Shift — pridėti)';
     case 'pan':
       return 'Tempkite brėžinį';
     case 'distance':

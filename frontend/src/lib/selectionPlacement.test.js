@@ -33,6 +33,18 @@ test('the bar stays inside the canvas and right of the tool cards', () => {
   assert.ok(q.left + bar.width <= frame.width - 8);
 });
 
+test('the bar never lands on the chrome cards: docked below the top row, or the other side of the label', () => {
+  const topRow = { left: 300, top: 8, width: 520, height: 42 };
+  const docked = placeSelectionBar({ anchor: null, frame, bar: { width: 400, height: 40 }, inset, avoid: [topRow] });
+  assert.equal(docked.side, 'docked');
+  assert.equal(docked.top, 8 + 42 + 10);
+  // a label right under the top row: above would hit the row → below
+  const label = { left: 500, top: 70, width: 100, height: 36 };
+  const p = placeSelectionBar({ anchor: label, frame, bar: { width: 400, height: 40 }, inset, avoid: [topRow] });
+  assert.equal(p.side, 'below');
+  assert.equal(overlapArea({ ...p, width: 400, height: 40 }, topRow), 0);
+});
+
 test('the legend takes the first corner that covers nothing, else the least covered', () => {
   const size = { width: 260, height: 90 };
   const spots = [{ id: 'bottom-right', left: 560, top: 390 }, { id: 'top-right', left: 560, top: 56 }, { id: 'bottom-left', left: 88, top: 390 }];

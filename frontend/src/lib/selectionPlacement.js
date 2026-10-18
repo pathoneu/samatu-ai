@@ -21,24 +21,29 @@ export function overlapArea(a, b, pad = 0) {
 }
 
 /**
- * { anchor, frame: {width, height}, bar: {width, height}, gap, inset: {left, top, right, bottom} }
+ * { anchor, frame: {width, height}, bar: {width, height}, gap, inset: {left, top, right, bottom}, avoid }
  * → { left, top, docked, side: 'above' | 'below' | 'docked' }
+ * `avoid` — the chrome's own cards (pages / zoom, search, the pill): the bar never lands on them either.
  */
-export function placeSelectionBar({ anchor = null, frame, bar, gap = 10, inset = {} }) {
+export function placeSelectionBar({ anchor = null, frame, bar, gap = 10, inset = {}, avoid = [] }) {
   const L = inset.left ?? 8; const T = inset.top ?? 8; const R = inset.right ?? 8; const B = inset.bottom ?? 8;
   const minLeft = L;
   const maxLeft = Math.max(minLeft, frame.width - R - bar.width);
   const clampX = (x) => Math.min(Math.max(x, minLeft), maxLeft);
-  const docked = { left: clampX((L + frame.width - R - bar.width) / 2), top: T, docked: true, side: 'docked' };
+  const free = (p) => avoid.every((r) => overlapArea({ left: p.left, top: p.top, width: bar.width, height: bar.height }, r) === 0);
+  const dockLeft = clampX((L + frame.width - R - bar.width) / 2);
+  const dockTop = free({ left: dockLeft, top: T }) ? T
+    : Math.max(T, ...avoid.filter((r) => r.top < T + bar.height + gap).map((r) => rectBottom(r) + gap));
+  const docked = { left: dockLeft, top: dockTop, docked: true, side: 'docked' };
   if (!anchor) return docked;
   // the selection must be at least partly on the canvas, or the bar has nothing to stand next to
   const visible = rectRight(anchor) > L && anchor.left < frame.width - R && rectBottom(anchor) > T && anchor.top < frame.height - B;
   if (!visible) return docked;
   const left = clampX(anchor.left + anchor.width / 2 - bar.width / 2);
-  const above = anchor.top - gap - bar.height;
-  if (above >= T) return { left, top: above, docked: false, side: 'above' };
-  const below = rectBottom(anchor) + gap;
-  if (below + bar.height <= frame.height - B) return { left, top: below, docked: false, side: 'below' };
+  const above = { left, top: anchor.top - gap - bar.height, docked: false, side: 'above' };
+  if (above.top >= T && free(above)) return above;
+  const below = { left, top: rectBottom(anchor) + gap, docked: false, side: 'below' };
+  if (below.top + bar.height <= frame.height - B && free(below)) return below;
   return docked;
 }
 
@@ -46,7 +51,7 @@ export function placeSelectionBar({ anchor = null, frame, bar, gap = 10, inset =
  * spots: [{ id, left, top }] in order of preference; size: {width, height}; avoid: [rects]
  * → the id of the first spot that touches none of `avoid`, else the one with the least overlap.
  */
-export function pickSpot({ spots, size, avoid = [], pad = 6 }) {
+export function pickSpot({ spots, size, avoid = [], pad = 0 }) {
   let best = null;
   for (const s of spots) {
     const box = { left: s.left, top: s.top, width: size.width, height: size.height };

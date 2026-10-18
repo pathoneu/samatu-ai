@@ -2,8 +2,8 @@
  * SelectionBar — the floating action bar at the selection (Pathon v3 click model, W1-B B6; Kreo §11
  * fly-menu, design §5 „a floating action bar appears at the selection with icon AND Lithuanian text").
  *
- * A selected room: Taisyti kontūrą (E) · Padalyti · Sujungti (M) · Atimti (X) · Neskaičiuoti… · Rodyti
- * įrodymus, and „⋯" for „Kontūras paspaudus". Selected marks („Žymėti" / „Laso"): Pervadinti · Keisti
+ * A selected room: Taisyti kontūrą (E) · Padalyti · Sujungti (M) · Atimti (X) · Neskaičiuoti… · Įrodymai,
+ * and „⋯" for „Kontūras paspaudus". Selected marks („Žymėti" / „Laso"): Pervadinti · Keisti
  * tipą · Rodyti sąraše · Ištrinti — several: Ištrinti visus · Atžymėti. Every action calls a handler the
  * viewer already had (the old toolbar's room buttons, the right-click menu's items); the bar only moves
  * them to where the eye is. Never hover-only: icon and word on every button, the key in its title.
@@ -19,7 +19,7 @@ import {
 import { placeSelectionBar } from '@/lib/selectionPlacement';
 import { keyText } from '@/lib/viewerShortcuts';
 
-const btn = 'h-8 shrink-0 inline-flex items-center gap-1.5 px-2.5 rounded text-ui text-foreground whitespace-nowrap hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
+const btn = 'h-8 shrink-0 inline-flex items-center gap-1.5 px-2 rounded text-ui text-foreground whitespace-nowrap hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 
 function Action({ Icon, label, title, onClick, testId, coach, danger = false, disabled = false }) {
   return (
@@ -43,7 +43,7 @@ const withKeyTitle = (sentence, id) => {
   return k ? `${sentence} (${k})` : sentence;
 };
 
-export default function SelectionBar({ frame, anchor, insetLeft = 8, room = null, marks = null }) {
+export default function SelectionBar({ frame, anchor, avoid = [], insetLeft = 8, room = null, marks = null }) {
   const ref = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 40 });
   useLayoutEffect(() => {
@@ -57,7 +57,8 @@ export default function SelectionBar({ frame, anchor, insetLeft = 8, room = null
     anchor,
     frame,
     bar: { width: size.width || 480, height: size.height || 40 },
-    inset: { left: insetLeft, top: 8, right: 8, bottom: 52 },
+    inset: { left: insetLeft, top: 8, right: 8, bottom: 8 },
+    avoid,
   });
   return (
     <div
@@ -106,7 +107,7 @@ function RoomActions({ room }) {
           title={`Atidaro patalpos ${nr} lapą Patikroje — ten pačiame viršuje „Ši patalpa: skaičiuoju / neskaičiuoju" ir kurių darbų joje neskaičiuoti`} />
       )}
       {onEvidence && (
-        <Action Icon={FileSearch} label="Rodyti įrodymus" testId="selection-evidence" onClick={onEvidence}
+        <Action Icon={FileSearch} label="Įrodymai" testId="selection-evidence" onClick={onEvidence}
           title={`Patalpos ${nr} lapas: kiekvienas skaičius su sakiniu, iš kur jis paimtas, ir brėžinio iškarpa`} />
       )}
       {onFill && (

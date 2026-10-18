@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router';
 import { EmbedPDF } from '@embedpdf/core/react';
 import { usePdfiumEngine } from '@embedpdf/engines/react';
 import { Viewport } from '@embedpdf/plugin-viewport/react';
@@ -19,7 +20,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, Pentagon, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -44,12 +45,14 @@ import CountLegendPanel from './CountLegendPanel';
 import ShortcutsGuide from './ShortcutsGuide';
 import HistoryPanel from './HistoryPanel';
 import ViewerCoachMarks from './ViewerCoachMarks';
-import MeasureContextMenu from './MeasureContextMenu';
-import OutlineToolButtons from './OutlineToolButtons';
+import MeasureContextMenu, { RenameDialog } from './MeasureContextMenu';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
 import ModePill from './ModePill';
+import SelectionBar from './SelectionBar';
+import useChromeRects from './useChromeRects';
+import { pickSpot } from '@/lib/selectionPlacement';
 import CursorHint from './CursorHint';
 import { cursorHintFor } from '@/lib/cursorHints';
 import { escStep, openLayerInDocument } from '@/lib/escOrder';
@@ -151,7 +154,33 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, searchOpen, onToggleSearch, onCloseSearch, outlineEdit = null, onStartOutlineEdit = null, outlineToolsSlot = null, addon = null }) {
+// The two small cards of the canvas chrome that the horizontal toolbar used to hold (v3 W1-B B6): the
+// reading / editions buttons and the search at the top right, pages and zoom at the bottom right.
+const chromeBtn = 'h-8 min-w-8 px-1.5 inline-flex items-center justify-center rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const chromeCard = 'pointer-events-auto rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
+
+/** Top right: „Perskaityti iš naujo" and „Palyginti leidimus" (renderToolbarAddon), then the text search. */
+function CanvasHeader({ documentId, totalPages, addon = null, searchOpen, onToggleSearch, onCloseSearch }) {
+  const { state: scroll } = useScroll(documentId);
+  const cur = visiblePageOf(scroll);
+  return (
+    <div className={chromeCard} data-canvas-header>
+      {addon && <span className="inline-flex items-center gap-1 px-0.5">{addon(cur, totalPages || 1)}</span>}
+      {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
+      <button
+        type="button"
+        className={`${chromeBtn} ${searchOpen ? 'bg-viewer-chrome-active/15 text-viewer-chrome-active' : ''}`}
+        title={withKey('Paieška', 'openSearch')}
+        aria-label={withKey('Paieška', 'openSearch')}
+        aria-pressed={!!searchOpen}
+        onClick={onToggleSearch}
+      ><Search className="w-4 h-4" /></button>
+    </div>
+  );
+}
+
+/** Bottom right: page back / forward, zoom out / in with the level, fit width / fit page. */
+function NavCluster({ documentId, totalPages }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -164,87 +193,23 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
     if (cur !== (scroll?.currentPage ?? cur)) scrollApi?.scrollToPage({ pageNumber: cur });
     fn();
   };
-  const btn = 'p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40 disabled:hover:bg-transparent';
-  const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
-  const canFill = focusedRoomNr != null && onStartFill;
+  const sep = <span aria-hidden="true" className="w-px h-5 bg-border mx-0.5" />;
   return (
-    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
-      {/* The reading button („Perskaityti lapą", renderToolbarAddon) — first, so a narrow toolbar never hides it. */}
-      {addon && <>{addon(cur, total)}<span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" /></>}
+    <div className={chromeCard} data-nav-cluster role="group" aria-label="Puslapiai ir mastelis ekrane">
       {/* Deterministic: jump to visible page ± 1. The plugin's relative
           scrollToNext/PreviousPage steps from its own (stale) currentPage —
           under wheel scrolling that no-ops or bounces (founder: "page changer
           does not work"). */}
-      <button className={btn} title={withKey('Ankstesnis puslapis', 'prevPage')} disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
-      <span className="mono tabular px-1 whitespace-nowrap">psl. {cur} / {total}</span>
-      <button className={btn} title={withKey('Kitas puslapis', 'nextPage')} disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title={withKey('Tolinti', 'zoomOut')} onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
-      <span className="mono tabular w-11 text-center">{pct}%</span>
-      <button className={btn} title={withKey('Artinti', 'zoomIn')} onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
-      <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-      <button className={btn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
-      <button className={btn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
-      {canFill && (
-        <>
-          <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {/* Outline editing (2026-10-16): the focused room's outline vertex by vertex, snapping to the
-              drawing's walls; „Išsaugoti" re-reads its walls server side (api outline-set). */}
-          {outlineEdit ? null : (onStartOutlineEdit && fillFor == null) ? (
-            <button
-              type="button"
-              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap mr-1"
-              title={`Taisyti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
-              onClick={onStartOutlineEdit}
-              data-testid="outline-edit-start"
-              data-coach="outline-edit"
-            >
-              <Pentagon className="w-3.5 h-3.5" />
-              <span>Taisyti kontūrą</span>
-            </button>
-          ) : null}
-          {!outlineEdit && fillFor == null && outlineToolsSlot}
-          {fillFor == null ? (
-            <button
-              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
-              title={`Kontūras paspaudus: spustelėkite patalpos ${focusedRoomNr} viduje brėžinyje — kontūras bus surastas automatiškai`}
-              onClick={() => onStartFill(focusedRoomNr)}
-            >
-              <SquarePen className="w-3.5 h-3.5" />
-              <span>Kontūras paspaudus</span>
-            </button>
-          ) : (
-            /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
-            <span className="inline-flex shrink-0 items-center gap-1">
-              <button
-                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))] whitespace-nowrap"
-                title={`Laukiama spustelėjimo patalpos ${fillFor} viduje. Paspauskite čia arba Esc — atšaukti.`}
-                onClick={onCancelFill}
-              >
-                <SquarePen className="w-3.5 h-3.5" />
-                <span>Kontūras paspaudus</span>
-              </button>
-              <button
-                className="p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
-                title="Atšaukti (Esc)"
-                onClick={onCancelFill}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </span>
-          )}
-        </>
-      )}
-      {/* Right: search. Istorija, „?", print and download live in the rail's „Daugiau". */}
-      <div className="ml-auto flex items-center gap-1">
-        {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
-        <button
-          className={searchOpen ? pressed : btn}
-          title={withKey('Paieška', 'openSearch')}
-          aria-pressed={!!searchOpen}
-          onClick={onToggleSearch}
-        ><Search className="w-4 h-4" /></button>
-      </div>
+      <button type="button" className={chromeBtn} title={withKey('Ankstesnis puslapis', 'prevPage')} aria-label="Ankstesnis puslapis" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
+      <span className="mono tabular text-ui text-foreground px-0.5 whitespace-nowrap" aria-label={`Puslapis ${cur} iš ${total}`}>{cur} / {total}</span>
+      <button type="button" className={chromeBtn} title={withKey('Kitas puslapis', 'nextPage')} aria-label="Kitas puslapis" disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
+      {sep}
+      <button type="button" className={chromeBtn} title={withKey('Tolinti', 'zoomOut')} aria-label="Tolinti" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
+      <span className="mono tabular text-ui text-foreground w-12 text-center">{pct}%</span>
+      <button type="button" className={chromeBtn} title={withKey('Artinti', 'zoomIn')} aria-label="Artinti" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
+      {sep}
+      <button type="button" className={chromeBtn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} aria-label="Sutalpinti per visą plotį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
+      <button type="button" className={chromeBtn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} aria-label="Sutalpinti visą puslapį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
     </div>
   );
 }
@@ -1147,10 +1112,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const { panning } = useDragPan({ rootRef: tvRootRef, armed: measureTool === 'pan' && active && !check, space: active && !check });
   // The tool cards keep their labels while the canvas is tall enough for them, icons only below that.
   const [chromeHeight, setChromeHeight] = useState(0);
+  const [chromeEl, setChromeEl] = useState(null);
   const chromeObserver = useRef(null);
   const chromeRef = useCallback((el) => {
     chromeObserver.current?.disconnect();
     chromeObserver.current = null;
+    setChromeEl(el);
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => setChromeHeight(Math.round(el.getBoundingClientRect().height)));
     ro.observe(el);
@@ -1287,6 +1254,77 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const onRoomMerge = roomKeysFree && onOutlineTool ? () => outlineTools.start('merge') : null;
   const onRoomSubtract = roomKeysFree && onOutlineTool ? () => outlineTools.start('subtract') : null;
 
+  // ---- Selection bar (W1-B B6) ---------------------------------------------
+  // A selected room's actions, or the selected marks' — where the eye is, never on the label.
+  const navigate = useNavigate();
+  const barRoom = !check && focusedRoomNr != null && (onRoomPolygonFill || onRoomOutlineEdit || onOutlineTool)
+    ? (rooms || []).find((r) => String(r?.nr) === String(focusedRoomNr)) || null : null;
+  const selectedMarks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+  const marksBarOn = !check && (measureTool === 'select' || measureTool === 'lasso') && selectedMarks.length > 0;
+  const roomBarOn = !!barRoom && !marksBarOn && !outlineEdit && !outlineTools.tool && fillFor == null && !symbol.active
+    && (measureTool == null || measureTool === 'pan' || measureTool === 'select' || measureTool === 'lasso');
+  const openRoomSheet = (nr) => {
+    if (!projectId) return;
+    navigate(`/project/${encodeURIComponent(projectId)}/patikra?kambarys=${encodeURIComponent(nr)}`);
+  };
+  const [renaming, setRenaming] = useState(null);     // { id, value } while „Pervadinti" is open
+  const KIND_NAMES = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
+  const oneMark = selectedMarks.length === 1 ? selectedMarks[0] : null;
+  const barMarks = marksBarOn ? {
+    count: selectedMarks.length,
+    kindLabel: oneMark ? [KIND_NAMES[oneMark.kind] || 'Matavimas',
+      oneMark.kind === 'count' ? (countTypes.find((t) => t.id === oneMark.typeId)?.label || null) : null,
+      oneMark.name ? `„${oneMark.name}"` : null].filter(Boolean).join(' · ') : null,
+    countTypes: oneMark?.kind === 'count' ? countTypes : [],
+    typeId: oneMark?.typeId ?? null,
+    onRename: oneMark ? () => setRenaming({ id: oneMark.id, value: oneMark.name || '' }) : null,
+    onChangeType: oneMark?.kind === 'count' ? (typeId) => changeCountType(oneMark.id, typeId) : null,
+    onReveal: oneMark ? () => revealMeasurement(oneMark) : null,
+    onDelete: () => deleteMeasurement(selectedMeasureIds),
+    onDeselect: () => setSelectedMeasureIds([]),
+  } : null;
+  const barRoomActions = roomBarOn ? {
+    nr: String(barRoom.nr),
+    name: barRoom.pavadinimas || null,
+    onEdit: onRoomOutlineEdit ? startOutlineEdit : null,
+    onSplit: onOutlineTool ? () => outlineTools.start('split') : null,
+    onMerge: onOutlineTool ? () => outlineTools.start('merge') : null,
+    onSubtract: onOutlineTool ? () => outlineTools.start('subtract') : null,
+    onExclude: projectId ? () => openRoomSheet(barRoom.nr) : null,
+    onEvidence: projectId ? () => openRoomSheet(barRoom.nr) : null,
+    onFill: onRoomPolygonFill ? () => startFill(barRoom.nr) : null,
+  } : null;
+  const roomLabelSelectors = focusedRoomNr != null
+    ? [`[data-room-label="${focusedRoomNr}"]`, `[data-room-ring="${focusedRoomNr}"]`, `[data-room-zone="${focusedRoomNr}"]`] : [];
+  const chromeRects = useChromeRects(chromeEl, {
+    anchor: marksBarOn ? (oneMark ? [`[data-measure-anchor="${oneMark.id}"]`] : []) : (roomBarOn ? roomLabelSelectors : []),
+    label: roomLabelSelectors,
+    bar: '[data-testid="selection-bar"]',
+    pill: '[data-testid="mode-pill"]',
+    nav: '[data-nav-cluster]',
+    header: '[data-canvas-header]',
+    legend: '[data-layer-legend]',
+  });
+  // Where the top row of cards ends (pages / zoom and search may wrap to two rows on a narrow canvas).
+  const chromeTopBottom = Math.max(
+    (chromeRects.rects.nav ? chromeRects.rects.nav.top + chromeRects.rects.nav.height : 50),
+    (chromeRects.rects.header ? chromeRects.rects.header.top + chromeRects.rects.header.height : 50),
+  );
+  // The layer legend takes the first corner that covers neither the selected room's label, the bar, the pill
+  // nor the pages / zoom card (manager item 2026-10-18: it covered a selected zone's label at bottom right).
+  const legendSpot = (() => {
+    const f = chromeRects.frame;
+    if (!f) return 'bottom-right';
+    const r = chromeRects.rects;
+    const size = { width: r.legend?.width || 280, height: r.legend?.height || 96 };
+    const spots = [
+      { id: 'bottom-right', left: f.width - 8 - size.width, top: f.height - 8 - size.height },
+      { id: 'top-right', left: f.width - 8 - size.width, top: chromeTopBottom + 8 },
+      { id: 'bottom-left', left: (check ? 8 : RAIL_WIDTH + 16), top: f.height - 8 - size.height },
+    ];
+    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header].filter(Boolean) });
+  })();
+
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
@@ -1306,28 +1344,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const chromeLeft = sheetRailWidth({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
-          <Toolbar
-            documentId={activeDocumentId}
-            totalPages={totalPages}
-            focusedRoomNr={onRoomPolygonFill && !check ? focusedRoomNr : null}
-            fillFor={fillFor}
-            onStartFill={startFill}
-            onCancelFill={() => setFillFor(null)}
-            searchOpen={searchOpen}
-            onToggleSearch={() => setSearchOpen((v) => !v)}
-            onCloseSearch={() => setSearchOpen(false)}
-            outlineEdit={outlineEdit}
-            onStartOutlineEdit={check || !onRoomOutlineEdit ? null : startOutlineEdit}
-            outlineToolsSlot={check || !onOutlineTool ? null : (
-              <OutlineToolButtons
-                focusedRoomNr={focusedRoomNr}
-                active={outlineTools.tool?.mode ?? null}
-                onStart={outlineTools.start}
-                onCancel={outlineTools.cancel}
-              />
-            )}
-            addon={check ? null : renderToolbarAddon}
-          />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
@@ -1463,16 +1479,57 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   />
                 </div>
               )}
-              {/* The active mode's pill, bottom centre between the tool cards and the right edge. */}
+              {/* Top right, one row: pages and zoom, then the reading / editions buttons and the search. (At the
+                  bottom right the pages / zoom card left the pill too little room at 1280 px — the pill wrapped.) */}
+              <div className="absolute top-2 right-2 flex flex-wrap items-start justify-end gap-2" style={{ left: check ? 8 : RAIL_WIDTH + 16 }} data-chrome-top>
+                <NavCluster documentId={activeDocumentId} totalPages={totalPages} />
+                <CanvasHeader
+                  documentId={activeDocumentId}
+                  totalPages={totalPages}
+                  addon={check ? null : renderToolbarAddon}
+                  searchOpen={searchOpen}
+                  onToggleSearch={() => setSearchOpen((v) => !v)}
+                  onCloseSearch={() => setSearchOpen(false)}
+                />
+              </div>
+              {/* The active mode's pill, bottom centre right of the tool cards. */}
               {pill && (
-                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: RAIL_WIDTH + 16 }}>
+                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: check ? 8 : RAIL_WIDTH + 16 }}>
                   <ModePill pill={pill} onAction={onPillAction} />
                 </div>
+              )}
+              {/* The selected room's or marks' actions, right above the label (lib/selectionPlacement). */}
+              {(barRoomActions || barMarks) && (
+                <SelectionBar
+                  frame={chromeRects.frame}
+                  anchor={chromeRects.rects.anchor}
+                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill].filter(Boolean)}
+                  insetLeft={check ? 8 : RAIL_WIDTH + 16}
+                  room={barRoomActions}
+                  marks={barRoomActions ? null : barMarks}
+                />
+              )}
+              {/* Layer legend (2026-10-16 walls; v3 W1-C zones too): what each line style on the sheet means,
+                  named once, where the layers are — in the corner that covers nothing the user looks at. */}
+              {(wallsLayerVisible || zoneFillsVisible) && !check && (
+                <OverlayLegend
+                  vertical
+                  layers={[zoneFillsVisible && 'zones', wallsLayerVisible && 'walls'].filter(Boolean)}
+                  className={`absolute max-w-[300px] ${legendSpot === 'top-right' ? 'right-2' : legendSpot === 'bottom-left' ? '' : 'right-2'}`}
+                  style={legendSpot === 'top-right'
+                    ? { top: chromeTopBottom + 8 }
+                    : legendSpot === 'bottom-left'
+                      ? { left: RAIL_WIDTH + 16, bottom: 8 }
+                      : { bottom: 8 }}
+                  data-layer-legend={legendSpot}
+                  data-testid={wallsLayerVisible ? 'walls-legend' : 'zones-legend'}
+                />
               )}
             </div>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
 
+            <div className="absolute inset-x-0 top-12 bottom-0 pointer-events-none z-30"><div className="pointer-events-auto">
             <OutlineToolPanel
               tool={outlineTools.tool}
               rooms={rooms}
@@ -1486,18 +1543,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onCancel={outlineTools.cancel}
               onSave={outlineTools.save}
             />
-            {/* Layer legend (2026-10-16 walls; v3 W1-C zones too): what each line style on the sheet means,
-                named once, where the layers are — the overlay vocabulary never rides on colour alone. */}
-            {(wallsLayerVisible || zoneFillsVisible) && !check && (
-              <OverlayLegend
-                layers={[zoneFillsVisible && 'zones', wallsLayerVisible && 'walls'].filter(Boolean)}
-                className="absolute bottom-2 right-2 z-panel max-w-[calc(100%-1rem)]"
-                data-testid={wallsLayerVisible ? 'walls-legend' : 'zones-legend'}
-              />
-            )}
+            </div></div>
             {!check && <ScaleGateChip documentId={activeDocumentId} scales={effectiveScales} tool={measureTool} onSetScale={() => armMeasureTool('calibrate')} />}
             {(scalesOpen || scaleCheck) && !check && project && (
-              <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-2">
+              <div className="absolute top-14 right-2 z-30 flex flex-col items-end gap-2">
                 {scaleCheck && (
                   <ScaleCheckCard
                     readout={scaleCheck.readout}
@@ -1521,7 +1570,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               </div>
             )}
             {historyOpen && !check && (
-              <div className="absolute top-2 right-2 z-30">
+              <div className="absolute top-14 right-2 z-30">
                 <HistoryPanel
                   history={measureHist}
                   onUndo={undoMeasure}
@@ -1599,6 +1648,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onClose={() => setCalibRequest(null)}
           />
           <ShortcutsGuide open={guideOpen} onOpenChange={setGuideOpen} />
+          <RenameDialog
+            state={renaming}
+            onCancel={() => setRenaming(null)}
+            onSave={(name) => { renameMeasurement(renaming.id, name); setRenaming(null); }}
+          />
           {!check && (
             <MeasureContextMenu
               target={measureMenu}
