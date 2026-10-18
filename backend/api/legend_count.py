@@ -51,6 +51,7 @@ class CountBody(BaseModel):
     row_ids: list[str] = []
     pages: list[int] | None = None
     min_score: float = 0.70
+    margin: float | None = None        # the shape search keeps candidates within this of the best twin (default 0,02)
     other_sheets: bool = False
 
 
@@ -218,20 +219,22 @@ def _pages_for(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: boo
 
 
 def _raster_count(pdf_bytes: bytes, row: dict, geo, wanted: list[int], min_score: float, other_sheets: bool,
-                  budget: float) -> dict:
-    from extractor.cv_match import batch_find_symbol
+                  budget: float, margin: float | None = None) -> dict:
+    from extractor.cv_match import BATCH_MARGIN, batch_find_symbol
+    margin = BATCH_MARGIN if margin is None else float(margin)
     box = _mediabox_box(pdf_bytes, row, geo)
     exclude = {row["page"]: [row["legend_bbox_pct"]]} if row.get("legend_bbox_pct") else None
     first, rest = _pages_for(pdf_bytes, row, wanted, other_sheets)
     if not first:                          # no sheet carries the row's text: search them all (pages=[] would too)
         first, rest = rest, []
     started = time.monotonic()
-    res = batch_find_symbol(pdf_bytes, row["page"], box, first, min_score, exclude=exclude, time_budget_s=budget)
+    res = batch_find_symbol(pdf_bytes, row["page"], box, first, min_score, margin=margin, exclude=exclude,
+                            time_budget_s=budget)
     if res["status"] != "ok":
         return {"status": res["status"], "detail": res["detail"], "res": res}
     found = {e["page"]: [c for c in e["candidates"] if not c["is_source"]] for e in res["pages"]}
     if rest and not any(found.values()):
-        more = batch_find_symbol(pdf_bytes, row["page"], box, rest, min_score, exclude=exclude,
+        more = batch_find_symbol(pdf_bytes, row["page"], box, rest, min_score, margin=margin, exclude=exclude,
                                  time_budget_s=max(0.0, budget - (time.monotonic() - started)))
         if more["status"] == "ok":
             res["pages"] += more["pages"]
@@ -375,6 +378,8 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
         raise HTTPException(status_code=400, detail=f"Vienu kartu galima skaičiuoti iki {MAX_ROWS} eilučių")
     if not (0.3 <= float(body.min_score) <= 1.0):
         raise HTTPException(status_code=400, detail="Panašumo riba turi būti nuo 0,3 iki 1")
+    if body.margin is not None and not (0.0 <= float(body.margin) <= 0.3):
+        raise HTTPException(status_code=400, detail="Panašumo paklaida turi būti nuo 0 iki 0,3")
     rows = [_row_in(r) for r in rows_in]
     for k, r in enumerate(rows):
         r["row_id"] = r["row_id"] or f"sablonas-{k + 1}"
@@ -422,7 +427,8 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
         if remaining <= 0:
             answers[k] = {**base, "partial": True, "pages_not_read": wanted, "saltinis": "rastras"}
             continue
-        got = _raster_count(pdf_bytes, r, geo, wanted, float(body.min_score), bool(body.other_sheets), remaining)
+        got = _raster_count(pdf_bytes, r, geo, wanted, float(body.min_score), bool(body.other_sheets), remaining,
+                            body.margin)
         if got["status"] != "ok":
             answers[k] = {**base, "status": got["status"], "detail": got["detail"], "saltinis": "rastras"}
             continue
