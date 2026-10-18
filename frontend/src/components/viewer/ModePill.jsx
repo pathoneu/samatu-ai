@@ -3,7 +3,7 @@
  * name, what it holds now, its keys, and the buttons that finish or leave it. Content from
  * lib/modePill (pure, tested); `onAction(id)` is the viewer's. Nothing at rest.
  */
-export default function ModePill({ pill, sentence = null, onAction }) {
+export default function ModePill({ pill, onAction }) {
   if (!pill) return null;
   return (
     <div
@@ -15,7 +15,6 @@ export default function ModePill({ pill, sentence = null, onAction }) {
     >
       <span className="font-semibold whitespace-nowrap">{pill.name}</span>
       {pill.detail && <span className="text-foreground">{pill.detail}</span>}
-      {sentence && <span className="text-foreground">{sentence}</span>}
       {pill.keys && <span className="text-muted-foreground">{pill.keys}</span>}
       {pill.actions.length > 0 && (
         <span className="inline-flex items-center gap-1.5">

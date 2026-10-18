@@ -50,10 +50,12 @@ import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
 import ModePill from './ModePill';
+import CursorHint from './CursorHint';
+import { cursorHintFor } from '@/lib/cursorHints';
 import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
-import { matchViewerHotkey, withKey, hintText, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
+import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
@@ -63,24 +65,8 @@ import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floa
 // Empty measurement draft (shape of measureOverlayReducer's state).
 const EMPTY_DRAFT = { points: [], committed: false };
 
-// One-line instruction per armed tool (status bar) — the tools LOOK similar,
-// the hint says what each one is doing right now.
-// 2026-07-28 explainability pass: every draft has a „Baigti" / „Atšaukti"
-// button next to the last point, but the hints only advertised double-click —
-// so the visible exit was the one nobody was told about. Multi-step flows
-// (kalibravimas, kiekis) now number their steps.
-const MEASURE_HINTS = {
-  pan: 'Rankutė: tempkite brėžinį · Esc — baigti',
-  select: `Spustelėkite matavimą jam pažymėti · ${hintText(['deleteSelected'])} · dešinysis klavišas — meniu`,
-  lasso: `Laso: apveskite matavimus ir žymes (Shift — pridėti) · dešinysis klavišas — veiksmai su visais · ${hintText(['deleteSelected'])}`,
-  distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
-  area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
-  perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
-  count: 'Kiekis: 1) pasirinkite tipą kairėje 2) spustelėkite elementus · ant žymės — pašalinti',
-  calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
-  // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
-  scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
-};
+// The instruction for the armed tool is ONE sentence beside the pointer (lib/cursorHints, CursorHint —
+// v3 W1-B B3); the mode pill holds the mode's name and buttons, the status bar the scale and the snap note.
 // What this sheet snaps to, by its wall geometry status — said in the status bar while a snapping tool is
 // armed (the tool's own instruction lives in the pill on the drawing, once — v3 W1-C). One snap colour;
 // the mark's shape says what the click lands on (MeasureLayer SnapDot).
@@ -1212,7 +1198,24 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
     mac,
   });
-  const pillSentence = symbol.active ? SYMBOL_HINTS[symbol.phase] : (outlineEdit || fillFor != null ? null : (MEASURE_HINTS[measureTool] || null));
+  // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
+  // armed fill, „Rasti panašius", then the measure tool. Nothing at rest.
+  const hintMode = outlineEdit ? 'outlineEdit'
+    : outlineTools.tool ? outlineTools.tool.mode
+      : fillFor != null ? 'fill'
+        : symbol.active ? 'findSimilar'
+          : measureTool;
+  const resolveCursorHint = ({ shift }) => cursorHintFor({
+    mode: hintMode,
+    points: draftPoints,
+    shift,
+    calibPoint: calibSlot.point != null,
+    countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
+    symbolPhase: symbol.phase,
+    fill: fillFor != null ? { nr: fillFor, busy: fillBusy } : null,
+    selectionCount: selectedMeasureIds.length,
+    outlineTool: outlineTools.tool,
+  });
   const onPillAction = (id) => {
     if (id === 'outlineUndo') undoOutline();
     else if (id === 'outlineSave') saveOutlineEdit();
@@ -1408,7 +1411,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               {/* The active mode's pill, bottom centre between the tool cards and the right edge. */}
               {pill && (
                 <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: RAIL_WIDTH + 16 }}>
-                  <ModePill pill={pill} sentence={pillSentence} onAction={onPillAction} />
+                  <ModePill pill={pill} onAction={onPillAction} />
                 </div>
               )}
             </div>
@@ -1559,6 +1562,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             />
           )}
           <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
+          <CursorHint rootRef={tvRootRef} resolve={resolveCursorHint} mode={hintMode} enabled={active && !check} />
         </div>
         );
       }}
