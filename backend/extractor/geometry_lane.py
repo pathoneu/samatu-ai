@@ -241,6 +241,11 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
     meta["nupiesta"] = drawn
 
 
+def _merged(r: dict) -> bool:
+    """The room another was merged INTO („Sujungti", api/room_outline.py: `_sujungimas.su`)."""
+    return isinstance(r.get("_sujungimas"), dict) and bool(r["_sujungimas"].get("su"))
+
+
 def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta) -> None:
     """Which covering the FLOOR PLAN draws in each room (extractor/floor_coverings.py).
 
@@ -274,7 +279,7 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
             asked = []
             for r in rooms:
                 nr = _nr(r)
-                if nr in read:
+                if nr in read or _merged(r):
                     continue
                 polygon = point = None
                 poly = r.get("polygon_pct")
@@ -300,6 +305,10 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
             r["_grindu_dangos_dvi"] = two[nr]
         else:
             r.pop("_grindu_dangos_dvi", None)
+        if _merged(r):
+            # „Sujungti": the kept room's covering is applied to the whole area (its outline now holds both
+            # rooms' coverings) — settled by the merge, like his choice; a re-read never takes it back.
+            continue
         hit = read.get(nr)
         evidence = {k: hit[k] for k in ("danga", "page", "irodymas", "tekstas", "plotas_m2", "rect_pct")} if hit else None
         if hit:

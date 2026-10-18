@@ -351,6 +351,12 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   const floorRatios = (p) => (p.lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
   await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 }).toEqual(floorRatios(project));
   note(`after merge: „Patalpos 11 143,27 m²" · checks as before the merge: ${floorRatios(project).join(' · ') || '—'}`);
+  // W1-F F2: 04 keeps the floor covering the floor plan gives it (it went to „—" and Patikra asked again)
+  expect(roomsByNr(await getProject())['04']).toMatchObject({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' });
+  const { questions } = await api(`/api/projects/${PROJECT}/questions`);
+  const floorAsked = questions.filter((q) => q.kind === 'grindys').flatMap((q) => q.items.map((i) => i.room_nr));
+  expect(floorAsked, 'Patikra does not ask 04\'s floor again').not.toContain('04');
+  note(`04 grindys: plytelės (iš grindų plano) · Patikra klausia grindų: ${floorAsked.join(', ') || '—'}`);
 
   // „Atimti" (saved): a 2,06 m² column, „Kas atimama?" = kolona → 4 corners × 2,82 m
   await subtractColumn(page, await getProject());
@@ -605,6 +611,9 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await subtractColumn(page, await getProject());
   await page.goto(`/project/${PROJECT}/patikra?kambarys=04`);
   await expect(page.getByRole('heading', { level: 1, name: /^04 / })).toBeVisible({ timeout: 60_000 });
+  // W1-F F2: the merged 04 still says what the floor plan draws in it — not „dvi dangos", not a question
+  await expect(page.getByText(/^Grindų plane \(7 psl\.\) ši patalpa nubraižyta tuo pačiu raštu/)).toBeVisible();
+  await expect(page.getByText(/parašytos dvi dangos/)).toHaveCount(0);
   const learnedBefore = await learnedCount(page);
   const fact = page.locator('div')
     .filter({ has: page.getByRole('img', { name: /^Pertvarų sienos atviroje erdvėje/ }) })
