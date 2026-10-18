@@ -11,7 +11,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test:units": "node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js"
+    "test:units": "node --test src/lib/*.test.js src/lib/viewerEngine/*.test.js",
+    "test:e2e": "npm exec --yes --package=playwright@1.55.1 -- playwright test -c e2e/playwright.config.js"
   },
   "dependencies": {
     "@embedpdf/core": "^2.14.4",
