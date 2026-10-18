@@ -10,12 +10,16 @@
  * Derived from props on every render (`project.darbu_sarasas`, the rooms, hiddenRoomNrs): a recompute
  * replaces the project and the panel follows; the only local state is view state (filter, sort, which
  * rows are open, the keyboard cursor). Lines cannot be moved between families here — the engine
- * computes them, and the way to change one is Prielaidos.
+ * computes them, and the way to change one is Prielaidos. What he CAN do here (Pathon v3 W4-A): type a line's
+ * number (double-click it, or F2; Enter saves, Esc cancels, Tab goes on to the next line — the „ranka"
+ * override of lib/quantityOverride, with Atšaukti), and put a measurement on a line (drag a chip of the
+ * Matavimai tray onto it, or click the chip → „Į eilutę…"); a line carrying measurements shows „iš matavimų".
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Search } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator,
   ContextMenuTrigger,
@@ -24,6 +28,14 @@ import {
   SORT_ALPHA, SORT_ORDER, SORT_QUANTITY, buildQuantitiesTree, familiesWithRoom, footerTotals, visibleRowKeys,
 } from '@/lib/quantitiesTree';
 import { FamilyFooter, FamilyRow, RoomRow, SectionRow, TotalsFooter } from './QuantityRows';
+import { getProject, updateProject } from '@/lib/projectStore';
+import { updatePositionQuantity } from '@/lib/quantityOverride';
+import { restoreRow } from '@/lib/measuredRows';
+import { ltQuantity } from '@/lib/ledger';
+import { useMeasureRows } from '@/components/project/measure/useMeasureRows';
+import MeasureRowPicker from '@/components/project/measure/MeasureRowPicker';
+import MeasuredChip from '@/components/project/measure/MeasuredChip';
+import MeasureTray from '@/components/project/measure/MeasureTray';
 
 const SORT_LABELS = {
   [SORT_ORDER]: 'Kaip sąmatoje',
@@ -48,6 +60,10 @@ export default function QuantitiesPanel({
   onOpenAssumptions = null,
   onActiveRowChange = null,   // (row | null) — the line under the cursor, offered to „Pokalbis"
   onAddToChat = null,         // ({kind: 'row', row} | {kind: 'room', nr}) — „Pridėti į pokalbį"
+  // Pathon v3 W4-A: the panel writes — a typed quantity (double-click / F2) and measurements put on a row.
+  // Without it the panel stays read-only, as before.
+  onProjectChange = null,
+  onJumpToPage = null,        // (page) — a measurement line's „Rodyti brėžinyje"
 }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('');
@@ -57,6 +73,11 @@ export default function QuantitiesPanel({
   const [activeKey, setActiveKey] = useState(null);
   const [menuTarget, setMenuTarget] = useState(null);
   const listRef = useRef(null);
+  // The line whose number is being typed (family key) and the measurement whose row is being picked.
+  const [editingKey, setEditingKey] = useState(null);
+  const [pickerKey, setPickerKey] = useState(null);
+  const measure = useMeasureRows(project, onProjectChange);
+  const canWrite = !!(onProjectChange && project?.id);
 
   const tree = useMemo(
     () => buildQuantitiesTree(project?.darbu_sarasas, rooms, { filter, sort, hiddenRoomNrs }),
@@ -129,6 +150,11 @@ export default function QuantitiesPanel({
       return;
     }
     if (!item) return;
+    if (e.key === 'F2' && item.kind === 'family' && canWrite) {
+      e.preventDefault();
+      setEditingKey(item.key);
+      return;
+    }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (item.kind === 'section') toggleSection(item.key);
@@ -154,6 +180,40 @@ export default function QuantitiesPanel({
     setActiveKey(key);
     setMenuTarget({ family, room });
   };
+
+  // ── A typed quantity: Enter saves, Tab saves and opens the next line (lib/quantityOverride — the same
+  // „ranka" override every other table writes; Atšaukti in the toast puts the row back as it was). ──
+  const familyKeys = useMemo(() => keys.filter((k) => k.kind === 'family').map((k) => k.key), [keys]);
+  const commitQuantity = (family, value, move) => {
+    const at = familyKeys.indexOf(family.key);
+    const nextKey = move ? familyKeys[at + move] || null : null;
+    setEditingKey(nextKey);
+    if (nextKey) setActiveKey(nextKey);
+    const base = getProject(project.id) || project;
+    const row = family.row;
+    const previous = (base.darbu_sarasas || []).find((r) => (r?.id ?? r?._id) === (row.id ?? row._id)) || row;
+    if (Number(previous.kiekis) === value && previous.manual_override) return;
+    const rowId = row._id || `${row.eil_nr}-${row.aprasymas}`;
+    let rows;
+    try { rows = updatePositionQuantity(base.darbu_sarasas || [], rowId, value); } catch { return; }
+    const saved = updateProject(project.id, { darbu_sarasas: rows });
+    if (!saved) return;
+    onProjectChange?.(saved);
+    const unit = row.mato_vnt || row.vnt || '';
+    toast.success(`„${row.aprasymas}“: ${ltQuantity(previous.kiekis, unit)} → ${ltQuantity(value, unit)}`, {
+      description: 'Kiekį įrašėte ranka — perskaičiuojant jis nesikeis.',
+      duration: 8000,
+      action: {
+        label: 'Atšaukti',
+        onClick: () => {
+          const now = getProject(project.id) || saved;
+          const back = updateProject(project.id, { darbu_sarasas: restoreRow(now.darbu_sarasas, row, previous) });
+          if (back) onProjectChange?.(back);
+        },
+      },
+    });
+  };
+  const cancelEdit = (key) => setEditingKey((cur) => (cur === key ? null : cur));
 
   const recompute = () => {
     if (typeof window === 'undefined' || !project?.id) return;
@@ -237,6 +297,8 @@ export default function QuantitiesPanel({
         </div>
       )}
 
+      {canWrite && <MeasureTray project={project} onPickRow={setPickerKey} />}
+
       <ContextMenu onOpenChange={(open) => { if (!open) setMenuTarget(null); }}>
         {/* onContextMenu sits on the Trigger, not the div: only there does Radix skip opening when the
             handler calls preventDefault (a right-click on empty space opens nothing). */}
@@ -279,7 +341,22 @@ export default function QuantitiesPanel({
                           expanded={expanded}
                           active={activeKey === family.key}
                           containsFocused={containsFocused}
-                          onToggle={() => { setActiveKey(family.key); toggleFamily(family.key); }}
+                          onToggle={() => { if (editingKey !== family.key) { setActiveKey(family.key); toggleFamily(family.key); } }}
+                          editing={editingKey === family.key}
+                          onStartEdit={canWrite ? () => { setActiveKey(family.key); setEditingKey(family.key); } : null}
+                          onCommitEdit={(value, move) => commitQuantity(family, value, move)}
+                          onCancelEdit={() => cancelEdit(family.key)}
+                          dropProps={canWrite ? measure.dropProps(family.row) : null}
+                          dropOver={!!family.row?.id && measure.overRowId === family.row.id}
+                          chip={(
+                            <MeasuredChip
+                              row={family.row}
+                              compact
+                              onSetKaip={canWrite ? measure.setKaip : null}
+                              onUnlink={canWrite ? measure.unlink : null}
+                              onJumpToPage={onJumpToPage}
+                            />
+                          )}
                         />
                         {expanded && family.rooms.map((room) => {
                           const key = `${family.key}/${room.key}`;
@@ -326,6 +403,11 @@ export default function QuantitiesPanel({
                 {menuAllHidden ? 'Rodyti kontūrą' : 'Slėpti kontūrą'}
                 {!menuTarget.room && menuNrs.length > 0 ? ` (${menuNrs.length})` : ''}
               </ContextMenuItem>
+              {!menuTarget.room && canWrite && (
+                <ContextMenuItem onSelect={() => setEditingKey(menuTarget.family.key)}>
+                  Taisyti kiekį…
+                </ContextMenuItem>
+              )}
               <ContextMenuItem onSelect={() => openCheckSheet(menuTarget.room)}>
                 {menuTarget.room ? 'Atidaryti patikros lapą' : 'Atidaryti patikrą'}
               </ContextMenuItem>
@@ -352,6 +434,15 @@ export default function QuantitiesPanel({
       </ContextMenu>
 
       {rowCount > 0 && <TotalsFooter footer={footerTotals(tree, filter)} shown={tree.families.length} all={tree.familyCount} />}
+      {canWrite && (
+        <MeasureRowPicker
+          open={!!pickerKey}
+          onOpenChange={(v) => { if (!v) setPickerKey(null); }}
+          project={project}
+          sourceKey={pickerKey}
+          onPick={(row, kaip) => measure.link(pickerKey, row, kaip)}
+        />
+      )}
     </div>
   );
 }

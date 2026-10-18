@@ -284,6 +284,49 @@ export function linksOf(project) {
   return out;
 }
 
+function geometrySource(m, scales) {
+  const scale = pageScaleIn(scales, m.page);
+  const value = scale?.calibrated ? round2(measurementValue(m, scale).value) : null;
+  return {
+    key: `m:${m.id}`, value: Number.isFinite(value) ? value : null, unit: GEOMETRY_UNITS[m.kind],
+    pages: m.page != null ? [m.page] : [],
+    ...(m.name ? { pavadinimas: String(m.name) } : {}),
+  };
+}
+
+function countTypeSource(id, measurements, types) {
+  const marks = measurements.filter((m) => m?.kind === 'count' && m.typeId === id);
+  const pages = [...new Set(marks.map((m) => m.page).filter((p) => num(p) != null))].sort((a, b) => a - b);
+  const type = types.find((t) => t?.id === id);
+  return { key: `type:${id}`, value: marks.length, unit: 'vnt.', pages, pavadinimas: String(type?.label || id) };
+}
+
+/**
+ * One measurement or count type as he would read it — `{key, value, unit, pages, pavadinimas?}` — linked or
+ * not (the picker and the toasts name what is being put on a row). Null for an unknown key.
+ */
+export function measureSource(project, key) {
+  const measurements = Array.isArray(project?.measurements) ? project.measurements : [];
+  const k = String(key || '');
+  if (k.startsWith('m:')) {
+    const m = measurements.find((x) => x?.id != null && `m:${x.id}` === k);
+    return m && GEOMETRY_UNITS[m.kind] ? geometrySource(m, effectivePageScales(project)) : null;
+  }
+  if (k.startsWith('type:')) {
+    const id = k.slice(5);
+    const types = Array.isArray(project?.countTypes) ? project.countTypes : [];
+    if (!types.some((t) => t?.id === id) && !measurements.some((m) => m?.typeId === id)) return null;
+    return countTypeSource(id, measurements, types);
+  }
+  return null;
+}
+
+/** „Atstumas 4,20 m (lapas 1)" — a source in words, without the sign a row line carries. */
+export function sourceText(source) {
+  if (!source) return '';
+  return lineText({ ...source, kaip: 'kiekis' });
+}
+
 /**
  * The linked measurements as contributions — the measured value with its unit and pages. A length on a sheet
  * with no scale has `value: null` (listed, never counted). A count type is all of its marks.
@@ -296,31 +339,49 @@ export function measuredContributions(project) {
   const out = [];
   for (const m of measurements) {
     const link = m?.id ? links.get(`m:${m.id}`) : null;
-    const unit = GEOMETRY_UNITS[m?.kind];
-    if (!link || !unit) continue;
+    if (!link || !GEOMETRY_UNITS[m?.kind]) continue;
     if (!scales) scales = effectivePageScales(project);
-    const scale = pageScaleIn(scales, m.page);
-    const value = scale?.calibrated ? round2(measurementValue(m, scale).value) : null;
-    out.push({
-      key: `m:${m.id}`, ...link, value: Number.isFinite(value) ? value : null, unit,
-      pages: m.page != null ? [m.page] : [],
-      ...(m.name ? { pavadinimas: String(m.name) } : {}),
-    });
+    const { key, ...src } = geometrySource(m, scales);
+    out.push({ key, ...link, ...src });
   }
   const types = Array.isArray(project?.countTypes) ? project.countTypes : [];
   const typeIds = new Set([...types.map((t) => t?.id), ...measurements.map((m) => m?.typeId)].filter(Boolean));
   for (const id of typeIds) {
     const link = links.get(`type:${id}`);
     if (!link) continue;
-    const marks = measurements.filter((m) => m?.kind === 'count' && m.typeId === id);
-    const pages = [...new Set(marks.map((m) => m.page).filter((p) => num(p) != null))].sort((a, b) => a - b);
-    const type = types.find((t) => t?.id === id);
-    out.push({
-      key: `type:${id}`, ...link, value: marks.length, unit: 'vnt.', pages,
-      pavadinimas: String(type?.label || id),
-    });
+    const { key, ...src } = countTypeSource(id, measurements, types);
+    out.push({ key, ...link, ...src });
   }
   return out;
+}
+
+// ── Drag and drop ───────────────────────────────────────────────────────────────────────────────────
+
+/** The drag payload's type: a measurement's link key travels as text under it. */
+export const MEASURE_DRAG_TYPE = 'application/x-pathon-matavimas';
+
+/** May this measurement go on this row? `{ok}` or `{ok: false, why}` in his words. */
+export function canLinkTo(source, row) {
+  if (!source) return { ok: false, why: 'Matavimo nebėra.' };
+  if (!row?.id) return { ok: false, why: 'Šios eilutės priskirti negalima — perskaičiuokite sąmatą.' };
+  const rowUnit = unitOfRow(row);
+  if (rowUnit && !unitsMatch(source.unit, rowUnit)) {
+    return { ok: false, why: `Eilutė skaičiuojama ${rowUnit}, o matavimas — ${foldUnit(source.unit)}. Pasirinkite eilutę, skaičiuojamą ${foldUnit(source.unit)}.` };
+  }
+  return { ok: true };
+}
+
+/** A row put back as it was (an Undo): the row in `rows` that is `row` takes `previous`'s fields. */
+export function restoreRow(rows, row, previous) {
+  const list = Array.isArray(rows) ? rows : [];
+  const id = row?.id ?? row?._id;
+  const at = id != null
+    ? list.findIndex((r) => (r?.id ?? r?._id) === id)
+    : list.findIndex((r) => r?.aprasymas === row?.aprasymas && (r?.skyrius || '') === (row?.skyrius || ''));
+  if (at < 0) return list;
+  const next = list.slice();
+  next[at] = previous;
+  return next;
 }
 
 /** Does anything on the project link a measurement to a row (or did, so a row must be released)? */

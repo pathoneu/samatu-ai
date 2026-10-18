@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  applyMeasuredRows, defaultKaip, linkKey, linksOf, linkPatch, measuredContributions, rowMeasurements,
-  syncMeasuredRows, unitOfRow, unitsMatch,
+  applyMeasuredRows, canLinkTo, defaultKaip, linkKey, linksOf, linkPatch, linkStatus, measureSource,
+  measuredContributions, restoreRow, rowMeasurements, sourceText, syncMeasuredRows, unitOfRow, unitsMatch,
 } from './measuredRows.js';
 
 const CASES = JSON.parse(readFileSync(new URL('./measuredRows.cases.json', import.meta.url), 'utf8'));
@@ -138,4 +138,39 @@ test('the row\'s measurements, for the chip and its list', () => {
   const list = rowMeasurements(on, on.darbu_sarasas[0]);
   assert.deepEqual(list.map((l) => [l.key, l.tekstas, l.taikoma]), [['m:d1', '+ matavimas 4,20 m (lapas 1)', true]]);
   assert.deepEqual(rowMeasurements(on, on.darbu_sarasas[1]), []);
+});
+
+test('a source in words, linked or not — what the picker and the toasts name', () => {
+  const p = project();
+  assert.equal(sourceText(measureSource(p, 'm:d1')), 'matavimas 4,20 m (lapas 1)');
+  assert.equal(sourceText(measureSource(p, 'm:d2')), 'matavimas „Siena“ be mastelio (lapas 2)');
+  assert.equal(sourceText(measureSource(p, 'type:rozetes')), 'matavimas „Rozetės“ 3 vnt. (lapai 1, 3)');
+  assert.equal(measureSource(p, 'm:nope'), null);
+  assert.equal(measureSource(p, 'type:nope'), null);
+});
+
+test('a drop on a row of another unit is refused, and says which rows fit', () => {
+  const p = project();
+  assert.deepEqual(canLinkTo(measureSource(p, 'm:d1'), p.darbu_sarasas[0]), { ok: true });
+  const why = canLinkTo(measureSource(p, 'm:d1'), p.darbu_sarasas[1]);
+  assert.equal(why.ok, false);
+  assert.match(why.why, /Eilutė skaičiuojama vnt\., o matavimas — m/);
+  assert.equal(canLinkTo(measureSource(p, 'm:d1'), { aprasymas: 'be id', mato_vnt: 'm' }).ok, false);
+});
+
+test('where a measurement sits — and when its line has left the sąmata', () => {
+  const p0 = project();
+  const on = { ...p0, ...linkPatch(p0, 'm:d1', { eilute_id: 'a', kaip: 'pridėti' }) };
+  assert.equal(linkStatus(on, 'm:d1').row.id, 'a');
+  const gone = { ...on, darbu_sarasas: on.darbu_sarasas.filter((r) => r.id !== 'a') };
+  assert.equal(linkStatus(gone, 'm:d1').row, null);
+  assert.equal(linkStatus(on, 'm:d2'), null);
+});
+
+test('an Undo puts the one row back as it was', () => {
+  const rows = [{ id: 'a', kiekis: 1 }, { id: 'b', kiekis: 2 }];
+  const back = restoreRow(rows, { id: 'b' }, { id: 'b', kiekis: 9 });
+  assert.deepEqual(back.map((r) => r.kiekis), [1, 9]);
+  assert.equal(back[0], rows[0]);
+  assert.equal(restoreRow(rows, { id: 'zz' }, {}), rows);
 });

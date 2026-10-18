@@ -14,7 +14,7 @@
  * visus". One history entry per action.
  */
 import { useEffect, useState } from 'react';
-import { Pencil, Shapes, Trash2, ListTree, Palette, SquareDashedMousePointer } from 'lucide-react';
+import { Pencil, Shapes, Trash2, ListTree, Palette, Rows3, SquareDashedMousePointer } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -92,6 +92,20 @@ export default function MeasureContextMenu({
           {onReveal && (
             <DropdownMenuItem onSelect={() => { onReveal(measurement); onClose?.(); }}>
               <ListTree className="w-3.5 h-3.5 mr-2" />Rodyti sąraše
+            </DropdownMenuItem>
+          )}
+          {/* Pathon v3 W4-A: the measurement (a count mark: its whole type) onto a sąmata row — the panel's
+              „Į eilutę…" picker (WorkspacePanel listens). Shown where „Rodyti sąraše" is: the main viewer. */}
+          {onReveal && measurement && ['distance', 'perimeter', 'area', 'count'].includes(measurement.kind) && (
+            <DropdownMenuItem
+              onSelect={() => {
+                const key = measurement.kind === 'count' ? `type:${measurement.typeId}` : `m:${measurement.id}`;
+                window.dispatchEvent(new CustomEvent('samatu:measure-to-row', { detail: { key } }));
+                onClose?.();
+              }}
+              data-testid="measure-menu-to-row"
+            >
+              <Rows3 className="w-3.5 h-3.5 mr-2" />Į eilutę…
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
