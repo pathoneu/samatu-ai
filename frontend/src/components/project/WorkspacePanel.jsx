@@ -586,7 +586,7 @@ export default function WorkspacePanel({
                     title={r._source === 'manual' ? 'Pažymėta brėžinyje (rankinis polygon)' : SOURCE_TITLE.table}
                   />
                 )}
-                <span className="text-foreground truncate" data-testid="room-row-name">{r.pavadinimas}</span>
+                <span className="text-foreground truncate" data-testid="room-row-name" title={r.pavadinimas}>{r.pavadinimas}</span>
                 {/* „Sujungti" (2026-10-16): the absorbed room is billed inside the kept one — say where, never „neskaičiuojama" */}
                 {(r._sujungta_i || r._sujungimas) && (
                   <span
