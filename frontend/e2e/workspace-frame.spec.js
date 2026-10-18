@@ -15,7 +15,8 @@
  * `baseURL`, e.g. http://localhost:5203 for the W1-A worktree) and needs the backend with auth off.
  * Nothing here writes to the project except the browser-local panel width.
  */
-import { test, expect } from '@playwright/test';
+// Runs under the founder-guide suite's runner (npm run test:e2e): Playwright is resolved by ./pw.js.
+import { test, expect } from './pw.js';
 
 const PROJECT = process.env.PATHON_E2E_PROJECT || 'demo-objektas_h';
 const STEP_NAV = 'nav[aria-label="Projekto žingsniai"]';
