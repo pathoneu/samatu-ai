@@ -641,7 +641,7 @@ export default function PatikraQuestions() {
                             : null}
                       fallback={{ room: roomFacts.room, projectId: id, highlightCorners: false, facts: factList, wholeSheet: true, onToggleWhole: () => {}, activeFactKey: FACT_OF[current.kind] || null }}
                     />
-                  ) : (
+                  ) : host?.canvasReady ? null : (
                     <div className="h-64 animate-pulse rounded-[2px] bg-muted" />
                   )}
                 </div>

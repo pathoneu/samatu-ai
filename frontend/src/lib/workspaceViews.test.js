@@ -4,7 +4,7 @@ import {
   VIEWS, PANEL_TABS, PANEL_LIMITS, MIN_SPLIT_CANVAS,
   panelForView, canvasModeForView, selectTab, tabForView,
   viewFromLocation, locationForView, patikraSubview,
-  clampPanelWidth, readPanelWidth, writePanelWidth, panelWidthFor,
+  clampPanelWidth, readPanelWidth, writePanelWidth, panelWidthFor, revealTarget,
 } from './workspaceViews.js';
 
 const memoryStorage = (init = {}) => {
@@ -112,6 +112,18 @@ test("a step change keeps parameters that are not the frame's own, and drops the
 
 test('project ids are encoded into the path', () => {
   assert.equal(locationForView('a b/c', 'brezinys'), '/project/a%20b%2Fc');
+});
+
+test('„show me this place" becomes the viewer focus: page, rect, a fresh nonce', () => {
+  assert.deepEqual(revealTarget({ page: 3, rect_pct: [0.1, 0.2, 0.4, 0.5] }, 7), { page: 3, rect: [0.1, 0.2, 0.4, 0.5], nonce: 7 });
+  assert.deepEqual(revealTarget({ page: '2' }, 1), { page: 2, rect: [0, 0, 1, 1], nonce: 1 }, 'no rect → the whole sheet');
+  assert.deepEqual(revealTarget({ page: 2, rect_pct: [0, 0, 1] }, 2).rect, [0, 0, 1, 1], 'a malformed rect → the whole sheet');
+  assert.deepEqual(revealTarget({ page: 2, rect_pct: [0, 'x', 1, 1] }, 2).rect, [0, 0, 1, 1]);
+  assert.deepEqual(revealTarget({ page: 2, rect_pct: ['0.5', 0, 1, 1] }, 2).rect, [0.5, 0, 1, 1], 'numbers as strings are numbers');
+  assert.equal(revealTarget({ page: 0 }), null);
+  assert.equal(revealTarget({ page: null }), null);
+  assert.equal(revealTarget({ page: 1.5 }), null);
+  assert.equal(revealTarget(), null);
 });
 
 test('panel width is clamped to its mode, the full panel starts at 340 px', () => {

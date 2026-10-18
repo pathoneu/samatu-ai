@@ -41,7 +41,7 @@ import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
   MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth,
-  selectTab, tabForView, writePanelWidth,
+  revealTarget, selectTab, tabForView, writePanelWidth,
 } from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
@@ -643,15 +643,49 @@ export default function InteriorWorkspace({
   }, [widthMode]);
   const hiddenViewerWidth = canvasWidth || Math.max(480, (workspaceWidth || 1200) - (panelWidthFor('full', { workspaceWidth }) || 340));
 
-  // What the panel's contents get from the frame (components/project/workspaceHost): its width, and a way
-  // to hand Patikra's saved project back to the top bar.
+  // What the panel's contents get from the frame (components/project/workspaceHost): its width, a way to
+  // hand Patikra's saved project back to the top bar, the two-way highlight hooks, and the drawing itself
+  // for a check view.
   const patikraProjectRef = useRef(onPatikraProject);
   patikraProjectRef.current = onPatikraProject;
   const hostProjectChange = useCallback((next) => patikraProjectRef.current?.(next), []);
+  // „Show me this place" — a fact's evidence, a room's frame: the drawing jumps there and fits it.
+  const revealNonce = useRef(0);
+  const [revealFocus, setRevealFocus] = useState(null);
+  const onRevealEvidence = useCallback((where) => {
+    const target = revealTarget(where || {}, revealNonce.current + 1);
+    if (!target) return;
+    revealNonce.current = target.nonce;
+    setRevealFocus(target);
+  }, []);
+  const roomsRef = useRef([]);
+  roomsRef.current = project.v8_rooms || project.patalpos || [];
+  const onFocusRoom = useCallback((nr) => {
+    const room = roomsRef.current.find((r) => String(r?.nr) === String(nr));
+    if (!room) return;
+    const page = room.puslapio_nr ?? room.page_nr ?? null;
+    if (page) setLocalFocusedPage(page);
+    setLocalFocusedRoom(room);
+  }, []);
+  // The drawing lent to Patikra (RoomDrawingPane): what was READ about one room is drawn instead of the
+  // room zones, and while he points at the drawing his clicks go to the question, not to the tools.
+  const [canvasSlot, setCanvasSlot] = useState(null);
+  const [hostedCheck, setHostedCheck] = useState(null);      // {check, pickActive} | null
+  const hostedPointRef = useRef(null);
+  const hostedPoint = useCallback((pt) => hostedPointRef.current?.(pt), []);
+  const canvasReady = Boolean(pdfUrl && embedEngine && !strip && !isMobile);
   const hostValue = useMemo(() => ({
     panelWidth: panelWidth ?? workspaceWidth,
     onProjectChange: hostProjectChange,
-  }), [panelWidth, workspaceWidth, hostProjectChange]);
+    onRevealEvidence,
+    onFocusRoom,
+    canvasReady,
+    canvasSlot,
+    setCanvasCheck: setHostedCheck,
+    pointRef: hostedPointRef,
+  }), [panelWidth, workspaceWidth, hostProjectChange, onRevealEvidence, onFocusRoom, canvasReady, canvasSlot]);
+  const viewerCheck = view === 'patikra' ? (hostedCheck?.check || null) : null;
+  const picking = Boolean(viewerCheck && hostedCheck?.pickActive);
 
   const panelLabel = (id) => PANEL_TABS.find((tab) => tab.id === id)?.label || id;
 
@@ -660,6 +694,10 @@ export default function InteriorWorkspace({
       <TakeoffViewer
         fileUrl={pdfUrl}
         active={!strip}
+        // Patikra's check view on this same viewer (RoomDrawingPane hosted), and „show me this place"
+        check={viewerCheck}
+        focus={revealFocus}
+        onPagePoint={picking ? hostedPoint : null}
         rooms={project?.v8_rooms || project?.patalpos || []}
         focusedRoom={effectiveFocusedRoom}
         focusedPage={effectiveFocusedPage}
@@ -889,7 +927,17 @@ export default function InteriorWorkspace({
             {t('project.interiorWorkspace.detecting')}
           </div>
         )}
-        <div className="relative flex-1 min-h-0 overflow-hidden">
+        {/* Patikra's drawing controls („Į patalpą", „Visas lapas", what to click, the wall legend) — right
+            above the drawing they act on (RoomDrawingPane portals here); empty and hidden otherwise. */}
+        <div
+          ref={setCanvasSlot}
+          data-testid="canvas-slot"
+          className="shrink-0 max-h-[45%] overflow-y-auto border-b border-border bg-card px-3 py-2 empty:hidden"
+        />
+        <div
+          className={`relative flex-1 min-h-0 overflow-hidden ${picking ? 'ring-2 ring-inset ring-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : ''}`}
+          data-picking={picking ? '1' : undefined}
+        >
           <div
             aria-hidden={strip || undefined}
             className="h-full flex flex-col"

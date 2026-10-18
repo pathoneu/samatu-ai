@@ -185,6 +185,36 @@ test.describe('workspace frame — one workspace, four views', () => {
     });
   }
 
+  test("Patikra draws on the workspace's drawing: one viewer, the check on it, a pick click reaches the room sheet", async ({ page }) => {
+    await openProject(page);
+    await waitForDrawing(page);
+    await page.evaluate(() => { window.__w1aViewer = document.querySelector('[data-takeoff-viewer]'); });
+    // the outline read is answered here (nothing is saved): it only has to prove the click got through
+    const asked = [];
+    await page.route('**/rooms/*/outline-at', async (route) => {
+      asked.push(route.request().postDataJSON());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'outside' }) });
+    });
+    await page.goto(`/project/${PROJECT}/patikra?kambarys=03`);
+    await waitForDrawing(page);
+    const pane = page.locator('[data-testid="canvas-slot"] [data-testid="room-drawing-pane"]');
+    await expect(pane).toHaveAttribute('data-hosted', '1', { timeout: 30_000 });
+    expect(await page.locator('[data-takeoff-viewer]').count(), 'no second viewer in the panel').toBe(1);
+
+    await page.locator('[data-testid="outline-pick"]').click();
+    await expect(page.locator('[data-testid="viewer-root"] [data-picking="1"]')).toBeVisible();
+    const canvas = await page.locator('[data-testid="viewer-canvas"]').boundingBox();
+    await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await expect.poll(() => asked.length).toBe(1);
+    expect(asked[0]).toHaveProperty('page');
+
+    // leaving Patikra gives the drawing back: no check controls, the same viewer
+    await goToStep(page, 'Brėžinys');
+    await expect.poll(() => workspaceView(page)).toBe('brezinys');
+    await expect(page.locator('[data-testid="room-drawing-pane"]')).toHaveCount(0);
+    await expect(page.locator('[data-picking="1"]')).toHaveCount(0);
+  });
+
   test('Sąmata „Išskleisti" gives the rows the width and keeps the drawing mounted behind a strip', async ({ page }) => {
     await openProject(page, `/project/${PROJECT}?step=samata`);
     await waitForDrawing(page);

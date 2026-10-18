@@ -518,7 +518,7 @@ export default function RoomSheet() {
                 }}
               />
             )
-            : <div className="h-64 animate-pulse rounded-[2px] bg-muted" />}
+            : (host?.canvasReady ? null : <div className="h-64 animate-pulse rounded-[2px] bg-muted" />)}
         </div>
 
         {/* Right — the two layers. */}

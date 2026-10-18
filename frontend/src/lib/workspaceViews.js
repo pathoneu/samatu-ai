@@ -124,6 +124,20 @@ export function locationForView(projectId, view, { kambarys = null, etapas = nul
   return qs ? `${path}?${qs}` : path;
 }
 
+// ── Two-way highlight (A6) ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * The viewer's `focus` for „show me this place" (`onRevealEvidence({page, rect_pct})`): `{page, rect,
+ * nonce}` with the rect in display-frame page fractions, the whole sheet when none (or a malformed one) is
+ * given; null when there is no page to go to. The nonce makes the same place asked for twice two jumps.
+ */
+export function revealTarget({ page = null, rect_pct = null } = {}, nonce = 0) {
+  const p = Number(page);
+  if (!Number.isInteger(p) || p < 1) return null;
+  const ok = Array.isArray(rect_pct) && rect_pct.length === 4 && rect_pct.every((v) => Number.isFinite(Number(v)));
+  return { page: p, rect: ok ? rect_pct.map(Number) : [0, 0, 1, 1], nonce };
+}
+
 // ── Right panel width ──────────────────────────────────────────────────────────────────────────────
 
 // 'full': the panel beside the drawing (Brėžinys) — 340 px by default, 300–480, remembered per browser.

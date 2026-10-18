@@ -8,6 +8,14 @@
  * Value: {
  *   panelWidth,                     // px of the right panel (layout decisions: one column or two)
  *   onProjectChange(project),       // their saved project, mirrored to the frame (no second save)
+ *   // two-way highlight hooks (A6)
+ *   onRevealEvidence({ page, rect_pct }), // the workspace drawing jumps to that place and frames it
+ *   onFocusRoom(nr),                // the workspace drawing focuses that room (its page, its ring)
+ *   // the workspace drawing lent to a check view (RoomDrawingPane)
+ *   canvasReady,                    // the drawing is the EmbedPDF viewer with a PDF, on screen
+ *   canvasSlot,                     // DOM node above the drawing for the check view's own controls
+ *   setCanvasCheck({ check, pickActive } | null), // what the drawing shows instead of the room zones
+ *   pointRef,                       // ref: (point) => void — where a click on the drawing goes while picking
  * }
  */
 import { createContext, useContext } from 'react';

@@ -1090,6 +1090,19 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (searchOpen) { setSearchOpen(false); return true; }
     return false;
   };
+  // The project workspace lends this one viewer to Patikra's check view and takes it back (Pathon v3,
+  // InteriorWorkspace): when `check` arrives every tool stands down, so a click on the sheet reaches the
+  // check's own pick and nothing else. (A viewer born in check mode has nothing armed — a no-op there.)
+  const inCheck = !!check;
+  useEffect(() => {
+    if (!inCheck) return;
+    setMeasureTool(null);
+    setSelectedMeasureIds([]);
+    setFillFor(null);
+    setOutlineEdit(null);
+    outlineTools.cancel();
+    if (symbol.active) symbol.close();
+  }, [inCheck]); // eslint-disable-line react-hooks/exhaustive-deps
   const countTallies = useMemo(() => measurements.reduce((acc, m) => {
     if (m.kind === 'count' && m.typeId) acc[m.typeId] = (acc[m.typeId] || 0) + 1;
     return acc;
@@ -1320,7 +1333,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleScales={check || !project ? null : () => setScalesOpen((v) => !v)}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
-          {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
+          {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
+          {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
               „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}
           {active && <ViewerHotkeys
