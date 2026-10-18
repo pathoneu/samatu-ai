@@ -93,10 +93,12 @@ const MEASURE_HINTS = {
 // Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
 // Key names come from lib/viewerShortcuts, the table the „?" guide prints.
 const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · ${hintText(['outlineUndo', 'outlineSave', 'outlineCancel'])}`;
-// What the status bar adds to a measure hint about snapping, by the sheet's wall geometry status.
+// What this sheet snaps to, by its wall geometry status — said in the status bar while a snapping tool is
+// armed (the tool's own instruction lives in the pill on the drawing, once — v3 W1-C). One snap colour;
+// the mark's shape says what the click lands on (MeasureLayer SnapDot).
 const SNAP_NOTE = {
-  ok: ' · prilimpa prie brėžinio sienų (oranžinė žymė) ir prie matavimų (žalia)',
-  no_walls: ' · šiame lape vektorinių sienų nėra — prilimpa tik prie matavimų',
+  ok: 'Prilimpa prie brėžinio sienų kampų (kvadratas), sienų (rombas) ir jūsų matavimų (apskritimas)',
+  no_walls: 'Šiame lape vektorinių sienų nėra — prilimpa tik prie jūsų matavimų',
 };
 
 // visiblePageOf moved to lib/visiblePage (2026-10-16): the scale panel reads the same page.
@@ -463,8 +465,9 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   // costs no extra request; `select` and `count` do not snap, the others do.
   const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count';
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
-  const snapNote = snapsHere ? (SNAP_NOTE[geometryStatus] || '') : '';
-  const measureHint = symbolHint || (outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null));
+  // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
+  // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
+  const snapNote = snapsHere && !symbolHint && !outlineEdit ? (SNAP_NOTE[geometryStatus] || '') : '';
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
@@ -473,18 +476,19 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
         <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">
           {fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`}
         </span>
-      ) : measureHint ? (
-        <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">{measureHint}</span>
       ) : (
-        /* Idle: the scale readout doubles as the calibration entry point. */
-        <button
-          type="button"
-          onClick={onCalibrateClick || undefined}
-          title={scaleStatusTitle(pageScale)}
-          className={`ml-auto whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
-        >
-          {scaleText}
-        </button>
+        <>
+          {snapNote && <span className="ml-auto min-w-0 truncate" title={snapNote}>{snapNote}</span>}
+          {/* The scale readout doubles as the calibration entry point. */}
+          <button
+            type="button"
+            onClick={onCalibrateClick || undefined}
+            title={scaleStatusTitle(pageScale)}
+            className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap ${onCalibrateClick ? 'hover:underline cursor-pointer' : ''} ${pageScale?.calibrated ? 'text-[hsl(var(--viewer-chrome-foreground))]' : 'text-[hsl(var(--viewer-chrome-active))]'}`}
+          >
+            {scaleText}
+          </button>
+        </>
       )}
     </div>
   );
@@ -1425,7 +1429,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
             {(measureTool != null || outlineEdit || symbol.active) && (
-              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-meta text-foreground shadow-md pointer-events-none whitespace-nowrap`}>
+              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-panel px-3.5 py-1.5 rounded-panel border border-border bg-card text-ui text-foreground shadow-md pointer-events-none w-max max-w-[calc(100%-1rem)] text-center`}>
                 {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
             )}
