@@ -23,7 +23,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -119,4 +119,42 @@ test('no screen sends him to a „Prielaidos" place — the top-bar button says 
   const en = JSON.parse(readFileSync(join(HERE, '../i18n/en.json'), 'utf8'));
   assert.doesNotMatch(en.project.interior.windowsNotFoundDesc, /Assumptions/);
   assert.match(en.project.interior.windowsNotFoundDesc, /“Settings” button/);
+});
+
+// ── Retired screen phrases in the components themselves (2026-10-18 audit §6 item 10, side findings C–F) ──
+// The test above reads lt.json; most viewer text is written straight into the components. These phrases
+// were on screen and were wrong — a side that is the other side, a screen that no longer exists, a layer
+// that is no longer drawn, pipeline words. Comments may still name them (history); code may not.
+const SRC = join(HERE, '..');
+const SKIP_DIRS = new Set(['bofu', 'landing', 'i18n']);
+// legal wording (lawyers), marketing FAQ (founder) and the DEV-only annotator are not app screens
+const SKIP_FILES = new Set(['Privacy.jsx', 'Terms.jsx', 'Cookies.jsx', 'Duk.jsx', 'Annotator.jsx']);
+function sourceFiles(dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) { if (!SKIP_DIRS.has(name)) out.push(...sourceFiles(p)); continue; }
+    if (!/\.(jsx?|mjs)$/.test(name) || /\.test\.js$/.test(name) || SKIP_FILES.has(name)) continue;
+    out.push(p);
+  }
+  return out;
+}
+const withoutComments = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+
+// [phrase, why it went]
+const RETIRED = [
+  ['pasirinkite tipą dešinėje', 'the count types panel is on the left'],
+];
+
+test('components carry none of the retired screen phrases', () => {
+  const files = ['components', 'lib', 'hooks', 'pages'].flatMap((d) => sourceFiles(join(SRC, d)));
+  assert.ok(files.length > 100, `expected the app sources, got ${files.length}`);
+  const found = [];
+  for (const file of files) {
+    const code = withoutComments(readFileSync(file, 'utf8'));
+    for (const [phrase, why] of RETIRED) {
+      if (code.includes(phrase)) found.push(`  ${file.slice(SRC.length + 1)}: „${phrase}" — ${why}`);
+    }
+  }
+  assert.deepEqual(found, [], `retired phrases back on screen:\n${found.join('\n')}`);
 });

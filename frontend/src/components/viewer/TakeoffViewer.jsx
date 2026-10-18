@@ -84,7 +84,7 @@ const MEASURE_HINTS = {
   distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
   area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
-  count: 'Kiekis: 1) pasirinkite tipą dešinėje 2) spustelėkite elementus · ant žymės — pašalinti',
+  count: 'Kiekis: 1) pasirinkite tipą kairėje 2) spustelėkite elementus · ant žymės — pašalinti',
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
   // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
   scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
