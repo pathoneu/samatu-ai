@@ -7,8 +7,8 @@ const memStore = () => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
 };
 
-test('three steps in order: Mastelis → Atstumas → Redaguoti kontūrą', () => {
-  assert.deepEqual(COACH_STEPS.map((s) => s.title), ['Mastelis', 'Atstumas', 'Redaguoti kontūrą']);
+test('three steps in order: Mastelis → Atstumas → Taisyti kontūrą', () => {
+  assert.deepEqual(COACH_STEPS.map((s) => s.title), ['Mastelis', 'Atstumas', 'Taisyti kontūrą']);
   for (const s of COACH_STEPS) assert.ok(s.anchor && s.body.length > 40, s.id);
 });
 

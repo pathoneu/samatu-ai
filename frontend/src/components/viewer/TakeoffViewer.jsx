@@ -54,7 +54,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
-import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor } from '@/lib/sheetRail';
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft } from '@/lib/sheetRail';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -85,7 +85,7 @@ const MEASURE_HINTS = {
   distance: 'Atstumas: spustelėkite pradžią ir pabaigą · „Baigti" arba dukart spustelėkite',
   area: 'Plotas: apveskite kontūrą (bent 3 taškai) · „Baigti" arba dukart spustelėkite',
   perimeter: 'Perimetras: spustelėkite kampus iš eilės · „Baigti" arba dukart spustelėkite',
-  count: 'Kiekis: 1) pasirinkite tipą dešinėje 2) spustelėkite elementus · ant žymės — pašalinti',
+  count: 'Kiekis: 1) pasirinkite tipą kairėje 2) spustelėkite elementus · ant žymės — pašalinti',
   calibrate: 'Mastelis: 1) spustelėkite atkarpos pradžią ir pabaigą 2) įrašykite jos tikrą ilgį',
   // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
   scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
@@ -98,7 +98,7 @@ const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti
 // the mark's shape says what the click lands on (MeasureLayer SnapDot).
 const SNAP_NOTE = {
   ok: 'Prilimpa prie brėžinio sienų kampų (kvadratas), sienų (rombas) ir jūsų matavimų (apskritimas)',
-  no_walls: 'Šiame lape vektorinių sienų nėra — prilimpa tik prie jūsų matavimų',
+  no_walls: 'Šiame lape sienų programa neperskaitė — prilimpa tik prie jūsų matavimų',
 };
 
 // visiblePageOf moved to lib/visiblePage (2026-10-16): the scale panel reads the same page.
@@ -219,8 +219,9 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
       {onToggleZoneFills && (
         <>
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
-          {/* Zone-fill layer toggle. Founder decision 2026-07-11: markers are the
-              default; this re-enables the filled room polygons.
+          {/* Zone-fill layer toggle. Founder decision 2026-07-14: a clean drawing is the
+              default (only the chosen room's ring); this re-enables the filled room polygons.
+              2026-10-18: the title still promised number markers, gone since 2026-07-14.
               2026-07-28: the old title named the CURRENT state and then the
               OTHER state's action in one breath ("užpildai: įjungta (rodyti
               žymeklius)") — both readings were wrong. Say only what the click
@@ -228,8 +229,8 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           <button
             className={zoneFillsVisible ? pressed : btn}
             title={zoneFillsVisible
-              ? 'Rodyti tik patalpų numerių žymeklius (dabar matomos nuspalvintos patalpų zonos)'
-              : 'Nuspalvinti patalpų zonas brėžinyje (dabar matomi tik numerių žymekliai)'}
+              ? 'Paslėpti nuspalvintas patalpas — brėžinys liks švarus, pasirinkta patalpa bus pažymėta žiedu ties jos numeriu'
+              : 'Nuspalvinti visas patalpas pagal jų kontūrus (dabar brėžinys švarus — pasirinkta patalpa pažymima žiedu ties jos numeriu)'}
             aria-pressed={!!zoneFillsVisible}
             onClick={onToggleZoneFills}
           ><Layers className="w-4 h-4" /></button>
@@ -241,7 +242,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               className={wallsLayerVisible ? pressed : btn}
               title={wallsLayerVisible
                 ? 'Paslėpti sienų sluoksnį'
-                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš vektorinio PDF'}
+                : 'Sienų sluoksnis: brėžinio sienos, visų patalpų kontūrai ir angos, kurias programa perskaitė iš brėžinio'}
               aria-pressed={!!wallsLayerVisible}
               aria-label="Sienų sluoksnis"
               data-testid="viewer-walls-layer"
@@ -301,10 +302,10 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           {/* Outline editing (2026-10-16): the focused room's outline vertex by vertex, snapping to the
               drawing's walls; „Išsaugoti" re-reads its walls server side (api outline-set). */}
           {outlineEdit ? (
-            <span className="inline-flex items-center gap-1 mr-1">
+            <span className="inline-flex shrink-0 items-center gap-1 mr-1">
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white disabled:opacity-60"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white whitespace-nowrap disabled:opacity-60"
                 title={outlineInvalid
                   ? 'Kontūras kertasi pats su savimi — pataisykite viršūnes, tada išsaugokite'
                   : 'Išsaugoti pakeistą kontūrą (Enter) — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti'}
@@ -326,7 +327,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               ><Undo2 className="w-4 h-4" /></button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
                 title="Atšaukti kontūro redagavimą (Esc) — niekas neišsaugoma"
                 onClick={onCancelOutlineEdit}
               >
@@ -337,36 +338,36 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           ) : (onStartOutlineEdit && fillFor == null) ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] mr-1"
-              title={`Redaguoti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
+              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap mr-1"
+              title={`Taisyti patalpos ${focusedRoomNr} kontūrą viršūnėmis: tempkite kampą, spustelėkite vidurio tašką — pridėti, dukart spustelėkite kampą — pašalinti; prilimpa prie brėžinio sienų`}
               onClick={onStartOutlineEdit}
               data-testid="outline-edit-start"
               data-coach="outline-edit"
             >
               <Pentagon className="w-3.5 h-3.5" />
-              <span>Redaguoti kontūrą</span>
+              <span>Taisyti kontūrą</span>
             </button>
           ) : null}
           {!outlineEdit && fillFor == null && outlineToolsSlot}
           {fillFor == null ? (
             <button
-              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))]"
-              title={`Perbrėžti patalpos ${focusedRoomNr} zoną: paspaudus — spustelėkite patalpos viduje brėžinyje, kontūras bus surastas automatiškai`}
+              className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
+              title={`Kontūras paspaudus: spustelėkite patalpos ${focusedRoomNr} viduje brėžinyje — kontūras bus surastas automatiškai`}
               onClick={() => onStartFill(focusedRoomNr)}
             >
               <SquarePen className="w-3.5 h-3.5" />
-              <span>Taisyti kontūrą</span>
+              <span>Kontūras paspaudus</span>
             </button>
           ) : (
             /* Armed: pressed button + X cancel. The click hint lives in the status bar. */
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex shrink-0 items-center gap-1">
               <button
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))]"
+                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] border border-[hsl(var(--viewer-chrome-active)/0.4)] text-[hsl(var(--viewer-chrome-active))] whitespace-nowrap"
                 title={`Laukiama spustelėjimo patalpos ${fillFor} viduje. Paspauskite čia arba Esc — atšaukti.`}
                 onClick={onCancelFill}
               >
                 <SquarePen className="w-3.5 h-3.5" />
-                <span>Taisyti kontūrą</span>
+                <span>Kontūras paspaudus</span>
               </button>
               <button
                 className="p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]"
@@ -790,7 +791,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
   );
   const focusedRoomNr = focusedRoom?.nr ?? null;
-  // `fillFor` = the room nr currently armed for "Taisyti kontūrą" click-to-fill.
+  // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
+  // „Taisyti kontūrą", the name the vertex editor now carries — one verb per outline fix).
   const [fillFor, setFillFor] = useState(null);
   // Round-trip in flight (backend flood-fill takes ~3-6 s) — drives the status
   // hint so the user sees progress instead of a silent stall (audit P0).
@@ -817,7 +819,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const startOutlineEdit = () => {
     const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
     if (!r || !Array.isArray(r.polygon_pct) || r.polygon_pct.length < 3) {
-      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
+      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Kontūras paspaudus"');
       return;
     }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close(); outlineTools.cancel();
@@ -1053,7 +1055,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
     symbol.open();
   };
-  // External fill arming (review-queue pencil → "Taisyti kontūrą" armed here).
+  // External fill arming (review-queue pencil → „Kontūras paspaudus" armed here).
   // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
   useEffect(() => {
     if (fillRequest?.nr != null) startFill(fillRequest.nr);
@@ -1268,6 +1270,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
         const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         const sheetRail = sheetPages && !check ? buildSheetRail({ puslapiai: sheetPages, overrides: sheetOverrides, pageCount: totalPages }) : null;
+        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1493,7 +1496,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             )}
             {/* „Rasti panašius" review list (2026-10-16). */}
             {symbol.active && (
-              <div className="absolute top-2 z-30 w-72" style={{ left: railOpen ? 156 : 8 }}>
+              <div className="absolute top-2 z-30 w-72" style={{ left: panelLeft }}>
                 <SymbolReviewPanel documentId={activeDocumentId} search={symbol} countTypes={countTypes} totalPages={totalPages || 1} />
               </div>
             )}
@@ -1501,7 +1504,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {measureTool === 'count' && (
               <div
                 className="absolute top-2 z-30 w-60 shadow-lg"
-                style={{ left: railOpen ? (sheetRail ? 240 : 156) : 8 }}
+                style={{ left: panelLeft }}
               >
                 <CountLegendPanel
                   countTypes={countTypes}

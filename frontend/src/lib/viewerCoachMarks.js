@@ -24,8 +24,8 @@ export const COACH_STEPS = [
   {
     id: 'outline',
     anchor: 'outline-edit',
-    title: 'Redaguoti kontūrą',
-    body: 'Pasirinkite patalpą sąraše arba brėžinyje — viršuje atsiras „Redaguoti kontūrą". Tempkite kampus (jie prilimpa prie sienų — oranžinė žymė), '
+    title: 'Taisyti kontūrą',
+    body: 'Pasirinkite patalpą sąraše arba brėžinyje — viršuje atsiras „Taisyti kontūrą". Tempkite kampus (jie prilimpa prie sienų — oranžinė žymė), '
       + 'spustelėkite vidurio tašką — pridėsite kampą, dukart spustelėkite kampą — pašalinsite. Enter išsaugo: sienos ir angos perskaitomos iš naujo, kiekiai perskaičiuojami.',
     // The button exists only while a room is selected — say where it will appear instead of pointing at nothing.
     missingAnchorNote: 'Mygtukas atsiras pasirinkus patalpą.',

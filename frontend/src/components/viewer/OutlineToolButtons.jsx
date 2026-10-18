@@ -1,5 +1,5 @@
 /**
- * OutlineToolButtons — „Padalyti" / „Sujungti" / „Atimti" in the viewer toolbar, next to „Redaguoti
+ * OutlineToolButtons — „Padalyti" / „Sujungti" / „Atimti" in the viewer toolbar, next to „Taisyti
  * kontūrą", for the focused room (2026-10-16). Pressed while its tool is active; a second press cancels.
  */
 import { Scissors, Combine, SquareDashed } from 'lucide-react';

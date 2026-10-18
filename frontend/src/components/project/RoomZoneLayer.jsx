@@ -32,10 +32,10 @@
 
 import { useMemo, useState } from 'react';
 import {
-  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers,
+  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers, missingRoomsText,
   ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 } from '@/lib/roomZones';
-import { ltCount } from '@/lib/ltPlural';
+import { areaConfidenceSentence } from '@/lib/confidence';
 import {
   FILL_ALPHA, FILL_ALPHA_HOVER, LABEL_FONT_PX, LABEL_STYLE, OUTLINE_SENTENCE, SELECTED_STROKE_PX, STROKE_PX,
   labelWidth, lineStyle, ov, paint,
@@ -74,7 +74,8 @@ function outlineNote(z) {
 }
 // The whole sentence — the hover title of an interactive zone.
 function zoneSentence(z) {
-  return [`${z.nr} ${z.label}`, chipSubFor(z), OUTLINE_SENTENCE[z.outline]].filter(Boolean).join(' · ');
+  return [`${z.nr} ${z.label}`, chipSubFor(z), OUTLINE_SENTENCE[z.outline]].filter(Boolean).join(' · ')
+    + (z.areaLabel ? `. ${areaConfidenceSentence(z.confidence)}` : '');
 }
 
 // Marker aesthetics: professional "clean number marker" — white/paper fill,
@@ -329,11 +330,13 @@ export default function RoomZoneLayer({
   );
 }
 
-// Honest disclosure chip, identical in both presentation modes.
+// Honest disclosure chip, identical in both presentation modes. Its width follows the sentence
+// (~5,6 px a character at 11 px, measured 4,9) — the old fixed 250 px only fitted the old, shorter text.
 function MissingRoomsChip({ count }) {
-  const text = `${ltCount(count, 'patalpa', 'patalpos', 'patalpų')} be vietos plane — žr. „Peržiūra“`;
+  // the sentence names the real place to fix it — „Patikra" (W0-B, lib/roomZones.missingRoomsText)
+  const text = missingRoomsText(count);
   return (
-    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }} data-missing-rooms-chip>
+    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }} data-testid="missing-rooms-chip">
       <rect x={0} y={0} width={labelWidth(text)} height={24} rx={2}
         style={paint({ fill: ov('label-bg'), stroke: ov('estimated') })} strokeWidth={1} />
       <text x={7} y={16} fontSize={LABEL_FONT_PX} style={{ ...LABEL_STYLE, ...paint({ fill: ov('label-fg') }) }}>

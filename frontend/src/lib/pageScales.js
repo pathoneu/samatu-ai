@@ -30,6 +30,16 @@ export function effectivePageScales(project, durable = project?.pageScalesDurabl
   return mergePageScales(autoPageScalesFromRooms(roomsOf(project)), laneScalesOf(project), durable || {});
 }
 
+/**
+ * The map a viewer with no scale state of its own shows — Patikra's room sheet (2026-10-18 audit, side finding
+ * A). It is handed in as that viewer's lane input: with no rooms and no durable map of its own, the viewer then
+ * measures with exactly the main viewer's map, so a confirmed sheet reads „Patvirtintas" in both (before, the
+ * room sheet got the lane alone and called the same sheet „Spėjamas").
+ */
+export function checkViewerScales(project) {
+  return effectivePageScales(project);
+}
+
 /** One page's entry of a merged map, number or string key; null when none. */
 export function pageScaleIn(scales, page) {
   if (!scales || page == null) return null;

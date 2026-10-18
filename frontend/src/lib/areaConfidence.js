@@ -30,8 +30,8 @@ const SOURCE_LABEL_LT = {
   eksplikacija: 'iš eksplikacijos',
   plano_uzrasas: 'užrašyta plane',
   manual_polygon: 'rankinis',
-  vision: 'iš AI',
-  dimension: 'iš dimensijos',
+  vision: 'perskaityta iš brėžinio',
+  dimension: 'iš matmenų',
 };
 
 export function computeAreaConfidence(room) {
