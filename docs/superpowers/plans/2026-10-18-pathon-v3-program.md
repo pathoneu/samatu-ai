@@ -52,20 +52,29 @@ Demo projects: `http://localhost:<VITE_PORT>/project/demo-objektas_h` (vector PD
 | W2-B legend marking UI with review-before-create, counts → rows | `v3/legend-ui` | 8129 | 5209 | 2 |
 | W3-A table reader with row bboxes (door/window/finish schedules), "lentelės" stage | `v3/tables` | 8130 | 5210 | 3 |
 | W3-B reader frame fix — `pdf_vectors._read_page_unlocked` and `plan_area_annotations._iter_pages_pdfium_unlocked` take the display frame from PDFium `get_size` (as `sheet_zones.display_frame` does) instead of guessing it from where content lies; wrong today on /Rotate 270 sheets (objektas_e: text reader 17 sheets, wall reader 3); lane-touching → four eval passes, objektas_e deltas reported, manager decides | `v3/reader-frame` | 8132 | 5212 | 3 |
+| W1-F merge bugs from the W0-A smoke run (absorbed room's floor counted twice in totals and checks, merge drops the kept room's floor covering, Kiekiai Σ across unlike work, stale localStorage) — after W1-D merges | `v3/merge-bugs` | 8133 | 5213 | 1 |
+| W5-A editing gestures (double-click edit, vertex pop-up, edge drag, one-click negative, marquee, Ctrl-snap, count picker, right-click find similar, openings on the drawing) | `v3/edit-gestures` | 8134 | 5214 | 5 |
+| W5-B viewer chrome + zones in the viewer (sheet badge + pager, zone hover, rooms by zones, view settings, zoom cluster, confirm box, scale gate, focus zoom) | `v3/viewer-chrome` | 8135 | 5215 | 5 |
+| W5-C guidance + feedback (teaching during the paid read, room name chips, Enter in Patikra, run pill, Projektai rows, room picker, row ⋯ menu, note pins) | `v3/guidance` | 8136 | 5216 | 5 |
+| W5-D reading completeness (floor-covering legend, zone-aware counts, Vision fallbacks behind OK, figures + heights in the free re-read, scale per viewport, tags, hatch search, multi-PDF intake) | `v3/reading-completeness` | 8137 | 5217 | 5 |
+| W5-E calculation completeness, interior only (inputs and reminders; engine edits by the manager behind flags, measured) | `v3/calc-completeness` | 8138 | 5218 | 5 |
+| W6-A look hygiene (`.dark` / `dark:` / `[hsl(var())]` codemod, ✨ leftovers, room-name rows; the look itself waits for the founder) | `v3/look-hygiene` | 8139 | 5219 | 6 |
+| W7-A market readiness (billing checklist, email, security -14/-21 + re-audit, PVM in exports, help, limits, data, accuracy claims, deploy plan) | `v3/market-readiness` | 8140 | 5220 | 7 |
 
-Wave-1 rows are briefed only after the wave-1 implementation plan is written and reviewed; W1-B/C/D branch off W1-A once its frame is merged (they all touch the viewer).
+Wave-1 rows are briefed only after the wave-1 implementation plan is written and reviewed; W1-B/C/D branch off W1-A once its frame is merged (they all touch the viewer). Waves 5–7 (and W1-F): `docs/superpowers/plans/2026-10-18-pathon-v3-wave5-7-plan.md`, which homes every UNPLANNED row of `2026-10-18-pathon-v3-coverage.md`.
 
 ## Waves (summary; details in the design doc §7)
 
 | Wave | Scope | Done when |
 |---|---|---|
 | 0 | Playwright smoke of the 2026-10-17 review guide; the 7 small bugs and the banned-word copy pass from the audit; baselines T1–T3 noted | smoke green on togal-v2; bugs merged; numbers in this doc |
-| 1 | One workspace + click model + overlay vocabulary + room tool + Undo + scale chip; sheet zones backend | founder walks the guide on the new frame; eval gate identical; T1 clicks measured against the targets |
+| 1 | One workspace + click model + overlay vocabulary + room tool + Undo + scale chip; sheet zones backend; W1-F merge bugs from the smoke run | founder walks the guide on the new frame; eval gate identical; T1 clicks measured against the targets |
 | 2 | Legend marking and symbol counting with review-before-create; counts → rows live | T4 on the corpus plan sheets; legend reuse across projects |
 | 3 | Tables: door/window/finish schedules with row bboxes; "lentelės" stage; reconciliation questions | T4 schedule part; Patikra asks the new questions |
 | 4 | Measurements → sąmata model; Kiekiai inline edit; "Kas pasikeitė — Atšaukti" | counts and lengths flow live |
-| 5 | Pro layer (decision pending) | – |
-| 6 | Look (decision pending) | – |
+| 5 | Editing gestures, viewer chrome + zones in the viewer, guidance and feedback, reading completeness, interior calculation completeness (W5-A…E; wave 5–7 plan) | every row homed to wave 5 merged; eval gate identical (measured flags default off, deltas per codename); T1 re-measured |
+| 6 | Look hygiene (W6-A); the look itself (dark frame, palette) waits for the founder | UI probe no worse; smoke green; two look screenshots for the founder |
+| 7 | Market readiness (W7-A); multi-user, roles, pro-layer switch, prices = founder decides (no track) | each item fact → task → verified; deploy only on the founder's OK |
 
 ## Manager duties and merge protocol
 
