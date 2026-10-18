@@ -97,3 +97,25 @@ test('landing, pricing and sign-in copy sell no hidden construction types', () =
   for (const m of metas) if (HIDDEN_TYPES.test(m)) found.push(`index.html: ${m.slice(0, 100)}`);
   assert.deepEqual(found, [], `Hidden types still sold:\n${found.join('\n')}`);
 });
+
+// v3 W7-A M9 (2026-10-18): an accuracy NUMBER may reach public copy only from the
+// human-confirmed ground truth (scripts/build_ground_truth.py), and it must say
+// which kind it is — in-sample (projects the engine was developed against) or
+// out-of-sample (a blind batch, docs/superpowers/plans/2026-10-05-blind-batch-protocol.md).
+// On 2026-10-18 there is no such number anywhere (that corpus held 4 confirmed
+// outlines and 9 confirmed quantities on the dev database), so today this only
+// keeps it that way: a percentage in a sentence about accuracy without the label fails.
+const ACCURACY_WORDS = /tikslum|paklaid|accura|precision|error rate/i;
+const SOURCE_LABEL = /in-sample|out-of-sample|tirtuose projektuose|naujuose, nematytuose projektuose|human-confirmed|žmogaus patvirtint/i;
+
+test('an accuracy number in public copy carries its source label (in- or out-of-sample)', () => {
+  const found = [];
+  for (const [where, text] of [...scopedStrings('lt'), ...scopedStrings('en'), ...pageTexts()]) {
+    for (const sentence of text.split(/(?<=[.!?])\s+|\n/)) {
+      if (ACCURACY_WORDS.test(sentence) && /\d\s?%/.test(sentence) && !SOURCE_LABEL.test(sentence)) {
+        found.push(`${where}: „${sentence.trim().slice(0, 120)}"`);
+      }
+    }
+  }
+  assert.deepEqual(found, [], `Accuracy numbers without a source label:\n${found.join('\n')}`);
+});
