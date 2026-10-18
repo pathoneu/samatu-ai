@@ -20,7 +20,7 @@ import {
   DEFAULT_OPACITY, MODES, MODE_LABELS, deleteRevision, editionLabel, listRevisions, sheetInfo, uploadRevision,
 } from '@/lib/pdfRevisions';
 
-const chip = 'inline-flex items-center gap-1 rounded-[2px] border px-2 py-0.5 text-[12px] transition-colors';
+const chip = 'inline-flex items-center gap-1 rounded-[2px] border px-2 py-0.5 text-meta transition-colors';
 
 function Swatch({ token, children }) {
   return (
@@ -109,7 +109,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-[2px] px-2 py-1 text-[12px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${overlay
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-[2px] px-2 py-1 text-meta font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${overlay
             ? 'bg-[hsl(var(--accent-2))] text-white'
             : 'text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--muted))]'}`}
           title="Uždėti naują projektuotojo atsiųstą brėžinio leidimą ant dabartinio ir pamatyti, kas pasikeitė"
@@ -122,25 +122,25 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
       </PopoverTrigger>
       <PopoverContent align="start" className="w-96 rounded-[2px] p-3 space-y-3" data-testid="revision-compare-panel">
         <div>
-          <p className="text-[13px] font-semibold text-foreground">Palyginti su nauju brėžinio leidimu</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="text-ui font-semibold text-foreground">Palyginti su nauju brėžinio leidimu</p>
+          <p className="mt-0.5 text-meta leading-snug text-muted-foreground">
             Naujas projektuotojo PDF uždedamas ant dabartinio brėžinio. Palyginimas nekeičia jokio kiekio,
             o dabartinis brėžinys lieka toks pat.
           </p>
         </div>
 
         <div className="space-y-1">
-          {records === null && <p className="text-[12px] text-muted-foreground">Kraunama…</p>}
-          {records?.length === 0 && <p className="text-[12px] text-muted-foreground">Naujų leidimų dar nėra.</p>}
+          {records === null && <p className="text-meta text-muted-foreground">Kraunama…</p>}
+          {records?.length === 0 && <p className="text-meta text-muted-foreground">Naujų leidimų dar nėra.</p>}
           {(records || []).map((r) => (
             <div key={r.id} className="flex items-center gap-2">
-              <label className="flex flex-1 min-w-0 items-center gap-2 text-[13px] cursor-pointer">
+              <label className="flex flex-1 min-w-0 items-center gap-2 text-ui cursor-pointer">
                 <input
                   type="radio" name="revision" className="accent-[hsl(var(--accent-2))]"
                   checked={overlay?.rid === r.id} onChange={() => show(r)}
                 />
                 <span className="truncate" title={editionLabel(r)}>{editionLabel(r)}</span>
-                <span className="text-[11px] text-muted-foreground shrink-0">{r.puslapiai} lap.</span>
+                <span className="text-meta text-muted-foreground shrink-0">{r.puslapiai} lap.</span>
               </label>
               <button
                 type="button" disabled={busy} onClick={() => remove(r)}
@@ -179,7 +179,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-foreground/85">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-meta text-foreground/85">
               {overlay.mode === 'skirtumas' ? (
                 <>
                   <Swatch token="--revision-new">nauja — yra tik naujame leidime</Swatch>
@@ -189,7 +189,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
                 <Swatch token="--revision-new">naujo leidimo linijos</Swatch>
               )}
             </div>
-            <label className="block text-[12px] text-muted-foreground">
+            <label className="block text-meta text-muted-foreground">
               Ryškumas
               <Slider
                 className="mt-1.5"
@@ -200,7 +200,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
               />
             </label>
             {info && (
-              <p className={`text-[12px] leading-snug ${info.matched && info.byWalls ? 'text-foreground/85' : 'text-[hsl(var(--conf-med))]'}`}>
+              <p className={`text-meta leading-snug ${info.matched && info.byWalls ? 'text-foreground/85' : 'text-[hsl(var(--conf-med))]'}`}>
                 {info.text}
               </p>
             )}

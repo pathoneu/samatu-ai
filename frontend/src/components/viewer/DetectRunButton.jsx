@@ -29,7 +29,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
         <button
           type="button"
           disabled={busy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-2.5 py-1 text-[12px] font-semibold text-white hover:opacity-95 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-2.5 py-1 text-meta font-semibold text-white hover:opacity-95 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={busy
             ? 'Brėžinys skaitomas — eiga rodoma kortelėje virš brėžinio; galite toliau dirbti'
             : 'Perskaityti šį lapą iš brėžinio: mastelis, patalpos, kontūrai, angos, sienų ilgiai, grindys. Nemokama, be dirbtinio intelekto užklausų.'}
@@ -40,14 +40,14 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 rounded-[2px] p-3" data-testid="detect-run-picker">
-        <p className="text-[13px] font-semibold text-foreground">Ką perskaityti?</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+        <p className="text-ui font-semibold text-foreground">Ką perskaityti?</p>
+        <p className="mt-0.5 text-meta leading-snug text-muted-foreground">
           Skaitoma iš paties PDF, nemokamai. Jūsų pataisyti kontūrai, įvesti skaičiai ir patvirtintos patalpos nekeičiami.
         </p>
         <ul className="mt-2 space-y-1.5">
           {FEATURES.map((f) => (
             <li key={f}>
-              <label className={`flex items-start gap-2 text-[13px] ${f === 'plotai' ? 'text-muted-foreground' : 'text-foreground cursor-pointer'}`} title={FEATURE_HINTS[f]}>
+              <label className={`flex items-start gap-2 text-ui ${f === 'plotai' ? 'text-muted-foreground' : 'text-foreground cursor-pointer'}`} title={FEATURE_HINTS[f]}>
                 <input
                   type="checkbox"
                   className="mt-0.5 h-4 w-4 accent-[hsl(var(--accent-2))]"
@@ -58,7 +58,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
                 />
                 <span>
                   {FEATURE_LABELS[f]}
-                  <span className="block text-[11px] leading-snug text-muted-foreground">{FEATURE_HINTS[f]}</span>
+                  <span className="block text-meta leading-snug text-muted-foreground">{FEATURE_HINTS[f]}</span>
                 </span>
               </label>
             </li>
@@ -69,7 +69,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
             type="button"
             disabled={!canStart(features)}
             onClick={() => go([currentPage])}
-            className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-3 text-[13px] font-semibold text-white hover:opacity-95 disabled:opacity-50"
+            className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-3 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-50"
             data-testid="detect-run-start-page"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
@@ -80,7 +80,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
               type="button"
               disabled={!canStart(features)}
               onClick={() => go('all')}
-              className="inline-flex min-h-[36px] items-center justify-center rounded-[2px] border border-border px-3 text-[13px] text-foreground hover:bg-muted disabled:opacity-50"
+              className="inline-flex min-h-[36px] items-center justify-center rounded-[2px] border border-border px-3 text-ui text-foreground hover:bg-muted disabled:opacity-50"
               data-testid="detect-run-start-all"
             >
               Perskaityti visus lapus ({totalPages})

@@ -5,9 +5,10 @@ module.exports = {
   theme: {
   	extend: {
   		fontFamily: {
-  			sans: ['var(--font-sans)', 'Hanken Grotesk', 'system-ui', 'sans-serif'],
-  			mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
-  			display: ['var(--font-display)', 'Sora', 'Hanken Grotesk', 'sans-serif'],
+  			// IBM Plex only (index.css --font-*); the dead Hanken/JetBrains/Sora fallbacks are gone (v3 W1-C)
+  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+  			mono: ['var(--font-mono)', 'monospace'],
+  			display: ['var(--font-display)', 'sans-serif'],
   		},
   		// v3 W1-C: one corner for controls (2 px — the old md/sm calc() fell to 0 px and plain
   		// `rounded` was Tailwind's 4 px), 4 px for floating panels. xl/2xl/full stay Tailwind's.

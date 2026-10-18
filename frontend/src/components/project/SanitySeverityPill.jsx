@@ -54,7 +54,7 @@ export default function SanitySeverityPill({ sanity, onOpen }) {
       style={{
         height: 24,
         padding: '0 8px',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 500,
         color: `hsl(${tone})`,
         border: `1px solid hsl(${tone} / 0.4)`,

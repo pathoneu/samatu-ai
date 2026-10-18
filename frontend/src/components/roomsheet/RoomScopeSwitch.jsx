@@ -73,7 +73,7 @@ export default function RoomScopeSwitch({ included, familiesOff = [], busy = fal
                     on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))]/10 font-semibold' : 'border-border bg-card text-muted-foreground'
                   }`}
                 >
-                  <span aria-hidden className={`inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm border text-[11px] ${
+                  <span aria-hidden className={`inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm border text-meta ${
                     on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white' : 'border-border'}`}>
                     {on ? '✓' : ''}
                   </span>

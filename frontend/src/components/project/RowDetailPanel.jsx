@@ -75,13 +75,13 @@ export default function RowDetailPanel({
           }}
         >
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+            <p className="text-meta text-muted-foreground font-semibold">
               {t('project.ledger.title')}
             </p>
             <h3 className="text-sm font-semibold text-foreground leading-snug">
               {row.aprasymas || row.pavadinimas}
             </h3>
-            <p className="text-[11px] text-muted-foreground truncate">
+            <p className="text-meta text-muted-foreground truncate">
               {(row.nr || row.eil_nr) != null && (
                 <span className="mono tabular">{row.nr || row.eil_nr} · </span>
               )}
@@ -109,7 +109,7 @@ export default function RowDetailPanel({
                 className={`dot ${CONFIDENCE_DOT_CLASS[tier]}`}
                 title={confidenceLabel(tier)}
               />
-              <span className="text-[11px] text-muted-foreground">{confidenceLabel(tier)}</span>
+              <span className="text-meta text-muted-foreground">{confidenceLabel(tier)}</span>
             </div>
             {row._confidence_reason && (
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -121,18 +121,18 @@ export default function RowDetailPanel({
           {/* ── Price / sum, as the sąmata bills it ───────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 {t('project.ledger.unitPrice')}
               </p>
               <p className="mono tabular text-sm text-foreground">
                 {row.kaina ? ltEur(row.kaina, 2) : '—'}
               </p>
               {priceSplitText(row) && (
-                <p className="text-[11px] text-muted-foreground tabular">{priceSplitText(row)}</p>
+                <p className="text-meta text-muted-foreground tabular">{priceSplitText(row)}</p>
               )}
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-meta text-muted-foreground">
                 {t('project.ledger.total')}
               </p>
               <p className="mono tabular text-sm font-semibold" style={{ color: 'hsl(var(--primary))' }}>
@@ -144,7 +144,7 @@ export default function RowDetailPanel({
           {/* ── The assumption the line was built on, finally rendered ────── */}
           {row._assumption && (
             <div
-              className="flex items-start gap-2 rounded-sm px-3 py-2 text-[11px] leading-relaxed"
+              className="flex items-start gap-2 rounded-sm px-3 py-2 text-meta leading-relaxed"
               style={{
                 background: 'hsl(var(--conf-med) / 0.08)',
                 border: '1px solid hsl(var(--conf-med) / 0.3)',

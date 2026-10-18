@@ -450,7 +450,7 @@ export default function WorkspacePanel({
       {/* ── Filter + provenance toggle ──────────────────────────────────── */}
       <div className="flex gap-1.5 p-2.5 border-b border-border" style={{ borderColor: 'hsl(var(--border) / 0.5)' }}>
         <div className="relative flex-1">
-          <Search className="absolute left-2 top-2 w-3 h-3 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Ieškoti eilutės ar patalpos…"
@@ -458,8 +458,8 @@ export default function WorkspacePanel({
             title="Įrašykite dalį pavadinimo — sąrašas bus sutrumpintas"
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="w-full pl-7 pr-2.5 text-foreground bg-card border border-border rounded outline-none focus:border-primary"
-            style={{ fontSize: 12, height: 28 }}
+            className="w-full pl-8 pr-2.5 text-foreground bg-card border border-border rounded outline-none focus:border-primary"
+            style={{ fontSize: 14, height: 32 }}
           />
         </div>
         <button
@@ -472,7 +472,7 @@ export default function WorkspacePanel({
           aria-pressed={showProvenance}
           className="rounded border flex items-center justify-center transition-colors"
           style={{
-            height: 28, width: 28,
+            height: 32, width: 32,
             borderColor: showProvenance
               ? 'hsl(var(--primary) / 0.3)'
               : 'hsl(var(--border))',
@@ -545,7 +545,7 @@ export default function WorkspacePanel({
               }}
               className="rounded border px-1.5 whitespace-nowrap transition-colors text-primary border-primary/30 hover:bg-primary/10"
               style={{
-                fontSize: 10, lineHeight: '16px',
+                fontSize: 12, lineHeight: '18px',
               }}
               title="Rodyti visas paslėptas zonas plane"
             >
@@ -568,15 +568,16 @@ export default function WorkspacePanel({
               onMouseLeave={onRoomRowHover ? () => onRoomRowHover(null) : undefined}
               className={`row-hover-halo grid items-center cursor-pointer transition-colors${isHidden ? ' opacity-50' : ''}`}
               style={{
-                gridTemplateColumns: onToggleRoomVisibility ? '24px 1fr auto 20px' : '24px 1fr auto',
-                gap: 8, padding: '6px 12px', fontSize: 12,
+                // v3 density: 39 px rows (24 px eye target), name and area at the 14 px interface size (were 30 px / 12 px)
+                gridTemplateColumns: onToggleRoomVisibility ? '22px 1fr auto 24px' : '22px 1fr auto',
+                gap: 8, padding: '7px 12px', fontSize: 14, lineHeight: '20px',
                 borderBottom: '1px solid hsl(var(--border) / 0.5)',
                 background: isFocused ? 'hsl(var(--primary) / 0.10)' : undefined,
                 boxShadow: isFocused ? 'inset 3px 0 0 hsl(var(--primary))' : undefined,
               }}
               title={canJump ? `Atidaryti psl. ${targetPage}` : undefined}
             >
-              <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
+              <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }} data-testid="room-row-nr">
                 {String(r.nr || i + 1).padStart(2, '0')}
               </span>
               {/* overflow-hidden: at narrow widths (audit P2, ~1000px) the fixed
@@ -590,12 +591,12 @@ export default function WorkspacePanel({
                     title={r._source === 'manual' ? 'Pažymėta brėžinyje (rankinis polygon)' : SOURCE_TITLE.table}
                   />
                 )}
-                <span className="text-foreground/90 truncate">{r.pavadinimas}</span>
+                <span className="text-foreground truncate" data-testid="room-row-name">{r.pavadinimas}</span>
                 {/* „Sujungti" (2026-10-16): the absorbed room is billed inside the kept one — say where, never „neskaičiuojama" */}
                 {(r._sujungta_i || r._sujungimas) && (
                   <span
-                    className="shrink-0 px-1 py-0 rounded font-medium tracking-wide text-muted-foreground"
-                    style={{ fontSize: 9, lineHeight: '14px', border: '1px solid hsl(var(--border))' }}
+                    className="shrink-0 text-muted-foreground whitespace-nowrap"
+                    style={{ fontSize: 12 }}
                     title={r._sujungta_i
                       ? `Patalpa sujungta su ${r._sujungta_i}: jos plotas ir angos skaičiuojami patalpoje ${r._sujungta_i}`
                       : [r._sujungimas?.sakinys, r._sujungimas?.apdaila_skiriasi].filter(Boolean).join('. ')}
@@ -606,20 +607,17 @@ export default function WorkspacePanel({
                 )}
                 {isWet && (
                   <span
-                    className="px-1 py-0 rounded font-medium uppercase tracking-wide"
-                    style={{
-                      fontSize: 9, lineHeight: '14px',
-                      border: '1px solid hsl(var(--source-ai) / 0.4)',
-                      color: 'hsl(var(--source-ai))',
-                    }}
+                    className="shrink-0 text-muted-foreground"
+                    style={{ fontSize: 12 }}
+                    title="Drėgna patalpa — sienoms ir lubims skaičiuojamos drėgmei atsparios medžiagos ir hidroizoliacija"
                   >
                     drėgna
                   </span>
                 )}
               </div>
-              <span className="mono tabular text-foreground/90 whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
-                {fmt(r.plotas_m2)}
-                <span className="text-muted-foreground/70" style={{ fontSize: 9 }}>m²</span>
+              <span className="tabular text-foreground whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 14 }}>
+                <span className="mono">{fmt(r.plotas_m2)}</span>
+                <span className="mono text-muted-foreground" style={{ fontSize: 12 }} data-testid="room-row-unit">m²</span>
                 {(() => {
                   const src = inferPlotasSource(r);
                   return src ? (
@@ -648,8 +646,8 @@ export default function WorkspacePanel({
                     if ((e.ctrlKey || e.metaKey) && onIsolateRoom) onIsolateRoom(r.nr);
                     else onToggleRoomVisibility(r.nr);
                   }}
-                  className="flex items-center justify-center justify-self-end text-muted-foreground hover:text-foreground transition-colors"
-                  style={{ width: 16, height: 16 }}
+                  className="flex items-center justify-center justify-self-end rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  style={{ width: 24, height: 24 }}
                   title="Rodyti/slėpti kontūrą plane · Ctrl+spustelėjimas — rodyti tik šį"
                 >
                   {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -678,7 +676,7 @@ export default function WorkspacePanel({
             {!collapsed.meas && (measCountRows.length > 0 || measGeomRows.length > 0) && (
               /* Export the raw measurements (pre-prod audit 2026-07-25: the
                  tested export lib had no UI since the legacy toolbar died). */
-              <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 text-meta text-muted-foreground">
                 <span className="flex-1">Eksportuoti matavimus</span>
                 {/* Bare "CSV" / "JSON" told a contractor nothing about what
                     lands on disk. Name the file and its use. (2026-07-28.) */}
@@ -706,7 +704,7 @@ export default function WorkspacePanel({
               <div
                 key={r.typeId}
                 data-measure-row={`count:${r.typeId}`}
-                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `count:${r.typeId}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
+                className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-border/50 text-ui ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `count:${r.typeId}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && r.firstPage ? () => onJumpToPage(r.firstPage) : undefined}
                 title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage})` : undefined}
               >
@@ -734,7 +732,7 @@ export default function WorkspacePanel({
               <div
                 key={m.id}
                 data-measure-row={`meas:${m.id}`}
-                className={`flex items-center gap-2.5 px-3 py-2 border-b border-border/50 text-xs ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `meas:${m.id}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
+                className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-border/50 text-ui ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `meas:${m.id}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && m.page ? () => onJumpToPage(m.page) : undefined}
                 title={m.page ? `Rodyti brėžinyje (psl. ${m.page})` : undefined}
               >
@@ -763,7 +761,7 @@ export default function WorkspacePanel({
             purchase twice — so say what these prices are. (2026-09-02) */}
         {!collapsed.kiekiai && (
           <div className="px-3 py-1.5 text-muted-foreground"
-               style={{ fontSize: 10, lineHeight: 1.4,
+               style={{ fontSize: 12, lineHeight: 1.4,
                         background: 'hsl(var(--muted) / 0.25)',
                         borderBottom: '1px solid hsl(var(--border) / 0.5)' }}>
             {t('project.mainView.worksAreLabourOnly')}
@@ -869,7 +867,7 @@ function PlyteliuSpecsSection({ specs }) {
             ? <ChevronDown className="w-3 h-3 text-muted-foreground" />
             : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
           <span className="skyrius-header">Plytelių specifikacija (iš brėžinio)</span>
-          <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
+          <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
             {grouped.length} unik. dydžiai
           </span>
         </div>
@@ -886,31 +884,27 @@ function PlyteliuSpecsSection({ specs }) {
         >
           <span />
           <div className="min-w-0 flex items-center gap-2">
-            <span className="mono tabular font-medium" style={{ fontSize: 11 }}>
+            <span className="mono tabular font-medium" style={{ fontSize: 12 }}>
               {g.size_mm}
             </span>
-            <span className="text-muted-foreground" style={{ fontSize: 10 }}>
+            <span className="text-muted-foreground" style={{ fontSize: 12 }}>
               {WHERE_LT[g.where] || g.where}
             </span>
             {g.format_label && (
               <span
-                className="px-1 py-0 rounded uppercase tracking-wide font-medium"
-                style={{
-                  fontSize: 9, lineHeight: '14px',
-                  border: '1px solid hsl(var(--border-strong))',
-                  color: 'hsl(var(--muted-foreground))',
-                }}
+                className="text-muted-foreground"
+                style={{ fontSize: 12 }}
               >
                 {g.format_label}
               </span>
             )}
             {g.brand && (
-              <span className="text-foreground/70" style={{ fontSize: 10 }}>
+              <span className="text-foreground/70" style={{ fontSize: 12 }}>
                 {g.brand}
               </span>
             )}
           </div>
-          <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
+          <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
             psl. {Array.from(g.pages).sort((a, b) => a - b).join(', ')}
           </span>
         </div>
@@ -932,25 +926,26 @@ function SectionHeader({ icon: Icon, title, count, summary, collapsed, onToggle,
         background: 'hsl(var(--background))',
         borderTop: '1px solid hsl(var(--border))',
         borderBottom: '1px solid hsl(var(--border))',
-        padding: '8px 12px',
+        padding: '9px 12px',
         cursor: isToggleable ? 'pointer' : 'default',
       }}
     >
       <div className="flex items-center gap-2">
         {isToggleable
           ? (collapsed
-              ? <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              : <ChevronDown className="w-3 h-3 text-muted-foreground" />)
-          : <span style={{ width: 12 }} />}
-        {Icon && <Icon className="w-3 h-3 text-muted-foreground" />}
-        <span className="skyrius-header">{title}</span>
-        <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
+              ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />)
+          : <span style={{ width: 14 }} />}
+        {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" />}
+        {/* sentence case at the interface size (was a 10 px uppercase tracked eyebrow) */}
+        <span className="text-ui font-semibold text-foreground">{title}</span>
+        <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
           {count}
         </span>
       </div>
       <span className="flex items-center gap-2">
         {action}
-        <span className="mono tabular text-muted-foreground" style={{ fontSize: 10 }}>
+        <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
           {summary}
         </span>
       </span>
@@ -991,15 +986,15 @@ const PositionGroup = memo(function PositionGroup({
           ? <ChevronRight className="w-3 h-3 text-muted-foreground" />
           : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
         <span
-          className="text-foreground font-semibold uppercase"
-          style={{ fontSize: 11, letterSpacing: '0.04em' }}
+          className="text-foreground font-semibold"
+          style={{ fontSize: 14 }}
         >
           {group.skyrius}
         </span>
-        <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
+        <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
           {group.rows.length}
         </span>
-        <span className="mono tabular text-foreground/90" style={{ fontSize: 11 }}>
+        <span className="mono tabular text-foreground/90" style={{ fontSize: 12 }}>
           {fmtEur(group.subtotal)}
         </span>
       </button>
@@ -1126,8 +1121,10 @@ const PositionRow = memo(function PositionRow({
         // wraps now (whitespace-normal below) instead of truncating with
         // ellipsis, so a name like "Sienų antrinis glaistymas Q2" fits on
         // two lines rather than being cut to "Sienų antrinis g...".
+        // v3 density: 36 px rows. The six-column numeric table stays at the 12 px metadata size —
+        // at 14 px its sum column overflows the 400 px panel (and W1-A narrows it to 340).
         gridTemplateColumns: '12px 32px 1fr 88px 72px 76px',
-        gap: 6, padding: '7px 12px', fontSize: 12,
+        gap: 6, padding: '9px 12px', fontSize: 12,
         borderBottom: '1px solid hsl(var(--border) / 0.5)',
       }}
     >
@@ -1139,7 +1136,7 @@ const PositionRow = memo(function PositionRow({
       ) : (
         <span className={`dot ${confClass}`} title={confTitle} />
       )}
-      <span className="mono tabular text-muted-foreground/70" style={{ fontSize: 10 }}>
+      <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }}>
         {row.eil_nr || ''}
       </span>
       <div className="flex items-start gap-1.5 min-w-0">
@@ -1169,7 +1166,7 @@ const PositionRow = memo(function PositionRow({
           aria-label="Kiekis"
           title="Kiekis; kablelis arba taškas — abu tinka. Enter — įrašyti, Esc — atsisakyti."
           className="mono tabular bg-card border border-primary rounded outline-none text-right"
-          style={{ fontSize: 11, height: 22, padding: '2px 6px' }}
+          style={{ fontSize: 12, height: 22, padding: '2px 6px' }}
         />
       ) : (
         <div className="flex items-center justify-end gap-1">
@@ -1177,7 +1174,7 @@ const PositionRow = memo(function PositionRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onQuantityAdjust(-1); }}
-              className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-red-400 hover:text-red-400 transition-colors"
+              className="w-5 h-5 rounded border border-border text-muted-foreground hover:border-destructive hover:text-destructive transition-colors"
               title="Atimti 1"
             >
               −
@@ -1187,20 +1184,17 @@ const PositionRow = memo(function PositionRow({
             type="button"
             onClick={beginQtyEdit}
             className="mono tabular text-foreground/90 whitespace-nowrap text-right rounded px-1 py-0.5 hover:bg-primary/10 hover:text-primary transition-colors"
-            style={{ fontSize: 11 }}
+            style={{ fontSize: 12 }}
             title="Spustelėkite, norėdami pataisyti kiekį"
           >
             {fmt(row.kiekis)}
-            <span className="text-muted-foreground/70 ml-1" style={{ fontSize: 9 }}>{row.mato_vnt}</span>
+            <span className="text-muted-foreground ml-1" style={{ fontSize: 12 }}>{row.mato_vnt}</span>
             {isManualQty && (
               <span
-                className="ml-1 px-1 rounded uppercase font-semibold"
+                className="ml-1 font-semibold"
                 style={{
-                  fontSize: 8,
-                  lineHeight: '12px',
-                  border: '1px solid hsl(var(--source-table) / 0.35)',
+                  fontSize: 12,
                   color: 'hsl(var(--source-table))',
-                  background: 'hsl(var(--source-table) / 0.08)',
                 }}
                 title="Kiekį įrašėte ranka — ankstesnis skaičius pakeistas"
               >
@@ -1212,7 +1206,7 @@ const PositionRow = memo(function PositionRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onQuantityAdjust(1); }}
-              className="w-5 h-5 rounded border border-border text-muted-foreground/70 hover:border-emerald-400 hover:text-emerald-400 transition-colors"
+              className="w-5 h-5 rounded border border-border text-muted-foreground hover:border-accent-2 hover:text-accent-2 transition-colors"
               title="Pridėti 1"
             >
               +
@@ -1236,15 +1230,15 @@ const PositionRow = memo(function PositionRow({
           aria-label="Vieneto kaina, €"
           title="Vieneto kaina eurais be PVM; kablelis arba taškas — abu tinka. Enter — įrašyti, Esc — atsisakyti."
           className="mono tabular bg-card border border-primary rounded outline-none text-right"
-          style={{ fontSize: 11, height: 22, padding: '2px 6px' }}
+          style={{ fontSize: 12, height: 22, padding: '2px 6px' }}
         />
       ) : (
         <span
           onClick={beginEdit}
           className="mono tabular cursor-text whitespace-nowrap inline-flex items-center justify-end gap-1"
           style={{
-            fontSize: 11,
-            color: row.kaina ? 'hsl(var(--muted-foreground))' : 'hsl(var(--muted-foreground) / 0.6)',
+            fontSize: 12,
+            color: 'hsl(var(--muted-foreground))',
             textAlign: 'right',
             textUnderlineOffset: 2,
           }}
@@ -1276,7 +1270,7 @@ const PositionRow = memo(function PositionRow({
         </span>
       )}
       <span className="mono tabular text-foreground font-medium whitespace-nowrap"
-        style={{ fontSize: 11, textAlign: 'right' }}>
+        style={{ fontSize: 12, textAlign: 'right' }}>
         {row.kaina ? `${sum.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—'}
       </span>
       {/* Medžiagos rows say which work they belong to — without it a bare
@@ -1286,7 +1280,7 @@ const PositionRow = memo(function PositionRow({
           className="col-span-6 text-muted-foreground truncate"
           style={{
             gridColumn: 'span 6 / span 6',
-            fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
+            fontSize: 12, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
           }}
           title={row.susijes_darbas}
         >
@@ -1303,9 +1297,9 @@ const PositionRow = memo(function PositionRow({
           style={{ gridColumn: 'span 6 / span 6', paddingLeft: 18, paddingTop: 3 }}
         >
           <span
-            className="inline-flex items-center gap-1 rounded px-1 uppercase font-semibold"
+            className="inline-flex items-center gap-1 rounded px-1 font-semibold"
             style={{
-              fontSize: 8, lineHeight: '13px',
+              fontSize: 12, lineHeight: '16px',
               border: '1px solid hsl(var(--warning, 38 92% 50%) / 0.45)',
               color: 'hsl(var(--warning, 38 92% 50%))',
               background: 'hsl(var(--warning, 38 92% 50%) / 0.08)',
@@ -1319,8 +1313,8 @@ const PositionRow = memo(function PositionRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRemove(); }}
-              className="underline decoration-dotted text-muted-foreground hover:text-red-600"
-              style={{ fontSize: 9, textUnderlineOffset: 2 }}
+              className="underline decoration-dotted text-muted-foreground hover:text-destructive"
+              style={{ fontSize: 12, textUnderlineOffset: 2 }}
               title={t('project.mainView.removeTitle')}
             >
               {t('project.mainView.orphanRemove')}
@@ -1333,7 +1327,7 @@ const PositionRow = memo(function PositionRow({
           className="col-span-6 text-muted-foreground"
           style={{
             gridColumn: 'span 6 / span 6',
-            fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
+            fontSize: 12, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
           }}
         >
           {row._detail_m2 != null && (
@@ -1349,7 +1343,7 @@ const PositionRow = memo(function PositionRow({
           className="col-span-6 text-muted-foreground"
           style={{
             gridColumn: 'span 6 / span 6',
-            fontSize: 10, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
+            fontSize: 12, paddingLeft: 18, paddingTop: 2, lineHeight: 1.3,
           }}
         >
           iš brėžinio buvo <span className="mono tabular">{fmt(row.ai_kiekis_original)}</span>

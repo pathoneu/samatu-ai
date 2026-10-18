@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+/* The app's two families only (Nordic Slate): IBM Plex Sans + IBM Plex Mono. The landing's leftover
+   Hanken Grotesk / JetBrains Mono spans load their own fonts from src/pages/landing/landing.css (v3 W1-C). */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -193,7 +195,8 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
-    font-size: 13px;
+    /* 14 px interface floor (v3 type scale, design 2026-10-18 §6: 12 metadata · 14 interface · 16 body) */
+    font-size: 14px;
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -213,11 +216,11 @@
 .dot-med      { background: hsl(var(--conf-med)); }
 .dot-low      { background: hsl(var(--conf-low)); }
 
-/* Skyrius header (uppercase eyebrow) */
+/* Skyrius header — a sentence-case section label at the metadata size (v3 W1-C: no uppercase
+   tracked eyebrows, no 10 px). */
 .skyrius-header {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.01em;
   color: hsl(var(--muted-foreground));
   font-weight: 600;
 }

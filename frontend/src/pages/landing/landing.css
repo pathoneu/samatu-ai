@@ -7,8 +7,11 @@
  * data-palette attribute in Landing.jsx.
  *
  * Fonts (IBM Plex Sans / IBM Plex Mono — Nordic Slate, 2026-07-11) come from src/index.css —
- * do not add @font-face here.
+ * do not add @font-face here. The import below is only for the few landing / cookie-banner spans
+ * that still name Hanken Grotesk or JetBrains Mono inline: the app stylesheet stopped loading them
+ * (v3 W1-C), the landing keeps its own.
  */
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ── Palettes ── */
 #plr {

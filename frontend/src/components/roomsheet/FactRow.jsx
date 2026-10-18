@@ -138,7 +138,7 @@ export default function FactRow({
           {/* His own value — typed, chosen, accepted or drawn by him (room_facts `_is_yours`). */}
           {fact?.yours && (
             <span
-              className="rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-1.5 py-px text-[11px] font-semibold normal-case tracking-normal text-[hsl(var(--accent-2))]"
+              className="rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-1.5 py-px text-meta font-semibold normal-case tracking-normal text-[hsl(var(--accent-2))]"
               data-testid="fact-yours"
             >
               {t('project.roomSheet.yoursBadge')}

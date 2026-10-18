@@ -222,7 +222,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
   return (
     <div className="flex flex-col p-2 rounded-lg border bg-card text-card-foreground shadow-lg" data-testid="symbol-review-panel">
       <div className="flex items-center px-1 pb-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex-1"
+        <h3 className="text-xs font-semibold text-muted-foreground flex-1"
           title="Apveskite vieną simbolį — programa suras panašius pagal formą. Tai pagalba skaičiuoti, ne tikras atpažinimas: patikrinkite kiekvieną.">
           Rasti panašius
         </h3>
@@ -242,7 +242,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
       )}
 
       {s.progress && (
-        <div className="mx-1 my-1 inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-muted text-[11px] text-foreground" data-testid="symbol-progress">
+        <div className="mx-1 my-1 inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-muted text-meta text-foreground" data-testid="symbol-progress">
           <Loader2 className="w-3 h-3 animate-spin" />
           {s.progress.total > 1
             ? `Ieškoma: ${s.progress.page} lapas (${s.progress.done + 1} iš ${s.progress.total})`
@@ -260,7 +260,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
               {countLabel({ found: s.found, shown: s.visible.length, threshold: s.threshold })}
             </span>
           </div>
-          <label className="px-1 py-1 flex items-center gap-2 text-[11px] text-muted-foreground"
+          <label className="px-1 py-1 flex items-center gap-2 text-meta text-muted-foreground"
             title="Panašumas pagal formą (0–1), ne tikimybė. Didinkite — mažiau, bet tikresnių; mažinkite — daugiau, bet daugiau klaidų.">
             <span className="whitespace-nowrap">Riba</span>
             <input type="range" min={MIN_THRESHOLD} max={1} step={0.01} value={s.threshold}
@@ -270,7 +270,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
           </label>
 
           {hasUnusual && (
-            <div className="mx-1 my-1 p-2 rounded border border-[hsl(var(--conf-med)/0.5)] bg-[hsl(var(--conf-med)/0.08)] text-[11px] leading-snug" data-testid="symbol-unusual">
+            <div className="mx-1 my-1 p-2 rounded border border-[hsl(var(--conf-med)/0.5)] bg-[hsl(var(--conf-med)/0.08)] text-meta leading-snug" data-testid="symbol-unusual">
               <div className="flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 text-[hsl(var(--conf-med))]" />
                 <span>{UNUSUAL_WARNING} (lap. {pageRanges(unusualList)}).</span></div>
               <label className="mt-1.5 flex items-center gap-1.5">
@@ -280,12 +280,12 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
             </div>
           )}
           {s.rasterPages.length > 0 && (
-            <p className="mx-1 my-1 px-2 py-1 rounded bg-muted text-[11px] leading-snug" data-testid="symbol-raster">
+            <p className="mx-1 my-1 px-2 py-1 rounded bg-muted text-meta leading-snug" data-testid="symbol-raster">
               Lap. {pageRanges(s.rasterPages)}: lapas rastrinis arba tamsus — panašumų paieška nepatikima, ten neieškota.
             </p>
           )}
           {s.truncatedPages.length > 0 && (
-            <p className="px-1 text-[11px] text-muted-foreground">Lap. {pageRanges(s.truncatedPages)} rodomi tik 300 panašiausių.</p>
+            <p className="px-1 text-meta text-muted-foreground">Lap. {pageRanges(s.truncatedPages)} rodomi tik 300 panašiausių.</p>
           )}
 
           <div className="mt-1 max-h-[34vh] overflow-y-auto border-y border-border/60" data-testid="symbol-list">
@@ -294,7 +294,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
             )}
             {s.groups.map((g) => (
               <div key={g.page}>
-                <div className="sticky top-0 bg-card px-2 py-1 text-[11px] font-medium text-muted-foreground flex items-center">
+                <div className="sticky top-0 bg-card px-2 py-1 text-meta font-medium text-muted-foreground flex items-center">
                   <button type="button" className="hover:underline" onClick={() => scrollApi?.scrollToPage({ pageNumber: g.page, behavior: 'smooth' })}
                     title={`Rodyti ${g.page} lapą`}>{g.page} lapas</button>
                   <span className="ml-auto tabular-nums">{g.items.length} vnt.</span>
@@ -315,7 +315,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
                           background: c.isSource ? 'hsl(var(--ov-read))' : 'hsl(var(--ov-proposed))' }} />
                     </span>
                     <span className="mono tabular w-8 text-right">{formatScore(c.score)}</span>
-                    {c.isSource && <span className="text-[10px] text-muted-foreground" title="Tai jūsų apvestas pavyzdys">pavyzdys</span>}
+                    {c.isSource && <span className="text-meta text-muted-foreground" title="Tai jūsų apvestas pavyzdys">pavyzdys</span>}
                     <button type="button" onClick={() => s.remove(c.id)} aria-label={`Pašalinti ${s.numbers[c.id]}`}
                       title="Ne tas simbolis — pašalinti" data-testid="symbol-remove"
                       className="p-0.5 rounded text-muted-foreground hover:bg-[hsl(var(--conf-low))] hover:text-white">
@@ -328,7 +328,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
           </div>
 
           {s.skipped && (
-            <p className="px-1 pt-1 text-[11px] text-muted-foreground leading-snug" data-testid="symbol-skipped">
+            <p className="px-1 pt-1 text-meta text-muted-foreground leading-snug" data-testid="symbol-skipped">
               {s.skipped.pages.length > 0 && `Neieškota lap. ${pageRanges(s.skipped.pages)} (${s.skipped.why}). `}
               {s.skipped.failed?.length > 0 && `Nepavyko lap. ${pageRanges(s.skipped.failed)}. `}
               {s.skipped.pages.length === 0 && !s.skipped.failed?.length && `Paieška ${s.skipped.why}.`}

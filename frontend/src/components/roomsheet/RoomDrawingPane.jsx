@@ -131,7 +131,7 @@ export default function RoomDrawingPane({
     return (
       <div className="flex min-w-0 flex-col gap-2">
         {pdfState === 'failed' && !isMobile && (
-          <p className="text-[13px] text-muted-foreground">{t('project.roomSheet.drawFallback')}</p>
+          <p className="text-ui text-muted-foreground">{t('project.roomSheet.drawFallback')}</p>
         )}
         <RoomPlanPane {...fallback} />
       </div>
@@ -149,7 +149,7 @@ export default function RoomDrawingPane({
   return (
     <div className="flex min-w-0 flex-col gap-2" data-testid="room-drawing-pane">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-mono text-[13px] text-muted-foreground">
+        <p className="font-mono text-ui text-muted-foreground">
           {t('project.roomSheet.drawCaption', { room: roomKey ?? '' })}
         </p>
         <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export default function RoomDrawingPane({
               ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
               : pick.mode === 'split'
                 ? (
-                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-[13px] font-bold text-[hsl(var(--accent-2))]">
+                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-ui font-bold text-[hsl(var(--accent-2))]">
                     {pick.first ? '2 / 2' : '1 / 2'}
                   </span>
                 )
@@ -271,20 +271,20 @@ export default function RoomDrawingPane({
       </div>
 
       {space && (
-        <p className="text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
           {t('project.roomSheet.drawOpenSpace', { rooms: others.join(', ') })}
         </p>
       )}
       {noOutline && (
-        <p className="text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
           {reason
             ? t('project.roomSheet.drawNoOutline', { reason: reason.replace(/\.$/, '') })
             : t('project.roomSheet.drawNoOutlinePlain')}
         </p>
       )}
       {(states.size > 0 || hasOpenings) && (
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground" data-testid="check-legend">
-          <li className="font-semibold uppercase tracking-wide">{t('project.roomSheet.legendWallsTitle')}</li>
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ui text-muted-foreground" data-testid="check-legend">
+          <li className="font-semibold">{t('project.roomSheet.legendWallsTitle')}</li>
           {WALL_LEGEND.filter(([state]) => states.has(state)).map(([state, key]) => (
             <li key={state} className="flex items-center gap-1.5">
               <svg width="24" height="8" aria-hidden="true">

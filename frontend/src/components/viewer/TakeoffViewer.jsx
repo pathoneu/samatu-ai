@@ -155,17 +155,17 @@ function SearchBox({ documentId, onClose }) {
         placeholder="Ieškoti brėžinyje…"
         aria-label="Paieška dokumente"
         title="Ieško teksto brėžinyje (patalpų pavadinimų, žymėjimų). Skenuotuose PDF teksto nėra — nerasta nieko."
-        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-[12px] text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
+        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-meta text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
       />
       {hasQuery && (
-        <span className="mono tabular text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
+        <span className="mono tabular text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
           {total > 0 ? `${(search.activeResultIndex ?? 0) + 1} / ${total}` : '0 / 0'}
         </span>
       )}
       <button className={btn} title="Ankstesnis rezultatas (Shift+Enter)" disabled={total === 0} onClick={() => searchApi?.previousResult()}><ChevronUp className="w-4 h-4" /></button>
       <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
       {noHits && (
-        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
+        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
           Rezultatų nėra — šis PDF greičiausiai skenuotas (be teksto)
         </span>
       )}
@@ -191,7 +191,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
   const pressed = 'p-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
   const canFill = focusedRoomNr != null && onStartFill;
   return (
-    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-[12px] text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
+    <div className="h-9 shrink-0 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] px-3 flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] overflow-x-auto">
       <button
         className={btn + (railOpen ? ' bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-active))]' : '')}
         title={withKey('Puslapių juosta', 'toggleThumbs')}
@@ -261,7 +261,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               onClick={() => onMeasureTool(id)}
             >
               <Icon className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">{label}</span>
+              <span className="text-meta leading-none hidden lg:inline">{label}</span>
             </button>
           ))}
           {/* „Rasti panašius" (2026-10-16, Togal's AI Image Search): box one symbol → similar ones → count. */}
@@ -275,7 +275,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               data-testid="viewer-symbol-search"
             >
               <ScanSearch className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">Rasti panašius</span>
+              <span className="text-meta leading-none hidden lg:inline">Rasti panašius</span>
             </button>
           )}
           {onToggleScales && (
@@ -288,7 +288,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
               data-testid="scales-toggle"
             >
               <ListChecks className="w-4 h-4" />
-              <span className="text-[11px] leading-none hidden lg:inline">Masteliai</span>
+              <span className="text-meta leading-none hidden lg:inline">Masteliai</span>
             </button>
           )}
         </>
@@ -389,7 +389,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
             data-testid="viewer-history-toggle"
           >
             <History className="w-4 h-4" />
-            <span className="text-[11px] leading-none hidden xl:inline">Istorija</span>
+            <span className="text-meta leading-none hidden xl:inline">Istorija</span>
           </button>
         )}
         {onOpenGuide && (
@@ -466,7 +466,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const snapNote = snapsHere ? (SNAP_NOTE[geometryStatus] || '') : '';
   const measureHint = symbolHint || (outlineEdit ? OUTLINE_HINT : (measureTool ? `${MEASURE_HINTS[measureTool]}${snapNote}` : null));
   return (
-    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-[11px] text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
+    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
       {fillFor != null ? (
@@ -521,7 +521,7 @@ function ThumbnailRail({ documentId }) {
               />
               <span
                 style={{ height: m.labelHeight, lineHeight: `${m.labelHeight}px` }}
-                className={`mono tabular text-[10px] ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
+                className={`mono tabular text-meta ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
               >
                 {pageNumber}
               </span>
@@ -1425,7 +1425,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
             {(measureTool != null || outlineEdit || symbol.active) && (
-              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-[12px] text-foreground shadow-md pointer-events-none whitespace-nowrap`}>
+              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-30 px-3.5 py-1.5 rounded-full border border-border bg-card text-meta text-foreground shadow-md pointer-events-none whitespace-nowrap`}>
                 {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
               </div>
             )}
@@ -1637,7 +1637,7 @@ export default function TakeoffViewer({
     () => (fileUrl ? makeViewerPlugins(fileUrl, exportFileName || undefined) : null),
     [fileUrl, exportFileName],
   );
-  if (error) return <div className="p-5 text-sm text-red-600">Variklio klaida: {String(error.message || error)}</div>;
+  if (error) return <div className="p-5 text-sm text-destructive">Variklio klaida: {String(error.message || error)}</div>;
   if (isLoading || !engine || !plugins) return <div className="p-5 text-sm text-muted-foreground">Kraunamas PDF variklis…</div>;
   return (
     <div className="h-full" data-takeoff-viewer>
