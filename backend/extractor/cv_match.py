@@ -474,8 +474,17 @@ def _batch(pdf: bytes, tpage: int, box: list[float], pages, min_score: float, ma
     reference = max(others) if others else None
     floor = max(min_score, reference - margin) if reference is not None else min_score
     for e in raw_pages:
-        kept = [c for c in e["candidates"] if c["is_source"] or c["score"] >= floor]
-        e["candidates"] = sorted(kept, key=lambda c: -c["score"])[:max_per_page]
+        kept: list[dict] = []
+        for c in sorted(e["candidates"], key=lambda c: (not c["is_source"], -c["score"])):
+            if not (c["is_source"] or c["score"] >= floor):
+                continue
+            # one symbol, one candidate: a shifted or rescaled hit whose centre lies inside a better one's box
+            # is the same symbol (objektas_h's slot diffuser: three hits along one 2 × 20 pt double line)
+            cx, cy = (c["box_pt"][0] + c["box_pt"][2]) / 2, (c["box_pt"][1] + c["box_pt"][3]) / 2
+            if any(k["box_pt"][0] <= cx <= k["box_pt"][2] and k["box_pt"][1] <= cy <= k["box_pt"][3] for k in kept):
+                continue
+            kept.append(c)
+        e["candidates"] = kept[:max_per_page]
     out.update(pages=raw_pages, reference_score=reference, score_floor=round(floor, 4))
     if out["partial"]:
         out["detail"] = "ne visi lapai peržiūrėti per skirtą laiką — rasta tik dalis"

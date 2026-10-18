@@ -96,6 +96,21 @@ def test_material_samples_are_rows_but_not_pieces_to_count():
     assert all(not r["countable"] and r["reason_lt"] == lr.SAMPLE_LT for r in res["rows"])
 
 
+def test_one_long_stroke_is_a_length_sample_a_double_line_is_a_symbol():
+    """objektas_d's „LED juosta" (one 1,7 pt stroke) is a length; objektas_b's slot diffuser (two parallel lines)
+    is a symbol to count."""
+    from test_vector_symbols_2026_09_24 import GREEN, H as DH, W as DW, Draw
+    d = Draw()
+    d.c.setStrokeColorRGB(*GREEN)
+    d.c.setLineWidth(1.7)
+    d.c.line(150, DH - 661, 175, DH - 661)
+    d.text(182, 664, "LED juosta")
+    d.double_line(150, 673, 25, GREEN)
+    d.text(182, 676, "Plyšinis difuzorius")
+    rows = lr.split_legend_rows(d.pdf(), 1, [140 / DW, 650 / DH, 400 / DW, 690 / DH])["rows"]
+    assert [(r["text"], r["countable"]) for r in rows] == [("LED juosta", False), ("Plyšinis difuzorius", True)]
+
+
 @pytest.mark.parametrize("rotation", [90, 180, 270])
 def test_a_turned_sheets_rows_land_on_the_glyphs_in_both_frames(rotation):
     """A CAD sheet drawn unrotated and turned by /Rotate: the rows are read in the frame the legend reads in,

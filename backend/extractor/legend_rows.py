@@ -54,6 +54,7 @@ MAX_MARKS = 20_000            # a box this busy is a piece of the plan, not a le
 COUNTABLE_COMPACT_PT = 16.0   # vector_symbols: a symbol is at most this big across…
 COUNTABLE_THIN_PT = 4.0       # …or a slot this thin…
 COUNTABLE_LONG_PT = 120.0     # …and this long
+LINE_SAMPLE_LONG_PT = 8.0     # ONE stroke at least this long (and 3 × its thickness) is a line sample, not a symbol
 _BULLETS = set("-–—•·*‒")
 _SYMBOL_CHAR = re.compile(r"^[^\w\s]$|^[A-ZĄČĘĖĮŠŲŪŽ]$")
 
@@ -249,10 +250,19 @@ def _kind_and_colour(marks: list[dict]) -> tuple[str, str | None]:
     return ("spalvotas", _hex(best)) if best else ("juodas", None)
 
 
-def _countable(box: tuple[float, float, float, float]) -> bool:
+def _countable(box: tuple[float, float, float, float], marks: list[dict]) -> bool:
+    """False for a sample of a length or an area, not a symbol: ONE stroke drawn thin and long (an LED strip, a
+    cable — objektas_d's „LED juosta" matched 1308 strokes; a slot diffuser is a DOUBLE line, two marks), or a
+    filled box bigger than a symbol that is the whole glyph (a material swatch)."""
     w, h = box[2] - box[0], box[3] - box[1]
     long, short = max(w, h), min(w, h)
-    return long <= COUNTABLE_COMPACT_PT or (short <= COUNTABLE_THIN_PT and long <= COUNTABLE_LONG_PT)
+    paths = [m for m in marks if not m["image"]]
+    if len(paths) == 1 and short <= COUNTABLE_THIN_PT and long >= LINE_SAMPLE_LONG_PT and long >= 3 * short:
+        return False
+    if long > COUNTABLE_COMPACT_PT and any(_visible(m["fill"]) and (m["x1"] - m["x0"]) >= 0.8 * w
+                                           and (m["bottom"] - m["top"]) >= 0.8 * h for m in marks):
+        return False
+    return long <= COUNTABLE_LONG_PT
 
 
 def _pct(b, W: float, H: float) -> list[float]:
@@ -398,7 +408,7 @@ def _split(pdf_bytes: bytes, page: int, bbox_pct: list[float]) -> dict:
             kind, colour = _kind_and_colour(gm)
             row = {"phrase": ph, "gbox": gbox, "kind": kind, "colour": colour, "glyph_text": None,
                    "text": ph["text"], "tbox": (ph["x0"], ph["top"], ph["x1"], ph["bottom"]),
-                   "countable": _countable(gbox)}
+                   "countable": _countable(gbox, gm)}
             rows.append(row)
             row_of[pi] = row
             continue
