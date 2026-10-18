@@ -261,3 +261,86 @@ def test_zones_for_pages_is_the_stored_shape():
     out = sz.zones_for_pages(pdf, [2, 1, 1])
     assert list(out) == ["1", "2"]
     assert out["2"] == [] and out["1"]
+
+
+# ── shapes the corpus showed (2026-10-18 report, scripts/sheet_zones_report.py) ─────────────────────
+
+def test_a_legend_whose_symbols_stand_in_a_column_right_of_the_text():
+    """objektas_g's electrical legend: „El. taškas | Žymėjimas" — the text first, the symbol column after it."""
+    from synthetic_plan import LEGEND_COLUMN_DX
+    legend = _one(sz.detect_zones(build_plan([_full_sheet(legend_style="column")]), 1), "legenda")
+    x, top = LEGEND_AT
+    _close(legend["bbox_pct"], _pct(x, top, x + LEGEND_COLUMN_DX + 6, top + 42))
+    assert "3 eil." in legend["evidence"]["detail"]
+
+
+def test_a_legend_of_material_swatches():
+    """objektas_d's ceiling legend: a grey box per finish (92 × 31 pt there), the text right of it."""
+    from synthetic_plan import SWATCH, SWATCH_TEXT_DX
+    legend = _one(sz.detect_zones(build_plan([_full_sheet(legend_style="swatches")]), 1), "legenda")
+    x, top = LEGEND_AT
+    right = max(x + stringWidth(LEGEND_HEADING, LT_FONT, 6),
+                max(x + SWATCH_TEXT_DX + stringWidth(t, LT_FONT, 5) for t in LEGEND_ROWS))
+    _close(legend["bbox_pct"], _pct(x, top, right, top + 12 + 2 * 12 + 3 + SWATCH[1] / 2))
+    assert "3 eil." in legend["evidence"]["detail"]
+
+
+def test_a_table_whose_first_row_has_no_word_is_not_a_table():
+    """Walls drawn as boxes with their dimensions in them (objektas_h p1: a „table" headed by numbers)."""
+    rows = (("4000", "3000", "2000"), ("150", "1200", "900"), ("300", "600", "450"), ("120", "80", "60"))
+    zones = sz.detect_zones(build_plan([_full_sheet(table_rows=rows, table_title="")]), 1)
+    assert not [z for z in zones if z["kind"] == "lentele"]
+
+
+def test_a_reader_in_another_frame_than_the_page_is_not_used(monkeypatch):
+    """objektas_e: the wall reader (and the character reader) settle their frame from where the content lies;
+    on a /Rotate 270 sheet whose content does not prove it they end up turned. Zones are never placed from a
+    frame that disagrees with the page's real one — the answer says so instead."""
+    from extractor import pdf_vectors
+    pdf = build_plan([_full_sheet()])
+    real = pdf_vectors.page_geometry
+    monkeypatch.setattr(pdf_vectors, "page_geometry", lambda b, p: (lambda w, h, r: (h, w, r))(*real(b, p)))
+    res = sz.read_zones(pdf, 1)
+    assert not [z for z in res["zones"] if z["kind"] == "planas"]
+    assert "sienų brėžinio rėmas nesutampa" in res["detail"]
+    assert {"legenda", "lentele", "antspaudas"} <= {z["kind"] for z in res["zones"]}    # the text still reads
+
+
+def test_a_text_direction_in_another_frame_is_not_used(monkeypatch):
+    from extractor import plan_area_annotations as paa
+    pdf = build_plan([_full_sheet()])
+    real = paa._iter_pages
+
+    def turned(b, pages):
+        for pn, W_, H_, chars, to_display in real(b, pages):
+            yield pn, H_, W_, chars, to_display
+    monkeypatch.setattr(paa, "_iter_pages", turned)
+    res = sz.read_zones(pdf, 1)
+    assert "teksto lapo rėmas nesutampa" in res["detail"]
+    assert not [z for z in res["zones"] if z["kind"] in ("legenda", "pastabos", "antspaudas")]
+    _close(_one(res["zones"], "planas")["bbox_pct"], _plan_box())           # the walls still read
+
+
+def test_a_sheet_too_heavy_to_lay_out_skips_tables_and_says_so(monkeypatch):
+    monkeypatch.setattr(sz, "TABLE_MAX_OBJECTS", 10)
+    res = sz.read_zones(build_plan([_full_sheet()]), 1)
+    assert not [z for z in res["zones"] if z["kind"] == "lentele"]
+    assert "lentelių neieškota" in res["detail"]
+    assert _one(res["zones"], "legenda")                                    # what needs no table still reads
+
+
+def test_three_short_lines_without_a_heading_are_not_notes():
+    s = two_rooms()
+    s.texts = [("Laidas išvedamas iš lubų", 9.0, 1.0, (0, 0, 0)),
+               ("Jungiklis montuojamas į baldą", 9.0, 1.3, (0, 0, 0)),
+               ("Apšvietimas jungiamas su jungtuku", 9.0, 1.6, (0, 0, 0))]
+    assert not [z for z in sz.detect_zones(build_plan([s]), 1) if z["kind"] == "pastabos"]
+
+
+def test_zone_at_takes_a_legend_inside_the_title_band():
+    zones = [{"kind": "antspaudas", "bbox_pct": [0.0, 0.7, 1.0, 1.0]},
+             {"kind": "legenda", "bbox_pct": [0.6, 0.75, 0.8, 0.9]},
+             {"kind": "planas", "bbox_pct": [0.5, 0.5, 0.9, 0.95]}]
+    assert sz.zone_at(zones, 0.7, 0.8)["kind"] == "legenda"
+    assert sz.zone_at(zones, 0.2, 0.8)["kind"] == "antspaudas"
+    assert sz.zone_at(zones, 0.6, 0.6)["kind"] == "planas"

@@ -50,6 +50,7 @@ class Sheet:
     title_block: str | None = None                          # a ruled title block in the lower right, carrying this document code
     notes_at: tuple[float, float] | None = None             # „PASTABOS:" + NOTES_LINES prose lines
     legend_glyphs: bool = True                              # False: the rows are plain text (a heading with no legend under it)
+    legend_style: str = "symbols"                           # "symbols" left of the text, "column" right of it, "swatches" (material boxes)
     table_title: str | None = None                          # the table's title (default TABLE_TITLE)…
     table_rows: tuple[tuple[str, ...], ...] | None = None   # …and its rows (default TABLE_ROWS)
     rotate: int = 0                                         # the page's /Rotate — drawn unrotated, the viewer turns it
@@ -61,6 +62,9 @@ LEGEND_ROWS = ("Šviestuvas lubose", "Elektros rozetė", "Vėdinimo difuzorius")
 LEGEND_ROW_STEP = 12.0
 LEGEND_TEXT_DX = 14.0          # the row text starts this far right of the block's left edge (the glyph is left of it)
 LEGEND_WIDTH = 120.0
+LEGEND_COLUMN_DX = 100.0       # "column" style: the glyphs stand in a column this far right of the block's left edge
+SWATCH = (40.0, 10.0)          # "swatches" style: a grey material box this big, the text right of it
+SWATCH_TEXT_DX = 48.0
 TABLE_TITLE = "DURŲ ŽINIARAŠTIS"
 TABLE_ROWS = (("Žymuo", "Dydis", "Kiekis"), ("D1", "900x2100", "3"), ("D2", "800x2100", "2"), ("D3", "700x2100", "1"))
 TABLE_COL_W = (40.0, 60.0, 40.0)
@@ -84,23 +88,33 @@ def _zone_blocks(c, sheet: "Sheet") -> None:
         for i, text in enumerate(LEGEND_ROWS):
             row_top = top + 12 + i * LEGEND_ROW_STEP
             cy = H - row_top - 3                                  # the row's centre line
+            gx = x                                                # where the glyph is drawn
+            tx = x + LEGEND_TEXT_DX                               # where the row's text starts
+            if sheet.legend_style == "column":
+                gx, tx = x + LEGEND_COLUMN_DX, x
             if not sheet.legend_glyphs:
                 pass
+            elif sheet.legend_style == "swatches":
+                c.setFillGray(0.6 - 0.2 * i)
+                c.setStrokeGray(0.0)
+                c.setLineWidth(0.3)
+                c.rect(x, cy - SWATCH[1] / 2, SWATCH[0], SWATCH[1], stroke=1, fill=1)
+                tx = x + SWATCH_TEXT_DX
             elif i == 0:                                            # a coloured square
                 c.setFillColorRGB(0.9, 0.2, 0.1)
-                c.rect(x, cy - 3, 6, 6, stroke=0, fill=1)
+                c.rect(gx, cy - 3, 6, 6, stroke=0, fill=1)
             elif i == 1:                                          # a hairline circle
                 c.setStrokeGray(0.0)
                 c.setLineWidth(0.25)
-                c.circle(x + 3, cy, 3, stroke=1, fill=0)
+                c.circle(gx + 3, cy, 3, stroke=1, fill=0)
             else:                                                 # a black cross
                 c.setStrokeGray(0.0)
                 c.setLineWidth(0.4)
-                c.line(x, cy - 3, x + 6, cy + 3)
-                c.line(x, cy + 3, x + 6, cy - 3)
+                c.line(gx, cy - 3, gx + 6, cy + 3)
+                c.line(gx, cy + 3, gx + 6, cy - 3)
             c.setFillGray(0.0)
             c.setFont(LT_FONT, 5)
-            c.drawString(x + LEGEND_TEXT_DX, cy - 1.8, text)
+            c.drawString(tx, cy - 1.8, text)
     if sheet.table_at:
         x, top = sheet.table_at
         c.setFillGray(0.0)
