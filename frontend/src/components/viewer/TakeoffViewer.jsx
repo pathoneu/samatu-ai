@@ -36,7 +36,10 @@ import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
 import { selfIntersects } from '@/lib/polygonGeometry';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
+import { roomAtPoint, nextRoomSelection } from '@/lib/roomHitTest';
+import { displayPointOf } from '@/lib/roomOutline';
 import PageOverlayHost from './PageOverlayHost';
+import { hitTest as hitTestMeasurement, MEASURE_HIT_TOL_PX } from './MeasureLayer';
 import CalibrateDialog from './CalibrateDialog';
 import { ScaleOverviewDock, ScaleGateChip } from './ScaleOverviewPanel';
 import ScaleCheckCard from './ScaleCheckCard';
@@ -620,7 +623,7 @@ function ViewerHotkeys({ documentId, fillArmed, onCancelFill, onClearFocus, onTo
 // focused room the old effect re-ran scrollToPage on EVERY tick — the viewer
 // literally fought the user's navigation. Jump ONCE per new target; re-arm
 // only when the focus object itself changes (clicking a room again re-jumps).
-function FocusScroller({ documentId, focusedRoom, focusedPage }) {
+function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null }) {
   const { provides: scrollApi, state: scroll } = useScroll(documentId);
   // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
   // zone layer and this scroller must never disagree about a room's page.
@@ -631,8 +634,12 @@ function FocusScroller({ documentId, focusedRoom, focusedPage }) {
     if (!targetPage || !scrollApi?.scrollToPage) return;
     if (doneRef.current === targetPage) return; // one jump per target — never re-yank
     doneRef.current = targetPage;
+    // A room he clicked ON the drawing is already on screen (Pathon v3 W1-D): jumping to its page would
+    // throw the view back to the sheet's top-left corner under his cursor.
+    const skip = skipJumpRef?.current;
+    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) return;
     scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
-  }, [targetPage, scrollApi]);
+  }, [targetPage, scrollApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE JUMP CAN LAND ON NOTHING (2026-09-04, measured). `scrollToPage` is
   // callable before the pages have been measured, and calling it then computes
@@ -786,6 +793,39 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
   );
   const focusedRoomNr = focusedRoom?.nr ?? null;
+  // ---- Select by click (Pathon v3 W1-D, D1) ---------------------------------
+  // The focused room is the host's (the panel's room); Shift+click adds rooms beside it (`extraRoomNrs`), the
+  // way Togal and Kreo select several shapes. A click on the drawing that focuses a room must not make the
+  // viewer jump to that room's page — it is already under the cursor (FocusScroller reads `skipJumpRef`).
+  const [extraRoomNrs, setExtraRoomNrs] = useState([]);
+  const skipJumpRef = useRef(null);
+  const selectionFromClickRef = useRef(false);
+  // The host moved the focus (a list row, Patikra, Esc): the extra rooms were chosen beside the OLD room.
+  useEffect(() => {
+    if (selectionFromClickRef.current) { selectionFromClickRef.current = false; return; }
+    setExtraRoomNrs([]);
+  }, [focusedRoomNr]);
+  const applyRoomSelection = (next) => {
+    const cur = focusedRoomNr == null ? null : String(focusedRoomNr);
+    if (next.focused !== cur) {
+      selectionFromClickRef.current = true;
+      if (next.focused == null) onClearFocus?.();
+      else {
+        const room = (rooms || []).find((r) => String(r?.nr) === next.focused);
+        skipJumpRef.current = { nr: next.focused, until: Date.now() + 1500 };
+        onRoomZoneClick?.({ nr: next.focused, puslapio_nr: roomPageOf(room) });
+      }
+    }
+    setExtraRoomNrs(next.extra);
+  };
+  // A click at rest (or with „Žymėti") on the drawing: the room under it, else nothing (empty paper clears).
+  const selectRoomAt = (pt) => {
+    const where = displayPointOf(pt);
+    const hit = where ? roomAtPoint(rooms, where, {
+      renderedWidth: pt.renderedWidth, renderedHeight: pt.renderedHeight, hidden: hiddenRoomNrs,
+    }) : null;
+    applyRoomSelection(nextRoomSelection({ focused: focusedRoomNr, extra: extraRoomNrs }, hit?.nr ?? null, { shift: !!pt.shiftKey }));
+  };
   // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
   // „Taisyti kontūrą", the name the vertex editor now carries — one verb per outline fix).
   const [fillFor, setFillFor] = useState(null);
@@ -1190,15 +1230,22 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
     if (fillFor == null) {
-      // Plain canvas click (no fill, no measure tool): clear the focused-room
-      // chip — a room stays "selected" only while the user means it (audit P2
-      // sticky chip) — and forward to any external consumer. While a measure
-      // tool owns the pointer, leave focus alone. Same while an outline is being
-      // edited: a drag that starts a hair off a vertex must not drop the focus
-      // (which would abandon the edit, 2026-10-16).
-      if (measureTool == null && !outlineEdit && !outlineTools.tool) {
-        onClearFocus?.();
-        onPagePoint?.(pt);
+      // Plain canvas click (no fill, no measure tool) — Pathon v3 W1-D: the room under the click is SELECTED
+      // (Shift adds or removes one), empty paper clears the selection (the audit P2 sticky-chip rule still
+      // holds: a room stays selected only while he means it); the click is forwarded to any external
+      // consumer. „Žymėti" selects rooms too, unless the click is on one of his measurements (MeasureLayer
+      // selects that one). While another measure tool owns the pointer, leave focus alone. Same while an
+      // outline is being edited: a drag that starts a hair off a vertex must not drop the focus (which would
+      // abandon the edit, 2026-10-16). The check view lent to Patikra keeps its own click: clear, then the pick.
+      if (!outlineEdit && !outlineTools.tool && (measureTool == null || measureTool === 'select')) {
+        if (check) {
+          if (measureTool == null) onClearFocus?.();
+        } else {
+          const tol = MEASURE_HIT_TOL_PX / (Number(pt.scale) > 0 ? Number(pt.scale) : 1);
+          const onMark = measureTool === 'select' && hitTestMeasurement({ x: pt.x, y: pt.y }, measurements, pt.pageIndex + 1, tol);
+          if (!onMark) selectRoomAt(pt);
+        }
+        if (measureTool == null) onPagePoint?.(pt);
       }
       return;
     }
@@ -1334,7 +1381,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             scalesOpen={scalesOpen}
             onToggleScales={check || !project ? null : () => setScalesOpen((v) => !v)}
           />
-          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
+          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef} />}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
@@ -1382,6 +1429,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       checkData={check?.pages?.[layout.pageNumber] || null}
                       symbolSearch={symbol.active ? symbol : null}
                       focusedRoomNr={focusedRoomNr}
+                      selectedRoomNrs={extraRoomNrs}
                       hiddenRoomNrs={hiddenRoomNrs}
                       hoveredRoomNrExternal={hoveredRoomNrExternal}
                       zoneFillsVisible={zoneFillsVisible}

@@ -31,7 +31,7 @@ import CalloutLayer from './CalloutLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
-function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint }) {
+function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale = null, renderedWidth = null, renderedHeight = null }) {
   const { register } = usePointerHandlers({ documentId, pageIndex });
   // COORDINATE CONTRACT (verified in @embedpdf/plugin-interaction-manager dist):
   // PagePointerProvider's default convertEventToPoint runs restorePosition(),
@@ -41,9 +41,14 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
   // here must therefore be the mediabox size in POINTS (pageSizePt), so that
   // consumers get pct with a straight divide. pageRotation (/Rotate enum) is
   // included for context only — no rotation math belongs in this path.
+  // Pathon v3 W1-D: the click also says whether Shift was held (Shift+click adds a room to the selection), the
+  // page's screen pixels per PDF point (`scale`, for hit tolerances) and its size on screen.
   useEffect(() => register({
-    onClick: (pos) => onPagePoint?.({ pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation }),
-  }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint]);
+    onClick: (pos, evt) => onPagePoint?.({
+      pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation,
+      shiftKey: !!evt?.shiftKey, scale, renderedWidth, renderedHeight,
+    }),
+  }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale, renderedWidth, renderedHeight]);
   return null;
 }
 
@@ -66,6 +71,8 @@ export default function PageOverlayHost({
   pageRotation = 0,
   pageSizePt = null,
   focusedRoomNr,
+  // Rooms Shift+clicked beside the focused one (Pathon v3 W1-D) — drawn with the same selected style.
+  selectedRoomNrs = null,
   hiddenRoomNrs = null,
   hoveredRoomNrExternal = null,
   // Founder decision 2026-07-11: rooms render as numbered markers by default;
@@ -212,7 +219,7 @@ export default function PageOverlayHost({
             below the room zones so measure/zone interactions are unaffected. */}
         <SearchLayer documentId={documentId} pageIndex={layout.pageIndex} style={{ position: 'absolute', inset: 0 }} />
       </div>
-      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} />
+      <PageClicks documentId={documentId} pageIndex={layout.pageIndex} pageWidth={pageWidthPt} pageHeight={pageHeightPt} pageRotation={pageRotation} onPagePoint={onPagePoint} scale={adapter?.scale ?? null} renderedWidth={width} renderedHeight={height} />
       {/* Absolutely-positioned overlay host, page-sized; RoomZoneLayer draws inside */}
       {checkMode && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -238,11 +245,15 @@ export default function PageOverlayHost({
           page={layout.pageNumber}
           renderedSize={{ width, height }}
           focusedRoomNr={focusedRoomNr}
+          selectedRoomNrs={selectedRoomNrs}
           hiddenRoomNrs={hiddenRoomNrs}
           hoveredRoomNrExternal={hoveredRoomNrExternal}
           zoneFillsVisible={zoneFillsVisible}
           interactive={!measureActive && !outlineEdit && !outlineTool}
-          onRoomClick={(zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
+          // Selecting is the page click's job (TakeoffViewer.handlePagePoint hit-tests what this layer draws, so
+          // Shift+click can add a room); a zone of its own would re-focus the room after the page did. Without
+          // the viewer's selection (`onPagePoint` absent) the zone still focuses its room as before.
+          onRoomClick={onPagePoint ? () => {} : (zone) => onRoomZoneClick?.({ nr: zone.nr, puslapio_nr: layout.pageNumber })}
         />
       </div>
       )}
