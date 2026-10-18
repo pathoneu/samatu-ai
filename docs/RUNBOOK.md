@@ -322,6 +322,29 @@ Production today is **Vercel (`app.pathon.eu`) + Railway (`api.pathon.eu`), both
 
 Status 2026-10-18: written, not yet run on dev or prod (workers may not touch either); the local gates of step 2 are what W7-A ran.
 
+## 8b. What Privacy / Terms / Cookies promise, against the code (v3 W7-A M11, 2026-10-18)
+
+The legal review itself is the founder's (a lawyer). This is the list of promises the three pages make and what the code on `v3/market-readiness` actually does. **MISMATCH** rows need a founder decision — change the setting or change the text.
+
+| Page § | Promise | Code | State |
+|---|---|---|---|
+| Privacy §5 | Account deletion is immediate and irreversible; all projects (bin included) with drawings and sąmatos, company data and logo, settings, price lists, templates go; signed out everywhere | `api/account.py` → `project_purge.delete_project_and_files` per project (row, stored PDF + editions, renders, annotations, calibrations, legend, evidence crops, F2/F3 lines, held re-reads, and since M8 the symbol-training crops), `db.delete_account` (settings, jobs, price lists, templates, assemblies, email tokens; session_version bump), and since M8 `purge_account_files` (per-owner architect legends) | matches |
+| Privacy §5 | The deleted account keeps a minimal record without email, name, company data or Google link | tombstone row: email replaced, name / company / Google / avatar / company code / PVM code cleared; invoices kept. **But `consumed_trials` keeps the company code (with the user id) after deletion** — the free-trial anti-abuse gate | **MISMATCH (small)**: say so in the text, or drop the user id from that row |
+| Privacy §5 | Nightly backups are kept 30 days, so deleted data leaves them within 30 days | `backend/backup.py` prunes only when `SAMATU_BACKUP_KEEP_DAYS` is set; it is unset by design (§2a) → **every backup is kept forever** | **MISMATCH**: set `SAMATU_BACKUP_KEEP_DAYS=30` on Railway (check first with `scripts/report_backup_retention.py --days 30` in that environment), or change the text |
+| Privacy §5 | Server logs with IP are deleted automatically after up to 90 days | no app-side log store; the access log lives in Railway's log retention, which depends on the plan | unverified — founder checks the Railway plan's retention |
+| Privacy §5 | Drawings sent to Anthropic are kept there per their policy (usually up to 30 days) | external | not code |
+| Privacy §2 | Passwords only as bcrypt hashes; Google: only the account id, email and name | `auth.hash_password` (bcrypt 12); Google stores `google_sub`, email, name, avatar URL | matches (the avatar URL is not named) |
+| Privacy §2 | IP kept briefly in server logs for rate limiting / abuse | rate limiter is in memory (60 s windows); IPs appear in access / security logs | matches |
+| Privacy §2 | Prices and price lists are only in your account | `price_lists`, settings, templates are per user | matches |
+| Privacy §8 | HTTPS everywhere; session cookie HTTPOnly, SameSite=Lax, signed | `SessionMiddleware(same_site="lax", https_only=ENV=production)` | matches |
+| Privacy (processors) | Anthropic, Stripe, Google named | also Cloudflare R2 (drawings, backups), Railway, Vercel hosting; **an email provider once SMTP is chosen (M2)** | **gap**: the hosting / storage processors and the future email provider are not named |
+| Privacy | (not mentioned) | in-app usage events (`/api/telemetry/session`: event type, target such as a room number, timings, per project) are written to a server log for the pilot report; since M3 only for a signed-in owner; the lines are **not** removed when the project is deleted | **gap**: mention it, and/or purge by project id |
+| Cookies §3 | `samatu_session` lasts for the session / until sign-out | `SESSION_MAX_AGE_S` = 30 days (a persistent cookie, invalidated by sign-out) | **MISMATCH**: the table should say „iki 30 dienų arba iki atsijungimo" |
+| Cookies §2–3 | No analytics / marketing cookie before consent; exact cookies listed once a tool is installed | `lib/analytics.js` loads gtag.js only after consent (Consent Mode defaults denied) | matches; if a GA id is configured in production, its cookies (`_ga`, `_ga_*`) should now be listed |
+| Cookies | similar technologies (localStorage) | also `samatu_projects` / settings caches, IndexedDB copies of drawings — cleared on logout and on another person's sign-in since M3 | matches in spirit; the list is not exhaustive |
+| Terms §7 | You can delete the account any time, by email or in settings | Settings › account deletion (2026-10-05) | matches |
+| Terms §4 | Cancel a subscription any time, it runs to the end of the paid period | billing is off; Stripe `customer.subscription.deleted` → free | matches once billing is on |
+
 ## 9. Decommission / shutdown
 
 If you ever need to take the service down:
