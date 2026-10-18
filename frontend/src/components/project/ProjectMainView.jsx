@@ -534,6 +534,9 @@ export default function ProjectMainView({
   // { nonce, excluded } — open the price of the first row that would reach the
   // client without one. Acted on once; onPriceFocusDone clears it upstream.
   priceFocus = null, onPriceFocusDone,
+  // Beside the drawing in the workspace (Pathon v3 Sąmata view, before „Išskleisti"): the room summary
+  // and the „show the drawing" button are left out — the drawing and its rooms panel are right there.
+  compact = false,
 }) {
   const { t } = useTranslation();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
@@ -853,6 +856,7 @@ export default function ProjectMainView({
       </div>
 
       {/* PATALPŲ SUVESTINĖ — collapsible */}
+      {!compact && (
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <button
           onClick={() => setPatalposExpanded(v => !v)}
@@ -929,6 +933,7 @@ export default function ProjectMainView({
           </div>
         )}
       </div>
+      )}
 
       {/* KAINOS — „Užpildyti iš mano kainyno" / „Įvesiu pats" (design §3).
           A choice with its consequence written next to it, not a hidden
@@ -1158,7 +1163,7 @@ export default function ProjectMainView({
 
       {/* Bottom actions */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        {onShowDrawing && (
+        {onShowDrawing && !compact && (
           <Button
             variant="outline"
             onClick={onShowDrawing}

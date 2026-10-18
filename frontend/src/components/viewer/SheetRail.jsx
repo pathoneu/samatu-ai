@@ -8,18 +8,22 @@
  * The model (names, groups, what is automatic) is lib/sheetRail.buildSheetRail; persistence and
  * undo belong to the owner (TakeoffViewer → InteriorWorkspace → project.sheet_overrides).
  *
+ * Pathon v3 (workspace frame, A4): the rail opens as a 56 px STRIP of thumbnails with the sheet number
+ * under each, groups kept apart by a rule; a sheet's name and group show beside the strip when its
+ * thumbnail is focused or clicked (never on hover alone). „Lapai" at the top (or T) opens the full rail.
+ *
  * Thumbnails are not virtualized like the old ThumbnailsPane (groups break its fixed-row
  * windowing); instead each row mounts its ThumbImg only once it scrolls near the rail's viewport.
  * Sheet sets are tens of pages, not thousands.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Pencil, RotateCcw, Check, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, RotateCcw, Check, X, PanelLeftOpen } from 'lucide-react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { pageTypeColor } from '@/lib/pageTypes';
 import {
-  SHEET_TYPE_OPTIONS, DISCIPLINE_OPTIONS, sheetTypeLabel, searchHitsByPage,
+  SHEET_TYPE_OPTIONS, DISCIPLINE_OPTIONS, sheetTypeLabel, searchHitsByPage, stripLabel, stripTag,
 } from '@/lib/sheetRail';
 
 const CLOSED_KEY = 'samatu_viewer_sheet_groups_closed';
@@ -162,7 +166,153 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
   );
 }
 
-export default function SheetRail({ documentId, rail, currentPageOf, onRename = null, onReset = null }) {
+/**
+ * The rail in two widths (Pathon v3 frame, A4): `mode="strip"` — 56 px of thumbnails, the drawing gets the
+ * room — and `mode="full"` — numbers, names, types and the rename editor. Two components, so switching
+ * never mixes their state.
+ */
+export default function SheetRail({ mode = 'full', ...props }) {
+  return mode === 'strip' ? <SheetStrip {...props} /> : <SheetRailFull {...props} />;
+}
+
+function SheetStripRow({ documentId, sheet, current, hits, searching, label, rootRef, rowRef, onOpen, onShowLabel, onHideLabel }) {
+  const [nearRef, near] = useNearViewport(rootRef);
+  const setRefs = (el) => { nearRef.current = el; rowRef(el); };
+  return (
+    <li ref={setRefs} data-sheet-page={sheet.page} aria-current={current ? 'page' : undefined} className="relative">
+      <button
+        type="button"
+        onClick={() => { onOpen(); onShowLabel(); }}
+        onFocus={onShowLabel}
+        onBlur={onHideLabel}
+        aria-label={label}
+        className={`flex w-full flex-col items-center gap-0.5 border-l-2 px-1 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--viewer-chrome-active))] ${current
+          ? 'border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-muted))]'
+          : 'border-transparent hover:bg-[hsl(var(--viewer-chrome-hover))]'}`}
+      >
+        <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
+          {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 40, height: 'auto', display: 'block' }} />}
+        </span>
+        <span className={`mono tabular text-meta leading-tight ${current ? 'font-semibold text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}>
+          {stripTag(sheet)}
+        </span>
+      </button>
+      {searching && hits > 0 && (
+        <span
+          className="pointer-events-none absolute right-1 top-1 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] px-1 text-meta leading-[16px] text-white mono tabular"
+          data-testid="sheet-hits"
+        >{hits}</span>
+      )}
+    </li>
+  );
+}
+
+function SheetStrip({ documentId, rail, currentPageOf, onExpand = null }) {
+  const { state: scroll, provides: scrollApi } = useScroll(documentId);
+  const { state: search } = useSearch(documentId);
+  const cur = currentPageOf ? currentPageOf(scroll) : (scroll?.currentPage ?? 1);
+  const rootRef = useRef(null);
+  const rows = useRef(new Map());
+  // The sheet whose name is shown beside the strip: on focus or click, never on hover alone (Rimas).
+  const [label, setLabel] = useState(null);       // {page, top, left} in viewport px
+
+  const searching = !!(search?.query && search?.active !== false && !search?.loading);
+  const hits = useMemo(() => (searching ? searchHitsByPage(search?.results) : {}), [searching, search?.results]);
+  const groupLabelOf = useMemo(() => {
+    const m = new Map();
+    rail.groups.forEach((g) => g.sheets.forEach((s) => m.set(s.page, g.label)));
+    return m;
+  }, [rail.groups]);
+
+  useEffect(() => {
+    rows.current.get(cur)?.scrollIntoView?.({ block: 'nearest' });
+  }, [cur]);
+
+  const showLabel = (page) => {
+    const el = rows.current.get(page);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setLabel({ page, top: Math.round(r.top + r.height / 2), left: Math.round(r.right + 6) });
+  };
+  // Esc, a click elsewhere or a scroll of the strip puts the name away.
+  useEffect(() => {
+    if (!label) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setLabel(null); };
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setLabel(null); };
+    const onScroll = () => setLabel(null);
+    const root = rootRef.current;
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown, true);
+    root?.addEventListener('scroll', onScroll);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown, true);
+      root?.removeEventListener('scroll', onScroll);
+    };
+  }, [label]);
+
+  const open = (page) => scrollApi?.scrollToPage({ pageNumber: page, behavior: 'smooth' });
+  const labelSheet = label ? rail.sheets.find((s) => s.page === label.page) : null;
+
+  return (
+    <aside
+      ref={rootRef}
+      className="w-14 shrink-0 overflow-y-auto overflow-x-hidden bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]"
+      aria-label="Brėžinio lapai"
+      data-testid="sheet-rail"
+      data-mode="strip"
+    >
+      {onExpand && (
+        <button
+          type="button"
+          onClick={onExpand}
+          title="Lapų sąrašas su pavadinimais ir tipais (T)"
+          aria-label="Rodyti lapų sąrašą su pavadinimais"
+          data-testid="sheet-rail-expand"
+          className="sticky top-0 z-10 flex w-full flex-col items-center gap-0.5 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] py-1.5 text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--viewer-chrome-active))]"
+        >
+          <PanelLeftOpen className="h-4 w-4" aria-hidden />
+          <span className="text-[14px] leading-tight">Lapai</span>
+        </button>
+      )}
+      {rail.groups.map((g, gi) => (
+        <section key={g.key} aria-label={g.label}>
+          {gi > 0 && <div aria-hidden className="mx-2 my-1 border-t border-[hsl(var(--viewer-chrome-border))]" />}
+          <ul>
+            {g.sheets.map((s) => (
+              <SheetStripRow
+                key={s.page}
+                documentId={documentId}
+                sheet={s}
+                current={s.page === cur}
+                hits={hits[s.page] || 0}
+                searching={searching}
+                label={stripLabel(s, g.label)}
+                rootRef={rootRef}
+                rowRef={(el) => { if (el) rows.current.set(s.page, el); else rows.current.delete(s.page); }}
+                onOpen={() => open(s.page)}
+                onShowLabel={() => showLabel(s.page)}
+                onHideLabel={() => setLabel((cur2) => (cur2?.page === s.page ? null : cur2))}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {labelSheet && (
+        <div
+          role="tooltip"
+          data-testid="sheet-strip-label"
+          className="pointer-events-none fixed z-40 max-w-[320px] -translate-y-1/2 rounded-[2px] border border-border bg-card px-2.5 py-1.5 text-[14px] leading-snug text-foreground shadow-md"
+          style={{ top: label.top, left: label.left }}
+        >
+          {stripLabel(labelSheet, groupLabelOf.get(labelSheet.page))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onReset = null }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { state: search } = useSearch(documentId);
   const cur = currentPageOf ? currentPageOf(scroll) : (scroll?.currentPage ?? 1);

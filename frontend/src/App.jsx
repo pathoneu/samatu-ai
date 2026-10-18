@@ -45,8 +45,6 @@ const Annotator = import.meta.env.DEV ? lazy(() => import('@/pages/Annotator')) 
 // Phase 7 — billing UI (flag-gated: routes render nothing unless useBilling().enabled).
 const Pricing = lazy(() => import('@/pages/Pricing'));
 const BillingResult = lazy(() => import('@/pages/BillingResult'));
-// Patikra: opens on the question list; a room (`?kambarys=`) opens the room sheet (pages/PatikraEntry.jsx)
-const PatikraEntry = lazy(() => import('@/pages/PatikraEntry'));
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -135,7 +133,10 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/new-project" element={<NewProject />} />
                 <Route path="/project/:id" element={<ProjectDetail />} />
-                <Route path="/project/:id/patikra" element={<PatikraEntry />} />
+                {/* Patikra is a VIEW of the project workspace (Pathon v3, design §3): the same page as
+                    /project/:id, so the drawing stays mounted while he moves between the steps. The
+                    question list / room sheet (pages/PatikraEntry.jsx) open in its right panel. */}
+                <Route path="/project/:id/patikra" element={<ProjectDetail />} />
                 {/* Dev-only (see the Annotator import above). React Router
                     ignores non-element children, so this vanishes in prod. */}
                 {import.meta.env.DEV && Annotator && (
