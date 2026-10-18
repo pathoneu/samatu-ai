@@ -396,16 +396,7 @@ export default function MeasureLayer({
         decimals={decimals}
       />
 
-      {POLY_TOOLS.has(tool) && draft.points.length > 0 && (
-        <DraftActions
-          lastPt={adapter.toViewport(draft.points[draft.points.length - 1])}
-          width={adapter.width}
-          height={adapter.height}
-          finishable={draftFinishable}
-          onFinish={finishDraft}
-          onCancel={cancelDraft}
-        />
-      )}
+      {/* „Baigti" / „Atšaukti" live in the mode pill at the bottom of the drawing (v3 W1-B B2), always visible there. */}
 
       {lasso && lasso.px.length > 1 && (
         <polygon

@@ -19,14 +19,14 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, Pentagon, Search, Printer, Download, Undo2, History, ListChecks, Keyboard } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, SquarePen, X, PanelLeft, Pentagon, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
-import { makeCountType, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
+import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
-import { uncalibratedScale } from '@/lib/measureGeometry';
+import { uncalibratedScale, draftCommitPoints } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms, confirmLaneScales } from '@/lib/durableScale';
 import { mergePageScales } from '@/lib/pageScales';
 import { dimensionStringsOf } from '@/lib/scaleOverview';
@@ -49,6 +49,8 @@ import OutlineToolButtons from './OutlineToolButtons';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
+import ModePill from './ModePill';
+import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import { matchViewerHotkey, withKey, hintText, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
@@ -79,9 +81,6 @@ const MEASURE_HINTS = {
   // Togal-v2 W6: a readout, not a calibration — the same two-click pick, nothing is changed.
   scalecheck: 'Mastelio patikra: spustelėkite atkarpos, kurios ilgį žinote, pradžią ir pabaigą · Esc — baigti',
 };
-// Outline editing (2026-10-16): one line, every exit named — the same rule as the measure hints.
-// Key names come from lib/viewerShortcuts, the table the „?" guide prints.
-const OUTLINE_HINT = `Kontūras: tempkite kampą · vidurio taškas — pridėti · dukart — pašalinti · ${hintText(['outlineUndo', 'outlineSave', 'outlineCancel'])}`;
 // What this sheet snaps to, by its wall geometry status — said in the status bar while a snapping tool is
 // armed (the tool's own instruction lives in the pill on the drawing, once — v3 W1-C). One snap colour;
 // the mark's shape says what the click lands on (MeasureLayer SnapDot).
@@ -164,7 +163,7 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, searchOpen, onToggleSearch, onCloseSearch, outlineEdit = null, onStartOutlineEdit = null, onSaveOutlineEdit = null, onCancelOutlineEdit = null, onUndoOutlineEdit = null, outlineCanUndo = false, outlineInvalid = false, outlineSaving = false, outlineToolsSlot = null, addon = null }) {
+function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, onCancelFill, searchOpen, onToggleSearch, onCloseSearch, outlineEdit = null, onStartOutlineEdit = null, outlineToolsSlot = null, addon = null }) {
   const { state: zoom, provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -203,41 +202,7 @@ function Toolbar({ documentId, totalPages, focusedRoomNr, fillFor, onStartFill, 
           <span className="w-px h-4 bg-[hsl(var(--viewer-chrome-border))] mx-1.5" />
           {/* Outline editing (2026-10-16): the focused room's outline vertex by vertex, snapping to the
               drawing's walls; „Išsaugoti" re-reads its walls server side (api outline-set). */}
-          {outlineEdit ? (
-            <span className="inline-flex shrink-0 items-center gap-1 mr-1">
-              <button
-                type="button"
-                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded bg-[hsl(var(--viewer-chrome-active))] text-white whitespace-nowrap disabled:opacity-60"
-                title={outlineInvalid
-                  ? 'Kontūras kertasi pats su savimi — pataisykite viršūnes, tada išsaugokite'
-                  : 'Išsaugoti pakeistą kontūrą (Enter) — jo sienos ir angos bus perskaitytos iš naujo, kiekiai perskaičiuoti'}
-                disabled={outlineSaving || outlineInvalid}
-                onClick={onSaveOutlineEdit}
-                data-testid="outline-edit-save"
-              >
-                <Pentagon className="w-3.5 h-3.5" />
-                <span>{outlineSaving ? 'Saugoma…' : `Išsaugoti kontūrą (${outlineEdit.nr})`}</span>
-              </button>
-              <button
-                type="button"
-                className={btn}
-                title={withKey('Atšaukti paskutinį viršūnės pakeitimą', 'outlineUndo')}
-                aria-label="Atgal"
-                disabled={!outlineCanUndo}
-                onClick={onUndoOutlineEdit}
-                data-testid="outline-edit-undo"
-              ><Undo2 className="w-4 h-4" /></button>
-              <button
-                type="button"
-                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap"
-                title="Atšaukti kontūro redagavimą (Esc) — niekas neišsaugoma"
-                onClick={onCancelOutlineEdit}
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Atšaukti</span>
-              </button>
-            </span>
-          ) : (onStartOutlineEdit && fillFor == null) ? (
+          {outlineEdit ? null : (onStartOutlineEdit && fillFor == null) ? (
             <button
               type="button"
               className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] hover:bg-[hsl(var(--viewer-chrome-hover))] text-[hsl(var(--viewer-chrome-foreground))] whitespace-nowrap mr-1"
@@ -1020,6 +985,23 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     outlineTools.cancel();
     if (symbol.active) symbol.close();
   }, [inCheck]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A finished measurement (MeasureLayer, or the pill's „Baigti"): one history entry, and the value said aloud.
+  const commitMeasurement = (m) => {
+    setMeasurements((prev) => [...prev, m]);
+    // Founder 2026-07-25 ("no way to get measurements"):
+    // announce the committed value + where it lives.
+    if (m.kind !== 'count') {
+      const sc = effectiveScales[m.page];
+      const unit = m.kind === 'area' ? 'm²' : 'm';
+      const label = sc?.calibrated
+        ? `${measurementValue(m, sc).value.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unit}`
+        : 'nekalibruota';
+      const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
+      toast.success(`${KIND_LT[m.kind] || 'Matavimas'}: ${label}`, {
+        description: 'Įrašyta dešinės pusės skydelyje „Matavimai".',
+      });
+    }
+  };
   const countTallies = useMemo(() => measurements.reduce((acc, m) => {
     if (m.kind === 'count' && m.typeId) acc[m.typeId] = (acc[m.typeId] || 0) + 1;
     return acc;
@@ -1215,6 +1197,41 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   };
   // What the page layers and the status bar are told: the hand is not a page tool (it owns the pointer above them).
   const pageTool = measureTool === 'pan' ? null : measureTool;
+  // The bottom pill (W1-B B2): only the active mode — its name, what it holds, its keys, finish / leave.
+  const mac = useMemo(() => isMacPlatform(), []);
+  const activeCountType = measureTool === 'count' ? countTypes.find((t) => t.id === activeCountTypeId) : null;
+  const pill = check ? null : modePillFor({
+    tool: measureTool,
+    draftPoints,
+    finishable: !!draftCommitPoints(draftSlot.draft.points, measureTool),
+    calibPoint: calibSlot.point != null,
+    outlineEdit: outlineEdit ? { nr: outlineEdit.nr, canUndo: !!outlineEdit.history?.length, invalid: outlineInvalid, saving: outlineSaving } : null,
+    fill: fillFor != null ? { nr: fillFor, busy: fillBusy } : null,
+    symbolActive: symbol.active,
+    selectionCount: selectedMeasureIds.length,
+    countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
+    mac,
+  });
+  const pillSentence = symbol.active ? SYMBOL_HINTS[symbol.phase] : (outlineEdit || fillFor != null ? null : (MEASURE_HINTS[measureTool] || null));
+  const onPillAction = (id) => {
+    if (id === 'outlineUndo') undoOutline();
+    else if (id === 'outlineSave') saveOutlineEdit();
+    else if (id === 'outlineCancel') cancelOutlineEdit();
+    else if (id === 'fillCancel') setFillFor(null);
+    else if (id === 'symbolClose') symbol.close();
+    else if (id === 'draftFinish') {
+      const pts = draftCommitPoints(draftSlot.draft.points, measureTool);
+      if (pts && draftSlot.pageNr != null) commitMeasurement(makeMeasurement(measureTool, draftSlot.pageNr, pts));
+      setDraftSlot({ pageNr: null, draft: EMPTY_DRAFT });
+    } else if (id === 'draftCancel') setDraftSlot({ pageNr: null, draft: EMPTY_DRAFT });
+    else if (id === 'calibCancel') setCalibSlot({ pageNr: null, point: null });
+    else if (id === 'deselect') setSelectedMeasureIds([]);
+    else if (id === 'toolExit') {
+      if (measureTool === 'scalecheck') setScaleCheck(null);
+      setMeasureTool(null);
+      setSelectedMeasureId(null);
+    }
+  };
 
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
@@ -1246,12 +1263,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onCloseSearch={() => setSearchOpen(false)}
             outlineEdit={outlineEdit}
             onStartOutlineEdit={check || !onRoomOutlineEdit ? null : startOutlineEdit}
-            onSaveOutlineEdit={saveOutlineEdit}
-            onCancelOutlineEdit={cancelOutlineEdit}
-            onUndoOutlineEdit={undoOutline}
-            outlineCanUndo={!!outlineEdit?.history?.length}
-            outlineInvalid={outlineInvalid}
-            outlineSaving={outlineSaving}
             outlineToolsSlot={check || !onOutlineTool ? null : (
               <OutlineToolButtons
                 focusedRoomNr={focusedRoomNr}
@@ -1333,22 +1344,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       activeCountTypeId={activeCountTypeId}
                       selectedMeasureIds={selectedMeasureIds}
                       selectionMenuOnMiss={measureTool === 'lasso' && selectedMeasureIds.length > 1}
-                      onMeasureCommit={(m) => {
-                        setMeasurements((prev) => [...prev, m]);
-                        // Founder 2026-07-25 ("no way to get measurements"):
-                        // announce the committed value + where it lives.
-                        if (m.kind !== 'count') {
-                          const sc = effectiveScales[m.page];
-                          const unit = m.kind === 'area' ? 'm²' : 'm';
-                          const label = sc?.calibrated
-                            ? `${measurementValue(m, sc).value.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unit}`
-                            : 'nekalibruota';
-                          const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas' };
-                          toast.success(`${KIND_LT[m.kind] || 'Matavimas'}: ${label}`, {
-                            description: 'Įrašyta dešinės pusės skydelyje „Matavimai".',
-                          });
-                        }
-                      }}
+                      onMeasureCommit={commitMeasurement}
                       onMeasureCalibrate={(pageNr, a, b) => (measureTool === 'scalecheck' ? setScaleCheck({
                         page: pageNr,
                         readout: scaleCheckReadout({
@@ -1409,14 +1405,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   />
                 </div>
               )}
+              {/* The active mode's pill, bottom centre between the tool cards and the right edge. */}
+              {pill && (
+                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: RAIL_WIDTH + 16 }}>
+                  <ModePill pill={pill} sentence={pillSentence} onAction={onPillAction} />
+                </div>
+              )}
             </div>
             {/* Prominent tool instructions — the status-bar hint alone was
                 invisible to the founder ("no buttons... or anything"). */}
-            {(measureTool != null || outlineEdit || symbol.active) && (
-              <div className={`absolute ${symbol.active ? 'bottom-2' : 'top-2'} left-1/2 -translate-x-1/2 z-panel px-3.5 py-1.5 rounded-panel border border-border bg-card text-ui text-foreground shadow-md pointer-events-none w-max max-w-[calc(100%-1rem)] text-center`}>
-                {symbol.active ? SYMBOL_HINTS[symbol.phase] : outlineEdit ? OUTLINE_HINT : MEASURE_HINTS[measureTool]}
-              </div>
-            )}
+
             <OutlineToolPanel
               tool={outlineTools.tool}
               rooms={rooms}
