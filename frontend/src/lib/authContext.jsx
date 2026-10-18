@@ -35,7 +35,10 @@ async function apiCall(path, opts = {}) {
   let body;
   try { body = await res.json(); } catch { body = null; }
   if (!res.ok) {
-    const msg = body?.detail || `HTTP ${res.status}`;
+    // A detail may be a sentence or {error, message} (402/403 limits, v3 M2's
+    // email_not_verified) — never let "[object Object]" reach the screen.
+    const d = body?.detail;
+    const msg = (typeof d === 'string' ? d : d?.message) || `HTTP ${res.status}`;
     const err = new Error(msg);
     err.status = res.status;
     err.body = body;
@@ -127,6 +130,10 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ email, password, name, company_name }),
     });
+    // v3 M2: with the email gate on, no session starts until the link is opened.
+    if (d.verification_required) {
+      return { user: null, isFirstAdmin: false, verificationRequired: true, message: d.message || '' };
+    }
     await purgeLocalUserData();
     if (d.user) await claimCacheFor(d.user.id);
     setUser(d.user);

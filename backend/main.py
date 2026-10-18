@@ -421,6 +421,7 @@ from api.project_questions import router as project_questions_router
 from api.project_versions import router as project_versions_router
 from api.pdf_revisions import router as pdf_revisions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
+from api.auth_email import router as auth_email_router  # verification + password reset (v3 M2)
 
 load_dotenv()
 
@@ -777,6 +778,7 @@ app.include_router(project_questions_router)
 app.include_router(project_versions_router)
 app.include_router(pdf_revisions_router)
 app.include_router(account_router)
+app.include_router(auth_email_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
@@ -917,18 +919,21 @@ def _admin_allowlist() -> set[str]:
     return {e.strip().lower() for e in raw.split(",") if e.strip()}
 
 
-def _is_admin_email(email: str) -> bool:
+def _is_admin_email(email: str, verified: bool = False) -> bool:
     """Decide admin status for a NEWLY-created user (register + OAuth create).
 
     If SAMATU_ADMIN_EMAIL is set (non-empty) → ONLY listed emails become admin
     (opt-in allowlist). This stops the first stranger to register on a fresh
-    production DB from self-bootstrapping to global admin.
+    production DB from self-bootstrapping to global admin. Audit
+    backend-security-6 (fixed 2026-10-18): a typed address proves nothing, so
+    the allowlist applies only to a VERIFIED inbox — Google's email_verified at
+    sign-in, or later our own link (api/auth_email.on_email_verified).
     If unset/empty → preserve the legacy "first-ever user is admin" dev
     convenience EXACTLY (must not break local/dev bootstrap).
     """
     allow = _admin_allowlist()
     if allow:
-        return email.lower() in allow
+        return verified and email.lower() in allow
     return len(db.list_users()) == 0
 
 
@@ -952,10 +957,18 @@ def api_register(payload: RegisterPayload, request: Request):
         name=payload.name, company_name=payload.company_name,
         is_admin=is_admin,
     )
-    request.session["user_id"] = user["id"]
-    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
+    # v3 M2: a verification link goes out (console backend until SMTP_* is set).
+    # With SAMATU_REQUIRE_EMAIL_VERIFIED=1 no session starts until it is opened.
+    from api import auth_email as _auth_email
+    _auth_email.send_verification(user)
     log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_admin)
     user.pop("password_hash", None)
+    if _auth_email.verification_required():
+        return {"user": None, "is_first_admin": is_admin, "verification_required": True,
+                "message": "Išsiuntėme nuorodą į " + email + ". Atidarykite ją, kad "
+                           "patvirtintumėte el. paštą, tada prisijunkite."}
+    request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     return {"user": user, "is_first_admin": is_admin}
 
 
@@ -980,6 +993,12 @@ def api_login(payload: LoginPayload, request: Request):
         log.warning("failed login: email=%s ip=%s", email,
                     request.client.host if request.client else "?")
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
+    # v3 M2 (audit -9 follow-through): with the gate on, an unverified inbox
+    # gets no session. Only after the password matched, so it is no oracle.
+    from api import auth_email as _auth_email
+    if _auth_email.verification_required() and not user.get("email_verified_at"):
+        raise HTTPException(status_code=403, detail={
+            "error": "email_not_verified", "message": _auth_email.NOT_VERIFIED})
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
@@ -1199,13 +1218,27 @@ async def api_google_login(request: Request):
     return RedirectResponse(url=url, status_code=302)
 
 
+def _oauth_redirect(path: str) -> RedirectResponse:
+    """Where the Google callback sends the browser: `path` on the APP's origin.
+
+    The callback is served by the API (api.pathon.eu in production) while the
+    pages live on the app's origin (app.pathon.eu), so a bare "/login?…" landed
+    on the API and showed a 404 (audit backend-security-9, second half).
+    PATHON_APP_URL set → absolute URL on the app; unset (dev, tests) → the
+    relative path, exactly as before. `path` is always a same-site path here
+    (fixed strings or _safe_next_path output)."""
+    base = (os.environ.get("PATHON_APP_URL") or "").rstrip("/")
+    return RedirectResponse(url=f"{base}{path}" if base else path, status_code=302)
+
+
 @app.get("/api/auth/google/callback")
 async def api_google_callback(request: Request, code: str | None = None,
                               state: str | None = None, error: str | None = None):
     """Google OAuth redirect target. Exchanges code → token → user info,
     then creates/links the local user and starts a session."""
     if error:
-        return RedirectResponse(url=f"/login?oauth_error={error}", status_code=302)
+        from urllib.parse import quote as _q
+        return _oauth_redirect(f"/login?oauth_error={_q(str(error)[:64], safe='')}")
     if not GOOGLE_OAUTH_ENABLED:
         raise HTTPException(status_code=503, detail="Google OAuth not configured")
     expected_state = request.session.pop("google_oauth_state", None)
@@ -1216,11 +1249,9 @@ async def api_google_callback(request: Request, code: str | None = None,
     # exactly like the `error` and `account_disabled` paths already do.
     # (audit 2026-07-27)
     if not state or state != expected_state:
-        return RedirectResponse(url="/login?oauth_error=invalid_state",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=invalid_state")
     if not code:
-        return RedirectResponse(url="/login?oauth_error=missing_code",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=missing_code")
 
     import httpx  # lazy import — only loaded when OAuth is used
     async with httpx.AsyncClient(timeout=10) as client:
@@ -1236,21 +1267,18 @@ async def api_google_callback(request: Request, code: str | None = None,
         )
         if token_resp.status_code != 200:
             log.error("Google token exchange failed: %s", token_resp.text[:300])
-            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=token_exchange_failed")
         access_token = token_resp.json().get("access_token")
         if not access_token:
             log.error("Google token exchange returned no access_token")
-            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=token_exchange_failed")
         userinfo = await client.get(
             "https://openidconnect.googleapis.com/v1/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if userinfo.status_code != 200:
             log.error("Google userinfo fetch failed: HTTP %s", userinfo.status_code)
-            return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=incomplete_userinfo")
         info = userinfo.json()
 
     google_sub = info.get("sub")
@@ -1259,37 +1287,52 @@ async def api_google_callback(request: Request, code: str | None = None,
     avatar = info.get("picture")
     if not google_sub or not email:
         log.error("Google userinfo missing sub/email")
-        return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=incomplete_userinfo")
+    # Audit backend-security-9 (fixed 2026-10-18): Google vouches for the
+    # address only when it says so. Without that, linking by email would hand
+    # an existing account to whoever controls a Google login for that string.
+    if info.get("email_verified") is not True:
+        log.warning("Google sign-in refused: email not verified by Google")
+        return _oauth_redirect("/login?oauth_error=email_unverified")
 
+    from api import auth_email as _auth_email
     # Match priority: existing google_sub → existing email → create new user.
     user = db.get_user_by_google_sub(google_sub)
     if user is None:
         existing = db.get_user_by_email(email)
         if existing:
+            # Pre-account-takeover guard: a password account whose inbox was
+            # never proven may have been registered by someone else with this
+            # address. Do not merge Google into it; the owner signs in with
+            # the password (or resets it, which proves the inbox) first.
+            has_password = (existing.get("password_hash") or "") not in ("", "!oauth")
+            if has_password and not existing.get("email_verified_at"):
+                return _oauth_redirect("/login?oauth_error=link_needs_password")
             db.link_google_to_user(existing["id"], google_sub, avatar)
+            _auth_email.on_email_verified(existing["id"])
             user = db.get_user_by_id(existing["id"])
         else:
-            # Admin via SAMATU_ADMIN_EMAIL allowlist, else legacy first-user
-            # (matches /api/auth/register policy).
-            is_admin = _is_admin_email(email)
+            # Admin via SAMATU_ADMIN_EMAIL allowlist (a Google-verified inbox),
+            # else legacy first-user (matches /api/auth/register policy).
+            is_admin = _is_admin_email(email, verified=True)
             user = db.create_user_oauth(
                 email=email, google_sub=google_sub, name=name,
                 avatar_url=avatar, is_admin=is_admin,
             )
+            db.mark_email_verified(user["id"])
+            user = db.get_user_by_id(user["id"])
     # Admin-disable enforcement (2026-07-05): a deactivated account must not be
     # able to mint a session via OAuth either. The password /api/auth/login path
     # already rejects `is_active=0`, and get_current_user re-checks it on every
     # request — but refuse here too so a disabled user is bounced at the login
     # boundary (defense in depth) rather than getting a live-but-useless cookie.
     if not user.get("is_active"):
-        return RedirectResponse(url="/login?oauth_error=account_disabled",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=account_disabled")
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     # Re-sanitize on use (defense in depth) before redirecting.
-    return RedirectResponse(url=_safe_next_path(next_url), status_code=302)
+    return _oauth_redirect(_safe_next_path(next_url))
 
 
 # ── Project endpoints (per-user isolation) ──────────────────────────────────

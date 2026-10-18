@@ -338,7 +338,11 @@
     "brandHeadlineB": ", ne per dienas.",
     "brandSub": "Interjero apdailos kiekiai iš projekto PDF — sienos, lubos, grindys, angos.",
     "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis",
+    "forgotPasswordLink": "Pamiršote slaptažodį?",
+    "resendVerification": "Siųsti patvirtinimo nuorodą dar kartą",
     "oauthErr": {
+      "emailUnverified": "Google nepatvirtino šio el. pašto adreso. Prisijunkite el. paštu ir slaptažodžiu arba patvirtinkite adresą Google paskyroje.",
+      "linkNeedsPassword": "Šiuo el. pašto adresu jau sukurta paskyra su slaptažodžiu. Prisijunkite slaptažodžiu ir patvirtinkite el. paštą (arba pasikeiskite slaptažodį per „Pamiršote slaptažodį?“) — tada galėsite jungtis ir per Google.",
       "invalidState": "Prisijungimo sesija nebegalioja. Pradėkite prisijungimą per Google iš naujo.",
       "missingCode": "Google negrąžino patvirtinimo kodo. Bandykite prisijungti dar kartą.",
       "tokenExchangeFailed": "Nepavyko susisiekti su Google. Pabandykite po kelių minučių arba prisijunkite el. paštu.",
@@ -347,6 +351,27 @@
       "accessDenied": "Prisijungimas per Google atšauktas.",
       "generic": "Prisijungti per Google nepavyko. Bandykite dar kartą."
     }
+  },
+  "authEmail": {
+    "forgotTitle": "Slaptažodžio keitimas",
+    "forgotSub": "Įrašykite paskyros el. pašto adresą — atsiųsime nuorodą naujam slaptažodžiui nustatyti.",
+    "forgotSubmit": "Siųsti nuorodą",
+    "forgotUnavailable": "Laiškų siuntimas dar neįjungtas. Parašykite mums — slaptažodį pakeisime rankiniu būdu:",
+    "backToLogin": "Grįžti į prisijungimą",
+    "resetTitle": "Naujas slaptažodis",
+    "resetSub": "Nustatykite naują slaptažodį. Pakeitus jį, kituose įrenginiuose iš paskyros būsite atjungti.",
+    "newPassword": "Naujas slaptažodis",
+    "newPassword2": "Pakartokite slaptažodį",
+    "resetSubmit": "Išsaugoti slaptažodį",
+    "errMismatch": "Slaptažodžiai nesutampa.",
+    "errShort": "Slaptažodis turi būti bent 8 simbolių.",
+    "noToken": "Nuorodoje nėra kodo. Atidarykite visą nuorodą iš laiško arba paprašykite naujos.",
+    "askNewLink": "Paprašyti naujos nuorodos",
+    "verifyTitle": "El. pašto patvirtinimas",
+    "verifying": "Tikriname nuorodą…",
+    "toLogin": "Prisijungti",
+    "registeredCheckEmail": "Patikrinkite el. paštą",
+    "genericError": "Nepavyko. Patikrinkite interneto ryšį ir bandykite dar kartą."
   },
   "register": {
     "backHome": "Į pradžią",
