@@ -4,6 +4,7 @@
  * verbatim from the server; nothing here adds or rescales a quantity.
  */
 
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, Info } from 'lucide-react';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel } from '@/lib/confidence';
 import { ltNumber, ltQuantity } from '@/lib/ledger';
@@ -197,23 +198,63 @@ export function FamilyFooter({ family, onOpenAssumptions }) {
   );
 }
 
-/** Σ per unit of the lines shown — server `kiekis` added up, said plainly. */
-export function TotalsFooter({ totals, shown, all }) {
-  return (
-    <div
-      className="shrink-0 border-t border-border bg-card px-2.5 py-1.5 text-muted-foreground"
-      style={{ fontSize: 12 }}
-      title="Rodomų eilučių kiekių suma pagal mato vienetą. Skirtingi darbai su tuo pačiu vienetu sudedami — tai apžvalga, ne viena sąmatos eilutė."
-    >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-        <span>Rodoma {shown}{shown !== all ? ` iš ${all}` : ''} eil.</span>
-        {totals.units.map((u) => (
-          <span key={u.unit} className="mono tabular text-foreground/90">
-            Σ {ltNumber(u.value)} {u.unit}
-          </span>
-        ))}
-        {totals.missing > 0 && <span>{totals.missing} be kiekio</span>}
+/**
+ * Σ of the lines shown — server `kiekis` added up, said plainly (lib/quantitiesTree.footerTotals). With no
+ * filter, per unit within each work family behind „Rodyti sumas" (never one number over walls, ceilings and
+ * tiles together, #220); with a filter, per unit over the lines he picked.
+ */
+export function TotalsFooter({ footer, shown, all }) {
+  const [open, setOpen] = useState(false);
+  const count = <span>Rodoma {shown}{shown !== all ? ` iš ${all}` : ''} eil.</span>;
+  if (footer.mode === 'units') {
+    return (
+      <div
+        className="shrink-0 border-t border-border bg-card px-2.5 py-1.5 text-ui text-muted-foreground"
+        title="Rodomų eilučių kiekių suma pagal mato vienetą — tai apžvalga, ne viena sąmatos eilutė."
+        data-testid="quantities-footer"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          {count}
+          {footer.units.map((u) => (
+            <span key={u.unit} className="mono tabular text-foreground/90">
+              Σ {ltNumber(u.value)} {u.unit}
+            </span>
+          ))}
+          {footer.missing > 0 && <span>{footer.missing} be kiekio</span>}
+        </div>
       </div>
+    );
+  }
+  const sections = footer.sections.filter((s) => s.units.length || s.missing);
+  return (
+    <div className="shrink-0 border-t border-border bg-card text-ui text-muted-foreground" data-testid="quantities-footer">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-2.5 py-1">
+        {count}
+        <span>· sumos pagal darbų grupes</span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="ml-auto inline-flex min-h-[32px] items-center gap-1 rounded px-1.5 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="quantities-footer-toggle"
+        >
+          {open ? <ChevronDown className="w-4 h-4" aria-hidden /> : <ChevronRight className="w-4 h-4" aria-hidden />}
+          {open ? 'Slėpti sumas' : `Rodyti sumas (${sections.length})`}
+        </button>
+      </div>
+      {open && (
+        <ul className="max-h-[40vh] overflow-y-auto border-t border-border/60 px-2.5 py-1" data-testid="quantities-footer-sections">
+          {sections.map((s) => (
+            <li key={s.key} className="flex items-baseline gap-2 py-0.5">
+              <span className="min-w-0 flex-1 truncate text-foreground/85" title={s.label}>{s.label}</span>
+              <span className="mono tabular whitespace-nowrap text-foreground/90">
+                {s.units.map((u) => `Σ ${ltNumber(u.value)} ${u.unit}`).join(' · ')}
+                {s.missing > 0 ? `${s.units.length ? ' · ' : ''}${s.missing} be kiekio` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import {
-  SORT_ALPHA, SORT_ORDER, SORT_QUANTITY, buildQuantitiesTree, familiesWithRoom, visibleRowKeys,
+  SORT_ALPHA, SORT_ORDER, SORT_QUANTITY, buildQuantitiesTree, familiesWithRoom, footerTotals, visibleRowKeys,
 } from '@/lib/quantitiesTree';
 import { FamilyFooter, FamilyRow, RoomRow, SectionRow, TotalsFooter } from './QuantityRows';
 
@@ -351,7 +351,7 @@ export default function QuantitiesPanel({
         </ContextMenuContent>
       </ContextMenu>
 
-      {rowCount > 0 && <TotalsFooter totals={tree.totals} shown={tree.families.length} all={tree.familyCount} />}
+      {rowCount > 0 && <TotalsFooter footer={footerTotals(tree, filter)} shown={tree.families.length} all={tree.familyCount} />}
     </div>
   );
 }

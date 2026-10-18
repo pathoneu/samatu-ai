@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SORT_ALPHA, SORT_ORDER, SORT_QUANTITY, buildQuantitiesTree, familiesWithRoom, foldText,
-  geometrySource, totalsByUnit, visibleRowKeys,
+  footerTotals, geometrySource, totalsByUnit, visibleRowKeys,
 } from './quantitiesTree.js';
 
 const POLY = [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]];
@@ -175,6 +175,26 @@ test('totalsByUnit sums displayed kiekis per unit and counts lines without one',
   ]);
   assert.equal(tree.totals.missing, 1);
   assert.deepEqual(totalsByUnit([]), { units: [], missing: 0 });
+});
+
+test('the footer with no filter: Σ per unit within each work family, never one number across unlike work (#220)', () => {
+  const tree = buildQuantitiesTree(ROWS, ROOMS);
+  const foot = footerTotals(tree, '');
+  assert.equal(foot.mode, 'sections');
+  assert.deepEqual(foot.sections.map((s) => [s.label, s.units.map((u) => `${u.value} ${u.unit}`), s.missing]), [
+    ['Sienų glaistymas dažymas', ['81.8 m²', '120 m'], 0],
+    ['Lubų glaistymas dažymas', ['143.27 m²'], 0],
+    ['Elektros instaliacijos darbai', ['75 vnt'], 0],
+    ['GKP montavimas', [], 1],
+  ]);
+  // walls and ceilings are never added up: no Σ of 225,07 m² anywhere in the footer
+  assert.equal(foot.sections.flatMap((s) => s.units).some((u) => u.value === 225.07), false);
+  assert.equal('units' in foot, false);
+  // a filter is his choice of lines: their Σ per unit, as before
+  const filtered = footerTotals(buildQuantitiesTree(ROWS, ROOMS, { filter: 'glaistymas' }), 'glaistymas');
+  assert.equal(filtered.mode, 'units');
+  assert.deepEqual(filtered.units.map((u) => u.unit), ['m²', 'm']);
+  assert.equal(footerTotals(tree, '   ').mode, 'sections', 'blank is no filter');
 });
 
 test('the tree is rebuilt from props: a recompute that changes kiekis shows the new number', () => {
