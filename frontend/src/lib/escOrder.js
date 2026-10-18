@@ -40,8 +40,13 @@ export function escStep(state = {}) {
   return step ? step.id : null;
 }
 
-/** A menu, dialog or the draft's pop-up is open in the document (Radix closes its own on Esc). */
-export const OPEN_LAYER_SELECTOR = '[role="menu"], [role="dialog"], [role="alertdialog"], [data-draft-menu]';
+/**
+ * A menu, dialog or the draft's pop-up is open in the document (Radix closes its own on Esc). A layer on its
+ * way out (Radix keeps it in the DOM with data-state="closed" while it fades) is not open: an Esc pressed
+ * right after a menu choice must reach the panel that choice opened.
+ */
+export const OPEN_LAYER_SELECTOR = ['[role="menu"]', '[role="dialog"]', '[role="alertdialog"]']
+  .map((s) => `${s}:not([data-state="closed"])`).concat('[data-draft-menu]').join(', ');
 
 export function openLayerInDocument(doc = (typeof document !== 'undefined' ? document : null)) {
   return !!doc?.querySelector?.(OPEN_LAYER_SELECTOR);

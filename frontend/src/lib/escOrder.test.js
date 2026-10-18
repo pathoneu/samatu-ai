@@ -76,3 +76,10 @@ test('an open menu or dialog is found in the document', () => {
   assert.equal(openLayerInDocument(doc(false)), false);
   assert.equal(openLayerInDocument(null), false);
 });
+
+test('a menu fading out after a choice is not an open layer (Esc reaches the panel the choice opened)', () => {
+  for (const role of ['menu', 'dialog', 'alertdialog']) {
+    assert.ok(OPEN_LAYER_SELECTOR.includes(`[role="${role}"]:not([data-state="closed"])`), role);
+  }
+  assert.ok(OPEN_LAYER_SELECTOR.includes('[data-draft-menu]'));
+});
