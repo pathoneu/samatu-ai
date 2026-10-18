@@ -38,7 +38,7 @@ import { ltNumber } from '@/lib/ledger';
 import { ltPlural } from '@/lib/ltPlural';
 import { cleanUserText } from '@/lib/userText';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
-import { StepBar } from '@/pages/InteriorProject';
+import { StepBar } from '@/components/project/StepRail';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';

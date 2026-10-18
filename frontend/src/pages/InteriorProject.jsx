@@ -4,20 +4,21 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { viewFromLocation, locationForView } from '@/lib/workspaceViews';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
   AlertTriangle, ShieldAlert, FileText, X, CheckCircle2,
-  Map as MapIcon, ListChecks, Sliders, ArrowLeft, Trash2, Pencil,
-  ArrowRight, ClipboardCheck, Send, Phone, History,
+  Sliders, ArrowLeft, Trash2, Pencil,
+  ArrowRight, Phone, History,
 } from 'lucide-react';
 import AssumptionsPanel from '@/components/project/AssumptionsPanel';
 import RoomsGrid from '@/components/project/RoomsGrid';
 import ScaleInfoBanner from '@/components/project/ScaleInfoBanner';
 import PageStructureCard from '@/components/project/PageStructureCard';
 import InteriorWorkspace from '@/components/project/InteriorWorkspace';
-import LearningJournal from '@/components/project/LearningJournal';
+import { STEPS, StepBar } from '@/components/project/StepRail';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
@@ -284,79 +285,9 @@ function ProjectTopBar({ project, totalNet, totalGross, reverseVat = false, onPr
   );
 }
 
-// ── Step bar ──────────────────────────────────────────────────────────────────
-//
-// „Rimo kelionė" (2026-09-04): ONE path, FOUR steps, always visible —
-// Brėžinys → Patikra → Sąmata → Siųsti. Not tabs: a tab set says "these are
-// four unrelated places"; a numbered step row says "this is the order, and you
-// are here". Every step is clickable (nobody is ever trapped), the current one
-// is the loud one, and each step's own exit is ONE big button at the bottom.
-//
-// The Brėžinys step is ALWAYS present. Hiding it when a project has no PDF was
-// a dead end: the "prisegti brėžinį" affordance lives INSIDE that step, so a
-// project that lost its drawing could never get one back.
-
-export const STEPS = ['brezinys', 'patikra', 'samata', 'siusti'];
-
-export function StepBar({ step, setStep, hasPdf, projectId = null }) {
-  const { t } = useTranslation();
-  const icons = {
-    brezinys: MapIcon, patikra: ClipboardCheck, samata: ListChecks, siusti: Send,
-  };
-  const currentIdx = STEPS.indexOf(step);
-  return (
-    <nav
-      aria-label={t('project.steps.navLabel')}
-      className="flex items-center border-b border-border overflow-x-auto bg-card"
-      style={{ paddingLeft: 12, paddingRight: 12, gap: 2 }}
-    >
-      {STEPS.map((id, i) => {
-        const Icon = icons[id];
-        const isActive = step === id;
-        const isDone = i < currentIdx;
-        return (
-          <React.Fragment key={id}>
-            {i > 0 && (
-              <span aria-hidden className="text-muted-foreground/50 shrink-0" style={{ fontSize: 15 }}>›</span>
-            )}
-            <button
-              onClick={() => setStep(id)}
-              title={id === 'brezinys' && !hasPdf
-                ? t('project.steps.brezinysAttachTitle')
-                : t(`project.steps.titles.${id}`)}
-              aria-current={isActive ? 'step' : undefined}
-              /* 44 px tall, 16 px label — the whole product is aimed at 35–60
-                 year old eyes and hands (design §5). */
-              className={`flex items-center shrink-0 whitespace-nowrap border-b-2 -mb-px transition-colors ${
-                isActive
-                  ? 'border-primary text-foreground font-semibold'
-                  : isDone
-                    ? 'border-transparent text-foreground/75 hover:text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              style={{ minHeight: 44, padding: '0 14px', gap: 8, fontSize: 16 }}
-            >
-              <span
-                aria-hidden
-                className={`inline-flex items-center justify-center rounded-full shrink-0 ${
-                  isActive ? 'bg-primary text-primary-foreground'
-                           : 'bg-muted text-muted-foreground'
-                }`}
-                style={{ width: 22, height: 22, fontSize: 12, fontWeight: 600 }}
-              >
-                {i + 1}
-              </span>
-              <Icon className="w-4 h-4 shrink-0" aria-hidden />
-              {t(`project.steps.${id}`)}
-            </button>
-          </React.Fragment>
-        );
-      })}
-      {/* „Įsiminta: N" — the learning journal, on every step (togal-v2 W11) */}
-      {projectId && <LearningJournal projectId={projectId} />}
-    </nav>
-  );
-}
+// ── Step bar — moved to components/project/StepRail.jsx (Pathon v3 frame); re-exported here for
+// the importers that still reach for it through this page.
+export { STEPS, StepBar };
 
 // ── Step footer — „Atgal" left, ONE big next-button right ─────────────────────
 //
@@ -775,27 +706,37 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   useEffect(() => () => flushProjectSaves(), []);
   const project = projectState;
   const setProject = setProjectState;
-  // ONE path, four steps (design „Rimo kelionė" §2). `step` replaced the old
-  // three-tab set: 'main' → 'samata', 'eksport' → 'siusti', and the AI-chat tab
-  // became a small button in the bottom-right corner.
-  // The room check sheet lives on its own route (/project/:id/patikra) and
-  // hands the contractor back here with `?step=samata`, so the step is read
-  // from the URL once on mount. 'patikra' itself is never a local step: asking
-  // for it navigates to the sheet (see goStep).
-  const [searchParams] = useSearchParams();
+  // ONE path, four steps (design „Rimo kelionė" §2) — and since Pathon v3 (design §3) ONE workspace:
+  // the steps are VIEWS of it. The view is read from the URL (lib/workspaceViews: /project/:id,
+  // ?step=samata|siusti, /project/:id/patikra[?kambarys=|?etapas=]) and a step change is a navigation,
+  // so every old link still lands where it did and „Atgal" in the browser walks back through the steps.
+  // This page stays mounted across all four (both routes render it), and so does the drawing in it.
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: routeProjectId } = useParams();
-  const [step, setStep]         = useState(() => {
-    const q = searchParams.get('step');
-    return q && STEPS.includes(q) && q !== 'patikra' ? q : 'brezinys';
-  });
-  const goStep = useCallback((id) => {
-    if (id === 'patikra') {
-      navigate(`/project/${routeProjectId || projectProp?.id}/patikra`);
-      return;
+  const { view } = viewFromLocation(location.pathname, location.search);
+  const step = view;
+  const searchRef = useRef(location.search);
+  searchRef.current = location.search;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const urlProjectId = routeProjectId || projectProp?.id;
+  const goStep = useCallback((id, extra = {}, { replace = false } = {}) => {
+    navigate(locationForView(urlProjectId, id, { ...extra, keep: searchRef.current }), { replace });
+  }, [navigate, urlProjectId]);
+  const setStep = goStep;
+  // Sąmata „Išskleisti": the rows take the width and the drawing collapses to a strip (lib/workspaceViews).
+  const [samataExpanded, setSamataExpanded] = useState(false);
+  // Leaving Patikra: its panel kept its own copy of the project while he answered (pages/PatikraQuestions,
+  // RoomSheet save through the store) — the store is the truth, so the frame takes it back from there.
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (prevViewRef.current === 'patikra' && view !== 'patikra') {
+      const fresh = getProject(projectProp?.id);
+      if (fresh) setProjectState(fresh);
     }
-    setStep(id);
-  }, [navigate, routeProjectId, projectProp?.id]);
+    prevViewRef.current = view;
+  }, [view, projectProp?.id]);
   // Prielaidos used to be a full-screen tab: the panel's own intro promised the
   // quantities recompute „dešinėje" while the takeover had hidden them. It is a
   // right-hand drawer now, so the drawing / sąmata stays on screen behind it.
@@ -918,7 +859,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         // brėžinį" recovery screen, so land on the sąmata instead. Also covers
         // hasPdf turning false at runtime (project switch), because this
         // effect re-runs per project.id. (2026-07-28 UX walkthrough.)
-        if (!u) setStep(cur => (cur === 'brezinys' ? 'samata' : cur));
+        if (!u && viewRef.current === 'brezinys') goStep('samata', {}, { replace: true });
       } else if (u) {
         URL.revokeObjectURL(u);
       }
@@ -927,7 +868,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
       // left the user on an empty 'brezinys' step with no way out. Treat a
       // failure exactly like "no stored PDF".
       console.warn('[InteriorProject] PDF URL load failed:', e);
-      if (!revoked) setStep(cur => (cur === 'brezinys' ? 'samata' : cur));
+      if (!revoked && viewRef.current === 'brezinys') goStep('samata', {}, { replace: true });
     });
     return () => {
       revoked = true;
@@ -1098,7 +1039,11 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
   const totalGross = totalNet * (1 + vatRate / 100);
 
   return (
-    <div className="flex flex-col">
+    // The project frame (Pathon v3, design §3/§6): top bar, step rail, the workspace, the step's own exit —
+    // exactly one screen high, so the step's one big button is always on screen and nothing scrolls the
+    // top bar away. The workspace is mounted ONCE for all four steps: a step changes how much of the width
+    // the drawing gets and what the right panel shows, never the drawing itself.
+    <div className="flex flex-col h-[calc(100dvh-3.5rem)] md:h-screen min-h-[560px]" data-testid="project-frame" data-view={step}>
       <ProjectTopBar
         project={project}
         totalNet={totalNet}
@@ -1121,69 +1066,85 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         projectId={project.id}
       />
 
-      <div className="flex-1 px-4 py-4 space-y-5">
-
-      {/* What the last re-read of the drawing changed — on every step, until
-          he presses „Supratau" (lib/mergeReextract.js records it). */}
-      {/* A project read before the geometry lane existed can be read again for free (no Vision). */}
-      <FreeRereadBanner project={project} onComplete={(next) => setProject(next)} className="mt-3" />
-      <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
-
-      {/* ── STEP 1 · BRĖŽINYS — the drawing, its rooms, its measurements ── */}
-      {/* ── STEP 2 · PATIKRA — the same workspace with the check rail open.
-             ONE component, two entry points (never a parallel surface): the
-             room check sheet the next worker builds replaces the rail's card
-             in place, and both steps keep the drawing beside it. ─────────── */}
-      {(step === 'brezinys' || step === 'patikra') && (
-        <InteriorWorkspace
-          project={project}
-          mode={step}
-          focusedPage={focusedPage}
-          focusedRoom={focusedRoom}
-          onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
-          onOpenAssumptions={openAssumptions}
-          lastRipple={lastRipple}
-          onProjectChange={(updated) => {
-            updateProject(project.id, updated);
-            setProject(updated);
-            // pdfUrl is only ever used as a boolean here (step gating), so mint
-            // a blob URL ONLY when we don't have one. Doing it on every project
-            // change leaked an object URL per edit — the old one was never
-            // revoked and the effect's cleanup only knows about the first.
-            if (!pdfUrl) {
-              getPdfUrl(project.id).then((url) => setPdfUrl(url))
-                .catch((e) => console.warn('[InteriorProject] PDF URL refresh failed:', e));
-            }
-          }}
-        />
-      )}
-
-      {/* ── STEP 3 · SĄMATA (jo lentelė, jo skyriai) ────────────────────── */}
-      {step === 'samata' && (
-        <ProjectMainView
-          project={project}
-          onProjectChange={(updated) => {
-            // Update both local state (so React re-renders the banner /
-            // cards immediately) and persisted store (so the next page
-            // reload picks up the same data). Pre-2026-05-10 this only
-            // hit the store, leaving the UI showing stale lt_sanity until
-            // a full reload — the revalidate button looked like a no-op.
-            setProject(updated);
-            updateProject(project.id, updated);
-          }}
-          onShowDrawing={pdfUrl ? () => setStep('brezinys') : null}
-          onJumpToPage={pdfUrl ? (pageNr, room) => {
-            focusOnRoom(pageNr, room);
-            setStep('brezinys');
-          } : null}
-          // A sanity warning about lubų aukštis is only actionable if the
-          // control it names is one click away.
-          onOpenAssumptions={openAssumptions}
-          focusSanityNonce={sanityFocus}
-          priceFocus={priceFocus}
-          onPriceFocusDone={() => setPriceFocus(null)}
-        />
-      )}
+      {/* ── STEPS 1–4 · ONE WORKSPACE ───────────────────────────────────────
+             Brėžinys: the drawing with the rooms/lines panel. Patikra: the drawing beside the question
+             list / room sheet. Sąmata: the drawing beside the rows („Išskleisti" gives the rows the
+             width). Siųsti: its own screen, the drawing kept behind a strip. */}
+      <InteriorWorkspace
+        project={project}
+        view={step}
+        className="flex-1 min-h-0"
+        focusedPage={focusedPage}
+        focusedRoom={focusedRoom}
+        onJumpToPage={(pageNr, room) => focusOnRoom(pageNr, room)}
+        onOpenAssumptions={openAssumptions}
+        lastRipple={lastRipple}
+        onViewChange={goStep}
+        samataExpanded={samataExpanded}
+        onSamataExpandedChange={setSamataExpanded}
+        // Patikra's panel keeps its own copy of the project while he answers; every change is mirrored
+        // here (no second save — the panel saved it) so the top-bar totals move with his answers.
+        onPatikraProject={(next) => { if (next) setProject(next); }}
+        onProjectChange={(updated) => {
+          updateProject(project.id, updated);
+          setProject(updated);
+          // pdfUrl is only ever used as a boolean here (step gating), so mint
+          // a blob URL ONLY when we don't have one. Doing it on every project
+          // change leaked an object URL per edit — the old one was never
+          // revoked and the effect's cleanup only knows about the first.
+          if (!pdfUrl) {
+            getPdfUrl(project.id).then((url) => setPdfUrl(url))
+              .catch((e) => console.warn('[InteriorProject] PDF URL refresh failed:', e));
+          }
+        }}
+        // What the last re-read of the drawing changed — on every step, until he presses „Supratau"
+        // (lib/mergeReextract.js records it) — and the free re-read offer for a project read before the
+        // geometry lane existed. Outside the drawing's column, so they never take its height. Patikra
+        // shows its own (the question list asks again after a re-read).
+        notices={step === 'patikra' ? null : (
+          <>
+            <FreeRereadBanner project={project} onComplete={(next) => setProject(next)} />
+            <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
+          </>
+        )}
+        samataContent={step === 'samata' ? (
+          <ProjectMainView
+            project={project}
+            onProjectChange={(updated) => {
+              // Update both local state (so React re-renders the banner /
+              // cards immediately) and persisted store (so the next page
+              // reload picks up the same data). Pre-2026-05-10 this only
+              // hit the store, leaving the UI showing stale lt_sanity until
+              // a full reload — the revalidate button looked like a no-op.
+              setProject(updated);
+              updateProject(project.id, updated);
+            }}
+            onShowDrawing={pdfUrl ? () => setStep('brezinys') : null}
+            // The drawing is beside the rows now: a row's „show on the drawing" focuses it there and
+            // stays on Sąmata (out of „Išskleisti" first, so the drawing can be seen).
+            onJumpToPage={pdfUrl ? (pageNr, room) => {
+              focusOnRoom(pageNr, room);
+              setSamataExpanded(false);
+            } : null}
+            // A sanity warning about lubų aukštis is only actionable if the
+            // control it names is one click away.
+            onOpenAssumptions={openAssumptions}
+            focusSanityNonce={sanityFocus}
+            priceFocus={priceFocus}
+            onPriceFocusDone={() => setPriceFocus(null)}
+          />
+        ) : null}
+        sendContent={step === 'siusti' ? (
+          <SendStep
+            project={project}
+            onProjectChange={(updated) => {
+              setProject(updated);
+              updateProject(project.id, updated);
+            }}
+            onGoToPrices={showPrices}
+          />
+        ) : null}
+      />
 
       {/* ── NUSTATYMAI (ex-„Prielaidos") — a right-hand DRAWER, not a step.
           It is not part of the four-step path: it is the place you are sent to
@@ -1314,18 +1275,6 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           project={project}
           onClose={() => setHistoryOpen(false)}
           onRestored={(saved) => setProject(saved)}
-        />
-      )}
-
-      {/* ── STEP 4 · SIŲSTI — three actions and one sentence before sending ─ */}
-      {step === 'siusti' && (
-        <SendStep
-          project={project}
-          onProjectChange={(updated) => {
-            setProject(updated);
-            updateProject(project.id, updated);
-          }}
-          onGoToPrices={showPrices}
         />
       )}
 
@@ -1844,8 +1793,6 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
           )}
         </>
       )}
-
-      </div>
 
       {/* ── The step's own exit: „Atgal" + ONE big button ────────────────── */}
       <StepFooter

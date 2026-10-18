@@ -61,7 +61,7 @@ import { ltPlural } from '@/lib/ltPlural';
 import { ltNumber } from '@/lib/ledger';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
-import { StepBar } from '@/pages/InteriorProject';
+import { StepBar } from '@/components/project/StepRail';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 

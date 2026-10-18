@@ -751,7 +751,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -1311,7 +1311,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
           {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
-          <ViewerHotkeys
+          {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
+              „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}
+          {active && <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
             onCancelFill={() => setFillFor(null)}
@@ -1328,7 +1330,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onOpenGuide={() => setGuideOpen((v) => !v)}
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
-          />
+          />}
           <div className="relative flex flex-1 min-h-0">
             {railOpen && (sheetRail
               ? <SheetRail documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} />
@@ -1338,7 +1340,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 Viewport component. As a parent it got null → setupZoomGestures
                 never ran → no ctrl+wheel / pinch zoom (audit P2, root-caused
                 2026-07-14 via defaultPrevented=false on a synthetic event). */}
-            <Viewport documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0, background: 'hsl(var(--viewer-blueprint-bg))' }}>
+            <Viewport documentId={activeDocumentId} data-testid="viewer-canvas" style={{ flex: 1, minHeight: 0, minWidth: 0, background: 'hsl(var(--viewer-blueprint-bg))' }}>
               <ZoomGestureWrapper documentId={activeDocumentId}>
                 <Scroller
                   documentId={activeDocumentId}
@@ -1571,7 +1573,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onReveal={revealMeasurement}
             />
           )}
-          <ViewerCoachMarks rootRef={tvRootRef} enabled={!check} />
+          <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
         </div>
         );
       }}
@@ -1630,6 +1632,9 @@ export default function TakeoffViewer({
   sheetLinksVersion = 0,
   // A later edition of the drawing laid over the sheets ({rid, record, mode, opacity}; RevisionCompareControl).
   revisionOverlay = null,
+  // false while the project workspace keeps the viewer mounted out of sight (InteriorWorkspace strip mode):
+  // no keyboard shortcuts, no first-run coach marks. Default true — every other host is unchanged.
+  active = true,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1671,6 +1676,7 @@ export default function TakeoffViewer({
           onSheetOverridesChange={onSheetOverridesChange}
           sheetLinksVersion={sheetLinksVersion}
           revisionOverlay={revisionOverlay}
+          active={active}
         />
       </EmbedPDF>
     </div>
