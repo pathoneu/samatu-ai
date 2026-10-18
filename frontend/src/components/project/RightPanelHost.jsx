@@ -102,7 +102,9 @@ export default function RightPanelHost({
         </div>
       )}
 
-      <div role="tablist" aria-label="Dešinysis skydelis" className="shrink-0 flex border-b border-border bg-card overflow-x-auto">
+      {/* The tabs wrap rather than scroll: at 340 px five labels do not fit one line, and a tab behind a
+          scrollbar is a tab he does not have. */}
+      <div role="tablist" aria-label="Dešinysis skydelis" className="shrink-0 flex flex-wrap items-end border-b border-border bg-card">
         {tabs.map(({ id, label }) => (
           <button
             key={id}

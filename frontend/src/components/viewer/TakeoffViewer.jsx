@@ -53,7 +53,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
-import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor } from '@/lib/sheetRail';
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -1142,6 +1142,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     try { localStorage.setItem('samatu_viewer_thumbs', next ? '1' : '0'); } catch { /* private mode */ }
     setThumbsPref(next);
   };
+  // A sheet set (SheetRail) opens on its 56 px strip; the full rail is „Lapai" or T (Pathon v3 frame, A4).
+  const [sheetRailFull, setSheetRailFullState] = useState(() => readSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null));
+  const setSheetRailFull = (next) => {
+    writeSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null, next);
+    setSheetRailFullState(next);
+  };
 
   // Download the ORIGINAL source PDF blob directly (pre-prod QA 2026-07-15:
   // EmbedPDF's exportApi.download() → pdfium saveAsCopy() silently no-ops on a
@@ -1261,8 +1267,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const totalPages = documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null;
         // No explicit user choice yet → open by default on multi-page documents.
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
-        const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         const sheetRail = sheetPages && !check ? buildSheetRail({ puslapiai: sheetPages, overrides: sheetOverrides, pageCount: totalPages }) : null;
+        // With sheets the toggle switches the full rail ⇄ the strip; without, the plain thumbnails on ⇄ off.
+        const railOpen = sheetRail ? sheetRailFull : (thumbsPref ?? (check ? false : (totalPages ?? 1) > 1));
+        const toggleRail = () => (sheetRail ? setSheetRailFull(!sheetRailFull) : setRailOpen(!railOpen));
+        // Floating panels start right of whichever rail is showing.
+        const railInset = sheetRail ? (sheetRailFull ? 240 : 64) : (railOpen ? 156 : 8);
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1273,7 +1283,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onStartFill={startFill}
             onCancelFill={() => setFillFor(null)}
             railOpen={railOpen}
-            onToggleThumbs={() => setRailOpen(!railOpen)}
+            onToggleThumbs={toggleRail}
             measureTool={measureTool}
             onMeasureTool={check ? null : armMeasureTool}
             searchOpen={searchOpen}
@@ -1318,7 +1328,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             fillArmed={fillFor != null}
             onCancelFill={() => setFillFor(null)}
             onClearFocus={onClearFocus}
-            onToggleThumbs={() => setRailOpen(!railOpen)}
+            onToggleThumbs={toggleRail}
             onMeasureToolKey={armMeasureTool}
             onMeasureEscape={measureEscape}
             canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
@@ -1332,9 +1342,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
           />}
           <div className="relative flex flex-1 min-h-0">
-            {railOpen && (sheetRail
-              ? <SheetRail documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} />
-              : <ThumbnailRail documentId={activeDocumentId} />)}
+            {sheetRail
+              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
+              : railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
                 reads ViewportElementContext, whose Provider is rendered BY the
                 Viewport component. As a parent it got null → setupZoomGestures
@@ -1490,7 +1500,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             )}
             {/* „Rasti panašius" review list (2026-10-16). */}
             {symbol.active && (
-              <div className="absolute top-2 z-30 w-72" style={{ left: railOpen ? 156 : 8 }}>
+              <div className="absolute top-2 z-30 w-72" style={{ left: railInset }}>
                 <SymbolReviewPanel documentId={activeDocumentId} search={symbol} countTypes={countTypes} totalPages={totalPages || 1} />
               </div>
             )}
@@ -1498,7 +1508,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             {measureTool === 'count' && (
               <div
                 className="absolute top-2 z-30 w-60 shadow-lg"
-                style={{ left: railOpen ? (sheetRail ? 240 : 156) : 8 }}
+                style={{ left: railInset }}
               >
                 <CountLegendPanel
                   countTypes={countTypes}

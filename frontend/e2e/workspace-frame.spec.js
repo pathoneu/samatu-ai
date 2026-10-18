@@ -6,6 +6,8 @@
  *  - today's URLs land on the right view;
  *  - the right panel is 340 px, resizable 300–480, remembered in localStorage `samatu_panel_width`;
  *  - Sąmata „Išskleisti" collapses the drawing to a 56 px strip without unmounting it;
+ *  - the sheet list opens as a 56 px strip (name on click/focus, „Lapai"/T for the full rail);
+ *  - the drawing's canvas takes ≥ 48 % of a 1440×900 window on Brėžinys;
  *
  * Written to merge into W0-A's Playwright suite (frontend/e2e): it uses relative URLs (the suite's
  * `baseURL`, e.g. http://localhost:5203 for the W1-A worktree) and needs the backend with auth off.
@@ -113,6 +115,45 @@ test.describe('workspace frame — one workspace, four views', () => {
     await waitForDrawing(page);
     expect(await width()).toBe(316);
     await page.evaluate(() => { try { localStorage.removeItem('samatu_panel_width'); } catch { /* */ } });
+  });
+
+  test('the sheets sit in a 56 px strip; a click names the sheet; „Lapai" opens the full rail', async ({ page }) => {
+    await openProject(page);
+    await page.evaluate(() => { try { localStorage.removeItem('samatu_viewer_sheet_rail'); } catch { /* */ } });
+    await page.reload();
+    await waitForDrawing(page);
+    const rail = page.locator('[data-testid="sheet-rail"]');
+    await expect(rail).toHaveAttribute('data-mode', 'strip');
+    expect(Math.round((await rail.boundingBox()).width)).toBe(56);
+
+    // a click on a thumbnail opens that sheet and says its name beside the strip (not hover-only)
+    await rail.locator('li[data-sheet-page="5"] button').click();
+    await expect(page.locator('[data-testid="sheet-strip-label"]')).toContainText('lapas 5');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid="sheet-strip-label"]')).toHaveCount(0);
+
+    await page.locator('[data-testid="sheet-rail-expand"]').click();
+    await expect(rail).not.toHaveAttribute('data-mode', 'strip');
+    expect(Math.round((await rail.boundingBox()).width)).toBe(232);
+    // T toggles back to the strip, and the choice is remembered
+    await page.keyboard.press('t');
+    await expect(rail).toHaveAttribute('data-mode', 'strip');
+    expect(await page.evaluate(() => localStorage.getItem('samatu_viewer_sheet_rail'))).toBe('strip');
+  });
+
+  test('the drawing gets at least 48 % of a 1440×900 window on Brėžinys', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openProject(page);
+    await page.evaluate(() => {
+      try { localStorage.removeItem('samatu_panel_width'); localStorage.removeItem('samatu_viewer_sheet_rail'); } catch { /* */ }
+    });
+    await page.reload();
+    await waitForDrawing(page);
+    const share = await page.evaluate(() => {
+      const r = document.querySelector('[data-testid="viewer-canvas"]').getBoundingClientRect();
+      return (r.width * r.height) / (innerWidth * innerHeight);
+    });
+    expect(share).toBeGreaterThanOrEqual(0.48);
   });
 
   test('Sąmata „Išskleisti" gives the rows the width and keeps the drawing mounted behind a strip', async ({ page }) => {
