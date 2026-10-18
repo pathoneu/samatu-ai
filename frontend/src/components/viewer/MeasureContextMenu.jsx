@@ -23,10 +23,12 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 const KIND_LT = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
-// The colours a measurement can take in a batch (the count-type palette of lib/measurements).
+// The colours a measurement can take in a batch (the count-type palette of lib/measurements). No red: on the
+// drawing red means an error and nothing else (v3 overlay vocabulary) — a measurement already stored red keeps
+// its colour (it is his data), it just cannot be chosen any more.
 const COLOURS = [
   { id: '#2a6fb5', label: 'Mėlyna' }, { id: '#2f6b4f', label: 'Žalia' }, { id: '#d97706', label: 'Oranžinė' },
-  { id: '#dc2626', label: 'Raudona' }, { id: '#7c3aed', label: 'Violetinė' }, { id: '#475569', label: 'Pilka' },
+  { id: '#0d9488', label: 'Žalsvai mėlyna' }, { id: '#7c3aed', label: 'Violetinė' }, { id: '#475569', label: 'Pilka' },
 ];
 
 // „3 matavimai", „5 žymės" — Lithuanian count agreement for the two nouns the menu names.
@@ -112,7 +114,7 @@ export default function MeasureContextMenu({
   );
 }
 
-function RenameDialog({ state, onCancel, onSave }) {
+export function RenameDialog({ state, onCancel, onSave }) {
   const [value, setValue] = useState('');
   useEffect(() => { if (state) setValue(state.value); }, [state]);
   return (
