@@ -104,7 +104,28 @@ def test_internal_copy_lists_his_changes(env):
     ws = wb[SHEET_TITLE]
     rows = [[c for c in row] for row in ws.iter_rows(min_row=3, values_only=True)]
     assert any(r[1] == "Lubų aukštis" and r[2] == "104" and r[3] == "2,7" and r[4] == "3,1"
-               and r[5] == "Prielaidos" for r in rows), rows
+               and r[5] == "Projekto nustatymai" for r in rows), rows
+
+
+@pytest.mark.parametrize("mode, heading", [("aukstai", "SĄMATA · pagal aukštus"),
+                                           ("butai", "SĄMATA · pagal butus")])
+def test_generate_excel_takes_the_new_groupings(env, mode, heading):
+    """Found in the browser: /generate-excel looked the sheet title up in a table
+    that did not know the new modes (KeyError → 500)."""
+    rows = [{"nr": "1", "aprasymas": "Sienų dažymas", "mato_vnt": "m²", "kiekis": 10, "kaina": 5,
+             "suma": 50, "skyrius": "Dažymas",
+             "dalys": [{"room_nr": "2F-01", "room_name": "Miegamasis", "page": 1, "value": 10}]}]
+    r = env.post("/generate-excel", json={"projektas": "Mano", "eilutes": rows, "grupavimas": mode,
+                                          "patalpos": ROOMS})
+    assert r.status_code == 200, r.text
+    ws = load_workbook(io.BytesIO(r.content))["Sąmata"]
+    texts = [v for row in ws.iter_rows(values_only=True) for v in row if isinstance(v, str)]
+    assert any(heading in t for t in texts), texts[:10]
+
+
+def test_every_grouping_has_a_sheet_title():
+    from api.export_grouping import DEFAULT_GROUPING, GROUPINGS, TITLE_SUFFIX
+    assert set(TITLE_SUFFIX) == set(GROUPINGS) - {DEFAULT_GROUPING}
 
 
 def test_client_copy_and_foreign_project_get_no_change_log(env):

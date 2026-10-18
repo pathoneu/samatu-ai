@@ -38,7 +38,7 @@ _ROOM_PART_LABELS = {
     "lubu_aukstis_m": "Lubų aukštis, m",
 }
 _SOURCE_LABELS = {
-    "prielaidos": "Prielaidos",
+    "prielaidos": "Projekto nustatymai",
     "konturas": "Kontūras brėžinyje",
     "patalpa_pertvaros": "Patalpos pertvaros",
     "simbolis": "Simbolių žymėjimas",

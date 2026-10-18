@@ -397,6 +397,8 @@ TITLE_SUFFIX = {
     "seimos": "pagal darbų šeimas",
     "lapai": "pagal lapus",
     "be_grupavimo": "visos eilutės be grupavimo",
+    "aukstai": "pagal aukštus",
+    "butai": "pagal butus",
 }
 
 
