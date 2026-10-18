@@ -116,14 +116,48 @@ def _store_zones(parsed: dict, pdf_bytes: bytes, lane: dict, project_id) -> None
         log.warning("free-reread sheet zones failed for %s: %r", project_id, exc)
 
 
-def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
-    """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, then the
-    drawing's door schedule and its vector symbols — answered in the shape POST /free-reread returns. Saves
-    nothing. `on_stage` hears the lane's steps (geometry_lane.apply_geometry) and then "kiekiai" when the
-    project-level scans start (api/detect_run.py shows them as stages)."""
-    parsed = copy.deepcopy(project)
+def read_tables(pdf_bytes: bytes, project_id=None) -> dict:
+    """The „lentelės" stage (Pathon v3 W3-A): the drawing's ruled tables and schedules (extractor/schedules.py,
+    €0) → {"meta": `_meta.lenteles`, "_langu_ziniarastis": …, "_apdailos_lentele": …}. An ADDITION like the
+    zones: no room key changes, `LANE_VERSION` stays; the door schedule keeps its own scan (`kiekiai`), which
+    reads the same ruled table through the same reader. Never fails the read."""
     try:
-        out = apply_geometry(parsed, pdf_bytes, on_stage=on_stage)
+        from extractor.schedules import finish_record, read_schedules, tables_meta, windows_record
+        from extractor.sheet_zones import REREAD_TABLE_MAX_OBJECTS
+        res = read_schedules(pdf_bytes, max_objects=REREAD_TABLE_MAX_OBJECTS)
+        return {"meta": tables_meta(res), "_langu_ziniarastis": windows_record(res, pdf_bytes),
+                "_apdailos_lentele": finish_record(res)}
+    except Exception as exc:  # noqa: BLE001 — tables are extra evidence, never the reason a re-read fails
+        log.warning("free-reread tables failed for %s: %r", project_id, exc)
+        return {}
+
+
+def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
+    """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, the
+    drawing's tables (the „lentelės" stage, read while the lane moves from the text to the plan), then the
+    door schedule and the vector symbols — answered in the shape POST /free-reread returns. Saves nothing.
+    `on_stage` hears the lane's steps (geometry_lane.apply_geometry), "lenteles" between "tekstas" and
+    "planas", and then "kiekiai" when the project-level scans start (api/detect_run.py shows them as stages)."""
+    parsed = copy.deepcopy(project)
+    tables: dict = {}
+
+    def tables_once() -> None:
+        if "done" not in tables:
+            tables["done"] = True
+            tables.update(read_tables(pdf_bytes, project.get("id")))
+
+    def staged(name: str) -> None:
+        if name == "planas" and "done" not in tables:
+            # the lane has read the text layer and turns to the plan: the tables are read here, so the stage
+            # list reads mastelis → tekstas → lentelės → planas (the lane itself is not touched)
+            if on_stage:
+                on_stage("lenteles")
+            tables_once()
+        if on_stage:
+            on_stage(name)
+
+    try:
+        out = apply_geometry(parsed, pdf_bytes, on_stage=staged)
     except Exception as exc:  # noqa: BLE001 — the lane never raises; if it ever does, nothing changes
         log.error("free-reread lane raised for %s: %r", project.get("id"), exc)
         return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
@@ -132,6 +166,7 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         return {"status": "ok", "lane": "failed", "patalpos": project.get("patalpos") or [],
                 "_meta": project.get("_meta") or {}, "santrauka": None}
     floors = out.get("grindu_dangos") or {}
+    tables_once()                       # a lane that stopped before the plan still gets the drawing's tables
     if on_stage:
         on_stage("kiekiai")
     # the drawing's door schedule (deterministic, $0) rides along: a project read before it existed
@@ -151,12 +186,15 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
     _store_zones(parsed, pdf_bytes, out, project.get("id"))
+    if tables.get("meta") is not None:
+        parsed.setdefault("_meta", {})["lenteles"] = tables["meta"]
     return {
         "status": "ok",
         "lane": out.get("status"),
         "patalpos": parsed.get("patalpos") or [],
         "_meta": parsed.get("_meta") or {},
         **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
+        **{k: tables[k] for k in ("_langu_ziniarastis", "_apdailos_lentele") if tables.get(k) is not None},
         **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
         "santrauka": {
             "konturai": len(out.get("konturai") or []),

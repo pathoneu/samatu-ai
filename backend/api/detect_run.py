@@ -56,6 +56,9 @@ STAGES: tuple[tuple[str, str, str], ...] = (
      "Skaitomi ant brėžinio linijų užrašyti matmenys. Iš linijos ilgio lape ir parašyto skaičiaus nustatomas kiekvieno lapo mastelis."),
     ("tekstas", "Tekstas",
      "Lape ieškoma patalpų numerių ir plotų užrašų — taip sužinoma, kur stovi kiekviena eksplikacijos patalpa."),
+    ("lenteles", "Lentelės",
+     "Perskaitomos brėžinio lentelės — durų, langų ir apdailos žiniaraščiai. Kiekviena eilutė pažymima ten, kur ji "
+     "stovi lape, kad galėtumėte ją pamatyti brėžinyje."),
     ("planas", "Planas",
      "Lapai, kuriuose nubraižytas tas pats planas, sutapdinami pagal tas pačias sienas, kad kiekvienai patalpai būtų surinkti visų lapų užrašai."),
     ("konturai", "Kontūrai",
@@ -125,7 +128,7 @@ class _Job:
         self.error: str | None = None
 
     def _chosen(self, sid: str) -> bool:
-        return any(sid in FEATURE_STAGES[f] for f in self.features) or sid in ("mastelis", "kiekiai")
+        return any(sid in FEATURE_STAGES[f] for f in self.features) or sid in ("mastelis", "lenteles", "kiekiai")
 
     def enter(self, sid: str) -> None:
         idx = STAGE_IDS.index(sid)
@@ -342,6 +345,9 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
     out["patalpos"] = rooms
     if "angos" not in features:
         out.pop("_duru_ziniarastis", None)
+        out.pop("_langu_ziniarastis", None)
+    if "grindys" not in features:
+        out.pop("_apdailos_lentele", None)
     # a sheet whose plan holds every room is the whole read: only a room left out, or a feature not chosen, narrows it
     narrowed = left_out > 0 or set(features) != set(FEATURES)
     if narrowed and isinstance(out.get("_meta"), dict) and isinstance(out["_meta"].get("geometrija"), dict):
@@ -399,6 +405,31 @@ def _of_rooms(n: int) -> str:
     return f"iš {n} " + ("patalpos" if n % 10 == 1 and n % 100 != 11 else "patalpų")
 
 
+_SCHEDULE_LT = {"durys": "durų žiniaraštis", "langai": "langų žiniaraštis", "apdaila": "apdailos lentelė",
+                "plyteles": "plytelių specifikacija", "eksplikacija": "patalpų eksplikacija"}
+
+
+def tables_note(result: dict) -> str:
+    """The „lentelės" stage's note: which schedules were read (with how many rows and on which sheet), or why
+    none was."""
+    meta = ((result.get("_meta") or {}).get("lenteles") or {}) if isinstance(result.get("_meta"), dict) else {}
+    found = []
+    for kind, s in (meta.get("ziniarasciai") or {}).items():
+        if not isinstance(s, dict) or kind not in _SCHEDULE_LT:
+            continue
+        pages = s.get("pages") or [s.get("page")]
+        where = f"{pages[0]} lape" if len(pages) == 1 else "lapuose " + ", ".join(str(p) for p in pages)
+        found.append(f"{_SCHEDULE_LT[kind]} ({_lt(int(s.get('eilutes') or 0), 'eilutė', 'eilutės', 'eilučių')}, {where})")
+    if found:
+        return "Perskaityta: " + "; ".join(found) + "."
+    if meta.get("status") == "no_text":
+        return "Brėžinio lapuose nėra teksto sluoksnio — lentelių perskaityti negalima."
+    n = sum(len(v or []) for v in (meta.get("lenteles") or {}).values())
+    if n:
+        return f"Rasta lentelių: {n}, bet nė viena nėra durų, langų ar apdailos žiniaraštis."
+    return "Durų, langų ar apdailos lentelių brėžinyje nerasta."
+
+
 def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     geo = ((result.get("_meta") or {}).get("geometrija") or {}) if isinstance(result.get("_meta"), dict) else {}
     rooms = [r for r in result.get("patalpos") or [] if isinstance(r, dict) and _nr(r) in set(in_scope)]
@@ -415,6 +446,7 @@ def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     located = [r for r in rooms if isinstance(r.get("_vieta"), dict)]
     notes["tekstas"] = (f"Rasta {len(located)} {_of_rooms(n)} pagal numerį ar plotą lape." if n
                         else "Šiame lape eksplikacijos patalpų nerasta.")
+    notes["lenteles"] = tables_note(result)
     groups = [sorted(int(p) for p in g) for g in geo.get("grupes") or []]
     if pages != "all":
         mine = [g for g in groups if set(g) & set(pages)]

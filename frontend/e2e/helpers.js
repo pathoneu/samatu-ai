@@ -123,7 +123,16 @@ export function measRow(page, label, value) {
     .last();
 }
 
-/** Focus a room via its list row — the room tools appear only then. */
+/**
+ * An item of the tool cards' „Daugiau" menu (v3 W1-B: Masteliai, Istorija, the key guide, print, download moved
+ * there from the old toolbar's far end). Opens the menu and picks the item by its test id.
+ */
+export async function moreItem(page, testId) {
+  await page.getByTestId('viewer-more').click();
+  await page.getByTestId(testId).click();
+}
+
+/** Focus a room via its list row — the room tools appear only then (v3 W1-B: in the bar above its label). */
 export async function focusRoom(page, nr) {
   await roomRow(page, nr).click();
   await expect(page.getByTestId('outline-edit-start')).toBeVisible();
