@@ -53,7 +53,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
-import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft } from '@/lib/sheetRail';
+import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
 
 // Measurement tool palette (Phase 3). 'select' exists so committed measurements
 // can be picked (→ delete affordance); drawing keys 2/3/4/6 match the hotkeys.
@@ -752,7 +752,7 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -1092,6 +1092,19 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (searchOpen) { setSearchOpen(false); return true; }
     return false;
   };
+  // The project workspace lends this one viewer to Patikra's check view and takes it back (Pathon v3,
+  // InteriorWorkspace): when `check` arrives every tool stands down, so a click on the sheet reaches the
+  // check's own pick and nothing else. (A viewer born in check mode has nothing armed — a no-op there.)
+  const inCheck = !!check;
+  useEffect(() => {
+    if (!inCheck) return;
+    setMeasureTool(null);
+    setSelectedMeasureIds([]);
+    setFillFor(null);
+    setOutlineEdit(null);
+    outlineTools.cancel();
+    if (symbol.active) symbol.close();
+  }, [inCheck]); // eslint-disable-line react-hooks/exhaustive-deps
   const countTallies = useMemo(() => measurements.reduce((acc, m) => {
     if (m.kind === 'count' && m.typeId) acc[m.typeId] = (acc[m.typeId] || 0) + 1;
     return acc;
@@ -1143,6 +1156,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const setRailOpen = (next) => {
     try { localStorage.setItem('samatu_viewer_thumbs', next ? '1' : '0'); } catch { /* private mode */ }
     setThumbsPref(next);
+  };
+  // A sheet set (SheetRail) opens on its 56 px strip; the full rail is „Lapai" or T (Pathon v3 frame, A4).
+  const [sheetRailFull, setSheetRailFullState] = useState(() => readSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null));
+  const setSheetRailFull = (next) => {
+    writeSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null, next);
+    setSheetRailFullState(next);
   };
 
   // Download the ORIGINAL source PDF blob directly (pre-prod QA 2026-07-15:
@@ -1263,9 +1282,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const totalPages = documentState?.document?.pageCount ?? documentState?.pageCount ?? documentState?.pages?.length ?? null;
         // No explicit user choice yet → open by default on multi-page documents.
         // The check sheet's drawing pane is narrow: the rail stays shut there unless asked for.
-        const railOpen = thumbsPref ?? (check ? false : (totalPages ?? 1) > 1);
         const sheetRail = sheetPages && !check ? buildSheetRail({ puslapiai: sheetPages, overrides: sheetOverrides, pageCount: totalPages }) : null;
-        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail });
+        // With sheets the toggle switches the full rail ⇄ the strip; without, the plain thumbnails on ⇄ off.
+        const railOpen = sheetRail ? sheetRailFull : (thumbsPref ?? (check ? false : (totalPages ?? 1) > 1));
+        const toggleRail = () => (sheetRail ? setSheetRailFull(!sheetRailFull) : setRailOpen(!railOpen));
+        // Floating panels start right of whichever rail is showing — the full rail, the 56 px strip, the thumbnails.
+        const panelLeft = floatingPanelLeft({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
           <Toolbar
@@ -1276,7 +1298,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onStartFill={startFill}
             onCancelFill={() => setFillFor(null)}
             railOpen={railOpen}
-            onToggleThumbs={() => setRailOpen(!railOpen)}
+            onToggleThumbs={toggleRail}
             measureTool={measureTool}
             onMeasureTool={check ? null : armMeasureTool}
             searchOpen={searchOpen}
@@ -1313,13 +1335,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleScales={check || !project ? null : () => setScalesOpen((v) => !v)}
           />
           {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} />}
-          {check && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
-          <ViewerHotkeys
+          {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
+          {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
+          {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
+              „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}
+          {active && <ViewerHotkeys
             documentId={activeDocumentId}
             fillArmed={fillFor != null}
             onCancelFill={() => setFillFor(null)}
             onClearFocus={onClearFocus}
-            onToggleThumbs={() => setRailOpen(!railOpen)}
+            onToggleThumbs={toggleRail}
             onMeasureToolKey={armMeasureTool}
             onMeasureEscape={measureEscape}
             canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
@@ -1331,17 +1356,17 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onOpenGuide={() => setGuideOpen((v) => !v)}
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
-          />
+          />}
           <div className="relative flex flex-1 min-h-0">
-            {railOpen && (sheetRail
-              ? <SheetRail documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} />
-              : <ThumbnailRail documentId={activeDocumentId} />)}
+            {sheetRail
+              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
+              : railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
                 reads ViewportElementContext, whose Provider is rendered BY the
                 Viewport component. As a parent it got null → setupZoomGestures
                 never ran → no ctrl+wheel / pinch zoom (audit P2, root-caused
                 2026-07-14 via defaultPrevented=false on a synthetic event). */}
-            <Viewport documentId={activeDocumentId} style={{ flex: 1, minHeight: 0, minWidth: 0, background: 'hsl(var(--viewer-blueprint-bg))' }}>
+            <Viewport documentId={activeDocumentId} data-testid="viewer-canvas" style={{ flex: 1, minHeight: 0, minWidth: 0, background: 'hsl(var(--viewer-blueprint-bg))' }}>
               <ZoomGestureWrapper documentId={activeDocumentId}>
                 <Scroller
                   documentId={activeDocumentId}
@@ -1574,7 +1599,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onReveal={revealMeasurement}
             />
           )}
-          <ViewerCoachMarks rootRef={tvRootRef} enabled={!check} />
+          <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
         </div>
         );
       }}
@@ -1633,6 +1658,9 @@ export default function TakeoffViewer({
   sheetLinksVersion = 0,
   // A later edition of the drawing laid over the sheets ({rid, record, mode, opacity}; RevisionCompareControl).
   revisionOverlay = null,
+  // false while the project workspace keeps the viewer mounted out of sight (InteriorWorkspace strip mode):
+  // no keyboard shortcuts, no first-run coach marks. Default true — every other host is unchanged.
+  active = true,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1674,6 +1702,7 @@ export default function TakeoffViewer({
           onSheetOverridesChange={onSheetOverridesChange}
           sheetLinksVersion={sheetLinksVersion}
           revisionOverlay={revisionOverlay}
+          active={active}
         />
       </EmbedPDF>
     </div>

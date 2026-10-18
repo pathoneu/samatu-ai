@@ -1,29 +1,25 @@
 /**
- * InteriorWorkspace — auto-count stiliaus split-screen interjero takeoff workflow.
+ * InteriorWorkspace — the project's ONE workspace (Pathon v3, design §3; wave-1 track A).
  *
- * Layout:
- *   ┌───────────────────────────────────────────────────────┐
- *   │ Header: projektas, mastelio statusas, AI/Industries    │
- *   ├──────────────────────────┬────────────────────────────┤
- *   │                          │  TOTALS PANEL (sticky top) │
- *   │                          │  - Dažomas plotas          │
- *   │   PDF + POLYGON CANVAS   │  - Kampai                  │
- *   │       (60% width)        │  - Lubos                   │
- *   │                          ├────────────────────────────┤
- *   │                          │  PATALPŲ SĄRAŠAS          │
- *   │                          │  (RoomsGrid scroll'a)      │
- *   │                          │                            │
- *   │                          ├────────────────────────────┤
- *   │                          │  DARBŲ SĄRAŠAS             │
- *   └──────────────────────────┴────────────────────────────┘
+ *   ┌──────────────────────────────────────────┬────────────────────────────┐
+ *   │                                          │  RIGHT PANEL (mode host)   │
+ *   │   THE DRAWING (TakeoffViewer)            │  Patalpos ir eilutės ·     │
+ *   │   mounted once, kept across all views    │  Kiekiai · Patikra ·       │
+ *   │                                          │  Sąmata · Pokalbis         │
+ *   └──────────────────────────────────────────┴────────────────────────────┘
  *
- * Vartotojas mato VISKĄ vienu metu — brūkšnioja polygon'ą kairėje,
- * mato totals atsinaujinant dešinėje real-time.
+ * The four steps are views of this one component (lib/workspaceViews):
+ *   brezinys — the drawing takes the width, the panel 340 px (resizable, remembered);
+ *   patikra  — the drawing beside a wide panel with the question list / room sheet;
+ *   samata   — the drawing beside the rows; „Išskleisti" collapses the drawing to a 56 px strip;
+ *   siusti   — its own screen; the drawing waits behind the strip.
+ * The viewer is never unmounted by a step change: its zoom, page, measurements and history survive,
+ * and the PDF engine loads once. Behind the strip it keeps its last size and stops listening to keys.
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Layers, Upload } from 'lucide-react';
+import { Layers, Upload, Map as MapIcon, Maximize2, Minimize2 } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import DetectRunButton from '@/components/viewer/DetectRunButton';
@@ -32,6 +28,8 @@ import DetectRunProgress from '@/components/viewer/DetectRunProgress';
 import { useDetectRun } from '@/lib/useDetectRun';
 import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
+import RightPanelHost from './RightPanelHost';
+import { WorkspaceHostContext } from './workspaceHost';
 import { toast } from 'sonner';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { laneScalesOf } from '@/lib/durableScale';
@@ -41,8 +39,15 @@ import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 import { fetchOutlineMerge, fetchOutlineSet } from '@/lib/roomOutlineApi';
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
+import {
+  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth,
+  revealTarget, selectTab, tabForView, writePanelWidth,
+} from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
+
+// Patikra's question list / room sheet (its own chunk, as when it was a separate route).
+const PatikraEntry = lazy(() => import('@/pages/PatikraEntry'));
 
 // Outlines that must never be re-detected over. The last two are traced by the
 // BACKEND during extraction (wall_outline.py, vector_rooms.py): before
@@ -144,10 +149,9 @@ function viewerEngineIsEmbed() {
 
 export default function InteriorWorkspace({
   project,
-  // 'brezinys' (step 1) or 'patikra' (step 2). ONE component, two steps: the
-  // drawing is identical, only the right-hand panel changes emphasis — step 1
-  // is the rooms + measurements, step 2 is the check list. (Design §2.)
-  mode = 'brezinys',
+  // Which of the four steps is on screen (lib/workspaceViews VIEWS). The drawing is the same in all of
+  // them; the view decides how much of the width it gets and what the right panel shows.
+  view = 'brezinys',
   focusedPage = null,
   focusedRoom = null,
   onJumpToPage = null,
@@ -157,6 +161,19 @@ export default function InteriorWorkspace({
   onOpenAssumptions = null,
   // …and the recompute it triggers comes back as a visible € ripple.
   lastRipple = null,
+  // (view) => void — a panel tab or the drawing strip asks for another step.
+  onViewChange = null,
+  // Sąmata „Išskleisti": the rows take the width, the drawing a strip.
+  samataExpanded = false,
+  onSamataExpandedChange = null,
+  // (project) => void — Patikra's panel keeps its own copy of the project while he answers.
+  onPatikraProject = null,
+  // The Sąmata rows (ProjectMainView) and the Siųsti screen — owned by the project page.
+  samataContent = null,
+  sendContent = null,
+  // Notices (re-read summary, free re-read offer) — shown above the panel, never in the drawing's column.
+  notices = null,
+  className = '',
 }) {
   const { t } = useTranslation();
   // „Perskaityti lapą" (2026-10-16): the €0 reading per sheet with named stages (api/detect_run.py)
@@ -165,9 +182,6 @@ export default function InteriorWorkspace({
   const [revisionOverlay, setRevisionOverlay] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfBlob, setPdfBlob] = useState(null);  // Diena 6: V9 click-to-count'ui
-  // Sprint H7 (2026-04-29): default 70/30 — PDF gets more central space.
-  // Resizer still allows 40-75 range so user can adjust if their panel is dense.
-  const [splitRatio, setSplitRatio] = useState(70);
   const [pdfMissing, setPdfMissing] = useState(false);
   const [attachingPdf, setAttachingPdf] = useState(false);
   // Local override: when user clicks a room in the right-side panel while
@@ -183,9 +197,16 @@ export default function InteriorWorkspace({
   // brightens the matching zone (panel → canvas half of the hover sync).
   const [hiddenRoomNrs, setHiddenRoomNrs] = useState(() => new Set());
   const [hoveredRoomNr, setHoveredRoomNr] = useState(null);
-  // Right panel tab (Togal-v2 capability B): 'patalpos' = WorkspacePanel as before, 'kiekiai' = the
-  // Quantities Panel. Both stay mounted while hidden so their filters / folds survive a switch.
-  const [rightTab, setRightTab] = useState('patalpos');
+  // Right panel tab (Togal-v2 capability B; v3 mode host): the drawing view keeps the tab he last chose
+  // there ('patalpos' | 'kiekiai' | 'pokalbis'); Patikra and Sąmata show their own. The drawing tabs stay
+  // mounted while hidden so their filters / folds survive a switch.
+  const [drawingTab, setDrawingTab] = useState('patalpos');
+  const rightTab = tabForView(view, drawingTab);
+  const setRightTab = useCallback((tab) => {
+    const next = selectTab(view, tab);
+    if (next.view === 'brezinys') setDrawingTab(next.tab);
+    if (next.view !== view) onViewChange?.(next.view);
+  }, [view, onViewChange]);
   // „Pokalbis" (togal-v2 W11): the line selected in Kiekiai is offered to the chat; „Pridėti į pokalbį" adds one.
   const [kiekiaiActiveRow, setKiekiaiActiveRow] = useState(null);
   const [chatAddRequest, setChatAddRequest] = useState(null);
@@ -461,6 +482,8 @@ export default function InteriorWorkspace({
     setHiddenRoomNrs(new Set(allNrs.filter((n) => !keep.has(n))));
   };
 
+  const [embedEngine] = useState(viewerEngineIsEmbed);
+
   const pageMetaDict = useMemo(() => buildPageMetaDict(project),
     [project.puslapiai, project.v8_pages]);
   const missingTypes = useMemo(() => missingInteriorTypes(project.puslapiai),
@@ -485,11 +508,396 @@ export default function InteriorWorkspace({
   // each comes from: written on the sheet or measured from the dimensions.
   const laneScales = useMemo(() => laneScalesOf(project), [project]);
 
+  // Legacy viewer (?viewer=legacy) symbol counting → a sąmata line. Moved out of the JSX unchanged.
+  const handleSymbolCountResult = (symbolType, result) => {
+    // Pridedam į projekto darbų sąrašą kaip naują eilutę.
+    // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
+    const aprasymas = SYMBOL_LABELS[symbolType]
+      ? t(`project.interiorWorkspace.symbols.${symbolType}`)
+      : t('project.interiorWorkspace.symbolCountFallback', { type: symbolType });
+    const skyrius = SYMBOL_CATEGORIES[symbolType]
+      ? t(`project.interiorWorkspace.categories.${symbolType}`)
+      : t('project.interiorWorkspace.otherWorks');
+    const kiekis = result?.count || (result?.matches?.length ?? 0);
+    if (!kiekis) return;
+    // Fresh read + field-scoped write: the counting round-trip is
+    // async, and the old `{...project, darbu_sarasas}` blob write
+    // also skipped onProjectChange — so React kept the pre-count
+    // list and the next edit wiped the new line. (2026-07-27 audit.)
+    const fresh = getProject(project.id) || project;
+    const darbai = [...(fresh.darbu_sarasas || [])];
+    const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
+    // Tikrinam ar tokia eilutė jau egzistuoja — jei taip, atnaujiname kiekį
+    const existingIdx = darbai.findIndex(d =>
+      (d.aprasymas || '').toLowerCase() === aprasymas.toLowerCase());
+    if (existingIdx >= 0) {
+      darbai[existingIdx] = {
+        ...darbai[existingIdx],
+        kiekis,
+        detected: true,
+        source: 'Pažymėjus brėžinyje',
+        confidence: 'medium',
+      };
+    } else {
+      darbai.push({
+        eil_nr: maxNr + 1,
+        skyrius,
+        aprasymas,
+        mato_vnt: 'vnt',
+        kiekis,
+        kaina: 0,
+        suma: 0,
+        detected: true,
+        source: 'Pažymėjus brėžinyje',
+        confidence: 'medium',
+      });
+    }
+    const updated = updateProject(project.id, { darbu_sarasas: darbai });
+    if (updated) onProjectChange?.(updated);
+  };
+
+  // „Įkelti brėžinį" when the stored PDF is gone. Moved out of the JSX unchanged.
+  const handleAttachPdf = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAttachingPdf(true);
+    try {
+      // Local cache first — has_pdf is only set once this
+      // succeeded, so the flag can never claim a drawing the
+      // browser doesn't have.
+      await savePdf(project.id, file);
+      const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
+      setPdfUrl(u);
+      setPdfBlob(b);
+      setPdfMissing(!u);
+      // Field-scoped (same class as the writes above): the await
+      // above means `project` is a pre-upload snapshot.
+      const updated = updateProject(project.id, {
+        pdf_name: file.name, has_pdf: true,
+      });
+      if (updated) onProjectChange?.(updated);
+      // …then the DURABLE copy (2026-07-28 audit). Re-attach used
+      // to write IndexedDB only, so the re-attached drawing was
+      // lost again on the next cache clear / device switch —
+      // unlike NewProject, which has always uploaded. Same
+      // fire-and-forget idiom as NewProject.jsx.
+      uploadPdfToBackend(project.id, file).then((ok) => {
+        if (!ok) {
+          console.warn('[InteriorWorkspace] backend PDF upload failed');
+          toast.warning(t('project.interiorWorkspace.pdfBackupFailed'));
+        }
+      }).catch((e) => console.warn('[InteriorWorkspace] upload error:', e));
+    } catch (e) {
+      // No catch at all before this: the rejection surfaced as an
+      // unhandled promise, the spinner cleared, and nothing told
+      // the user their drawing had NOT been attached.
+      console.error('[InteriorWorkspace] PDF attach failed:', e);
+      toast.error(t('project.interiorWorkspace.pdfAttachFailed'));
+    } finally {
+      setAttachingPdf(false);
+      event.target.value = '';
+    }
+  };
+
+  // ── Frame geometry ───────────────────────────────────────────────────────────────────────────
+  const canvasMode = canvasModeForView(view, { expanded: samataExpanded, noDrawing: pdfMissing });
+  const strip = canvasMode === 'strip';
+  const rootRef = useRef(null);
+  const canvasColRef = useRef(null);
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  // The drawing's last real width: behind the strip the viewer keeps it, so collapsing and expanding never
+  // re-fits the sheet or loses his zoom.
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      if (rootRef.current) setWorkspaceWidth(Math.round(rootRef.current.getBoundingClientRect().width));
+      const col = canvasColRef.current;
+      if (col && !col.dataset.strip) {
+        const w = Math.round(col.getBoundingClientRect().width);
+        if (w > STRIP_WIDTH * 2) setCanvasWidth(w);
+      }
+    });
+    if (rootRef.current) ro.observe(rootRef.current);
+    if (canvasColRef.current) ro.observe(canvasColRef.current);
+    return () => ro.disconnect();
+  }, []);
+  // The panel's width, as he dragged it: one for the drawing view (300–480 px, `samatu_panel_width`), one
+  // for the wide Patikra / Sąmata panel. Remembered per browser when a drag ends.
+  const [storedWidths, setStoredWidths] = useState(() => ({
+    full: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'full') : null,
+    split: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'split') : null,
+  }));
+  const panelWidth = panelWidthFor(canvasMode, {
+    workspaceWidth,
+    stored: canvasMode === 'split' ? storedWidths.split : storedWidths.full,
+  });
+  const widthMode = canvasMode === 'split' ? 'split' : 'full';
+  const panelMin = PANEL_LIMITS[widthMode].min;
+  const panelMax = widthMode === 'split' && workspaceWidth > 0
+    ? Math.max(panelMin, Math.min(PANEL_LIMITS.split.max, workspaceWidth - MIN_SPLIT_CANVAS))
+    : PANEL_LIMITS[widthMode].max;
+  const handlePanelWidth = useCallback((width, { final } = {}) => {
+    setStoredWidths((prev) => ({ ...prev, [widthMode]: width }));
+    if (final && typeof window !== 'undefined') writePanelWidth(window.localStorage, widthMode, width);
+  }, [widthMode]);
+  const hiddenViewerWidth = canvasWidth || Math.max(480, (workspaceWidth || 1200) - (panelWidthFor('full', { workspaceWidth }) || 340));
+
+  // What the panel's contents get from the frame (components/project/workspaceHost): its width, a way to
+  // hand Patikra's saved project back to the top bar, the two-way highlight hooks, and the drawing itself
+  // for a check view.
+  const patikraProjectRef = useRef(onPatikraProject);
+  patikraProjectRef.current = onPatikraProject;
+  const hostProjectChange = useCallback((next) => patikraProjectRef.current?.(next), []);
+  // „Show me this place" — a fact's evidence, a room's frame: the drawing jumps there and fits it.
+  const revealNonce = useRef(0);
+  const [revealFocus, setRevealFocus] = useState(null);
+  const onRevealEvidence = useCallback((where) => {
+    const target = revealTarget(where || {}, revealNonce.current + 1);
+    if (!target) return;
+    revealNonce.current = target.nonce;
+    setRevealFocus(target);
+  }, []);
+  const roomsRef = useRef([]);
+  roomsRef.current = project.v8_rooms || project.patalpos || [];
+  const onFocusRoom = useCallback((nr) => {
+    const room = roomsRef.current.find((r) => String(r?.nr) === String(nr));
+    if (!room) return;
+    const page = room.puslapio_nr ?? room.page_nr ?? null;
+    if (page) setLocalFocusedPage(page);
+    setLocalFocusedRoom(room);
+  }, []);
+  // The drawing lent to Patikra (RoomDrawingPane): what was READ about one room is drawn instead of the
+  // room zones, and while he points at the drawing his clicks go to the question, not to the tools.
+  const [canvasSlot, setCanvasSlot] = useState(null);
+  const [hostedCheck, setHostedCheck] = useState(null);      // {check, pickActive} | null
+  const hostedPointRef = useRef(null);
+  const hostedPoint = useCallback((pt) => hostedPointRef.current?.(pt), []);
+  const canvasReady = Boolean(pdfUrl && embedEngine && !strip && !isMobile);
+  const hostValue = useMemo(() => ({
+    panelWidth: panelWidth ?? workspaceWidth,
+    onProjectChange: hostProjectChange,
+    onRevealEvidence,
+    onFocusRoom,
+    canvasReady,
+    canvasSlot,
+    setCanvasCheck: setHostedCheck,
+    pointRef: hostedPointRef,
+  }), [panelWidth, workspaceWidth, hostProjectChange, onRevealEvidence, onFocusRoom, canvasReady, canvasSlot]);
+  const viewerCheck = view === 'patikra' ? (hostedCheck?.check || null) : null;
+  const picking = Boolean(viewerCheck && hostedCheck?.pickActive);
+
+  const panelLabel = (id) => PANEL_TABS.find((tab) => tab.id === id)?.label || id;
+
+  const viewerNode = pdfUrl ? (
+    embedEngine ? (
+      <TakeoffViewer
+        fileUrl={pdfUrl}
+        active={!strip}
+        // Patikra's check view on this same viewer (RoomDrawingPane hosted), and „show me this place"
+        check={viewerCheck}
+        focus={revealFocus}
+        onPagePoint={picking ? hostedPoint : null}
+        rooms={project?.v8_rooms || project?.patalpos || []}
+        focusedRoom={effectiveFocusedRoom}
+        focusedPage={effectiveFocusedPage}
+        hiddenRoomNrs={hiddenRoomNrs}
+        hoveredRoomNrExternal={hoveredRoomNr}
+        projectId={project.id}
+        pdfBlob={pdfBlob}
+        renderToolbarAddon={(page, total) => (
+          <>
+            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+            <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} />
+          </>
+        )}
+        revisionOverlay={revisionOverlay}
+        onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
+        onRoomPolygonFill={handleRoomPolygonFill}
+        onRoomOutlineEdit={handleRoomOutlineEdit}
+        onOutlineTool={handleOutlineTool}
+        fillRequest={fillRequest}
+        exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
+        initialMeasurements={project?.measurements || []}
+        initialMeasureScales={project?.pageScalesDurable || {}}
+        laneScales={laneScales}
+        project={project}
+        initialCountTypes={project?.countTypes || null}
+        onMeasureDataChange={handleMeasureDataChange}
+        sheetPages={project?.puslapiai || project?.v8_pages || []}
+        sheetOverrides={project?.sheet_overrides || null}
+        onSheetOverridesChange={handleSheetOverridesChange}
+        sheetLinksVersion={sheetLinksVersion}
+        onRoomZoneClick={(room) => {
+          if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
+          setLocalFocusedRoom(room);
+          onJumpToPage?.(room.puslapio_nr, room);
+        }}
+      />
+    ) : (
+      <PlanViewer
+        fileUrl={pdfUrl}
+        pageMeta={pageMetaDict}
+        missingTypes={missingTypes}
+        focusedPage={effectiveFocusedPage}
+        focusedRoom={effectiveFocusedRoom}
+        rooms={project?.v8_rooms || project?.patalpos || []}
+        onRoomZoneClick={(room) => {
+          // Canvas → panel: selecting a zone focuses that room. We already
+          // are on its page (zones are page-filtered), so puslapio_nr is the
+          // current page. effectiveFocusedRoom re-derives the full room from
+          // the live patalpos by nr, so {nr, puslapio_nr} is enough to drive
+          // both the canvas marker and the panel highlight.
+          if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
+          setLocalFocusedRoom(room);
+          onJumpToPage?.(room.puslapio_nr, room);
+        }}
+        eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
+        pdfFile={pdfBlob}
+        onRoomPolygonFill={handleRoomPolygonFill}
+        onSymbolCountResult={handleSymbolCountResult}
+      />
+    )
+  ) : pdfMissing ? (
+    <div className="flex-1 h-full flex flex-col items-center justify-center p-8 text-center">
+      <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
+      <p className="text-sm text-foreground font-medium mb-1">{t('project.interiorWorkspace.pdfUnavailable')}</p>
+      <p className="text-xs text-muted-foreground max-w-sm">
+        {t('project.interiorWorkspace.pdfUnavailableDesc')}
+      </p>
+      <label
+        className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
+      >
+        <Upload className="w-4 h-4" />
+        {attachingPdf ? t('project.interiorWorkspace.attaching') : t('project.interiorWorkspace.attachPdf')}
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          disabled={attachingPdf}
+          onChange={handleAttachPdf}
+        />
+      </label>
+    </div>
+  ) : (
+    <div className="flex-1 h-full flex items-center justify-center text-muted-foreground text-sm">
+      {t('project.interiorWorkspace.loadingDrawing')}
+    </div>
+  );
+
+  const drawingPanels = {
+    patalpos: (
+      <WorkspacePanel
+        project={project}
+        mode="brezinys"
+        onOpenAssumptions={onOpenAssumptions}
+        lastRipple={lastRipple}
+        focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+        hiddenRoomNrs={hiddenRoomNrs}
+        onToggleRoomVisibility={handleToggleRoomVisibility}
+        onIsolateRoom={handleIsolateRoom}
+        onShowAllRooms={() => setHiddenRoomNrs(new Set())}
+        onEditRoomZone={handleEditRoomZone}
+        onRoomRowHover={setHoveredRoomNr}
+        onJumpToPage={(pageNr, room) => {
+          setLocalFocusedPage(pageNr);
+          setLocalFocusedRoom(room || null);
+          onJumpToPage?.(pageNr, room);
+        }}
+        onJumpToProvenance={(room) => {
+          // Eksplikacija chips open an in-place data popover (handled inside
+          // WorkspacePanel). Other sources (manual_polygon, vision, dimension)
+          // jump to the room's page so the user can find it visually.
+          const src = room.plotas_source;
+          if (src === 'manual_polygon') {
+            const targetPage = room.page_nr ?? room.puslapio_nr;
+            if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
+          } else if (src && src !== 'eksplikacija') {
+            const targetPage = room.puslapio_nr ?? room.page_nr;
+            if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
+          }
+        }}
+        onProjectChange={onProjectChange}
+      />
+    ),
+    kiekiai: (
+      <QuantitiesPanel
+        project={project}
+        rooms={project.v8_rooms || project.patalpos || []}
+        focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+        hiddenRoomNrs={hiddenRoomNrs}
+        onFocusRoom={(room) => {
+          setLocalFocusedPage(room.puslapio_nr ?? null);
+          setLocalFocusedRoom(room);
+          onJumpToPage?.(room.puslapio_nr, room);
+        }}
+        onToggleRoomVisibility={handleToggleRoomVisibility}
+        onSetRoomsHidden={handleSetRoomsHidden}
+        onIsolateRooms={handleIsolateRooms}
+        onRoomRowHover={setHoveredRoomNr}
+        onOpenAssumptions={onOpenAssumptions ? () => onOpenAssumptions() : null}
+        onActiveRowChange={setKiekiaiActiveRow}
+        onAddToChat={(what) => {
+          setChatAddRequest({ ...what, nonce: Date.now() });
+          setRightTab('pokalbis');
+        }}
+      />
+    ),
+    pokalbis: (
+      <AiChat
+        project={project}
+        focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
+        activeRow={kiekiaiActiveRow}
+        addRequest={chatAddRequest}
+      />
+    ),
+  };
+
+  const panels = [
+    { id: 'patalpos', keepMounted: true, node: drawingPanels.patalpos },
+    { id: 'kiekiai', keepMounted: true, node: drawingPanels.kiekiai },
+    {
+      id: 'patikra',
+      scroll: true,
+      node: view === 'patikra' ? (
+        <WorkspaceHostContext.Provider value={hostValue}>
+          <Suspense fallback={<p className="p-4 text-[14px] text-muted-foreground">{t('project.roomSheet.loading')}</p>}>
+            <PatikraEntry />
+          </Suspense>
+        </WorkspaceHostContext.Provider>
+      ) : null,
+    },
+    { id: 'samata', scroll: true, node: samataContent ? <div className="px-3 pb-3">{samataContent}</div> : null },
+    { id: 'pokalbis', keepMounted: true, node: drawingPanels.pokalbis },
+  ];
+
+  // Sąmata: „Išskleisti" gives the rows the whole width (the drawing waits behind a 56 px strip);
+  // „Rodyti brėžinį" brings it back beside them. Nothing to bring back without a drawing.
+  const samataToggle = view === 'samata' && !pdfMissing ? (
+    <button
+      type="button"
+      data-testid="samata-expand"
+      aria-pressed={samataExpanded}
+      onClick={() => onSamataExpandedChange?.(!samataExpanded)}
+      title={samataExpanded
+        ? 'Rodyti brėžinį šalia sąmatos eilučių'
+        : 'Išskleisti sąmatą per visą plotį — brėžinys susitrauks į juostą kairėje'}
+      className="inline-flex items-center gap-1.5 min-h-[32px] px-2.5 rounded-[2px] border border-border-strong bg-card text-[14px] text-foreground/85 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {samataExpanded
+        ? <><Minimize2 className="w-4 h-4" aria-hidden /> Rodyti brėžinį</>
+        : <><Maximize2 className="w-4 h-4" aria-hidden /> Išskleisti</>}
+    </button>
+  ) : null;
+
   return (
-    // 244 px of chrome above/below: top bar 52 + step bar 46 + page padding 32
-    // + the step footer 64 + slack. The footer must stay on screen — it holds
-    // the step's one big button.
-    <div className="flex flex-col md:flex-row h-[calc(100vh-244px)] min-h-[520px] border border-border rounded-lg overflow-hidden bg-background relative">
+    <div
+      ref={rootRef}
+      data-testid="workspace"
+      data-view={view}
+      data-canvas-mode={canvasMode}
+      className={`relative flex flex-col md:flex-row min-h-0 overflow-hidden border-t border-border bg-background ${className}`}
+    >
       {/* Phase C-1 Task 24: coarse-pointer (touch) view-only notice. It lived in
           the Konva PdfViewer, which was deleted (dc9a230) — the component
           survived with zero imports, so touch users got no warning at all.
@@ -497,308 +905,85 @@ export default function InteriorWorkspace({
           to the viewport bottom and self-hides on a mouse pointer / after
           dismissal. (Re-mounted 2026-07-28 UX walkthrough.) */}
       <MobileViewOnlyBanner />
-      {/* LEFT (md+) / TOP (mobile): PDF + AI overlay (auto-count-style) */}
+
+      {/* THE DRAWING — one column, mounted once. `viewer-root` keeps its identity across every view. */}
       <div
-        className="relative flex flex-col border-b md:border-b-0 md:border-r border-border w-full md:w-auto"
-        style={{ width: isMobile ? '100%' : `${splitRatio}%`, height: isMobile ? '60%' : 'auto' }}
+        ref={canvasColRef}
+        data-testid="viewer-root"
+        data-strip={strip ? '1' : undefined}
+        className={`relative flex flex-col min-w-0 min-h-0 border-b md:border-b-0 md:border-r border-border ${strip ? 'shrink-0' : 'flex-1'}`}
+        style={strip
+          ? (isMobile ? { height: STRIP_WIDTH } : { width: STRIP_WIDTH })
+          : (isMobile ? { height: '60%' } : undefined)}
       >
-        {detectRun.run && (
+        {detectRun.run && !strip && (
           <div className="pointer-events-none absolute right-3 top-11 z-30">
             <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} />
           </div>
         )}
-        {detecting && (
+        {detecting && !strip && (
           <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 text-xs text-blue-300">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             {t('project.interiorWorkspace.detecting')}
           </div>
         )}
-        {pdfUrl ? (
-          viewerEngineIsEmbed() ? (
-            <TakeoffViewer
-              fileUrl={pdfUrl}
-              rooms={project?.v8_rooms || project?.patalpos || []}
-              focusedRoom={effectiveFocusedRoom}
-              focusedPage={effectiveFocusedPage}
-              hiddenRoomNrs={hiddenRoomNrs}
-              hoveredRoomNrExternal={hoveredRoomNr}
-              projectId={project.id}
-              pdfBlob={pdfBlob}
-              renderToolbarAddon={(page, total) => (
-                <>
-                  <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
-                  <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} />
-                </>
-              )}
-              revisionOverlay={revisionOverlay}
-              onClearFocus={() => { setLocalFocusedRoom(null); setLocalFocusedPage(null); }}
-              onRoomPolygonFill={handleRoomPolygonFill}
-              onRoomOutlineEdit={handleRoomOutlineEdit}
-              onOutlineTool={handleOutlineTool}
-              fillRequest={fillRequest}
-              exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
-              initialMeasurements={project?.measurements || []}
-              initialMeasureScales={project?.pageScalesDurable || {}}
-              laneScales={laneScales}
-              project={project}
-              initialCountTypes={project?.countTypes || null}
-              onMeasureDataChange={handleMeasureDataChange}
-              sheetPages={project?.puslapiai || project?.v8_pages || []}
-              sheetOverrides={project?.sheet_overrides || null}
-              onSheetOverridesChange={handleSheetOverridesChange}
-              sheetLinksVersion={sheetLinksVersion}
-              onRoomZoneClick={(room) => {
-                if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
-                setLocalFocusedRoom(room);
-                onJumpToPage?.(room.puslapio_nr, room);
-              }}
-            />
-          ) : (
-          <PlanViewer
-            fileUrl={pdfUrl}
-            pageMeta={pageMetaDict}
-            missingTypes={missingTypes}
-            focusedPage={effectiveFocusedPage}
-            focusedRoom={effectiveFocusedRoom}
-            rooms={project?.v8_rooms || project?.patalpos || []}
-            onRoomZoneClick={(room) => {
-              // Canvas → panel: selecting a zone focuses that room. We already
-              // are on its page (zones are page-filtered), so puslapio_nr is the
-              // current page. effectiveFocusedRoom (line ~114) re-derives the
-              // full room from the live patalpos by nr, so {nr, puslapio_nr} is
-              // enough to drive both the canvas marker and the panel highlight.
-              if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
-              setLocalFocusedRoom(room);
-              onJumpToPage?.(room.puslapio_nr, room);
-            }}
-            eksplikacija_source_page={project?._eksplikacija?.eksplikacija_source_page}
-            pdfFile={pdfBlob}
-            onRoomPolygonFill={handleRoomPolygonFill}
-            onSymbolCountResult={(symbolType, result) => {
-              // Pridedam į projekto darbų sąrašą kaip naują eilutę.
-              // Naudoja rangovas-kompatibilų pozicijos pavadinimą + kategoriją.
-              const aprasymas = SYMBOL_LABELS[symbolType]
-                ? t(`project.interiorWorkspace.symbols.${symbolType}`)
-                : t('project.interiorWorkspace.symbolCountFallback', { type: symbolType });
-              const skyrius = SYMBOL_CATEGORIES[symbolType]
-                ? t(`project.interiorWorkspace.categories.${symbolType}`)
-                : t('project.interiorWorkspace.otherWorks');
-              const kiekis = result?.count || (result?.matches?.length ?? 0);
-              if (!kiekis) return;
-              // Fresh read + field-scoped write: the counting round-trip is
-              // async, and the old `{...project, darbu_sarasas}` blob write
-              // also skipped onProjectChange — so React kept the pre-count
-              // list and the next edit wiped the new line. (2026-07-27 audit.)
-              const fresh = getProject(project.id) || project;
-              const darbai = [...(fresh.darbu_sarasas || [])];
-              const maxNr = darbai.reduce((m, d) => Math.max(m, d.eil_nr || 0), 0);
-              // Tikrinam ar tokia eilutė jau egzistuoja — jei taip, atnaujiname kiekį
-              const existingIdx = darbai.findIndex(d =>
-                (d.aprasymas || '').toLowerCase() === aprasymas.toLowerCase());
-              if (existingIdx >= 0) {
-                darbai[existingIdx] = {
-                  ...darbai[existingIdx],
-                  kiekis,
-                  detected: true,
-                  source: 'Pažymėjus brėžinyje',
-                  confidence: 'medium',
-                };
-              } else {
-                darbai.push({
-                  eil_nr: maxNr + 1,
-                  skyrius,
-                  aprasymas,
-                  mato_vnt: 'vnt',
-                  kiekis,
-                  kaina: 0,
-                  suma: 0,
-                  detected: true,
-                  source: 'Pažymėjus brėžinyje',
-                  confidence: 'medium',
-                });
-              }
-              const updated = updateProject(project.id, { darbu_sarasas: darbai });
-              if (updated) onProjectChange?.(updated);
-            }}
-          />
-          )
-        ) : pdfMissing ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-foreground font-medium mb-1">{t('project.interiorWorkspace.pdfUnavailable')}</p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              {t('project.interiorWorkspace.pdfUnavailableDesc')}
-            </p>
-            <label
-              className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 cursor-pointer text-sm text-foreground transition-colors"
+        {/* Patikra's drawing controls („Į patalpą", „Visas lapas", what to click, the wall legend) — right
+            above the drawing they act on (RoomDrawingPane portals here); empty and hidden otherwise. */}
+        <div
+          ref={setCanvasSlot}
+          data-testid="canvas-slot"
+          className="shrink-0 max-h-[45%] overflow-y-auto border-b border-border bg-card px-3 py-2 empty:hidden"
+        />
+        <div
+          className={`relative flex-1 min-h-0 overflow-hidden ${picking ? 'ring-2 ring-inset ring-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : ''}`}
+          data-picking={picking ? '1' : undefined}
+        >
+          <div
+            aria-hidden={strip || undefined}
+            className="h-full flex flex-col"
+            style={strip
+              ? { position: 'absolute', top: 0, bottom: 0, left: 0, width: hiddenViewerWidth, visibility: 'hidden', pointerEvents: 'none' }
+              : undefined}
+          >
+            {viewerNode}
+          </div>
+          {strip && (
+            <button
+              type="button"
+              data-testid="canvas-strip"
+              onClick={() => (view === 'samata' && !pdfMissing ? onSamataExpandedChange?.(false) : onViewChange?.('brezinys'))}
+              title={view === 'samata' && !pdfMissing ? 'Rodyti brėžinį šalia sąmatos' : 'Grįžti į brėžinį'}
+              aria-label={view === 'samata' && !pdfMissing ? 'Rodyti brėžinį šalia sąmatos' : 'Grįžti į brėžinį'}
+              className="absolute inset-0 flex md:flex-col items-center justify-center gap-2 bg-card hover:bg-muted/60 text-foreground/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
-              <Upload className="w-4 h-4" />
-              {attachingPdf ? t('project.interiorWorkspace.attaching') : t('project.interiorWorkspace.attachPdf')}
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                disabled={attachingPdf}
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  setAttachingPdf(true);
-                  try {
-                    // Local cache first — has_pdf is only set once this
-                    // succeeded, so the flag can never claim a drawing the
-                    // browser doesn't have.
-                    await savePdf(project.id, file);
-                    const [u, b] = await Promise.all([getPdfUrl(project.id), getPdfBlob(project.id)]);
-                    setPdfUrl(u);
-                    setPdfBlob(b);
-                    setPdfMissing(!u);
-                    // Field-scoped (same class as the writes above): the await
-                    // above means `project` is a pre-upload snapshot.
-                    const updated = updateProject(project.id, {
-                      pdf_name: file.name, has_pdf: true,
-                    });
-                    if (updated) onProjectChange?.(updated);
-                    // …then the DURABLE copy (2026-07-28 audit). Re-attach used
-                    // to write IndexedDB only, so the re-attached drawing was
-                    // lost again on the next cache clear / device switch —
-                    // unlike NewProject, which has always uploaded. Same
-                    // fire-and-forget idiom as NewProject.jsx.
-                    uploadPdfToBackend(project.id, file).then((ok) => {
-                      if (!ok) {
-                        console.warn('[InteriorWorkspace] backend PDF upload failed');
-                        toast.warning(t('project.interiorWorkspace.pdfBackupFailed'));
-                      }
-                    }).catch((e) => console.warn('[InteriorWorkspace] upload error:', e));
-                  } catch (e) {
-                    // No catch at all before this: the rejection surfaced as an
-                    // unhandled promise, the spinner cleared, and nothing told
-                    // the user their drawing had NOT been attached.
-                    console.error('[InteriorWorkspace] PDF attach failed:', e);
-                    toast.error(t('project.interiorWorkspace.pdfAttachFailed'));
-                  } finally {
-                    setAttachingPdf(false);
-                    event.target.value = '';
-                  }
-                }}
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            {t('project.interiorWorkspace.loadingDrawing')}
-          </div>
-        )}
+              <MapIcon className="w-5 h-5 shrink-0" aria-hidden />
+              <span className="text-[14px] font-medium md:[writing-mode:vertical-rl]">Brėžinys</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Resizer — only on desktop. Mobile uses fixed 60/40 vertical split. */}
-      {!isMobile && (
-        <div
-          className="w-1 hover:bg-foreground/20 cursor-col-resize transition-colors shrink-0"
-          onMouseDown={(e) => {
-            const startX = e.clientX;
-            const startRatio = splitRatio;
-            const containerWidth = e.currentTarget.parentElement.offsetWidth;
-            const onMove = (ev) => {
-              const delta = ((ev.clientX - startX) / containerWidth) * 100;
-              setSplitRatio(Math.max(40, Math.min(75, startRatio + delta)));
-            };
-            const onUp = () => {
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
-            };
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-          }}
+      {/* THE RIGHT PANEL — a mode host; on Siųsti the screen itself takes its place. */}
+      {view === 'siusti' ? (
+        <div data-testid="send-view" className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 space-y-3">
+          {notices}
+          {sendContent}
+        </div>
+      ) : (
+        <RightPanelHost
+          tabs={PANEL_TABS.map((tab) => ({ ...tab, label: panelLabel(tab.id) }))}
+          activeTab={rightTab}
+          onTabChange={setRightTab}
+          width={isMobile ? null : panelWidth}
+          grow={strip || isMobile}
+          minWidth={panelMin}
+          maxWidth={panelMax}
+          onWidthChange={isMobile || strip ? null : handlePanelWidth}
+          notices={notices}
+          tabBarExtra={samataToggle}
+          panels={panels}
         />
       )}
-
-      {/* RIGHT (md+) / BOTTOM (mobile): Kompaktinė sąmatos panelė */}
-      <div
-        style={{ width: isMobile ? '100%' : `${100 - splitRatio}%`, height: isMobile ? '40%' : 'auto' }}
-        className="overflow-hidden flex flex-col"
-      >
-        <div role="tablist" aria-label="Dešinysis skydelis" className="shrink-0 flex border-b border-border bg-card">
-          {[['patalpos', 'Patalpos ir eilutės'], ['kiekiai', 'Kiekiai'], ['pokalbis', 'Pokalbis']].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={rightTab === key}
-              onClick={() => setRightTab(key)}
-              className={`px-3 py-1.5 text-xs border-b-2 -mb-px transition-colors ${rightTab === key
-                ? 'border-primary text-foreground font-medium'
-                : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className={rightTab === 'kiekiai' ? 'flex-1 min-h-0' : 'hidden'}>
-            <QuantitiesPanel
-              project={project}
-              rooms={project.v8_rooms || project.patalpos || []}
-              focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
-              hiddenRoomNrs={hiddenRoomNrs}
-              onFocusRoom={(room) => {
-                setLocalFocusedPage(room.puslapio_nr ?? null);
-                setLocalFocusedRoom(room);
-                onJumpToPage?.(room.puslapio_nr, room);
-              }}
-              onToggleRoomVisibility={handleToggleRoomVisibility}
-              onSetRoomsHidden={handleSetRoomsHidden}
-              onIsolateRooms={handleIsolateRooms}
-              onRoomRowHover={setHoveredRoomNr}
-              onOpenAssumptions={onOpenAssumptions ? () => onOpenAssumptions() : null}
-              onActiveRowChange={setKiekiaiActiveRow}
-              onAddToChat={(what) => {
-                setChatAddRequest({ ...what, nonce: Date.now() });
-                setRightTab('pokalbis');
-              }}
-            />
-        </div>
-        <div className={rightTab === 'pokalbis' ? 'flex-1 min-h-0' : 'hidden'}>
-          <AiChat
-            project={project}
-            focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
-            activeRow={kiekiaiActiveRow}
-            addRequest={chatAddRequest}
-          />
-        </div>
-        <div className={rightTab === 'patalpos' ? 'flex-1 min-h-0' : 'hidden'}>
-        <WorkspacePanel
-          project={project}
-          mode={mode}
-          onOpenAssumptions={onOpenAssumptions}
-          lastRipple={lastRipple}
-          focusedRoomNr={effectiveFocusedRoom?.nr ?? null}
-          hiddenRoomNrs={hiddenRoomNrs}
-          onToggleRoomVisibility={handleToggleRoomVisibility}
-          onIsolateRoom={handleIsolateRoom}
-          onShowAllRooms={() => setHiddenRoomNrs(new Set())}
-          onEditRoomZone={handleEditRoomZone}
-          onRoomRowHover={setHoveredRoomNr}
-          onJumpToPage={(pageNr, room) => {
-            setLocalFocusedPage(pageNr);
-            setLocalFocusedRoom(room || null);
-            onJumpToPage?.(pageNr, room);
-          }}
-          onJumpToProvenance={(room) => {
-            // Eksplikacija chips open an in-place data popover (handled inside
-            // WorkspacePanel). Other sources (manual_polygon, vision, dimension)
-            // jump to the room's page so the user can find it visually.
-            const src = room.plotas_source;
-            if (src === 'manual_polygon') {
-              const targetPage = room.page_nr ?? room.puslapio_nr;
-              if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
-            } else if (src && src !== 'eksplikacija') {
-              const targetPage = room.puslapio_nr ?? room.page_nr;
-              if (targetPage && onJumpToPage) onJumpToPage(targetPage, room);
-            }
-          }}
-          onProjectChange={onProjectChange}
-        />
-        </div>
-      </div>
     </div>
   );
 }
