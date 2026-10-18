@@ -31,6 +31,12 @@ cp /Users/ignasgaldikas/samatu-ai/backend/.confidential-terms backend/.confident
 cd backend && SAMATU_AUTH_DISABLED=1 /Users/ignasgaldikas/samatu-ai/venv/bin/uvicorn main:app --port <BACKEND_PORT> --reload
 cd frontend && VITE_BACKEND_URL=http://localhost:<BACKEND_PORT> npm run dev -- --port <VITE_PORT>
 ```
+**Vite cache trap (found by W0-B, 2026-10-18):** because `node_modules` is a symlink to the main checkout, every worktree's Vite shares `node_modules/.vite/deps` and re-optimises it under the others; the browser then mixes two `@embedpdf` builds and the viewer hangs on „Kraunamas dokumentas…". Give each Vite its own cache with a wrapper config **outside the repo**, e.g. `<scratch>/vite.<worker>.config.mjs`:
+```js
+export default { ...(await import('<worktree>/frontend/vite.config.js')).default, cacheDir: '<scratch>/vite-cache' };
+```
+and run `VITE_BACKEND_URL=http://localhost:<BACKEND_PORT> ./node_modules/.bin/vite --port <VITE_PORT> --config <scratch>/vite.<worker>.config.mjs` from `frontend/` instead of `npm run dev`.
+
 Demo projects: `http://localhost:<VITE_PORT>/project/demo-objektas_h` (vector PDF, 11 rooms, 8 sheets) and `demo-objektas_g`. The live DB file is `backend/data/samatu.db` (not `backend/samatu.db`).
 
 | Worker | Branch | Backend | Vite | Wave |
@@ -74,8 +80,8 @@ None so far. Candidates (each asked for first, with purpose and cost): Vision le
 
 | When | Branch | What | Checks at merge |
 |---|---|---|---|
-| | | | |
+| 2026-10-18 | v3/audit-bugs (W0-B, 33b6a65) | the seven audit bugs: room-sheet viewer reads the main viewer's scale map (`checkViewerScales`), one floating-panel offset rule (`floatingPanelLeft`), count hint „kairėje", missing-rooms chip points to „Patikra" with number agreement, zone tooltip describes the ring, one area formatter with two decimals (`roomAreaText`), outline buttons on one line at 1280; banned-word copy pass („N rasta automatiškai", `areaConfidenceSentence`, „Sienos, kurias programa perskaitė", „po naujo skaičiavimo", one verb „Taisyti kontūrą" + „Kontūras paspaudus"); „Nustatymai" kept | frontend only, 13 commits; merged tree: units 1268 pass / 0 fail, eslint clean, build OK; worker screenshots at 1440 and 1280; manager spot-check of hint and chip texts on the worker's port |
 
 ## Founder decisions log
 
-- 2026-10-18: one workspace with four views — yes; overlay vocabulary — yes; legend zone suggested then confirmed (least manual work); wave order and small UI words — manager's call (frame first, zones in parallel; chip banner, 14 px, „Taisyti kontūrą", „Prielaidos"); pro layer / multi-user — open; €0 default, no paid run without asking; Kreo trial opened by the founder himself (the manager never types credentials); only the synthetic plan may be uploaded to a competitor.
+- 2026-10-18: one workspace with four views — yes; overlay vocabulary — yes; legend zone suggested then confirmed (least manual work); wave order and small UI words — manager's call (frame first, zones in parallel; chip banner, 14 px, „Taisyti kontūrą"; the assumptions button stays „Nustatymai" — about 30 engine messages and two guard tests reference it; the account page's name is the open question); pro layer / multi-user — open; €0 default, no paid run without asking; Kreo trial opened by the founder himself (the manager never types credentials); only the synthetic plan may be uploaded to a competitor.

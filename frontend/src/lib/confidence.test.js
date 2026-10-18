@@ -10,6 +10,7 @@ import {
   confidenceRank,
   confidenceNeedsReview,
   confidenceLabel,
+  areaConfidenceSentence,
 } from './confidence.js';
 
 test('normalizeConfidence: production LT vocabulary maps to itself', () => {
@@ -78,4 +79,17 @@ test('CONFIDENCE_DOT_CLASS: tiers map onto the existing index.css dot classes', 
   assert.equal(CONFIDENCE_DOT_CLASS[CONF_ZALIA], 'dot-high');
   assert.equal(CONFIDENCE_DOT_CLASS[CONF_GELTONA], 'dot-med');
   assert.equal(CONFIDENCE_DOT_CLASS[CONF_RAUDONA], 'dot-low');
+});
+
+// 2026-10-18 audit §6 item 10: the room chip's tooltip read „Ploto pasitikėjimas: high".
+test('areaConfidenceSentence: one Lithuanian sentence per tier, in the labels\' words, any vocabulary', () => {
+  assert.equal(areaConfidenceSentence('high'), 'Plotas skaitytas tiesiogiai — tikrinti nereikia.');
+  assert.equal(areaConfidenceSentence('zalia'), areaConfidenceSentence('high'));
+  assert.equal(areaConfidenceSentence('medium'), 'Plotą verta patikrinti.');
+  assert.equal(areaConfidenceSentence('low'), 'Plotą būtina patikrinti.');
+  // areaConfidence's 'unknown' is drift-safe: never read as trusted green
+  assert.equal(areaConfidenceSentence('unknown'), 'Plotą verta patikrinti.');
+  for (const v of ['high', 'medium', 'low', 'unknown']) {
+    assert.doesNotMatch(areaConfidenceSentence(v), /pasitikėjim|high|medium|low/i);
+  }
 });

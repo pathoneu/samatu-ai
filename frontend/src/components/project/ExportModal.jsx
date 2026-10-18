@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, FileText, AlertCircle, FileCode, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CONF_RAUDONA, normalizeConfidence } from '@/lib/confidence';
+import { CONF_RAUDONA, confidenceLabel, normalizeConfidence } from '@/lib/confidence';
 import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
@@ -174,7 +174,7 @@ function exportErrors(project) {
   const lines = [];
   lines.push(['Nr.', 'Aprašymas', 'Skyrius', 'Problema'].join(';'));
   problematic.forEach(r => {
-    const issue = r.warning || (normalizeConfidence(r.confidence) === CONF_RAUDONA ? 'Žemas AI tikslumas' : 'Trūksta kainos');
+    const issue = r.warning || (normalizeConfidence(r.confidence) === CONF_RAUDONA ? confidenceLabel(r.confidence) : 'Trūksta kainos');
     lines.push([r.nr || '', `"${(r.aprasymas || '').replace(/"/g, '""')}"`, r.skyrius || '', issue].join(';'));
   });
 
@@ -190,7 +190,7 @@ function exportErrors(project) {
 const exportOptions = [
   { icon: FileSpreadsheet, label: 'Excel (.xlsx)', desc: 'Profesionaliai suformatuota Excel sąmata su skyriais', action: 'excel' },
   { icon: FileText, label: 'PDF pasiūlymas', desc: 'Komercinio pasiūlymo PDF su skyriais ir sumomis', action: 'pdf' },
-  { icon: AlertCircle, label: 'Klaidų ataskaita', desc: 'Įtartinos eilutės, žemas AI tikslumas, trūkstamos kainos', action: 'errors' },
+  { icon: AlertCircle, label: 'Klaidų ataskaita', desc: 'Įtartinos eilutės, eilutės, kurias būtina patikrinti, ir trūkstamos kainos', action: 'errors' },
   { icon: FileCode, label: 'XML (Sistela/SES)', desc: 'Netrukus — XML eksportas į sistemą „Sistela“', action: 'xml', disabled: true },
 ];
 

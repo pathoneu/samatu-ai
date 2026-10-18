@@ -4,6 +4,7 @@ import {
   buildSheetRail, splitSheetName, disciplineOf, setSheetOverride, clearSheetOverride, overrideFor,
   searchHitsByPage, calloutHoverText, lapuForma, DISCIPLINES,
   SHEET_RAIL_KEY, readSheetRailFull, writeSheetRailFull, stripTag, stripLabel,
+  floatingPanelLeft, SHEET_RAIL_WIDTH, SHEET_STRIP_WIDTH, THUMBNAIL_RAIL_WIDTH,
 } from './sheetRail.js';
 
 // The stored classification of the 8-sheet demo project (types and names as the blob carries them).
@@ -142,4 +143,22 @@ test('legacy v8_pages rows name and type a sheet too', () => {
   const { sheets } = buildSheetRail({ puslapiai: [{ page: 1, type: 'ceiling_plan', label: 'Lubos' }], pageCount: 1 });
   assert.equal(sheets[0].name, 'Lubos');
   assert.equal(sheets[0].tipas, 'ceiling_plan');
+});
+
+// 2026-10-18 audit §4.6 item 4: „Rasti panašius" sat at left 156 while the sheet list is 232 px wide, so it
+// covered ~76 px of the list; the count panel already used 240. One rule for every top-left panel now.
+test('a floating panel starts right of whichever rail is open', () => {
+  assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: true }), 240);
+  assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: false }), 156);
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true }), 8);
+  assert.ok(floatingPanelLeft({ railOpen: true, sheetRail: true }) > SHEET_RAIL_WIDTH);
+  assert.ok(floatingPanelLeft({ railOpen: true, sheetRail: false }) > THUMBNAIL_RAIL_WIDTH);
+});
+
+// Pathon v3 frame (A4): a sheet set shows the 56 px strip when the full rail is shut — panels clear it too.
+test('a floating panel clears the 56 px sheet strip', () => {
+  assert.equal(SHEET_STRIP_WIDTH, 56);
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: true, strip: true }), 64);
+  assert.equal(floatingPanelLeft({ railOpen: true, sheetRail: true, strip: true }), 240, 'the full rail wins');
+  assert.equal(floatingPanelLeft({ railOpen: false, sheetRail: false, strip: true }), 8, 'no sheets → no strip');
 });

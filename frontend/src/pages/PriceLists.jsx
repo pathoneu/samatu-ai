@@ -90,7 +90,7 @@ export default function PriceLists() {
     queryClient.invalidateQueries({ queryKey: ['priceLists'] });
     toast.success(pl.is_default
       ? `„${pl.name}“ nebe numatytasis kainynas`
-      : `„${pl.name}“ — numatytasis kainynas. Kainos bus užpildomos automatiškai po naujos analizės.`);
+      : `„${pl.name}“ — numatytasis kainynas. Kainos bus užpildomos automatiškai po naujo skaičiavimo.`);
   };
 
   const saveImported = (items, file, skipped = 0, problems = []) => {
@@ -160,7 +160,7 @@ export default function PriceLists() {
           <h1 className="text-2xl font-bold text-foreground">Kainynai</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Valdykite įmonės kainų sąrašus. Pažymėkite žvaigždute numatytąjį —
-            jo kainos bus įrašomos automatiškai po naujos analizės.
+            jo kainos bus įrašomos automatiškai po naujo skaičiavimo.
           </p>
         </div>
         <div className="flex items-center gap-2">

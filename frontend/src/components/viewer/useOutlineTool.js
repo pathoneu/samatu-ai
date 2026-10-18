@@ -79,7 +79,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
     const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
     const ring = roomRing(r);
     if (!ring) {
-      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Taisyti kontūrą"');
+      toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Kontūras paspaudus"');
       return;
     }
     onBeforeStart?.();

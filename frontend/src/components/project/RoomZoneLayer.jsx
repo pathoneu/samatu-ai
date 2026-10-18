@@ -27,10 +27,10 @@
 
 import { useMemo, useState } from 'react';
 import {
-  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers,
+  buildPageRoomZones, countRoomsMissingGeometry, spreadOverlappingMarkers, missingRoomsText,
   ROOM_POLYGON_FILLS_DEFAULT_VISIBLE,
 } from '@/lib/roomZones';
-import { ltCount } from '@/lib/ltPlural';
+import { areaConfidenceSentence } from '@/lib/confidence';
 
 function centroidOf(geometry) {
   if (geometry.type === 'marker') return { cx: geometry.cx, cy: geometry.cy };
@@ -180,7 +180,7 @@ export default function RoomZoneLayer({
                   <rect x={-half} y={-17} width={w} height={34} rx={4}
                     fill="white" stroke={RED} strokeWidth={1} opacity={0.96} />
                   <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
-                    <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
+                    <title>{areaConfidenceSentence(z.confidence)}</title>
                   </circle>
                   <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
                     {chipLabelFor(z.label)}
@@ -307,7 +307,7 @@ export default function RoomZoneLayer({
               fill="white" stroke={asMarker ? MARKER_INK : z.color} strokeWidth={1} opacity={0.96}
             />
             <circle cx={-half + 10} cy={-6} r={4} fill={z.confidenceColor}>
-              <title>{`Ploto pasitikėjimas: ${z.confidence}`}</title>
+              <title>{areaConfidenceSentence(z.confidence)}</title>
             </circle>
             <text x={-half + 18} y={-2} fontSize={11} fontWeight="700" fill="#1f2937">
               {chipLabelFor(z.label)}
@@ -326,14 +326,16 @@ export default function RoomZoneLayer({
   );
 }
 
-// Honest disclosure chip, identical in both presentation modes.
+// Honest disclosure chip, identical in both presentation modes. Its width follows the sentence
+// (~5,6 px a character at 11 px, measured 4,9) — the old fixed 250 px only fitted the old, shorter text.
 function MissingRoomsChip({ count }) {
+  const text = missingRoomsText(count);
   return (
-    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }}>
-      <rect x={0} y={0} width={250} height={24} rx={5}
+    <g transform="translate(12, 12)" style={{ pointerEvents: 'none' }} data-testid="missing-rooms-chip">
+      <rect x={0} y={0} width={Math.ceil(20 + text.length * 5.6)} height={24} rx={5}
         fill="#fef3c7" stroke="#fde68a" strokeWidth={1} />
       <text x={10} y={16} fontSize={11} fill="#b45309">
-        {ltCount(count, 'patalpa', 'patalpos', 'patalpų')} be vietos plane — žr. „Peržiūra“
+        {text}
       </text>
     </g>
   );

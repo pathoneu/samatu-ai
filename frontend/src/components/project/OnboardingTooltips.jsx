@@ -25,7 +25,7 @@ const STEPS = [
   {
     id: 'kiekiai',
     title: '2. Kiekiai ir šaltinio žymekliai',
-    body: 'Po patalpomis — apskaičiuoti kiekiai pagal kategorijas (sienų dažymas, plytelės, GKP, santechnika ir t.t.). Kiekvienos eilutės žymeklis rodo, iš kur skaičius: „iš eksplikacijos“ — paimtas iš lentelės, „Formulė" — apskaičiuotas iš ploto pagal LT taisykles, „AI ženklas" — AI suskaičiavo brėžinyje, „Prielaida" — standartinis numatytasis, „Rankinis“ — jūs pakeitėte.',
+    body: 'Po patalpomis — apskaičiuoti kiekiai pagal kategorijas (sienų dažymas, plytelės, GKP, santechnika ir t.t.). Kiekvienos eilutės žymeklis rodo, iš kur skaičius: „iš eksplikacijos“ — paimtas iš lentelės, „Formulė" — apskaičiuotas iš ploto pagal LT taisykles, „Rasta automatiškai" — suskaičiuota brėžinyje, „Prielaida" — standartinis numatytasis, „Rankinis“ — jūs pakeitėte.',
     targetSel: null,
     side: 'top',
   },

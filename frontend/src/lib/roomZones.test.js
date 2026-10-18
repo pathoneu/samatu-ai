@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  roomZoneColor, confidenceHex, ROOM_ZONE_COLORS, CONFIDENCE_HEX,
+  roomZoneColor, confidenceHex, ROOM_ZONE_COLORS, CONFIDENCE_HEX, missingRoomsText, roomAreaText,
 } from './roomZones.js';
 
 test('roomZoneColor: known paskirtis → its hue', () => {
@@ -64,7 +64,7 @@ test('buildRoomZone: eksplikacija area → high confidence, green dot', () => {
   const z = buildRoomZone(roomPolygon, SIZE);
   assert.equal(z.confidence, 'high');                      // single eksplikacija source
   assert.equal(z.confidenceColor, '#16a34a');
-  assert.equal(z.areaLabel, '50,5 m²');                    // lt-LT, 1 decimal
+  assert.equal(z.areaLabel, '50,54 m²');                   // lt-LT, two decimals like the room list (was „50,5“)
 });
 
 test('buildRoomZone: traced flood-fill polygon is NOT approximate', () => {
@@ -372,4 +372,24 @@ test('countRoomsMissingGeometry: a room with no polygon and no anchor feeds the 
   const size = { renderedWidth: 100, renderedHeight: 100, page: 2 };
   assert.equal(buildPageRoomZones(rooms, size).length, 1);
   assert.equal(countRoomsMissingGeometry(rooms, size), 1);
+});
+
+// 2026-10-18 audit side finding D: the chip sent him to „Peržiūra", a screen that no longer exists.
+test('missingRoomsText names the step where a room is shown on the plan, in the right number', () => {
+  assert.equal(missingRoomsText(1), '1 patalpa be vietos plane — parodykite ją žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(3), '3 patalpos be vietos plane — parodykite jas žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(11), '11 patalpų be vietos plane — parodykite jas žingsnyje „Patikra“');
+  assert.equal(missingRoomsText(21), '21 patalpa be vietos plane — parodykite ją žingsnyje „Patikra“');
+  assert.doesNotMatch(missingRoomsText(2), /Peržiūr/);
+});
+
+// 2026-10-18 audit side finding F: the chip said „4,5 m²" and the list „4,48" for the same room.
+test('roomAreaText: one formatter for the chip and the room list — two decimals, Lithuanian comma', () => {
+  assert.equal(roomAreaText(4.48), '4,48');
+  assert.equal(roomAreaText(6.9), '6,90');
+  assert.equal(roomAreaText(35.5), '35,50');
+  assert.equal(roomAreaText(null), '—');
+  assert.equal(roomAreaText(undefined), '—');
+  const z = buildRoomZone({ ...roomPolygon, plotas_m2: 4.48 }, SIZE);
+  assert.equal(z.areaLabel, `${roomAreaText(4.48)} m²`);
 });

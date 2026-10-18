@@ -32,7 +32,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
           className="inline-flex shrink-0 items-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-2.5 py-1 text-[12px] font-semibold text-white hover:opacity-95 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={busy
             ? 'Brėžinys skaitomas — eiga rodoma kortelėje virš brėžinio; galite toliau dirbti'
-            : 'Perskaityti šį lapą iš brėžinio: mastelis, patalpos, kontūrai, angos, sienų ilgiai, grindys. Nemokama, be dirbtinio intelekto užklausų.'}
+            : 'Perskaityti šį lapą iš brėžinio: mastelis, patalpos, kontūrai, angos, sienų ilgiai, grindys. Nemokama, skaičiuoja iš brėžinio.'}
           data-testid="detect-run-button"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ScanLine className="h-3.5 w-3.5" aria-hidden="true" />}
