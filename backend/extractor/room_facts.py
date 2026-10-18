@@ -1805,7 +1805,54 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
         page = src.get("page")
         rect = src.get("rect_pct") or ([0.0, 0.0, 1.0, 1.0] if page else None)
         fact["crop_url"] = evidence_url(project_id, page, rect, d)
+        for ev in fact.get("lenteles") or []:
+            ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
     return payload
+
+
+# ── the drawing's schedules beside a fact (Pathon v3 W3-A) ──────────────────
+
+def _table_entry(kind: str, page: Any, rect: Any, sentence: str) -> dict | None:
+    """One schedule row or table a fact can be checked against: its sheet and box (display-frame fractions,
+    the frame of the evidence crops — „Rodyti brėžinyje") and what it says."""
+    p = _f(page)
+    box = _clamp_rect(list(rect)) if isinstance(rect, (list, tuple)) and len(rect) == 4 else None
+    if not p or not sentence:
+        return None
+    return {"kind": kind, "page": int(p), "rect_pct": box, "sentence": sentence, "crop_url": None}
+
+
+def table_evidence(project: dict, room: dict) -> dict[str, list[dict]]:
+    """{fact key: [entry, …]} — the schedules that speak about this room's facts: the door and window schedules
+    (their table) beside the openings, the finish schedule's row beside the floor and the finishes, the room
+    table's row beside the area when the room carries no row box of its own. Evidence only: no fact's value,
+    status or sentence changes."""
+    from .schedules import finish_row_for, finish_sentence, room_table_row_for
+    out: dict[str, list[dict]] = {}
+    for key, kind in (("_duru_ziniarastis", "duru_zinynas"), ("_langu_ziniarastis", "langu_zinynas")):
+        rec = project.get(key) if isinstance(project.get(key), dict) else {}
+        table = rec.get("lentele") if isinstance(rec.get("lentele"), dict) else None
+        if table and rec.get("sakinys"):
+            entry = _table_entry(kind, table.get("page"), table.get("bbox_pct"), str(rec["sakinys"]))
+            if entry:
+                out.setdefault("angos", []).append(entry)
+    row = finish_row_for(project, room)
+    if row:
+        entry = _table_entry("apdailos_lentele", row.get("page"), row.get("bbox_pct"), finish_sentence(row))
+        if entry:
+            if row.get("grindys"):
+                out.setdefault("grindys", []).append(entry)
+            if row.get("sienos") or row.get("lubos"):
+                out.setdefault("apdaila", []).append(dict(entry))
+    if not room.get("eksplikacija_row_bbox"):
+        eks = room_table_row_for(project, room)
+        if eks and eks.get("plotas_m2") is not None:
+            name = " ".join(x for x in (str(eks.get("nr") or ""), str(eks.get("pavadinimas") or "")) if x)
+            entry = _table_entry("eksplikacija", eks.get("page"), eks.get("bbox_pct"),
+                                 f"Patalpų eksplikacijoje ({eks.get('page')} lapas): {name} — {lt_num(eks['plotas_m2'])} m².")
+            if entry:
+                out.setdefault("plotas", []).append(entry)
+    return out
 
 
 # ── pertvaros (2026-10-17) ──────────────────────────────────────────────────
@@ -1888,6 +1935,13 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
         facts.append(pertvaros)
     for fact in facts:
         fact["yours"] = _is_yours(project, room, fact["key"])
+    try:
+        tables = table_evidence(project, room)
+    except Exception:  # noqa: BLE001 — a schedule beside a fact is extra evidence, never the sheet's failure
+        tables = {}
+    for fact in facts:
+        if tables.get(fact["key"]):
+            fact["lenteles"] = tables[fact["key"]]
     quantities, excluded = room_quantities(project, room_nr)
     return {
         "room": {

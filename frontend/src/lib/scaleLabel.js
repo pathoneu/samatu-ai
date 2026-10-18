@@ -106,23 +106,7 @@ export function scaleStatusTitle(pageScale) {
   const label = labelOf(pageScale);
   const lane = pageScale.source === 'plan' || pageScale.source === LANE_CONFIRMED;
   if (lane) {
-    let why;
-    if (pageScale.kilme === 'uzrasytas') {
-      why = `Mastelis ${label} užrašytas brėžinio lape, ir plane užrašyti matmenys jį patvirtina.`;
-    } else if (pageScale.kilme === 'ismatuotas') {
-      const stated = writtenAs(pageScale);
-      if (stated) {
-        why = `Lape užrašyta ${stated}, bet plane užrašyti matmenys rodo ${label} — lapas atspausdintas kitu dydžiu, `
-          + 'nei braižytas. Matuojama pagal matmenis.';
-      } else {
-        const odd = !DRAWING_SCALES.includes(ratioOf(pageScale))
-          ? ` ${label} nėra įprastas braižymo mastelis — lapas, matyt, atspausdintas kitu dydžiu, nei braižytas.`
-          : '';
-        why = `Mastelis išmatuotas pagal plane užrašytus matmenis: jų skaičiai palyginti su nubrėžtų linijų ilgiais.${odd}`;
-      }
-    } else {
-      why = 'Mastelis nustatytas pagal plane užrašytus matmenis.';
-    }
+    const why = laneExplanation(pageScale);
     if (pageScale.source === LANE_CONFIRMED) return `${why} Jūs jį patvirtinote. ${CLICK_TO_SET}`;
     return `${why} ${CONFIRM_HINT} ${CLICK_TO_SET}`;
   }
@@ -133,4 +117,39 @@ export function scaleStatusTitle(pageScale) {
     return 'Mastelį nustatėte patys pagal atstumą, kurio tikrą ilgį žinote. Spustelėkite, jei norite nustatyti iš naujo.';
   }
   return `Mastelis ${label}. ${CLICK_TO_SET}`;
+}
+
+/**
+ * Only WHERE the scale comes from and what that means — no „click here" hint (Pathon v3 W1-D): the scale chip's
+ * card shows this beside its own buttons, where the status bar's „spustelėkite / skydelyje „Masteliai"" hints
+ * would point somewhere else.
+ */
+export function scaleExplanation(pageScale) {
+  if (!pageScale?.calibrated) return 'Mastelis dar nenustatytas — matavimai bus be metrų.';
+  const s = pageScale.source;
+  if (s === 'plan') return laneExplanation(pageScale);
+  if (s === LANE_CONFIRMED) return `${laneExplanation(pageScale)} Jūs jį patvirtinote.`;
+  if (s === 'auto') return 'Mastelis apskaičiuotas iš patalpų plotų eksplikacijoje — todėl apytikslis (~).';
+  if (s === 'user') return 'Mastelį nustatėte patys pagal atstumą, kurio tikrą ilgį žinote.';
+  return `Mastelis ${labelOf(pageScale)}.`;
+}
+
+/** Why a lane scale is what it is — the drawing's dimension strings, written on the sheet or measured. */
+function laneExplanation(pageScale) {
+  const label = labelOf(pageScale);
+  if (pageScale.kilme === 'uzrasytas') {
+    return `Mastelis ${label} užrašytas brėžinio lape, ir plane užrašyti matmenys jį patvirtina.`;
+  }
+  if (pageScale.kilme === 'ismatuotas') {
+    const stated = writtenAs(pageScale);
+    if (stated) {
+      return `Lape užrašyta ${stated}, bet plane užrašyti matmenys rodo ${label} — lapas atspausdintas kitu dydžiu, `
+        + 'nei braižytas. Matuojama pagal matmenis.';
+    }
+    const odd = !DRAWING_SCALES.includes(ratioOf(pageScale))
+      ? ` ${label} nėra įprastas braižymo mastelis — lapas, matyt, atspausdintas kitu dydžiu, nei braižytas.`
+      : '';
+    return `Mastelis išmatuotas pagal plane užrašytus matmenis: jų skaičiai palyginti su nubrėžtų linijų ilgiais.${odd}`;
+  }
+  return 'Mastelis nustatytas pagal plane užrašytus matmenis.';
 }

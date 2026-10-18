@@ -33,6 +33,13 @@ OUTLINE_ACTS = {
     "sujungta": "patalpą sujungėte su kita",
 }
 
+# What an „Atšaukti" undid (api/room_outline.py `_restore`, source „atsaukta"), in the accusative.
+UNDONE_ACTS = {
+    "konturas": "kontūro pakeitimą",
+    "sujungimas": "patalpų sujungimą",
+    "padalijimas": "erdvės padalijimą",
+}
+
 # Prielaidos fields (AssumptionsPanel) → what was changed, in the accusative.
 SETTING_NAMES = {
     "lubu_auksciai": "lubų aukštį",
@@ -128,6 +135,11 @@ def sentence_for(c: dict, rows: dict[str, dict] | None = None) -> str:
         area = lt_number((new or {}).get("plotas_m2")) if isinstance(new, dict) else None
         tail = f" (pagal kontūrą {area} m²)" if area and how != "sujungta" else ""
         return f"{_room(c)}: {act}{tail}"
+    if source == "atsaukta":
+        # „Atšaukti" after an outline save (Pathon v3 W1-D, api/room_outline.py `_restore`)
+        act = (new or {}).get("atsaukta") if isinstance(new, dict) else None
+        what = UNDONE_ACTS.get(str(act or ""), "pakeitimą")
+        return f"{_room(c)}: {what} atšaukėte"
     if source == "simbolis":
         parts = _path(c)
         page = parts[1] if len(parts) >= 3 else None
