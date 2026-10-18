@@ -20,6 +20,7 @@
 import { API_BASE as API } from './apiBase.js';
 import { toast } from 'sonner';
 import { learningEventsFromChange } from './learningEvents.js';
+import { syncMeasuredRows } from './measuredRows.js';
 
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
@@ -715,6 +716,12 @@ export function createProject(data) {
   return project;
 }
 
+// The fields a measured row depends on: the links, the measurements and their sheets' scales (lib/pageScales:
+// the rooms' traced areas, the lane's dimension strings, his own calibration) and the rows themselves.
+const MEASURED_ROW_KEYS = new Set([
+  'measurementRows', 'measurements', 'countTypes', 'pageScalesDurable', 'darbu_sarasas', 'patalpos', 'v8_rooms', '_meta',
+]);
+
 /**
  * @param {{versionSource?: string}} [opts] — `versionSource` names the save in
  *   the project's history ('perskaityta' | 'lapas' | 'klausimas' …; default
@@ -738,6 +745,10 @@ export function updateProject(id, updates, opts) {
   }
   const before = projects[idx];
   projects[idx] = { ...projects[idx], ...updates, updated_at: new Date().toISOString() };
+  // Measurements on rows (Pathon v3 W4-A, lib/measuredRows.js): whatever surface saved — the viewer's list, a
+  // scale, a rebuild of the rows — the rows that carry a measurement follow it. A no-op (same object) for a
+  // project with no measurement on a row.
+  if (Object.keys(updates || {}).some((k) => MEASURED_ROW_KEYS.has(k))) projects[idx] = syncMeasuredRows(projects[idx]);
   // THE hot path — debounced. Everything else in this module saves immediately.
   _scheduleSave(projects, id, opts?.versionSource ? { versionSource: opts.versionSource } : undefined);
   // The learning journal (togal-v2 W11): every surface saves through here, so a row „Teisinga", a typed

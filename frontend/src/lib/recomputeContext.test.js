@@ -34,3 +34,15 @@ test('tolerates a missing blob — every key present, all undefined', () => {
   assert.deepEqual(Object.keys(ctx).sort(), [...RECOMPUTE_CONTEXT_KEYS].sort());
   for (const k of RECOMPUTE_CONTEXT_KEYS) assert.equal(ctx[k], undefined);
 });
+
+test('carries what he measured on rows — and nothing when nothing is linked (a recompute stays byte-identical)', () => {
+  const blob = {
+    pageScalesDurable: { 1: { calibrated: true, metersPerPointX: 0.01, metersPerPointY: 0.01 } },
+    measurements: [{ id: 'd1', kind: 'distance', page: 1, points: [{ x: 0, y: 0 }, { x: 420, y: 0 }] }],
+    measurementRows: { 'm:d1': { eilute_id: 'a', kaip: 'pridėti' } },
+  };
+  assert.deepEqual(buildRecomputeContext(blob).matavimai,
+    [{ key: 'm:d1', eilute_id: 'a', kaip: 'pridėti', value: 4.2, unit: 'm', pages: [1] }]);
+  assert.equal(buildRecomputeContext({ ...blob, measurementRows: {} }).matavimai, undefined);
+  assert.equal(JSON.stringify(buildRecomputeContext({})).includes('matavimai'), false);
+});
