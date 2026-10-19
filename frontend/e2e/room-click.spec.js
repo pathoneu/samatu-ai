@@ -19,7 +19,7 @@
 // (W0-A helpers: a SQLite-backup restore, proven through the API; the fixture waits for this test's writes).
 import { expect } from './pw.js';
 import { PROJECT, api } from './state.js';
-import { clickAt, focusRoom, it, restoreStart, sheetPoints } from './helpers.js';
+import { clickAt, focusRoom, it, restoreStart, sheetPoints, shot } from './helpers.js';
 
 const test = it;
 
@@ -223,6 +223,48 @@ test.describe('room click, room tool, Undo, scale chip', () => {
     await saved.getByRole('button', { name: 'Atšaukti' }).click();
     await expect(toast(page, 'Atšaukta: patalpos 06 kontūras grąžintas')).toBeVisible({ timeout: 30_000 });
     await expect.poll(async () => (await roomsInBrowser(page))['06'].polygon_holes_pct ?? null).toBe(null);
+  });
+
+  // B2-A: while „Kontūras paspaudus" is armed the tool keys used to do nothing at all — now each answers
+  // with one sentence beside the pointer and the armed fill stays as it was (no behaviour change).
+  test('with „Kontūras paspaudus" armed, G / R / 2 / K / F say „Pirmiausia baikite…" and the fill stays armed', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, ROOM_06_INSIDE[1]);
+    await clickSheet(page, ...ROOM_06_INSIDE);                // select 06
+    await page.getByTestId('selection-more').click();
+    await page.getByTestId('selection-fill').click();
+    const s = await sheet(page);
+    await page.mouse.move(s.x + 0.60 * s.w, s.y + 0.45 * s.h);
+    await page.mouse.move(s.x + 0.61 * s.w, s.y + 0.46 * s.h);
+    const hint = page.getByTestId('cursor-hint');
+    await expect(hint).toContainText('Spustelėkite patalpos 06 viduje', { timeout: 5_000 });
+    for (const key of ['g', 'r', '2', 'k', 'f']) {
+      await page.keyboard.press(key);
+      if (key === 'g') await shot(page, 'b2a-g-while-fill-armed');
+      await expect(hint, key).toContainText('Pirmiausia baikite „Kontūras paspaudus“ (Esc)', { timeout: 2_000 });
+      await expect(hint, `${key}: the sentence goes back to the fill's own`).toContainText('Spustelėkite patalpos 06 viduje', { timeout: 5_000 });
+    }
+    // nothing else took the pointer: no legend panel, no measure tool, the fill is still armed
+    await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
+    await expect(page.getByTestId('mode-pill').filter({ hasText: 'Kontūras paspaudus' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(hint).toHaveCount(0, { timeout: 3_000 });
+  });
+
+  test('with „Sujungti" armed for 04, E says „Pirmiausia baikite „Sujungti“ (Esc)" and the tool stays', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, 0.56);
+    await clickSheet(page, 0.5715, 0.5435);                  // select 04
+    await page.locator('[data-testid="outline-tool-merge"]').click();
+    const s = await sheet(page);
+    await page.mouse.move(s.x + 0.70 * s.w, s.y + 0.62 * s.h);
+    await page.mouse.move(s.x + 0.71 * s.w, s.y + 0.63 * s.h);
+    const hint = page.getByTestId('cursor-hint');
+    await expect(hint).toContainText('Spustelėkite gretimą patalpą', { timeout: 5_000 });
+    await page.keyboard.press('e');
+    await expect(hint).toContainText('Pirmiausia baikite „Sujungti“ (Esc)', { timeout: 2_000 });
+    await expect(page.locator('[data-outline-edit-layer]')).toHaveCount(0);
+    await expect(hint).toContainText('Spustelėkite gretimą patalpą', { timeout: 5_000 });
   });
 
   test('the scale chip: „1:115 · spėjamas", one click confirms it, „Kalibruoti" arms the calibrate tool', async ({ page }) => {
