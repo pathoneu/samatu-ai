@@ -26,7 +26,7 @@ import math
 import re
 from typing import Any, Iterable
 
-from .scope import is_room_excluded, normalize_apimtis
+from .scope import is_absorbed, is_room_excluded, normalize_apimtis
 from .universal_rules import WET_ROOM_PASKIRTYS, gkp_sheet_count, lt_num
 
 _log = logging.getLogger("samatu.reminders")
@@ -105,7 +105,8 @@ def counted_rooms(project: dict) -> list[dict]:
     """The rooms of the estimate: not merged into another, not left out („Neskaičiuoju")."""
     apimtis = normalize_apimtis(project.get("_apimtis"))
     return [r for r in (project.get("patalpos") or [])
-            if isinstance(r, dict) and _nr(r) and not r.get("_sujungta_i") and not r.get("_neskaiciuoti")
+            if isinstance(r, dict) and _nr(r) and not r.get("_sujungta_i") and not is_absorbed(r)
+            and not r.get("_neskaiciuoti")
             and not is_room_excluded(apimtis, _nr(r))]
 
 

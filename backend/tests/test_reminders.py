@@ -352,3 +352,13 @@ def test_route_reads_the_saved_legend(tmp_path, monkeypatch):
     out = TestClient(app).get("/api/projects/p9/reminders").json()
     assert _one(out, "silpnu_sroviu_lizdai:tv")["legendoje"] is True
     assert _one(out, "silpnu_sroviu_lizdai:interneto")["legendoje"] is False
+
+
+def test_an_absorbed_room_is_skipped_by_every_reminder():
+    """W1-F: a room merged into another (`scope.is_absorbed`) is billed through the kept room — its outline
+    lying over the kept one is the merge, not a double count."""
+    from extractor.reminders import counted_rooms
+    from extractor.scope import MERGED_BECAUSE
+    kept = _room("01")
+    absorbed = _room("02", _neskaiciuoti_kodel=MERGED_BECAUSE)
+    assert [r["nr"] for r in counted_rooms({"patalpos": [kept, absorbed]})] == ["01"]
