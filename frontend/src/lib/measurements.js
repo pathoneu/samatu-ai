@@ -10,13 +10,14 @@ export const DEFAULT_COUNT_TYPES = [
   { id: 'jungikliai', label: 'Jungikliai', color: '#7c3aed', shape: 'square' },
   { id: 'sviestuvai', label: 'Šviestuvai', color: '#d97706', shape: 'diamond' },
   { id: 'durys', label: 'Durys', color: '#16a34a', shape: 'check' },
-  { id: 'langai', label: 'Langai', color: '#dc2626', shape: 'square' },
+  { id: 'langai', label: 'Langai', color: '#854d0e', shape: 'square' },
   { id: 'santechnika', label: 'Santechnikos taškai', color: '#0d9488', shape: 'circle' },
 ];
 
 // User-defined count types (founder 2026-07-14: no fixed list — you name what
 // you're counting). Colors/shapes cycle; ids are diacritic-free slugs.
-const COUNT_TYPE_COLORS = ['#2a6fb5', '#7c3aed', '#d97706', '#16a34a', '#dc2626', '#0d9488', '#be185d', '#4d7c0f'];
+// No red: red means an error on the drawing (Pathon v3 overlay vocabulary). Types saved with a colour keep it.
+const COUNT_TYPE_COLORS = ['#2a6fb5', '#7c3aed', '#d97706', '#16a34a', '#854d0e', '#0d9488', '#be185d', '#4d7c0f'];
 const COUNT_TYPE_SHAPES = ['circle', 'square', 'diamond', 'check'];
 
 export function makeCountType(label, existing = []) {
