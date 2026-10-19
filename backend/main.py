@@ -1742,7 +1742,9 @@ async def api_get_shared(token: str):
     # marker_pct / polygon_source …) leaked to any link holder by default. Now
     # ONLY the fields SharedProject.jsx actually renders are copied out; a new
     # internal field is private unless someone deliberately adds it here.
-    _ROOM_KEYS = ("nr", "pavadinimas", "paskirtis", "plotas_m2", "lubu_aukstis_m")
+    # `_sujungta_i`: a room merged into another („Sujungti") — the page's floor total skips it, the room it
+    # joined already carries its area (lib/floorArea.js, Pathon v3 W1-F).
+    _ROOM_KEYS = ("nr", "pavadinimas", "paskirtis", "plotas_m2", "lubu_aukstis_m", "_sujungta_i")
     # SharedProject.jsx reads d.mato_vnt || d.vnt and d.skyrius || d.kategorija,
     # so both spellings of each pair stay in.
     _WORK_KEYS = ("eil_nr", "aprasymas", "kiekis", "mato_vnt", "vnt", "kaina",

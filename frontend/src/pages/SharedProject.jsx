@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, Eye, ArrowLeft, Building2 } from 'lucide-react';
 import { API_BASE as API } from '../lib/apiBase';
 import { isReverseVat, vatPercent } from '../lib/vatMode';
+import { floorAreaTotal } from '../lib/floorArea';
 
 // LT number formatting — same idiom as ProjectMainView (space thousands, comma
 // decimals). The share link is what the CLIENT sees, and it was the one surface
@@ -80,7 +81,7 @@ export default function SharedProject() {
   const reverseVat = isReverseVat(p);
   const vatRate = vatPercent(p) / 100;
   const sumWithVat = sumNoVat * (1 + vatRate);
-  const totalArea = patalpos.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
+  const totalArea = floorAreaTotal(patalpos);   // a merged-away room is inside the room it joined
 
   // Group darbai by skyrius for clean presentation.
   const grouped = {};

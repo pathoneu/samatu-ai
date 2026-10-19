@@ -266,3 +266,46 @@ def test_objektas_h_merge_through_the_sheet_keeps_143_27(client):
     blob = _objektas_h()
     assert _header_sent(client, blob["patalpos"]) == pytest.approx(143.27, abs=0.01)
     assert _header_sent(client, _merge_h(copy.deepcopy(blob))["patalpos"]) == pytest.approx(143.27, abs=0.01)
+
+
+# ── the §6 cross-checks read the project's floor once (W0-A-1, Pathon v3 W1-F) ──
+
+def _sanity(rooms):
+    from extractor import sanity_checks
+    return {w["code"]: w["message"] for w in sanity_checks.run_all_checks({"patalpos": rooms})}
+
+
+def test_the_sanity_checks_never_count_an_absorbed_room_twice():
+    """After „Sujungti" the kept room bills both table rows (a + b); the absorbed room keeps its own row
+    (b). The floor the checks compared against was a + b + b — a false „Lubų plotas 0,70×" and „Dažomas
+    sienų plotas 2,00×". Its perimeter, kept on its row, is inside the kept room's too."""
+    a, b = _merged()
+    a.update(ceiling_paintable_m2=21.0, walls_paintable_m2=60.0, grindjuostes_m=a["perimetras_m"] - 0.8)
+    scope.mark_rooms([a, b], None)
+    assert scope.is_absorbed(b) and b["plotas_m2"] == 9.0
+    found = _sanity([a, b])
+    assert "ceiling_floor_mismatch" not in found, found        # 21 / 21, not 21 / 30
+    assert "paintable_floor_ratio" not in found, found         # 60 / 21 = 2,86×, not 60 / 30
+    assert "baseboard_perimeter_mismatch" not in found, found  # 20 − 1 × 0,8 m, not 32 − 0,8 m
+    # a room he chose not to count is not a merged room: its area still counts, as before
+    a2, b2 = _rooms()
+    a2.update(ceiling_paintable_m2=12.0, walls_paintable_m2=40.0)
+    scope.mark_rooms([a2, b2], {"patalpos_ne": ["02"]})
+    assert "ceiling_floor_mismatch" in _sanity([a2, b2])        # 12 / 21 — unchanged behaviour
+
+
+def test_objektas_h_merge_05_into_04_raises_no_check_the_unmerged_project_does_not(client):
+    """The smoke run's numbers (W0-A test 5): 178,77 m² of floor (35,50 twice) against 143,27 m² of
+    ceiling gave „Lubų plotas 0,80× grindų ploto" and a paint ratio on the doubled floor."""
+    blob = _objektas_h()
+    body = lambda b: {"patalpos": b["patalpos"], "_ceiling_anchor": b.get("_ceiling_anchor"),  # noqa: E731
+                      "rules_override": {}}
+
+    def checks(b):
+        out = client.post("/recompute-interior", json=body(b)).json()
+        return {w["code"]: w["message"] for w in out.get("warnings") or []
+                if isinstance(w, dict) and w.get("source") == "sanity_checks"}
+    before = checks(copy.deepcopy(blob))
+    after = checks(_merge_h(copy.deepcopy(blob)))
+    assert "ceiling_floor_mismatch" not in after, after
+    assert after == before

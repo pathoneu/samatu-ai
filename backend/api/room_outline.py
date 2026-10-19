@@ -33,7 +33,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.free_reread import NO_PDF, _project_for
-from extractor.geometry_lane import KEEP_POLYGONS, apply_geometry, geometry_dimension_strings
+from extractor.geometry_lane import FLOOR_KEYS, KEEP_POLYGONS, apply_geometry, geometry_dimension_strings
 from extractor.pdf_vectors import page_geometry
 from extractor.universal_rules import ring_corner_counts
 from extractor.vector_rooms import SOURCE as VECTOR_SOURCE, STRONG, joined_space, outline_at, propose_split, split_space
@@ -516,6 +516,13 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
 
     k_a, k_b = outline_perimeter(kept), outline_perimeter(gone)
     p_a, p_b = number(kept.get("perimetras_m")), number(gone.get("perimetras_m"))
+    # What the floor plan says for each room, AS STORED: the union outline holds BOTH rooms' coverings, so the
+    # lane's re-read found two and took the kept room's away („plytelės" → „—", Patikra asked again — W0-A-2).
+    # The kept room's finish covers the whole area (`_sujungimas.apdaila`); the merge changes no covering.
+    floors = {}
+    for r in stored.get("patalpos") or []:
+        if isinstance(r, dict) and _nr(r) in (kept_nr, gone_nr) and r.get("grindu_danga"):
+            floors[_nr(r)] = {k: copy.deepcopy(r[k]) for k in FLOOR_KEYS if k in r}
     perimetras = _set_outline(kept, ring, holes, body.page, (W, H), scale, table_m2=both or None,
                               extra={"prijungta": [gone_nr], "plotas_uzrasas_kartu_m2": both or None},
                               holes_walls=body.holes_walls)
@@ -566,6 +573,12 @@ def api_room_outline_merge(request: Request, project_id: str, room_nr: str, body
     absorb(gone)
     apply_geometry(parsed, pdf_bytes, dims)
     absorb(gone)            # whatever the lane made of a room with no outline today is not its geometry: it is merged
+    for nr, r in ((kept_nr, kept), (gone_nr, gone)):
+        if nr in floors:     # the merge changes no floor covering the plan gives a room
+            for k in FLOOR_KEYS:
+                r.pop(k, None)
+            r.update(floors[nr])
+            r.pop("_grindu_dangos_dvi", None)
     _drawn_perimeter_if_unread(kept, perimetras)
     if str(kept.get("perimetras_saltinis") or "") in ("user_override", "manual") and p_a and p_b:
         # A perimeter he typed is never re-read — but it described ONE room. The merged room's walls are both

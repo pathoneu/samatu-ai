@@ -1,5 +1,6 @@
 import { CONF_RAUDONA, confidenceNeedsReview, confidenceRank, normalizeConfidence } from './confidence.js';
 import { tierBaseLabel, tierKey } from './mergeDarbuSarasas.js';
+import { floorAreaTotal } from './floorArea.js';
 import {
   contributionsOf, isAreaRead, isHeightRead, sortedContributions, termShare,
 } from './ledger.js';
@@ -445,7 +446,7 @@ export function summarizeTakeoffWorkflow(project = {}, { hasPdf = false } = {}) 
   const missingPrices = rows.filter(isMissingPrice).length;
   const totalRooms = rooms.length;
   const totalPages = pages.length;
-  const totalArea = rooms.reduce((sum, room) => sum + (Number(room?.plotas_m2) || 0), 0);
+  const totalArea = floorAreaTotal(rooms);   // a merged-away room is inside the room it joined
 
   const aiSymbolRows = rows.filter(row => getQuantitySourceKind(row) === 'ai_symbol').length;
   const assumptionRows = rows.filter(row => getQuantitySourceKind(row) === 'assumption').length;
