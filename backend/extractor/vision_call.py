@@ -3796,6 +3796,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "_assumption": "Plotas iš apdailos plano (molio/kalkinio tinko ar kitos dangos zona). Paruošimas įskaičiuotas į dekoravimo darbą — atskiros glaistymo eilutės šiam plotui nėra.",
         })
 
+    # v3 W5-E E2, flag SAMATU_WALLPAPER_ROLLS (default off → nothing): wallpaper rolls for the walls whose
+    # finish reads „tapetai" (extractor/wallpaper_flag.py)
+    from .wallpaper_flag import wallpaper_rows as _wallpaper_rows
+    pozicijos.extend(_wallpaper_rows(rooms, SK_GD, SAL))
+
     # The eksplikacija's own "Iš viso" is the ceiling quantity when we have a
     # trustworthy one — minus the rooms whose ceilings nobody paints. Falls back
     # to the per-room sum otherwise (see `_ceiling_paint_base`).

@@ -103,6 +103,7 @@ UNIVERSAL_RULES = {
         # v3 W5-E E7: read only under SAMATU_WASTE_BY_PATTERN=1 (extractor/waste_pattern.py)
         "tiles_hexagonal": 0.16,      # CLAUDE.md §1.7 +16%, §3 15-17%
         "laminate_hexagonal": 0.16,   # CLAUDE.md §1.6 hexagonal +16%
+        "wallpaper": 0.10,            # CLAUDE.md §3 10-15% — read only under SAMATU_WALLPAPER_ROLLS=1 (E2)
     },
 
     # Wallpaper
