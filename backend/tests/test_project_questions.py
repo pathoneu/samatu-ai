@@ -166,9 +166,14 @@ def test_doors_and_windows_nobody_can_add_with_one_click_still_ask_for_a_look():
     assert q["items"] == [] and [m["room_nr"] for m in q["manual"]] == ["09"]
     assert q["title"] == "Durys ir langai: patikrinkite 1 patalpą"
     # 2026-10-06 (contractor walkthrough): no shouting, and each room says what to check in plain words
-    assert q["why"] == "Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta žemiau."
-    assert q["manual"][0]["sentence"] == ("Durų ir langų šioje patalpoje neradau. "
-                                          "Jei jų yra, atidarykite patalpą ir įrašykite.")
+    # 2026-10-19: answered on the card — the reason says what the answer does, never „open the room"
+    assert q["why"] == ("Įrašykite, kiek durų ir langų yra šioje patalpoje — siūlau tiek, kiek nubraižyta sienose. "
+                        "Pagal jūsų skaičių perskaičiuosiu angokraščius, dažomą sienų plotą ir grindjuostes.")
+    assert q["manual"][0]["sentence"] == ("Durų ir langų šioje patalpoje neradau — "
+                                          "šios patalpos sienų brėžinyje neperskaičiau.")
+    m = q["manual"][0]
+    assert m["durys"] == {"sarase": 0, "sienose": 0, "laisvos": []} and m["langai"]["sarase"] == 0
+    assert m["proposed"] == {"durys": 0, "langai": 0} and m["sienos"] is False
     assert q["manual"][0]["details"] == ""
 
 
@@ -188,8 +193,9 @@ def test_more_openings_than_the_list_names_says_so_and_keeps_the_openings_for_a_
     q = _q(build_questions({"patalpos": [room], "_duru_ziniarastis": _SCHEDULE}), "angos")
     assert q["items"] == [] and [m["room_nr"] for m in q["manual"]] == ["01"]
     m = q["manual"][0]
-    assert m["sentence"] == ("Sienose matau daugiau angų, nei sąraše yra durų ir langų. "
-                             "Atidarykite patalpą ir patikrinkite, ar sąraše nieko netrūksta.")
+    assert m["sentence"] == "Sienose matau daugiau angų, nei sąraše yra durų ir langų."
+    # an older blob the walls pass has not seen: the list's own numbers on both sides
+    assert m["proposed"] == {"durys": 1, "langai": 1}
     assert "Sienose angų daugiau — 3" in m["details"]
 
 
@@ -349,10 +355,13 @@ def test_openings_a_listed_window_could_stand_in_are_named_for_a_look_not_offere
     assert [m["room_nr"] for m in q["manual"]] == ["102", "104"]
     assert q["manual"][0]["sentence"] == (
         "Sąraše langai 3,00 m (2 vnt.) neįstatyti į angas, o sienose liko angos 3,90 ir 0,96 m — tikriausiai tai tie "
-        "patys langai, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį patalpos lape.")
+        "patys langai, tik kito pločio.")
+    # the card stands the listed windows in the openings left: as many as listed, at the drawn widths
+    assert q["manual"][0]["langai"] == {"sarase": 3, "sienose": 3, "laisvos": [
+        {"plotis_m": 3.9, "i": "laukas"}, {"plotis_m": 0.96, "i": "laukas"}]}
     assert q["manual"][1]["sentence"] == (
         "Sąraše langas 1,80 m neįstatytas į angą, o sienose liko angos 1,00 ir 2,30 m — tikriausiai viena iš jų ir yra "
-        "tas langas, tik kito pločio. Patikrinkite brėžinyje; jei langas kitas — pataisykite jo plotį patalpos lape.")
+        "tas langas, tik kito pločio.")
     assert q["manual"][0]["details"].startswith("3 langai, 1 durys. Sienose 5 angos:")       # the room sheet's account
     # only what is offered and said changed: the rooms — and every quantity made of them — are as stored
     assert rooms == stored
@@ -381,4 +390,24 @@ def test_a_held_back_door_opening_is_said_in_place_of_the_bare_count():
     q = _q(build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE}), "angos")
     assert q["items"] == [] and q["manual"][0]["sentence"] == (
         "Sąraše durys 1,20 m neįstatytos į angą, o sienose liko anga į gretimą patalpą (0,70 m) — tikriausiai tai tos "
-        "pačios durys, tik kito pločio. Patikrinkite brėžinyje; jei durys kitos — pataisykite jų plotį patalpos lape.")
+        "pačios durys, tik kito pločio.")
+    assert q["manual"][0]["durys"]["laisvos"] == [{"plotis_m": 0.7, "i": "vidus"}]
+
+
+def test_door_and_window_counts_are_answered_on_the_card_and_the_answered_room_asks_no_more():
+    """2026-10-19, the founder on the first v3 walk: „negaliu iškart vietoje pataisyti to, ką reikia". The room
+    to check carries the list's number and the walls' number per kind, the walls' as the proposal — and a
+    room whose doors no opening backs at all keeps one door (every room has a way in). Once he answered the
+    count on the card (`_angos_patikrinta_at`), the room asks no more."""
+    from extractor import universal_rules as ur
+    rooms = [_outlined("09", "Techninė", [_el("duris", 900, 2100, n=2), _el("langas", 1200, 1500)], ("laukas", 1.2))]
+    ur.prepare_rooms_for_calc(rooms, overrides={"vidaus_durys_beapvadines": False})
+    q = _q(build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE}), "angos")
+    m = q["manual"][0]
+    assert m["durys"]["sarase"] == 2 and m["durys"]["sienose"] == 0
+    assert m["proposed"] == {"durys": 1, "langai": 1}
+    assert m["page"] == 1 and m["rect_pct"] and m["sienos"] is True and m["angos_brezinyje"] == 1
+    assert "atidaryk" not in (q["why"] + m["sentence"]).lower()
+    rooms[0]["_angos_patikrinta_at"] = "2026-10-19T10:00:00Z"
+    assert not [x for x in build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE})["questions"]
+                if x["kind"] == "angos"]
