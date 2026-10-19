@@ -204,3 +204,20 @@ export function agreementOf(values) {
   });
   return { agree: indices, disagree };
 }
+
+/**
+ * Where most rooms' areas come from (B1-D): the room list says it once in its header — „Plotai iš eksplikacijos"
+ * — and only a room whose area comes from somewhere else carries its own word. The most frequent
+ * `inferPlotasSource` of the rooms that have an area; a tie goes to the source met first. null when no room
+ * has an area.
+ */
+export function dominantAreaSource(rooms) {
+  const counts = new Map();
+  for (const r of Array.isArray(rooms) ? rooms : []) {
+    const src = inferPlotasSource(r);
+    if (src) counts.set(src, (counts.get(src) || 0) + 1);
+  }
+  let best = null;
+  for (const [src, n] of counts) if (best == null || n > counts.get(best)) best = src;
+  return best;
+}
