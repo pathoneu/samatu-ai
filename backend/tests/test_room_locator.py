@@ -169,3 +169,72 @@ def test_short_room_numbers_keep_the_small_badge_rule():
         c.setFont("Helvetica", 9.5)
         c.drawString(200, 600, "08")
     assert rl.locate_rooms(_page(draw), [{"nr": "08", "plotas_m2": 6.8}], plan_pages=[1]) == {}
+
+
+# ── B3 (Pathon v3 W5-B): badges by the sheet's plan zones, behind SAMATU_ROOMS_BY_ZONES (default off) ──────
+def _two_badges_pdf():
+    """Badge „1" low on the sheet (≈ 0,94 of the height — under the fixed 0,88 cut) and badge „2" high (≈ 0,29)."""
+    def draw(c):
+        c.setFont("Helvetica", 4)
+        c.drawString(300, 50, "1")
+        c.drawString(300, 600, "2")
+        c.setFont("Helvetica", 10)
+        c.drawString(60, 760, "PIRMO AUKSTO PLANAS")      # a sheet always has some text
+    return _page(draw)
+
+
+def _zones(monkeypatch, zones):
+    from extractor import sheet_zones
+    monkeypatch.setattr(sheet_zones, "read_zones", lambda pdf, page, **kw: {"status": "ok", "zones": zones})
+
+
+ROOMS_12 = [{"nr": "01", "pavadinimas": "A"}, {"nr": "02", "pavadinimas": "B"}]
+
+
+def test_flag_off_keeps_the_fixed_cut_and_never_reads_zones(monkeypatch):
+    monkeypatch.delenv(rl.ROOMS_BY_ZONES_ENV, raising=False)
+    from extractor import sheet_zones
+
+    def boom(*a, **k):
+        raise AssertionError("zones must not be read with the flag off")
+    monkeypatch.setattr(sheet_zones, "read_zones", boom)
+    where = rl.locate_rooms(_two_badges_pdf(), ROOMS_12, plan_pages=[1])
+    assert "01" not in where                       # under the 0,88 cut
+    assert where["02"]["saltinis"] == "zenkliukas"
+
+
+def test_flag_on_a_badge_counts_only_inside_a_plan_zone(monkeypatch):
+    monkeypatch.setenv(rl.ROOMS_BY_ZONES_ENV, "1")
+    _zones(monkeypatch, [{"kind": "planas", "bbox_pct": [0.0, 0.5, 1.0, 1.0]}])
+    where = rl.locate_rooms(_two_badges_pdf(), ROOMS_12, plan_pages=[1])
+    assert where["01"]["saltinis"] == "zenkliukas"  # low on the sheet, but in the plan
+    assert "02" not in where                        # high on the sheet, outside every plan
+
+
+def test_flag_on_a_legend_or_title_block_inside_the_plan_holds_no_room(monkeypatch):
+    monkeypatch.setenv(rl.ROOMS_BY_ZONES_ENV, "1")
+    _zones(monkeypatch, [{"kind": "planas", "bbox_pct": [0.0, 0.0, 1.0, 1.0]},
+                         {"kind": "legenda", "bbox_pct": [0.0, 0.2, 1.0, 0.4]},
+                         {"kind": "antspaudas", "bbox_pct": [0.3, 0.9, 1.0, 1.0]}])
+    assert rl.locate_rooms(_two_badges_pdf(), ROOMS_12, plan_pages=[1]) == {}
+
+
+def test_flag_on_a_sheet_without_a_plan_zone_keeps_the_cut(monkeypatch):
+    monkeypatch.setenv(rl.ROOMS_BY_ZONES_ENV, "1")
+    _zones(monkeypatch, [{"kind": "antspaudas", "bbox_pct": [0.3, 0.9, 1.0, 1.0]}])
+    where = rl.locate_rooms(_two_badges_pdf(), ROOMS_12, plan_pages=[1])
+    assert "01" not in where and where["02"]["saltinis"] == "zenkliukas"
+
+
+def test_flag_on_real_zones_still_find_the_synthetic_plans_badges(monkeypatch):
+    monkeypatch.setenv(rl.ROOMS_BY_ZONES_ENV, "1")
+    from extractor import sheet_zones
+    sheet_zones.clear()
+    where = rl.locate_rooms(build_plan([two_rooms()]), _rooms(), plan_pages=[1])
+    assert where["01"]["saltinis"] == "zenkliukas" and where["02"]["saltinis"] == "zenkliukas"
+
+
+def test_the_flag_reads_only_an_explicit_yes(monkeypatch):
+    for v, on in (("1", True), ("true", True), ("on", True), ("0", False), ("", False), ("no", False)):
+        monkeypatch.setenv(rl.ROOMS_BY_ZONES_ENV, v)
+        assert rl.rooms_by_zones() is on

@@ -104,9 +104,12 @@ test('a click in the title block, a legend or a table is never a room (sheet zon
   assert.equal(noRoomZoneAt(zones, 0.8, 0.2).kind, 'legenda');
   // a table drawn inside the plan viewport is still a table
   assert.equal(noRoomZoneAt(zones, 0.5, 0.7).kind, 'lentele');
-  // the plan and the notes are not refused; no zones known = nothing refused
+  // the plan is not refused; notes are refused outside every plan (W5-B B2), never inside one
   assert.equal(noRoomZoneAt(zones, 0.2, 0.2), null);
-  assert.equal(noRoomZoneAt(zones, 0.8, 0.5), null);
+  assert.equal(noRoomZoneAt(zones, 0.8, 0.5).kind, 'pastabos');
+  const notesInPlan = { status: 'ok', zones: [...zones.zones, { kind: 'pastabos', bbox_pct: [0.1, 0.62, 0.3, 0.66] }] };
+  assert.equal(noRoomZoneAt(notesInPlan, 0.2, 0.64), null);
+  // no zones known = nothing refused
   assert.equal(noRoomZoneAt({ status: 'no_text', zones: [] }, 0.8, 0.8), null);
   assert.equal(noRoomZoneAt(null, 0.8, 0.8), null);
 });

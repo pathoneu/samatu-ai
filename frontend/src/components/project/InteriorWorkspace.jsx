@@ -535,6 +535,14 @@ export default function InteriorWorkspace({
     flushProjectSaves().finally(() => setSheetLinksVersion((v) => v + 1));
   };
 
+  // „Neskaityti šio lapo" (W5-B B9): a project key the free re-read and the detection run read on the SERVER
+  // (api/skip_sheets.py) — so the save is flushed at once, before the next read can start.
+  const handleSkippedPagesChange = (next) => {
+    const updated = updateProject(project.id, { neskaitomi_lapai: next });
+    if (updated) onProjectChange?.(updated);
+    flushProjectSaves();
+  };
+
   // Per-room canvas visibility handlers (panel eye toggles, Phase 1 declutter).
   const handleToggleRoomVisibility = (nr) => {
     const key = String(nr);
@@ -797,9 +805,9 @@ export default function InteriorWorkspace({
         hoveredRoomNrExternal={hoveredRoomNr}
         projectId={project.id}
         pdfBlob={pdfBlob}
-        renderToolbarAddon={(page, total) => (
+        renderToolbarAddon={(page, total, ctx) => (
           <>
-            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} scaleGate={ctx?.scaleGate || null} onSetScale={ctx?.onSetScale || null} />
             <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} />
           </>
         )}
@@ -824,6 +832,8 @@ export default function InteriorWorkspace({
         sheetOverrides={project?.sheet_overrides || null}
         onSheetOverridesChange={handleSheetOverridesChange}
         sheetLinksVersion={sheetLinksVersion}
+        skippedPages={project?.neskaitomi_lapai || null}
+        onSkippedPagesChange={handleSkippedPagesChange}
         onRoomZoneClick={(room) => {
           if (room?.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
           setLocalFocusedRoom(room);
