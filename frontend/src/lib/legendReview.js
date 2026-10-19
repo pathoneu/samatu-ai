@@ -95,7 +95,8 @@ export function initialReview(rows, counts = {}) {
   const out = {};
   for (const r of rows || []) {
     const c = counts[r.row_id];
-    out[r.row_id] = { keep: !!(r.countable !== false && c && c.status === 'ok' && c.count > 0), name: null };
+    // marks to show, not the counter's number: a candidate standing on text-layer letters is listed, never a mark
+    out[r.row_id] = { keep: !!(r.countable !== false && c && c.status === 'ok' && (c.instances || []).length > 0), name: null };
   }
   return out;
 }

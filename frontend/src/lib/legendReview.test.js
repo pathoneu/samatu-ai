@@ -52,6 +52,8 @@ test('the review starts from a proposal: found rows ✔, empty / sample rows �
   assert.equal(review['p3-a'].keep, true);
   assert.equal(review['p3-b'].keep, false);
   assert.equal(review['p3-s'].keep, false);
+  // a count with no instance to show (candidates only on text letters) is not proposed ✔
+  assert.equal(initialReview([rowA], { 'p3-a': { status: 'ok', count: 2, instances: [] } })['p3-a'].keep, false);
   // a sample row is never created even if kept
   assert.deepEqual(rowsToCreate([rowA, rowS], { 'p3-a': { keep: true }, 'p3-s': { keep: true } }, counts).map((r) => r.row_id), ['p3-a']);
   assert.equal(createLabel(2), 'Sukurti kiekius (2)');
