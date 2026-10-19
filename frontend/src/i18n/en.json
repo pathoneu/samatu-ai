@@ -1477,8 +1477,18 @@
       "nr": "no. {{nr}}",
       "area": "Area",
       "purpose": "Purpose",
-      "sourcePrefix": "Source: pdfplumber table, p. {{page}}",
-      "sourceSuffix": " · read from the table"
+      "source": {
+        "eksplikacija": "Area read from the drawing's room table, sheet {{page}}.",
+        "eksplikacijaNoPage": "Area read from the drawing's room table.",
+        "plano_uzrasas": "Area written on the plan, sheet {{page}}.",
+        "plano_uzrasasNoPage": "Area written on the plan.",
+        "manual_polygonNoPage": "Area computed from the outline you drew.",
+        "vision": "Area read from the drawing, sheet {{page}}.",
+        "visionNoPage": "Area read from the drawing.",
+        "dimension": "Area computed from the dimensions, sheet {{page}}.",
+        "dimensionNoPage": "Area computed from the dimensions.",
+        "otherNoPage": "Where this area came from was not recorded."
+      }
     },
     "workspace": {
       "measExportLabel": "Export measurements"

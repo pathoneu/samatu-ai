@@ -1555,8 +1555,18 @@
       "nr": "nr {{nr}}",
       "area": "Plotas",
       "purpose": "Paskirtis",
-      "sourcePrefix": "Šaltinis: pdfplumber lentelė, psl. {{page}}",
-      "sourceSuffix": " · perskaityta iš lentelės"
+      "source": {
+        "eksplikacija": "Plotas perskaitytas iš brėžinio patalpų lentelės, {{page}} lapas.",
+        "eksplikacijaNoPage": "Plotas perskaitytas iš brėžinio patalpų lentelės.",
+        "plano_uzrasas": "Plotas užrašytas plane, {{page}} lapas.",
+        "plano_uzrasasNoPage": "Plotas užrašytas plane.",
+        "manual_polygonNoPage": "Plotas apskaičiuotas iš jūsų apvesto kontūro.",
+        "vision": "Plotas perskaitytas iš brėžinio, {{page}} lapas.",
+        "visionNoPage": "Plotas perskaitytas iš brėžinio.",
+        "dimension": "Plotas apskaičiuotas iš matmenų, {{page}} lapas.",
+        "dimensionNoPage": "Plotas apskaičiuotas iš matmenų.",
+        "otherNoPage": "Iš kur paimtas šis plotas, neužrašyta."
+      }
     },
     "workspace": {
       "measExportLabel": "Eksportuoti matavimus"
