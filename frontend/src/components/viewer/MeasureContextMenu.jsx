@@ -14,7 +14,7 @@
  * visus". One history entry per action.
  */
 import { useEffect, useState } from 'react';
-import { Pencil, Shapes, Trash2, ListTree, Palette, Rows3, SquareDashedMousePointer } from 'lucide-react';
+import { Pencil, Shapes, Trash2, ListTree, Palette, Rows3, SquareDashedMousePointer, ScanSearch } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -45,6 +45,8 @@ const MARKS = ['žymė', 'žymės', 'žymių'];
 export default function MeasureContextMenu({
   target, measurement, selection = null, countTypes = [], onClose, onRename, onChangeType, onDelete, onReveal,
   onDeleteMany, onChangeTypeMany, onRecolorMany, onDeselect,
+  // „Rasti panašius" from a count mark (W5-A A8): (mark) => void.
+  onFindSimilar = null,
 }) {
   const [renaming, setRenaming] = useState(null);       // { id, value } while the rename dialog is open
   if (target && Array.isArray(selection) && selection.length > 1) {
@@ -90,6 +92,11 @@ export default function MeasureContextMenu({
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+          )}
+          {onFindSimilar && measurement?.kind === 'count' && (
+            <DropdownMenuItem onSelect={() => { onFindSimilar(measurement); onClose?.(); }} data-testid="measure-menu-find-similar">
+              <ScanSearch className="w-3.5 h-3.5 mr-2" />Rasti panašius
+            </DropdownMenuItem>
           )}
           {onReveal && (
             <DropdownMenuItem onSelect={() => { onReveal(measurement); onClose?.(); }}>

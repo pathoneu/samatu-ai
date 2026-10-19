@@ -1083,6 +1083,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [legend.active, active]);
+  // „Rasti panašius" from a count mark (W5-A A8 [#218]): the template box is the mark's own (a found mark keeps the
+  // box it was found by) or a symbol-sized box round it; the found marks join the mark's type, so the type's row
+  // link (W4-A `type:<id>` / a legend row's `eilute_id`) counts them on the same sąmata row.
+  const findSimilarFrom = (m) => {
+    const p = m?.points?.[0];
+    if (!p) return;
+    const box = Array.isArray(m.box) && m.box.length === 4 ? m.box : [p.x - 16, p.y - 16, p.x + 16, p.y + 16];
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
+    symbol.openWith({ page: m.page, box, typeId: m.typeId || null });
+  };
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   // The selection: one mark („Žymėti") or several („Laso", 2026-10-16) — ONE list either way.
@@ -2174,6 +2184,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onChangeType={changeCountType}
               onDelete={deleteMeasurement}
               onReveal={revealMeasurement}
+              onFindSimilar={projectId ? findSimilarFrom : null}
             />
           )}
           <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />

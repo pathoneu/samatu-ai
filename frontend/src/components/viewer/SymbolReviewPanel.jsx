@@ -33,6 +33,8 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
   const [progress, setProgress] = useState(null);     // {done, total, page}
   const [skipped, setSkipped] = useState(null);       // {pages: [], why}
   const [error, setError] = useState(null);
+  // the type the found marks join (W5-A A8: „Rasti panašius" from a mark — its own type, so its row link carries over)
+  const [preferredTypeId, setPreferredTypeId] = useState(null);
   const runRef = useRef(0);
 
   const reset = () => {
@@ -40,8 +42,8 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     setBusy(false); setTemplate(null); setByPage({}); setRemoved(new Set());
     setHoveredId(null); setProgress(null); setSkipped(null); setError(null);
   };
-  const open = () => { reset(); setThreshold(DEFAULT_THRESHOLD); setActive(true); };
-  const finish = () => { reset(); setActive(false); };
+  const open = () => { reset(); setThreshold(DEFAULT_THRESHOLD); setPreferredTypeId(null); setActive(true); };
+  const finish = () => { reset(); setActive(false); setPreferredTypeId(null); };
 
   const all = useMemo(() => Object.values(byPage).flatMap((r) => r.candidates), [byPage]);
   const found = useMemo(() => all.filter((c) => !removed.has(c.id)).length, [all, removed]);
@@ -75,8 +77,8 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     };
   };
 
-  const runBox = async (page, box) => {
-    if (busy) return;
+  const runBox = async (page, box, { force = false } = {}) => {
+    if (busy && !force) return;
     if (!box) { toast.info('Rėmelis per mažas — tempdami apveskite visą simbolį'); return; }
     const run = ++runRef.current;
     const tpl = { page, box };
@@ -194,8 +196,18 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
     return true;
   };
 
+  // „Rasti panašius" from a mark (W5-A A8): the session opens with the template box already drawn round it and
+  // the mark's type chosen — the search runs at once, he reviews and adds.
+  const openWith = ({ page, box, typeId = null }) => {
+    reset();
+    setThreshold(DEFAULT_THRESHOLD);
+    setPreferredTypeId(typeId);
+    setActive(true);
+    runBox(page, box, { force: true });
+  };
+
   return {
-    active, phase, open, close, template, threshold, setThreshold, hoveredId, setHoveredId,
+    active, phase, open, openWith, preferredTypeId, close, template, threshold, setThreshold, hoveredId, setHoveredId,
     all, visible, groups, numbers, found, pageCounts, unusual, truncatedPages, rasterPages,
     progress, skipped, error, runBox, searchAllPages, stop, remove, add,
     searchedPages: Object.keys(byPage).map(Number).sort((a, b) => a - b),
@@ -210,7 +222,8 @@ export function useSymbolSearch({ projectId, countTypes, onAdd }) {
  */
 export default function SymbolReviewPanel({ documentId, search, countTypes = [], totalPages = 1 }) {
   const { provides: scrollApi } = useScroll(documentId);
-  const [typeChoice, setTypeChoice] = useState(() => countTypes[0]?.id ?? '__new');
+  const [typeChoice, setTypeChoice] = useState(() => (search?.preferredTypeId && countTypes.some((t) => t.id === search.preferredTypeId)
+    ? search.preferredTypeId : (countTypes[0]?.id ?? '__new')));
   const [newLabel, setNewLabel] = useState('');
   const [checkedUnusual, setCheckedUnusual] = useState(false);
   const s = search;

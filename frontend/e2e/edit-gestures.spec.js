@@ -283,6 +283,47 @@ test.describe('W5-A editing gestures', () => {
     await expect(picker).toHaveCount(0);
   });
 
+  test('A8: right-click a count mark → „Rasti panašius" runs with its box drawn and its type chosen — T1 „find similar"', async ({ page }) => {
+    await openProject(page);
+    // a door swing on sheet 1 (A4 portrait, no /Rotate: PDF point 338,5 × 344 of 595 × 842) marked by hand first
+    const fx = 338.52 / 595.28; const fy = 344 / 841.89;
+    await bringIntoView(page, fx, fy);
+    await page.mouse.move(...Object.values(await at(page, fx, fy)));
+    await page.keyboard.press('6');
+    await page.getByTestId('count-type-new-name').fill('Durys W5');
+    await page.getByTestId('count-type-new-name').press('Enter');
+    await page.mouse.click(...Object.values(await at(page, fx, fy)));
+    await expect(page.getByTestId('mode-pill')).toContainText('Durys W5: 1 vnt.');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1200);                          // the measurements reach the browser's cache
+    const { measurements } = await stored(page);
+    const mark = measurements.find((m) => m.kind === 'count' && Math.abs(m.points[0].x - 338.52) < 3);
+    expect(mark).toBeTruthy();
+    const before = measurements.filter((m) => m.typeId === mark.typeId).length;
+    const k = counter();
+    k.c.clicks += 1;
+    await page.mouse.click(...Object.values(await at(page, fx, fy)), { button: 'right' });
+    await k.click(page, centre(await page.getByTestId('measure-menu-find-similar').boundingBox()));
+    const panel = page.getByTestId('symbol-review-panel');
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId('symbol-count-label')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('symbol-type')).toHaveValue(mark.typeId);
+    await expect(page.getByTestId('symbol-progress')).toHaveCount(0, { timeout: 60_000 });
+    await shot(page, 'w5a-a8-find-similar');
+    const found = await page.getByTestId('symbol-row').count();
+    note(`„Rasti panašius" iš žymės: rėmelis nubrėžtas, tipas „Durys W5" parinktas, rasta ${found}`);
+    if (found > 0 && await page.getByTestId('symbol-add').isEnabled()) {
+      await k.click(page, centre(await page.getByTestId('symbol-add').boundingBox()));
+      await expect(panel).toHaveCount(0);
+      note(`T1 rasti panašius (k = ${found}): ${k.text()} (tikslas 3+k)`);
+      await expect.poll(async () => (await stored(page)).measurements.filter((m) => m.typeId === mark.typeId).length, { timeout: 10_000 })
+        .toBeGreaterThan(before);
+    } else {
+      note(`T1 rasti panašius: ${k.text()} iki peržiūros (šiame lape panašių nerasta — nepridėta)`);
+      await page.keyboard.press('Escape');
+    }
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);
