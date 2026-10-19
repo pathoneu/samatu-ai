@@ -40,8 +40,13 @@ async function goToStep(page, label) {
 }
 
 test('1 no translation key on screen — Brėžinys, Patikra, Sąmata', async ({ page }) => {
+  const refused = [];
+  page.on('console', (m) => { if (/localStorage write failed/.test(m.text())) refused.push(m.text()); });
   await openProject(page);
   expect(await rawKeys(page), 'Brėžinys').toEqual([]);
+  // the plain demo project in a fresh profile: WebKit refused every cache write and toasted „atmintis pilna"
+  expect(refused, 'no refused localStorage write').toEqual([]);
+  await expect(page.getByText('Naršyklės atmintis pilna', { exact: false })).toHaveCount(0);
   await goToStep(page, 'Patikra');
   expect(await rawKeys(page), 'Patikra').toEqual([]);
   await goToStep(page, 'Sąmata');
