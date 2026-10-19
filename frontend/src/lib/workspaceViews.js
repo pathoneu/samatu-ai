@@ -32,6 +32,30 @@ export const PANEL_TABS = [
 const VIEW_TABS = new Set(['patikra', 'samata']);
 const BREZINYS_TABS = new Set(['patalpos', 'kiekiai', 'pokalbis']);
 
+// What each step's panel shows as tabs (B1-D, after the founder's first walk: nine destinations on one
+// screen — four steps and five tabs — and „a person could easily get lost"). The step needs only these; the
+// other tabs wait under one „Daugiau ▾". The step rail stays the one way to move between steps.
+export const STEP_TABS = {
+  brezinys: ['patalpos', 'kiekiai'],
+  patikra: ['patikra'],
+  samata: ['samata'],
+  siusti: [],
+};
+
+/**
+ * `{ primary, more }` — the tabs a view's panel shows in its strip and the ones under „Daugiau ▾", both as
+ * PANEL_TABS entries in strip order. The tab on screen is always in the strip (a „Pokalbis" opened from a
+ * Kiekiai row's menu shows as the chosen tab, never hidden in the menu).
+ */
+export function panelTabsFor(view, activeTab = null) {
+  const own = new Set(STEP_TABS[view] || []);
+  if (activeTab) own.add(activeTab);
+  return {
+    primary: PANEL_TABS.filter((tab) => own.has(tab.id)),
+    more: PANEL_TABS.filter((tab) => !own.has(tab.id)),
+  };
+}
+
 /** Which panel a view opens with: 'patalpos' | 'patikra' | 'samata' | null (Siųsti has no panel). */
 export function panelForView(view) {
   switch (view) {
@@ -51,6 +75,10 @@ export function panelForView(view) {
  * `expanded` is the Sąmata „Išskleisti" switch; `noDrawing` (no PDF in storage) leaves nothing to show
  * beside the rows, so Sąmata takes the width by itself.
  */
+// On the Sąmata step the sąmata IS the page (B1-D): the rows open across the width, the drawing waits as
+// the strip, „Rodyti brėžinį" brings it back beside the rows.
+export const SAMATA_EXPANDED_DEFAULT = true;
+
 export function canvasModeForView(view, { expanded = false, noDrawing = false } = {}) {
   switch (view) {
     case 'brezinys': return 'full';

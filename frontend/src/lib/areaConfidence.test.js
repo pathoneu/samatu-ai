@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT, inferPlotasSource,
+  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT, inferPlotasSource, dominantAreaSource,
 } from './areaConfidence.js';
 
 test('computeAreaConfidence: room with eksplikacija + agreeing manual polygon → high', () => {
@@ -116,4 +116,14 @@ test('plano_uzrasas: the designer\'s area label read from the PDF text is a dete
   assert.equal(r.primarySource, 'plano_uzrasas');
   assert.deepEqual(r.sources.map((s) => s.type), ['plano_uzrasas']);
   assert.equal(inferPlotasSource(room), 'plano_uzrasas');
+});
+
+test('dominantAreaSource: the source most rooms share, said once in the list header', () => {
+  const eks = { plotas_m2: 4.48, plotas_saltinis: 'eksplikacija' };
+  const plan = { plotas_m2: 6.9, plotas_saltinis: 'plano_uzrasas' };
+  assert.equal(dominantAreaSource([eks, eks, plan]), 'eksplikacija');
+  assert.equal(dominantAreaSource([plan, plan, eks]), 'plano_uzrasas');
+  assert.equal(dominantAreaSource([plan, eks]), 'plano_uzrasas', 'a tie goes to the source met first');
+  assert.equal(dominantAreaSource([{ plotas_m2: null }, {}]), null);
+  assert.equal(dominantAreaSource(null), null);
 });

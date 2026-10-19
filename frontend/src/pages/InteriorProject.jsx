@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { viewFromLocation, locationForView } from '@/lib/workspaceViews';
+import { viewFromLocation, locationForView, SAMATA_EXPANDED_DEFAULT } from '@/lib/workspaceViews';
 import {
   Home, Layers, Paintbrush, Square, AlertCircle, ChevronDown, ChevronUp,
   Zap, Droplets, Lightbulb, CornerUpRight, Ruler,
@@ -728,8 +728,9 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
     navigate(locationForView(urlProjectId, id, { ...extra, keep: searchRef.current }), { replace });
   }, [navigate, urlProjectId]);
   const setStep = goStep;
-  // Sąmata „Išskleisti": the rows take the width and the drawing collapses to a strip (lib/workspaceViews).
-  const [samataExpanded, setSamataExpanded] = useState(false);
+  // Sąmata: the rows take the width and the drawing collapses to a strip — by default, the sąmata IS the
+  // page on that step (B1-D); „Rodyti brėžinį" brings the drawing back beside the rows (lib/workspaceViews).
+  const [samataExpanded, setSamataExpanded] = useState(SAMATA_EXPANDED_DEFAULT);
   // Leaving Patikra: its panel kept its own copy of the project while he answered (pages/PatikraQuestions,
   // RoomSheet save through the store) — the store is the truth, so the frame takes it back from there.
   const prevViewRef = useRef(view);
@@ -1110,7 +1111,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         notices={step === 'patikra' ? null : (
           <>
             <ServerRefreshNotice projectId={project?.id} />
-            <FreeRereadBanner project={project} onComplete={(next) => setProject(next)} />
+            <FreeRereadBanner project={project} className="mt-3" onComplete={(next) => setProject(next)} />
             <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
           </>
         )}

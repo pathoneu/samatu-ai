@@ -21,6 +21,10 @@
  *   • Persvarstyti: `openCookieSettings()` (eksportuota) arba poraštės nuoroda
  *     „Slapukų nustatymai" atveria juostą iš naujo su esamais pasirinkimais.
  *
+ * Docked (B1-D, the project workspace /project/…): the floating card covered the drawing's bottom edge, so
+ * there it is ONE bar laid over the step bar at the bottom of the window (the same three choices, the two
+ * policy links) and never over the canvas; „Tvarkyti" opens the categories above the bar.
+ *
  * Privacy-first: kol nėra sutikimo, jokios nebūtinosios kategorijos neįjungtos.
  * Būtinasis sesijos slapukas veikia nepriklausomai nuo šio pasirinkimo.
  */
@@ -200,6 +204,7 @@ export default function CookieBanner() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const paper = PAPER_ROUTES.has(pathname);
+  const docked = !paper && /^\/project\//.test(pathname || '');
   const [show, setShow] = useState(false);
   const [manage, setManage] = useState(false);
   const [cats, setCats] = useState(DEFAULT_CATEGORIES);
@@ -247,6 +252,74 @@ export default function CookieBanner() {
   };
 
   if (!show) return null;
+
+  if (docked) {
+    return (
+      <div
+        className="fixed inset-x-0 bottom-0 z-[60] border-t border-border-strong bg-card shadow-[0_-8px_24px_-16px_hsl(var(--foreground)/0.35)]"
+        role="dialog"
+        aria-modal="false"
+        aria-label={t('cookie.ariaLabel')}
+        data-testid="cookie-banner"
+        data-docked="1"
+      >
+        {manage && (
+          <div className="mx-auto max-w-[960px] px-4 pt-2">
+            <CategoryRow
+              title={t('cookie.catNecessaryTitle')}
+              badge={t('cookie.catNecessaryBadge')}
+              desc={t('cookie.catNecessaryDesc')}
+              checked
+              disabled
+              onChange={() => {}}
+            />
+            <CategoryRow
+              title={t('cookie.catAnalyticsTitle')}
+              desc={t('cookie.catAnalyticsDesc')}
+              checked={cats.analytics}
+              onChange={(v) => setCats((c) => ({ ...c, analytics: v }))}
+            />
+            <CategoryRow
+              title={t('cookie.catMarketingTitle')}
+              desc={t('cookie.catMarketingDesc')}
+              checked={cats.marketing}
+              onChange={(v) => setCats((c) => ({ ...c, marketing: v }))}
+            />
+          </div>
+        )}
+        <div className="flex min-h-[64px] flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2">
+          <p className="min-w-[16rem] flex-1 text-ui leading-snug text-ink-2">
+            {t('cookie.bodyDocked')}{' '}
+            <Link to="/cookies" className="text-primary underline hover:no-underline">{t('cookie.dockedCookiesLink')}</Link>
+            {' · '}
+            <Link to="/privacy" className="text-primary underline hover:no-underline">{t('cookie.dockedPrivacyLink')}</Link>
+          </p>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {manage ? (
+              <button onClick={saveSelection} className="btn-primary justify-center px-4 py-2 text-ui">
+                {t('cookie.saveSelection')}
+              </button>
+            ) : (
+              <button onClick={acceptAll} className="btn-primary justify-center px-4 py-2 text-ui">
+                {t('cookie.acceptAll')}
+              </button>
+            )}
+            <button onClick={rejectNonEssential} className="btn-ghost justify-center px-4 py-2 text-ui">
+              {t('cookie.onlyNecessary')}
+            </button>
+            {!manage && (
+              <button
+                onClick={() => setManage(true)}
+                className="justify-center px-3 py-2 text-ui font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t('cookie.manage')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Paper button sizing override (the landing pl-btn-* are hero-sized).
   const paperBtn = { padding: '11px 20px', fontSize: '13.5px', borderRadius: '9px' };

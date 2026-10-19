@@ -32,7 +32,7 @@ import WallElevationsPanel from './WallElevationsPanel';
 import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
-import { inferPlotasSource } from '@/lib/areaConfidence';
+import { dominantAreaSource, inferPlotasSource } from '@/lib/areaConfidence';
 import { manualRowId } from '@/lib/darbuRows';
 import { linkKey, linkStatus } from '@/lib/measuredRows';
 import {
@@ -191,6 +191,8 @@ export default function WorkspacePanel({
 
   // A room merged into another is inside the room it joined (lib/floorArea) — never counted twice.
   const totalArea = floorAreaTotal(allRooms);
+  // B1-D: the source said once in the room list's header (lib/areaConfidence dominantAreaSource)
+  const roomsSource = useMemo(() => dominantAreaSource(allRooms), [allRooms]);
 
   // Canvas visibility: nr may be number or string in data — compare as String.
   const hiddenRoomSet = useMemo(
@@ -685,6 +687,19 @@ export default function WorkspacePanel({
             </span>
           ) : null}
         />
+        {/* B1-D (manager decision G3 option B): where the areas come from is said ONCE, here — not
+            „iš eksplikacijos" on every one of the 11 rows. A row whose area comes from somewhere else keeps its
+            own word; on the others the area itself opens the same evidence (the table row, the plan's note). */}
+        {!collapsed.rooms && roomsSource && (
+          <div
+            className="px-3 py-1.5 text-ui text-muted-foreground"
+            style={{ borderBottom: '1px solid hsl(var(--border) / 0.5)' }}
+            data-testid="rooms-source-line"
+          >
+            <span className="text-foreground">{t(`project.provenance.listHeader.${roomsSource}`)}</span>
+            {' · '}{t('project.provenance.listHeaderHint')}
+          </div>
+        )}
         {!collapsed.rooms && filteredRooms.map((r, i) => {
           const targetPage = r.puslapio_nr ?? r.page_nr;
           const canJump = !!(onJumpToPage && targetPage);
@@ -707,7 +722,7 @@ export default function WorkspacePanel({
                 background: isFocused ? 'hsl(var(--primary) / 0.10)' : undefined,
                 boxShadow: isFocused ? 'inset 3px 0 0 hsl(var(--primary))' : undefined,
               }}
-              title={canJump ? `Atidaryti psl. ${targetPage}` : undefined}
+              title={canJump ? `Atidaryti psl. ${targetPage}${isWet ? ' · drėgna patalpa' : ''}` : undefined}
             >
               <span className="mono tabular text-muted-foreground" style={{ fontSize: 12 }} data-testid="room-row-nr">
                 {String(r.nr || i + 1).padStart(2, '0')}
@@ -737,39 +752,48 @@ export default function WorkspacePanel({
                     {r._sujungta_i ? `sujungta į ${r._sujungta_i}` : `+ ${(r._sujungimas?.su || []).join(', ')}`}
                   </span>
                 )}
-                {isWet && (
-                  <span
-                    className="shrink-0 text-muted-foreground"
-                    style={{ fontSize: 12 }}
-                    title="Drėgna patalpa — sienoms ir lubims skaičiuojamos drėgmei atsparios medžiagos ir hidroizoliacija"
-                  >
-                    drėgna
-                  </span>
-                )}
               </div>
-              <span className="tabular text-foreground whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 14 }}>
-                <span className="mono">{roomAreaText(r.plotas_m2)}</span>
-                <span className="mono text-muted-foreground" style={{ fontSize: 12 }} data-testid="room-row-unit">m²</span>
-                {(() => {
-                  const src = inferPlotasSource(r);
-                  return src ? (
-                    <ProvenanceChip
-                      source={src}
-                      onClick={(e) => {
-                        e?.stopPropagation?.();
-                        if (src === 'eksplikacija') {
-                          // Honest popover with parsed row data — no PDF
-                          // coordinate guessing. Anchored to the chip.
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopoverState({ room: r, anchorRect: rect });
-                        } else if (onJumpToProvenance) {
-                          onJumpToProvenance(r);
-                        }
-                      }}
-                    />
-                  ) : null;
-                })()}
-              </span>
+              {(() => {
+                const src = inferPlotasSource(r);
+                const openSource = (e) => {
+                  e?.stopPropagation?.();
+                  if (src === 'eksplikacija') {
+                    // Honest popover with parsed row data — no PDF
+                    // coordinate guessing. Anchored to the chip / the area.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setPopoverState({ room: r, anchorRect: rect });
+                  } else if (onJumpToProvenance) {
+                    onJumpToProvenance(r);
+                  }
+                };
+                const area = (
+                  <>
+                    <span className="mono">{roomAreaText(r.plotas_m2)}</span>
+                    <span className="mono text-muted-foreground" style={{ fontSize: 12 }} data-testid="room-row-unit">m²</span>
+                  </>
+                );
+                // the list header already says where: the area itself is the way to the evidence
+                if (src && src === roomsSource) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={openSource}
+                      title={t('project.provenance.areaButtonTitle')}
+                      data-testid="room-row-area"
+                      className="tabular text-foreground whitespace-nowrap inline-flex items-center gap-1.5 rounded px-1 -mx-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{ fontSize: 14 }}
+                    >
+                      {area}
+                    </button>
+                  );
+                }
+                return (
+                  <span className="tabular text-foreground whitespace-nowrap inline-flex items-center gap-1.5" style={{ fontSize: 14 }} data-testid="room-row-area">
+                    {area}
+                    {src ? <ProvenanceChip source={src} onClick={openSource} /> : null}
+                  </span>
+                );
+              })()}
               {onToggleRoomVisibility && (
                 <button
                   type="button"

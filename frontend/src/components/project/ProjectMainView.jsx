@@ -5,9 +5,10 @@
  *   ┌───────────────────────────────────────────────────────┐
  *   │  Projekto info  · Bendra suma €  · [Eksportuoti ▾]    │  ← sticky top
  *   ├───────────────────────────────────────────────────────┤
- *   │  Patalpų suvestinė (collapsible)                      │
- *   │     12 patalpų · 132 m²                                │
- *   │  ▾ Atidaryti (rodo per kambarį detales)                │
+ *   │  Patikrinimai · Įspėjimai 1 · Verta patikrinti 6 ▸    │  ← B1-D: one line each,
+ *   │  Priminimai · 6 ▸                                      │    opening in place
+ *   │  Patalpų suvestinė · 11 patalpų · 143,27 m² ▸         │
+ *   │  Kainos · įrašytos 117 iš 117 eilučių ▸               │
  *   ├───────────────────────────────────────────────────────┤
  *   │  Darbų sąrašas (grupuotas pagal skyrius)               │
  *   │     Sienų darbai                                       │
@@ -25,7 +26,7 @@ import { useTranslation } from '@/i18n/react';
 import { isReverseVat, vatPercent } from '@/lib/vatMode';
 import { toast } from 'sonner';
 import {
-  Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
+  Home, ChevronDown, Eye, Plus, FileText,
   Edit2, Check, X, Trash2, AlertCircle, Search, Sliders, Star, Sigma, MoreHorizontal,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
@@ -54,6 +55,7 @@ import { effectiveKodas } from '@/lib/kodas';
 import { materialPriceNotes } from '@/lib/assemblyPricing';
 import { floorAreaTotal } from '@/lib/floorArea';
 import SanityWarningsBanner from './SanityWarningsBanner';
+import FoldLine from './FoldLine';
 import RemindersNotice from './RemindersNotice';
 import { packagingNote, packagingSizes } from '@/lib/packaging';
 import SamataTemplateView from './SamataTemplateView';
@@ -643,6 +645,8 @@ export default function ProjectMainView({
   }, [project?.id]);
   const pilot = (type, target = {}) => recordPilot(project?.id, type, target);
   const [patalposExpanded, setPatalposExpanded] = useState(false);
+  // B1-D: the „Kainos" line — closed by default, its count says whether anything is left to price
+  const [pricesOpen, setPricesOpen] = useState(false);
   // „Kaip suskaičiuota" (2026-09-02, Patikra): the row whose ledger is open.
   // Re-derived from the live array below so a recompute under an open panel
   // refreshes it instead of freezing yesterday's number on screen.
@@ -687,6 +691,7 @@ export default function ProjectMainView({
   useEffect(() => {
     if (pendingPriceFocus && !priceTarget) setPendingPriceFocus(null);
   }, [pendingPriceFocus, priceTarget]);
+  const pricedCount = useMemo(() => darbai.filter((r) => Number(r?.kaina) > 0).length, [darbai]);
   // The one honest line under the table (design §E4).
   const rowSummary = useMemo(() => summarizeSamataRows(darbai), [darbai]);
 
@@ -831,15 +836,16 @@ export default function ProjectMainView({
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* TOP STICKY — Projekto suvestinė + Eksportas */}
       {/* Top bar — mirrors prototype's 52px ProjectTopBar (compact, single row).
           Be PVM 13px regular · Su PVM 18px bold · same 10px uppercase eyebrow. */}
-      <div className="sticky top-0 z-10 bg-background pt-2 pb-3 -mx-1 px-1">
-        <div className="bg-card border border-border rounded-md px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+      {/* B1-D: the totals are ONE line (the rooms and their area moved to the „Patalpų suvestinė" line below). */}
+      <div className="sticky top-0 z-10 bg-background pt-2 pb-2 -mx-1 px-1">
+        <div className="bg-card border border-border rounded-md px-4 py-1.5 shadow-sm" data-testid="samata-totals">
+          <div className="flex items-center justify-between gap-x-4 gap-y-1 flex-wrap">
             {/* Left: totals — Be PVM (compact) | Su PVM (emphasized) */}
-            <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-x-6 gap-y-1 flex-wrap">
               <div className="flex items-baseline gap-2">
                 <span className="skyrius-header" style={{ fontSize: 12 }}>{t('project.mainView.beVat')}</span>
                 <span className="mono tabular text-foreground/70" style={{ fontSize: 14 }}>
@@ -854,9 +860,7 @@ export default function ProjectMainView({
                   {fmtEur(totals.viso * (1 + vatPct / 100))}
                 </span>
               </div>
-              <div className="border-l border-border pl-6 flex items-center gap-4 text-xs text-muted-foreground">
-                <span><span className="tabular font-medium text-foreground">{(project.v8_rooms || project.patalpos || []).length}</span> {t('project.mainView.rooms')}</span>
-                <span><span className="tabular font-medium text-foreground">{fmt(totalArea)}</span> m²</span>
+              <div className="border-l border-border pl-6 flex items-center gap-4 text-ui text-muted-foreground">
                 <span><span className="tabular font-medium text-foreground">{totals.count}</span> {t('project.mainView.positions')}</span>
                 {projectHidroM2 > 0 && (
                   <span title={t('project.mainView.hidroTitle')}>
@@ -876,69 +880,55 @@ export default function ProjectMainView({
                 onGoToPrices={focusPrices} />
             </div>
           </div>
-
-          {/* Trūksta kainų — perspėjimas */}
-          {totals.viso === 0 && darbai.length > 0 && (
-            <div className="mt-3 flex items-start gap-2 p-2.5 bg-conf-med/5 border border-conf-med/30 rounded-lg text-xs text-foreground">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <div>
-                <strong>{t('project.mainView.pricesMissingStrong')}</strong>{t('project.mainView.pricesMissingRest')}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* LT sanity warnings — Sprint 2: vartotojas mato kur AI gali būti suklydęs */}
-      <div ref={sanityRef} id="sanity-banner" className="scroll-mt-4">
-        {project.lt_sanity && (
-          <SanityWarningsBanner
-            sanity={project.lt_sanity}
-            projectId={project.id}
-            onOpenAssumptions={onOpenAssumptions}
-            focusNonce={focusSanityNonce}
-            onRevalidated={(fresh) => {
-              // Backend returns a partial project (lt_sanity, patalpos,
-              // warnings_count) — merge so we keep v8_rooms and other state.
-              // `fresh.lt_sanity` has ALREADY been merged against the current
-              // one inside the banner (lib/sanitySeverity.mergeSanity), so a
-              // rebuild that did not re-run a validator cannot erase its
-              // checks from the UI.
-              const next = { ...project };
-              if (fresh.lt_sanity) next.lt_sanity = fresh.lt_sanity;
-              if (Array.isArray(fresh.patalpos)) next.patalpos = fresh.patalpos;
-              onProjectChange?.(next);
-            }}
+      {/* B1-D: everything that is not a row is ONE line that opens in place (FoldLine) — the checks, the
+          reminders, the room summary, the prices — so the rows start on the first screen. Every count is on
+          its line; arriving from the top bar's checks pill opens the checks (focusNonce). */}
+      {/* The lines sit side by side and wrap; the one he opens takes the full width with its contents
+          under it, the others stay where they were. */}
+      <div ref={sanityRef} id="sanity-banner" className="scroll-mt-4 flex flex-wrap items-start gap-1.5" data-testid="samata-fold-lines">
+        <div className="contents">
+          {project.lt_sanity && (
+            <SanityWarningsBanner
+              folded
+              sanity={project.lt_sanity}
+              projectId={project.id}
+              onOpenAssumptions={onOpenAssumptions}
+              focusNonce={focusSanityNonce}
+              onRevalidated={(fresh) => {
+                // Backend returns a partial project (lt_sanity, patalpos,
+                // warnings_count) — merge so we keep v8_rooms and other state.
+                // `fresh.lt_sanity` has ALREADY been merged against the current
+                // one inside the banner (lib/sanitySeverity.mergeSanity), so a
+                // rebuild that did not re-run a validator cannot erase its
+                // checks from the UI.
+                const next = { ...project };
+                if (fresh.lt_sanity) next.lt_sanity = fresh.lt_sanity;
+                if (Array.isArray(fresh.patalpos)) next.patalpos = fresh.patalpos;
+                onProjectChange?.(next);
+              }}
+            />
+          )}
+          {/* what is commonly forgotten (v3 W5-E) — notices only, never a row */}
+          <RemindersNotice
+            folded
+            projectId={project.id} where="samata" onJumpToPage={onJumpToPage}
+            rows={darbai} onAddRow={handleAddReminderRow}
           />
-        )}
-        {/* what is commonly forgotten (v3 W5-E) — notices only, never a row */}
-        <RemindersNotice
-          projectId={project.id} where="samata" onJumpToPage={onJumpToPage} className="mt-2 w-full"
-          rows={darbai} onAddRow={handleAddReminderRow}
-        />
-      </div>
+        </div>
 
-      {/* PATALPŲ SUVESTINĖ — collapsible */}
-      {!compact && (
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <button
-          onClick={() => setPatalposExpanded(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
+        {/* PATALPŲ SUVESTINĖ */}
+        <FoldLine
+          icon={Home}
+          title={t('project.mainView.roomsSummary')}
+          summary={t('project.mainView.roomsBadge', { count: (project.v8_rooms || project.patalpos || []).length, area: fmt(totalArea) })}
+          open={patalposExpanded}
+          onToggle={() => setPatalposExpanded((v) => !v)}
+          data-testid="samata-rooms-summary"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Home className="w-4 h-4 text-muted-foreground" />
-            {t('project.mainView.roomsSummary')}
-            <Badge variant="secondary" className="text-xs font-normal">
-              {t('project.mainView.roomsBadge', { count: (project.v8_rooms || project.patalpos || []).length, area: fmt(totalArea) })}
-            </Badge>
-          </span>
-          {patalposExpanded
-            ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </button>
-
-        {patalposExpanded && (
-          <div className="border-t border-border p-3">
+          <div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground border-b border-border">
@@ -994,33 +984,37 @@ export default function ProjectMainView({
               </table>
             </div>
           </div>
-        )}
-      </div>
-      )}
+        </FoldLine>
 
-      {/* KAINOS — „Užpildyti iš mano kainyno" / „Įvesiu pats" (design §3).
-          A choice with its consequence written next to it, not a hidden
-          dropdown in a toolbar: the two ways prices get into the sąmata, said
-          out loud, with the default one named. */}
-      <div className="bg-card border border-border rounded-xl p-4">
-        <h2 className="font-semibold text-foreground" style={{ fontSize: 16 }}>
-          {t('project.mainView.pricesTitle')}
-        </h2>
-        <p className="text-muted-foreground mt-0.5" style={{ fontSize: 14 }}>
-          {t('project.mainView.pricesNote')}
-        </p>
-        <div className="mt-3 flex items-center gap-3 flex-wrap">
-          <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
-          <ApplyAssembliesButton project={project} onProjectChange={onProjectChange} assemblies={assemblies} />
-          <span className="text-muted-foreground" style={{ fontSize: 14 }}>
-            {t('project.mainView.pricesManual')}
-          </span>
-        </div>
+        {/* KAINOS — „Užpildyti iš mano kainyno" / „Įvesiu pats" (design §3): the choice with its consequence
+            written next to it, behind one line that says how many rows already carry a price. */}
+        <FoldLine
+          title={t('project.mainView.pricesTitle')}
+          summary={darbai.length === 0 ? null
+            : pricedCount === 0 ? t('project.mainView.pricesFoldNone')
+              : t('project.mainView.pricesFoldSome', { priced: pricedCount, count: darbai.length })}
+          icon={pricedCount === 0 && darbai.length > 0 ? AlertCircle : null}
+          iconColor="hsl(var(--conf-med))"
+          open={pricesOpen}
+          onToggle={() => setPricesOpen((v) => !v)}
+          data-testid="samata-prices"
+        >
+          <p className="text-muted-foreground" style={{ fontSize: 14 }}>
+            {t('project.mainView.pricesNote')}
+          </p>
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <ApplyPriceListButton project={project} onProjectChange={onProjectChange} />
+            <ApplyAssembliesButton project={project} onProjectChange={onProjectChange} assemblies={assemblies} />
+            <span className="text-muted-foreground" style={{ fontSize: 14 }}>
+              {t('project.mainView.pricesManual')}
+            </span>
+          </div>
+        </FoldLine>
       </div>
 
       {/* SĄMATOS EILUTĖS — grupuotos pagal skyrius */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-4 py-2 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-semibold text-foreground flex items-center gap-2" style={{ fontSize: 16 }}>
             <FileText className="w-4 h-4 text-muted-foreground" />
             {t('project.mainView.worksList')}
@@ -1084,17 +1078,16 @@ export default function ProjectMainView({
         </div>
 
         {/* What he measured on the drawing, as chips to drag onto a row below (Pathon v3 W4-A). */}
-        {onProjectChange && <MeasureTray project={project} onPickRow={setMeasurePickerKey} />}
+        {onProjectChange && <MeasureTray project={project} onPickRow={setMeasurePickerKey} startOpen={false} />}
 
         {/* LT contractors habitually quote a work rate „su medžiagomis". Since
             the materials became their own section, entering an all-in rate on a
             work row AND letting the kainynas price the materials bills the same
             purchase twice — so say what these prices are. (2026-09-02) */}
         <div className="px-4 py-2 border-b border-border bg-muted/10 text-muted-foreground" style={{ fontSize: 14 }}>
-          {t('project.mainView.worksAreLabourOnly')}
-          {/* The keyboard shortcut, spelled out where it is used instead of
-              hidden in a hover tooltip. (Design §5 — „net „Enter" paaiškinta".) */}
-          <span className="block mt-0.5">{t('project.mainView.keyboardHint')}</span>
+          {/* What these prices are and the keyboard, spelled out where it is used instead of hidden in a hover
+              tooltip (design §5 — „net „Enter" paaiškinta"). B1-D: one line instead of two. */}
+          {t('project.mainView.worksHintLine')}
         </div>
 
         {hisLayout ? (

@@ -26,6 +26,9 @@
  * every count; the high tier („Įspėjimai") is always listed in full; „Verta
  * patikrinti" and „Pastabos" open behind „Rodyti visus (N)". Arriving from the
  * top bar's pill (focusNonce) opens everything, as before.
+ *
+ * B1-D (`folded`, the Sąmata page): the whole notice is ONE line with every count — „Patikrinimai · Įspėjimai 1 ·
+ * Verta patikrinti 6 · Pastabos 3 ▸" — that opens in place with all tiers listed (components/project/FoldLine).
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -57,6 +60,7 @@ import {
 } from '../../lib/sanityDismissals';
 import { cleanUserText } from '@/lib/userText';
 import Notice from '@/components/ui/Notice';
+import FoldLine from './FoldLine';
 
 // Colours come from the semantic confidence tokens in index.css
 // (--conf-low red / --conf-med amber) — never raw bg-red-500/bg-gray-900,
@@ -83,7 +87,7 @@ const SEVERITY_META = {
 };
 
 export default function SanityWarningsBanner({
-  sanity, projectId, onRevalidated, onOpenAssumptions, focusNonce = 0,
+  sanity, projectId, onRevalidated, onOpenAssumptions, focusNonce = 0, folded = false,
 }) {
   const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(loadDismissed);
@@ -97,6 +101,8 @@ export default function SanityWarningsBanner({
   const [revalidateError, setRevalidateError] = useState(null);
   // The med/low tiers behind one click (the high tier is always shown).
   const [expanded, setExpanded] = useState(false);
+  // `folded`: the one line is open (everything listed under it)
+  const [foldOpen, setFoldOpen] = useState(false);
 
   const warnings = useMemo(
     () => (Array.isArray(sanity?.warnings) ? sanity.warnings : []),
@@ -119,6 +125,7 @@ export default function SanityWarningsBanner({
     if (!focusNonce) return;
     setOpenOverride(prev => ({ ...prev, [SEV_HIGH]: true, [SEV_MED]: true }));
     setExpanded(true);
+    setFoldOpen(true);
   }, [focusNonce]);
 
   if (!sanity || warnings.length === 0) return null;
@@ -199,44 +206,42 @@ export default function SanityWarningsBanner({
   const hasHigh = groups.some(([sev]) => sev === SEV_HIGH);
   const tone = hasHigh ? 'error' : groups.some(([sev]) => sev === SEV_MED) ? 'warning' : 'info';
   const restCount = groups.filter(([sev]) => sev !== SEV_HIGH).reduce((n, [, items]) => n + items.length, 0);
-  const shownGroups = expanded ? groups : groups.filter(([sev]) => sev === SEV_HIGH);
+  // folded: opening the line IS „show everything" — no second „Rodyti visus" inside it
+  const shownGroups = expanded || folded ? groups : groups.filter(([sev]) => sev === SEV_HIGH);
 
-  return (
-    <Notice
-      tone={tone}
-      title={t('project.sanity.headerTitle')}
-      data-testid="sanity-notice"
-      action={(
-        <>
-          {projectId && (
-            <button
-              onClick={handleRevalidate}
-              disabled={revalidating}
-              className="inline-flex items-center gap-1 text-meta underline hover:no-underline disabled:opacity-50 disabled:no-underline"
-              style={{ color: 'hsl(var(--accent-2))' }}
-              title={t('project.sanity.revalidateTitle')}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${revalidating ? 'animate-spin' : ''}`} aria-hidden="true" />
-              {revalidating ? t('project.sanity.revalidating') : t('project.sanity.revalidate')}
-            </button>
-          )}
-          {restCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              className="inline-flex min-h-[32px] items-center gap-1 rounded border border-border bg-card px-2.5 text-ui font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              data-testid="sanity-toggle"
-            >
-              {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
-              {expanded ? t('project.sanity.collapse') : t('project.sanity.showAll', { count: restCount })}
-            </button>
-          )}
-        </>
+  const actions = (
+    <>
+      {projectId && (
+        <button
+          onClick={handleRevalidate}
+          disabled={revalidating}
+          className="inline-flex items-center gap-1 text-meta underline hover:no-underline disabled:opacity-50 disabled:no-underline"
+          style={{ color: 'hsl(var(--accent-2))' }}
+          title={t('project.sanity.revalidateTitle')}
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${revalidating ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {revalidating ? t('project.sanity.revalidating') : t('project.sanity.revalidate')}
+        </button>
       )}
-    >
-      {/* every count, always on the line — the honest-disclosure rule */}
-      <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
+      {restCount > 0 && !folded && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="inline-flex min-h-[32px] items-center gap-1 rounded border border-border bg-card px-2.5 text-ui font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="sanity-toggle"
+        >
+          {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+          {expanded ? t('project.sanity.collapse') : t('project.sanity.showAll', { count: restCount })}
+        </button>
+      )}
+    </>
+  );
+
+  const body = (
+    <>
+      {/* every count, always on the line — the honest-disclosure rule (folded: the line itself carries them) */}
+      {!folded && <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
         {groups.map(([severity, items], i) => (
           <span key={severity} className="inline-flex items-center gap-1">
             {i > 0 && <span aria-hidden="true">·</span>}
@@ -251,7 +256,7 @@ export default function SanityWarningsBanner({
             <span>{t('project.sanity.summary', { count: Number(summary.rooms_count) || 0, area: ltNumber(summary.total_area_m2, 1) })}</span>
           </>
         )}
-      </p>
+      </p>}
       {revalidateError && (
         <p className="text-destructive" role="alert">{revalidateError}</p>
       )}
@@ -342,6 +347,38 @@ export default function SanityWarningsBanner({
           </div>
         );
       })}
+    </>
+  );
+
+  if (folded) {
+    const toneIcon = { error: AlertCircle, warning: AlertTriangle, info: Info }[tone];
+    const toneColour = { error: 'hsl(var(--destructive))', warning: 'hsl(var(--conf-med))', info: 'hsl(var(--accent-2))' }[tone];
+    return (
+      <FoldLine
+        title={t('project.sanity.headerTitle')}
+        summary={groups.map(([severity, items]) => `${t(SEVERITY_META[severity].labelKey)} ${items.length}`).join(' · ')}
+        icon={toneIcon}
+        iconColor={toneColour}
+        open={foldOpen}
+        onToggle={() => setFoldOpen((v) => !v)}
+        data-testid="sanity-notice"
+      >
+        <div className="space-y-1.5 text-ui text-foreground">
+          <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>
+          {body}
+        </div>
+      </FoldLine>
+    );
+  }
+
+  return (
+    <Notice
+      tone={tone}
+      title={t('project.sanity.headerTitle')}
+      data-testid="sanity-notice"
+      action={actions}
+    >
+      {body}
     </Notice>
   );
 }

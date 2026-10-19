@@ -14,11 +14,16 @@
  *    or arrow keys on the focused handle); `final` marks the end of a drag, when the owner stores it.
  *  - `notices`: shown above the tabs — outside the drawing's column, so a notice never takes its height.
  *  - `tabBarExtra`: one control at the right end of the tab strip.
+ *  - `moreTabs`: tabs the current step does not need (B1-D) — listed under one „Daugiau ▾" at the end of the
+ *    strip (a click menu, never hover); choosing one is the same `onTabChange` as a tab.
+ *  - notices fold (W6-A NoticeFold): two or more notices show as one „Pranešimai (N)" line.
  *  - `cover`: a node laid over the tabs and their contents while a tool needs the panel (the legend review,
  *    v3 W2-B); the panels stay mounted underneath and come back as they were.
  */
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import NoticeFold from './NoticeFold';
 
 const KEY_STEP = 16;
 
@@ -35,6 +40,7 @@ export default function RightPanelHost({
   notices = null,
   // One control at the right end of the tab strip (the Sąmata „Išskleisti" switch).
   tabBarExtra = null,
+  moreTabs = [],
   cover = null,
   className = '',
 }) {
@@ -100,8 +106,8 @@ export default function RightPanelHost({
       )}
 
       {notices && (
-        <div data-testid="workspace-notices" className="shrink-0 max-h-[45%] overflow-y-auto border-b border-border px-3 pb-3 empty:hidden">
-          {notices}
+        <div data-testid="workspace-notices" className="shrink-0 max-h-[45%] overflow-y-auto border-b border-border px-3 pb-3 has-[[data-testid=notice-fold-body]:empty]:hidden">
+          <NoticeFold className="mt-3 w-full">{notices}</NoticeFold>
         </div>
       )}
 
@@ -125,6 +131,7 @@ export default function RightPanelHost({
             {label}
           </button>
         ))}
+        {moreTabs.length > 0 && <MoreTabs tabs={moreTabs} onPick={(id) => onTabChange?.(id)} />}
         {tabBarExtra && <div className="ml-auto flex items-center px-2 shrink-0">{tabBarExtra}</div>}
       </div>
 
@@ -148,5 +155,70 @@ export default function RightPanelHost({
         <div className="absolute inset-0 z-10 flex flex-col bg-background" data-testid="right-panel-cover">{cover}</div>
       )}
     </aside>
+  );
+}
+
+/** „Daugiau ▾" — the tabs this step does not need, one click away (a menu: Esc or a click outside closes it). */
+function MoreTabs({ tabs, onPick }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const button = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); button.current?.focus(); }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+  const onMenuKey = (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const items = [...(box.current?.querySelectorAll('[role="menuitem"]') || [])];
+    const at = items.indexOf(document.activeElement);
+    const next = e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length;
+    items[next]?.focus();
+  };
+  return (
+    <div ref={box} className="relative shrink-0">
+      <button
+        ref={button}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-testid="right-tab-more"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 whitespace-nowrap px-3 min-h-[40px] text-ui border-b-2 border-transparent -mb-px text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Daugiau
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Kiti skydelio skirtukai"
+          onKeyDown={onMenuKey}
+          className="absolute left-0 top-full z-30 mt-1 min-w-[200px] rounded-panel border border-border bg-card py-1 shadow-lg"
+        >
+          {tabs.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="menuitem"
+              data-testid={`right-more-${id}`}
+              onClick={() => { setOpen(false); onPick(id); }}
+              className="flex w-full items-center px-3 min-h-[40px] text-left text-ui text-foreground hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

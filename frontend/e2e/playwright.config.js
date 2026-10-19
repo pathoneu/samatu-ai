@@ -6,7 +6,7 @@
  */
 export default {
   testDir: '.',
-  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures|patikra-in-place|safari-robustness)\.spec\.js$/,
+  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures|patikra-in-place|safari-robustness|screens-calm)\.spec\.js$/,
   outputDir: './.results',
   fullyParallel: false,
   workers: 1,
@@ -34,7 +34,7 @@ export default {
     {
       name: 'webkit',
       use: { browserName: 'webkit' },
-      testMatch: /(founder-guide|workspace-frame|safari-robustness)\.spec\.js$/,
+      testMatch: /(founder-guide|workspace-frame|safari-robustness|screens-calm)\.spec\.js$/,
       // founder-guide: tests 1–3 only (coach marks, sheet rail, Perskaityti iš naujo)
       grepInvert: /4 Masteliai|5 room tools|6 measure tools|7 Rasti panašius|8 right panel|9 Palyginti|10 after 04|Versijos|Sąmata: Eksportuoti/,
     },

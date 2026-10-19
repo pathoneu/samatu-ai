@@ -24,11 +24,12 @@ export function measureKeys(project) {
 // Open by default while the chips fit in a couple of lines; a long list starts folded.
 const OPEN_UP_TO = 8;
 
-export default function MeasureTray({ project, onPickRow }) {
+// `startOpen` (B1-D): the Sąmata page starts it folded to its one line, so the rows reach the first screen.
+export default function MeasureTray({ project, onPickRow, startOpen = null }) {
   const items = useMemo(() => measureKeys(project).map((key) => ({
     key, source: measureSource(project, key), status: linkStatus(project, key),
   })).filter((i) => i.source), [project]);
-  const [open, setOpen] = useState(() => items.length <= OPEN_UP_TO);
+  const [open, setOpen] = useState(() => (startOpen ?? items.length <= OPEN_UP_TO));
   if (!items.length) return null;
   const linked = items.filter((i) => i.status?.row).length;
   return (

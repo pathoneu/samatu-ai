@@ -3,15 +3,15 @@
  *
  *   ┌──────────────────────────────────────────┬────────────────────────────┐
  *   │                                          │  RIGHT PANEL (mode host)   │
- *   │   THE DRAWING (TakeoffViewer)            │  Patalpos ir eilutės ·     │
- *   │   mounted once, kept across all views    │  Kiekiai · Patikra ·       │
- *   │                                          │  Sąmata · Pokalbis         │
+ *   │   THE DRAWING (TakeoffViewer)            │  the step's own tabs ·     │
+ *   │   mounted once, kept across all views    │  „Daugiau" for the rest    │
+ *   │                                          │  (lib/workspaceViews)      │
  *   └──────────────────────────────────────────┴────────────────────────────┘
  *
  * The four steps are views of this one component (lib/workspaceViews):
  *   brezinys — the drawing takes the width, the panel 340 px (resizable, remembered);
  *   patikra  — the drawing beside a wide panel with the question list / room sheet;
- *   samata   — the drawing beside the rows; „Išskleisti" collapses the drawing to a 56 px strip;
+ *   samata   — the rows across the width, the drawing a 56 px strip („Rodyti brėžinį" brings it back);
  *   siusti   — its own screen; the drawing waits behind the strip.
  * The viewer is never unmounted by a step change: its zoom, page, measurements and history survive,
  * and the PDF engine loads once. Behind the strip it keeps its last size and stops listening to keys.
@@ -29,6 +29,7 @@ import { useDetectRun } from '@/lib/useDetectRun';
 import WorkspacePanel from './WorkspacePanel';
 import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import RightPanelHost from './RightPanelHost';
+import NoticeFold from './NoticeFold';
 import { WorkspaceHostContext } from './workspaceHost';
 import { toast } from 'sonner';
 import { sheetsCrossingLimit, sheetLimitMessage } from '@/lib/measureLimits';
@@ -42,8 +43,8 @@ import { isNewest, newerSaves, restorePatch, ticketFor, undoneRooms, undoneSente
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
-  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth, browserStorage,
-  revealTarget, selectTab, tabForView, writePanelWidth,
+  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelTabsFor, panelWidthFor,
+  readPanelWidth, browserStorage, revealTarget, selectTab, tabForView, writePanelWidth,
 } from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
@@ -838,6 +839,8 @@ export default function InteriorWorkspace({
   const picking = Boolean(viewerCheck && hostedCheck?.pickActive);
 
   const panelLabel = (id) => PANEL_TABS.find((tab) => tab.id === id)?.label || id;
+  // Only the tabs this step needs in the strip; the rest under „Daugiau ▾" (B1-D, lib/workspaceViews STEP_TABS).
+  const stepTabs = panelTabsFor(view, rightTab);
 
   const viewerNode = pdfUrl ? (
     embedEngine ? (
@@ -1127,12 +1130,13 @@ export default function InteriorWorkspace({
       {/* THE RIGHT PANEL — a mode host; on Siųsti the screen itself takes its place. */}
       {view === 'siusti' ? (
         <div data-testid="send-view" className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 space-y-3">
-          {notices}
+          {notices && <NoticeFold className="w-full">{notices}</NoticeFold>}
           {sendContent}
         </div>
       ) : (
         <RightPanelHost
-          tabs={PANEL_TABS.map((tab) => ({ ...tab, label: panelLabel(tab.id) }))}
+          tabs={stepTabs.primary.map((tab) => ({ ...tab, label: panelLabel(tab.id) }))}
+          moreTabs={stepTabs.more.map((tab) => ({ ...tab, label: panelLabel(tab.id) }))}
           activeTab={rightTab}
           onTabChange={setRightTab}
           width={isMobile ? null : panelWidth}
