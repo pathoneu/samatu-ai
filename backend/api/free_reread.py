@@ -137,7 +137,11 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     drawing's tables (the „lentelės" stage, read while the lane moves from the text to the plan), then the
     door schedule and the vector symbols — answered in the shape POST /free-reread returns. Saves nothing.
     `on_stage` hears the lane's steps (geometry_lane.apply_geometry), "lenteles" between "tekstas" and
-    "planas", and then "kiekiai" when the project-level scans start (api/detect_run.py shows them as stages)."""
+    "planas", and then "kiekiai" when the project-level scans start (api/detect_run.py shows them as stages).
+    Sheets the user marked „Neskaityti šio lapo" (`neskaitomi_lapai`, api/skip_sheets.py) are read as blank
+    pages of the same size — every reader below sees nothing on them, page numbers unchanged."""
+    from api.skip_sheets import without_skipped
+    pdf_bytes = without_skipped(project, pdf_bytes)
     parsed = copy.deepcopy(project)
     tables: dict = {}
 

@@ -604,7 +604,7 @@ function LegendPageWatcher({ documentId, pageRef, onPage }) {
   return null;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -633,6 +633,25 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       { name: sheet.autoName, tipas: sheet.autoTipas, discipline: sheet.autoDiscipline }),
     `Lapas ${sheet.page} pakeistas`,
   );
+  // „Neskaityti šio lapo" (W5-B B9): the pages the re-read and the detection run read as blank; Undo in the toast.
+  const skippedRef = useRef(skippedPages);
+  useEffect(() => { skippedRef.current = skippedPages; });
+  const skippedSet = useMemo(() => new Set((skippedPages || []).map(Number)), [skippedPages]);
+  const putSkipped = (pages) => {
+    const next = [...new Set(pages.map(Number))].filter((n) => n >= 1).sort((a, b) => a - b);
+    skippedRef.current = next;
+    onSkippedPagesChange?.(next);
+  };
+  const toggleSkipSheet = (sheet) => {
+    const before = (skippedRef.current || []).map(Number);
+    const on = !before.includes(sheet.page);
+    putSkipped(on ? [...before, sheet.page] : before.filter((p) => p !== sheet.page));
+    toast.success(on ? `Lapas ${sheet.page} nebus skaitomas` : `Lapas ${sheet.page} vėl bus skaitomas`, {
+      description: on ? 'Jis lieka PDF ir brėžinyje. Perskaitant brėžinį iš naujo ir „Perskaityti lapą“ programa jo neskaitys.' : undefined,
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: () => putSkipped(before) },
+    });
+  };
   const resetSheet = (sheet) => changeSheet(
     sheet, clearSheetOverride(sheetOverridesRef.current, sheet.page),
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
@@ -1608,7 +1627,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           {viewSettings.cleanBg > 0 && <CleanBgFilter t={viewSettings.cleanBg} />}
           <div className="relative flex flex-1 min-h-0">
             {sheetRail
-              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
+              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} skipped={skippedSet} onToggleSkip={onSkippedPagesChange ? toggleSkipSheet : null} />
               : railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
                 reads ViewportElementContext, whose Provider is rendered BY the
@@ -2044,6 +2063,9 @@ export default function TakeoffViewer({
   // host when the tool is on (so it can show that node). Absent → the review floats beside the drawing.
   legendPanelSlot = null,
   onLegendPanelChange = null,
+  // „Neskaityti šio lapo" (W5-B B9): `project.neskaitomi_lapai` and its setter. Absent → no button.
+  skippedPages = null,
+  onSkippedPagesChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -2090,6 +2112,8 @@ export default function TakeoffViewer({
           active={active}
           legendPanelSlot={legendPanelSlot}
           onLegendPanelChange={onLegendPanelChange}
+          skippedPages={skippedPages}
+          onSkippedPagesChange={onSkippedPagesChange}
         />
       </EmbedPDF>
     </div>
