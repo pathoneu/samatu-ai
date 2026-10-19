@@ -17,7 +17,7 @@ export const USUAL_MINUTES = '25–28';
  * elapsed  seconds since the start
  * started  the server announced the run (its id came) — from then on the window may be closed safely
  * estMinutes the preflight's range („15–25"), or ''
- * → { stageKey, stageParams, step, steps, minutes, estimate, canLeave }
+ * → { stage, stageKey, stageParams, step, steps, minutes, estimate, canLeave }
  */
 export function runTeachingFor({ phase = null, progress = {}, elapsed = 0, started = false, estMinutes = '' } = {}) {
   const stage = STAGE_OF[phase] || 'rendering';
@@ -31,6 +31,7 @@ export function runTeachingFor({ phase = null, progress = {}, elapsed = 0, start
   if (stage === 'zoom' && params.total) stageKey = 'stage.zoomProgress';
   if (phase === 'finishing') stageKey = 'stage.finishing';
   return {
+    stage,                                  // the stage's name key (runTeaching.name.<stage>)
     stageKey,
     stageParams: params,
     step: STAGES.indexOf(stage) + 1,

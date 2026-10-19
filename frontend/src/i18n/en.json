@@ -1196,6 +1196,81 @@
       "rowSummaryNoQty_other": "{{count}} rows have no quantity — fill them in or delete them",
       "keyboardHint": "Click a quantity or price cell and type. Enter — save and move to the next row’s price. Esc — cancel."
     },
+    "coach": {
+      "aria": "Introduction: {{title}}",
+      "progress": "{{n}} of {{total}}",
+      "next": "Next",
+      "finish": "Done",
+      "skipAll": "Skip all",
+      "skipAllTitle": "Skip the whole introduction (Esc)",
+      "keyWord": "key",
+      "missing": "This button appears when you need it.",
+      "sheets": { "title": "Sheets", "body": "Click a sheet — it opens in the drawing." },
+      "tools": { "title": "Tools", "body": "Pick a tool on the left, then click on the drawing.", "keyNote": "all keys" },
+      "roomClick": { "title": "Room", "body": "Click a room on the drawing — it is marked in the list." },
+      "roomTool": { "title": "Room outline", "body": "Click inside a room — the outline follows the walls." },
+      "scale": { "title": "Scale", "body": "Check the scale before measuring; fix a wrong one here." },
+      "measure": { "title": "Distance", "body": "Click the start and the end — the distance is listed right." },
+      "legend": { "title": "Legend", "body": "Mark the legend — the program counts its symbols on the drawing." },
+      "patikra": { "title": "Check", "body": "Answer a few questions — the program proposes an answer.", "keyNote": "accepts the proposed answer" },
+      "samata": { "title": "Estimate", "body": "Quantities by row — enter your prices here." },
+      "siusti": { "title": "Send", "body": "Download Excel or PDF, or send the client a link." }
+    },
+    "firstUse": {
+      "legend": "The program counts the legend's symbols — you review them.",
+      "room": "The outline follows the walls — check it and save.",
+      "subtract": "A column or a cupboard is taken out of the room's area.",
+      "count": "Every click adds one item.",
+      "matavimai": "Put measurements into groups — drag them onto a group.",
+      "patikra": "Enter accepts the proposed answer, Esc goes back to the list.",
+      "nustatymai": "Change a value — the quantities are recalculated at once."
+    },
+    "settings": {
+      "intro": "Every change recalculates the quantities at once.",
+      "sections": {
+        "bendra": "General",
+        "patalpos": "Rooms",
+        "angos": "Openings and reveals",
+        "medziagos": "Materials and packaging",
+        "pasirinkimai": "Calculation choices"
+      },
+      "whatIs": "What is this: {{label}}",
+      "fromDrawing": "On the drawing: {{text}}",
+      "allRooms": "All rooms",
+      "differs": "differs",
+      "showAllRooms": "Show all rooms ({{count}})",
+      "onlyDiffering": "Show only the ones that differ",
+      "allSame": "All rooms are the same.",
+      "roomsOf": "{{n}} of {{total}}",
+      "puttyShort": { "Q1": "Q1", "Q2": "Q2", "Q3": "Q3", "Q4": "Q4" },
+      "heightLabel": "Ceiling height",
+      "wallsPaintLabel": "Walls",
+      "stretchLabel": "Ceilings",
+      "windowsLabel": "Windows",
+      "doorsLabel": "Doors",
+      "openingsCount": "{{count}} pcs.",
+      "edit": "Edit",
+      "hide": "Hide",
+      "noneOn": "none",
+      "notes": {
+        "putty": "A higher level means more filler and more sanding.",
+        "height": "The height changes the painted wall area and the ceiling board count.",
+        "wallsPaint": "Walls of unpainted rooms are not in the painted area.",
+        "stretch": "Filling and painting of stretch ceilings drop out of the estimate.",
+        "frameless": "Frameless doors add an opening preparation row.",
+        "reveals": "Openings of the ticked kinds are added to the reveal rows.",
+        "wallThickness": "Partition thickness for the reveal area; usually 0.10 m.",
+        "windows": "Window sizes are taken off the painted area.",
+        "doors": "Door sizes are taken off the painted area and the skirting.",
+        "packaging": "The estimate says how many bags or buckets are needed.",
+        "mixers": "Concealed — two rows: the body in the wall and the visible part.",
+        "led": "In rooms {{rooms}} the niche length was not read, estimate {{total}} m."
+      },
+      "changed": "Changed: {{label}}.",
+      "undo": "Undo",
+      "undone": "Restored: {{label}}.",
+      "recomputing": "Recalculating…"
+    },
     "assumptions": {
       "widthPlaceholder": "width",
       "heightPlaceholder": "height",
@@ -2319,6 +2394,36 @@
       "rememberedNote": "As on your last 3 projects — change it if this one is different.",
       "familiesAllNote": "All ticked. Untick one and its rows will not be in the estimate (nor the materials bought for them).",
       "familiesSomeOffNote": "Rows from the unticked areas will not be in the estimate, along with their materials. Sections that belong to no area (ventilation, for example) always stay."
+    }
+  },
+  "runTeaching": {
+    "title": "While it reads",
+    "stageHeading": "{{name}} · {{step}} of {{steps}}",
+    "name": {
+      "rendering": "Sheets",
+      "pass1": "Rooms",
+      "zoom": "Dimensions",
+      "post": "Quantities"
+    },
+    "stage": {
+      "rendering": "Opening the sheets and looking for floor plans.",
+      "renderingPages": "Opening {{count}} sheets and looking for floor plans.",
+      "pass1": "Reading the room table and the plans.",
+      "pass1Rooms": "Found {{count}} rooms — reading their areas.",
+      "zoom": "Refining every room's dimensions.",
+      "zoomProgress": "Refining room dimensions — {{done}} of {{total}}.",
+      "post": "Calculating quantities and preparing the estimate.",
+      "finishing": "Finishing on the server — almost done."
+    },
+    "scope": {
+      "title": "What the program reads",
+      "dismiss": "Got it",
+      "yesWord": "Reads:",
+      "yes": "interior plans, doors, windows and finish tables.",
+      "noWord": "Does not read:",
+      "no": "facades and roofs.",
+      "slowWord": "Slower:",
+      "slow": "scanned drawings — check them more carefully."
     }
   },
   "upload": {

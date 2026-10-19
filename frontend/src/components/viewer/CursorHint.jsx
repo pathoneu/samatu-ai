@@ -8,8 +8,10 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { CURSOR_HINT_EVENT, CURSOR_HINT_FLASH_MS } from '@/lib/cursorHints';
 import { OPEN_LAYER_SELECTOR } from '@/lib/escOrder';
+import { firstUseSeen, firstUseToolFor, markFirstUseSeen } from '@/lib/firstUseHints';
 
 const OFFSET_X = 18;
 const OFFSET_Y = 16;
@@ -19,6 +21,23 @@ export default function CursorHint({ rootRef, resolve, enabled = true, mode = nu
   const [flash, setFlash] = useState(null);      // a moment's „why nothing happened"
   const frame = useRef(0);
   const last = useRef(null);
+  const { t } = useTranslation();
+  // B1-E: the first time a tool is used (G, R, X, Kiekis) one sentence about it stands above the mode's
+  // own sentence; the first click on the drawing with that tool uses it up for good.
+  const firstUseId = firstUseToolFor(mode);
+  const [firstUseTick, setFirstUseTick] = useState(0);
+  const firstUse = firstUseId && !firstUseSeen(firstUseId) ? t(`project.firstUse.${firstUseId}`) : null;
+  useEffect(() => {
+    if (!enabled || !firstUse) return undefined;
+    const onDown = (e) => {
+      const canvas = rootRef?.current?.querySelector('[data-testid="viewer-canvas"]');
+      if (!(canvas && e.target instanceof Node && canvas.contains(e.target))) return;
+      markFirstUseSeen(firstUseId);
+      setFirstUseTick((n) => n + 1);
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, [enabled, firstUse, firstUseId, rootRef, firstUseTick]);
 
   useEffect(() => {
     if (!enabled) { setPos(null); return undefined; }
@@ -84,6 +103,11 @@ export default function CursorHint({ rootRef, resolve, enabled = true, mode = nu
       className="fixed z-popover pointer-events-none max-w-[320px] rounded bg-primary text-primary-foreground text-ui leading-snug px-2 py-1 shadow-md"
       style={style}
     >
+      {firstUse && !flash && (
+        <span className="block font-semibold pb-0.5 mb-0.5 border-b border-primary-foreground/30" data-testid="cursor-hint-first-use">
+          {firstUse}
+        </span>
+      )}
       {text}
     </div>,
     document.body,

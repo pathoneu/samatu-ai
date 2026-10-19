@@ -10,6 +10,7 @@ import { Link } from 'react-router';
 import { LifeBuoy, Sparkles, RotateCcw } from 'lucide-react';
 import { HELP_SECTIONS, WHATS_NEW } from '@/lib/helpContent';
 import { resetCoachMarks } from '@/lib/viewerCoachMarks';
+import { resetFirstUse } from '@/lib/firstUseHints';
 
 export default function Pagalba() {
   const [introReset, setIntroReset] = useState(false);
@@ -52,10 +53,10 @@ export default function Pagalba() {
         <section className="rounded-[4px] border border-border bg-card p-5">
           <h2 className="text-base font-semibold text-foreground mb-2">Įvadas brėžinyje</h2>
           <p className="text-sm text-muted-foreground">
-            Pirmą kartą atidarius brėžinį parodomi trys patarimai: mastelis, atstumas ir kontūro taisymas.
+            Pirmą kartą atidarius brėžinį trumpi patarimai rodomi po vieną — prie to, ką jie paaiškina.
           </p>
           <button type="button"
-            onClick={() => { resetCoachMarks(); setIntroReset(true); }}
+            onClick={() => { resetCoachMarks(); resetFirstUse(); setIntroReset(true); }}
             className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] border border-border text-sm hover:bg-muted"
             data-testid="help-reset-intro">
             <RotateCcw className="w-4 h-4" aria-hidden /> Rodyti įvadą dar kartą
