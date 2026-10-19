@@ -33,6 +33,7 @@ import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
+import { floorAreaTotal } from '@/lib/floorArea';
 import { roomAreaText } from '@/lib/roomZones';
 import { cleanUserText } from '@/lib/userText';
 
@@ -172,7 +173,8 @@ export default function WorkspacePanel({
     return [...v8, ...manual];
   }, [project.v8_rooms, project.patalpos, takeoff.polygons]);
 
-  const totalArea = allRooms.reduce((s, r) => s + (r.plotas_m2 || 0), 0);
+  // A room merged into another is inside the room it joined (lib/floorArea) — never counted twice.
+  const totalArea = floorAreaTotal(allRooms);
 
   // Canvas visibility: nr may be number or string in data — compare as String.
   const hiddenRoomSet = useMemo(
