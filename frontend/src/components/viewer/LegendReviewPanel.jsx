@@ -14,7 +14,7 @@ import { API_BASE } from '@/lib/apiBase';
 import Notice from '@/components/ui/Notice';
 import FeedbackThumbs from '@/components/ui/FeedbackThumbs';
 import { feedbackBody, sendFeedback, validBoxPct } from '@/lib/feedback';
-import { createLabel, keptInstances, perPage, perPageText, rowName } from '@/lib/legendReview';
+import { BLANK_REASON, createLabel, keptInstances, perPage, perPageText, rowName } from '@/lib/legendReview';
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border px-2.5 text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 const PLAIN = `${BTN} border-border bg-card hover:bg-muted`;
@@ -142,6 +142,12 @@ function Row({ row, count, review, removed, projectId, legend, onPage, onMeasure
         />
       )}
 
+      {keep && !sample && kept.length === 0 && (
+        <p className="mt-2 rounded-[2px] border border-[hsl(var(--conf-med)/0.5)] bg-[hsl(var(--conf-med)/0.08)] px-2 py-1.5 text-[14px] leading-snug" data-testid="legend-row-blank">
+          Sąmatoje bus tuščia eilutė: {BLANK_REASON}.
+        </p>
+      )}
+
       {naming && !sample && (
         <form
           className="mt-2 flex gap-1.5"
@@ -169,6 +175,7 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
   const busy = legend.phase === 'suggesting' || legend.phase === 'reading' || legend.phase === 'counting' || legend.phase === 'creating';
   const marks = legend.toCreate.reduce((n, r) => n + keptInstances(legend.counts[r.row_id], legend.removed).length, 0);
   const n = legend.toCreate.length;
+  const blanks = legend.blanks?.length || 0;
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-card text-card-foreground" aria-label="Legendos peržiūra" data-testid="legend-review-panel">
@@ -267,7 +274,7 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
         <footer className="border-t border-border px-3 py-3">
           <button
             type="button"
-            disabled={!n || legend.phase === 'creating'}
+            disabled={!(n || blanks) || legend.phase === 'creating'}
             onClick={legend.create}
             className={`${BTN} min-h-[44px] w-full justify-center border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-[15px] font-semibold text-white hover:opacity-95`}
             data-testid="legend-create"
@@ -276,7 +283,9 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
             {createLabel(n)}
           </button>
           <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground">
-            {n ? `${n} kiek. ir ${marks} žym. brėžinyje — sąmatos eilutės skaičiuosis pačios. Po to galėsite atšaukti.` : 'Pažymėkite bent vieną eilutę „Tinka“.'}
+            {n || blanks
+              ? `${n ? `${n} kiek. ir ${marks} žym. brėžinyje — sąmatos eilutės skaičiuosis pačios.` : ''}${blanks ? ` ${blanks} eil. be ženklų — sąmatoje tuščios, su klausimu.` : ''} Po to galėsite atšaukti.`.trim()
+              : 'Pažymėkite bent vieną eilutę „Tinka“.'}
           </p>
         </footer>
       )}

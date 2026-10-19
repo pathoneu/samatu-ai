@@ -15,7 +15,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   boxFromPctDrag, buildCreate, decisionsFor, initialReview, instanceId, journalRows, legendRowsToSave,
-  matchSavedLegend, pointInBox, proposalsFrom, rowsOf, rowsToCreate,
+  blankRows, matchSavedLegend, pointInBox, proposalsFrom, rowsOf, rowsToCreate,
 } from '@/lib/legendReview';
 import {
   countLegendRows, fetchLegendRows, loadArchitectLegend, loadProjectLegend, promoteArchitectLegend, readArchitects,
@@ -160,10 +160,11 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
     : {}));
   const dismissReuse = () => set({ reuse: null });
 
-  const toCreate = useMemo(() => rowsToCreate(s.rows, s.review), [s.rows, s.review]);
+  const toCreate = useMemo(() => rowsToCreate(s.rows, s.review, s.counts, s.removed), [s.rows, s.review, s.counts, s.removed]);
+  const blanks = useMemo(() => blankRows(s.rows, s.review, s.counts, s.removed), [s.rows, s.review, s.counts, s.removed]);
 
   const create = async () => {
-    if (s.phase !== 'review' || !toCreate.length) return;
+    if (s.phase !== 'review' || !(toCreate.length || blanks.length)) return;
     const pages = pagesRef.current || [];
     const plan = buildCreate({ rows: s.rows, counts: s.counts, review: s.review, removed: s.removed, countTypes, pages });
     const snapshot = s;
@@ -172,7 +173,7 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
     try { previous = await loadProjectLegend(projectId); } catch { previous = null; }
     const undoLegend = () => { saveProjectLegend(projectId, previous || { rows: [] }).catch(() => {}); };
     const architect = String(snapshot.architect || '').trim();
-    const undoMarks = onCreate(plan, { label: `Sukurta pagal legendą: ${plan.made.length} kiek., ${plan.marks.length} žym.`, undoLegend });
+    const undoMarks = onCreate(plan, { label: `Sukurta pagal legendą: ${plan.made.length} kiek., ${plan.marks.length} žym.${plan.blanks.length ? `, ${plan.blanks.length} tuščios eil.` : ''}`, undoLegend });
     // the legend this project keeps (rows he kept, his names), and the reuse on his next project
     const savedRows = legendRowsToSave(snapshot.rows, snapshot.review);
     const keepOld = (previous?.rows || []).filter((r) => !savedRows.some((n) => n.row_id === r.row_id));
@@ -208,7 +209,7 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   }, [s.rows, s.counts, s.removed, s.review]);
 
   return {
-    ...s, active: s.phase != null, toCreate, open, close, pageShown, accept, redraw, box, setKeep, rename,
+    ...s, active: s.phase != null, toCreate, blanks, open, close, pageShown, accept, redraw, box, setKeep, rename,
     removeInstance, restoreRow, setHovered, setHoveredRow, setArchitect, applyReuse, dismissReuse, create, instancesOn,
   };
 }
