@@ -82,3 +82,18 @@ def test_account_purge_removes_the_owner_architect_folder(monkeypatch, tmp_path)
     assert not (arch / "user-1").exists() and (arch / "user-2").exists()
     assert project_purge.purge_account_files("../legends") == []
     assert arch.exists()
+
+
+def test_account_purge_uses_the_same_folder_name_as_the_legend_routes(monkeypatch, tmp_path):
+    """The legend routes store under ``_owner_key`` (path-unsafe characters → ``_``);
+    the purge must remove that folder, not one named by the raw id."""
+    from api import legends
+    arch = tmp_path / "legends" / "architect"
+    raw_id = "google:12.34"
+    folder = arch / legends._owner_key({"id": raw_id})
+    assert folder.name == "google_12_34"
+    folder.mkdir(parents=True)
+    (folder / "biuras.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(legends, "ARCHITECT_DIR", arch, raising=False)
+    assert project_purge.purge_account_files(raw_id) == []
+    assert not folder.exists() and arch.exists()

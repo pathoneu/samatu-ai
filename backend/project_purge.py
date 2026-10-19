@@ -131,12 +131,18 @@ def purge_account_files(user_id: str) -> list[str]:
     account deletion committed; best-effort, safe to repeat. Returns the steps
     that failed."""
     failed: list[str] = []
-    if not _plain_id(user_id):
+    if not user_id:
         return failed
     try:
         from api import legends
         root = Path(getattr(legends, "ARCHITECT_DIR", Path(legends.LEGENDS_DIR) / "architect"))
-        _rmtree_inside(root, root / user_id)
+        # The folder name is the one the legend routes write under
+        # (`_owner_key`: path-unsafe characters → "_"), never the raw id.
+        owner_key = getattr(legends, "_owner_key", None)
+        folder = owner_key({"id": user_id}) if callable(owner_key) else user_id
+        if not _plain_id(folder):
+            return failed
+        _rmtree_inside(root, root / folder)
     except Exception as exc:  # noqa: BLE001
         log.warning("account purge: architect legends failed for %s: %r", user_id, exc)
         failed.append("architect_legends")
