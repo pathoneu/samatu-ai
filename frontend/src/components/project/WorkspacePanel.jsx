@@ -1389,17 +1389,11 @@ const PositionRow = memo(function PositionRow({
               the kainynas shipped and nothing read it — so a price the matcher
               guessed at from a merely SIMILAR row looked exactly like one the
               contractor typed. Amber says "check this one". (2026-09-02) */}
+          {/* in words, not a dot (C8, #213) */}
           {row.kaina && kainynasPriced && (
-            <span
-              aria-hidden="true"
-              className="shrink-0 rounded-full"
-              style={{
-                width: 5, height: 5,
-                background: approxMatch
-                  ? 'hsl(var(--warning, 38 92% 50%))'
-                  : 'hsl(var(--primary) / 0.5)',
-              }}
-            />
+            <span className="shrink-0 text-ui text-muted-foreground" data-testid="price-source">
+              {approxMatch ? t('project.mainView.priceWordSimilar') : t('project.mainView.priceWord')}
+            </span>
           )}
         </span>
       )}
