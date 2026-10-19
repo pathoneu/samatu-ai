@@ -1025,6 +1025,21 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     setMeasurements((prev) => prev.filter((m) => !gone.has(m.id)));
     setSelectedMeasureIds((cur) => cur.filter((x) => !gone.has(x)));
   };
+  // A delete he chose (selection bar, Delete key, right-click menu) says what went and offers „Atšaukti" — the
+  // undo, never a question (W5-B B6; Rimas §1.5). The count tool's one-click removal stays silent.
+  const deleteMeasurementWithUndo = (idOrIds) => {
+    const ids = new Set((Array.isArray(idOrIds) ? idOrIds : [idOrIds]).filter((x) => x != null));
+    const removed = measurements.filter((m) => ids.has(m.id));
+    if (!removed.length) return;
+    deleteMeasurement([...ids]);
+    toast(removed.length === 1 ? 'Matavimas ištrintas' : `Ištrinta matavimų: ${removed.length}`, {
+      duration: 10_000,
+      action: {
+        label: 'Atšaukti',
+        onClick: () => setMeasurements((prev) => [...prev, ...removed.filter((m) => !prev.some((x) => x.id === m.id))]),
+      },
+    });
+  };
   // Batch actions on a lasso selection (one history entry each).
   const changeCountTypeMany = (ids, typeId) => {
     const t = countTypes.find((x) => x.id === typeId);
@@ -1446,7 +1461,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onRename: oneMark ? () => setRenaming({ id: oneMark.id, value: oneMark.name || '' }) : null,
     onChangeType: oneMark?.kind === 'count' ? (typeId) => changeCountType(oneMark.id, typeId) : null,
     onReveal: oneMark ? () => revealMeasurement(oneMark) : null,
-    onDelete: () => deleteMeasurement(selectedMeasureIds),
+    onDelete: () => deleteMeasurementWithUndo(selectedMeasureIds),
     onDeselect: () => setSelectedMeasureIds([]),
   } : null;
   // A room Shift+clicked beside the focused one (W1-D) is the merge target M / „Sujungti" starts with.
@@ -1532,7 +1547,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleThumbs={toggleRail}
             onMeasureToolKey={armMeasureTool}
             canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
-            onDeleteSelected={() => deleteMeasurement(selectedMeasureIds)}
+            onDeleteSelected={() => deleteMeasurementWithUndo(selectedMeasureIds)}
             onOpenSearch={() => setSearchOpen(true)}
             onUndo={check ? null : undoMeasure}
             onRedo={check ? null : redoMeasure}
@@ -1897,7 +1912,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               target={measureMenu}
               measurement={menuMeasurement}
               selection={menuSelection}
-              onDeleteMany={deleteMeasurement}
+              onDeleteMany={deleteMeasurementWithUndo}
               onChangeTypeMany={changeCountTypeMany}
               onRecolorMany={recolorMany}
               onDeselect={() => setSelectedMeasureIds([])}
@@ -1905,7 +1920,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onClose={() => setMeasureMenu(null)}
               onRename={renameMeasurement}
               onChangeType={changeCountType}
-              onDelete={deleteMeasurement}
+              onDelete={deleteMeasurementWithUndo}
               onReveal={revealMeasurement}
             />
           )}

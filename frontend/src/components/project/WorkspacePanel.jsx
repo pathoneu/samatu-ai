@@ -151,6 +151,8 @@ export default function WorkspacePanel({
   const handleRemovePolygon = async (id) => {
     if (!(await confirm({
       title: 'Ištrinti pažymėjimą?',
+      // the consequence sentence of the one confirm box (W5-B B6): this delete has no Undo
+      description: 'Ranka nubrėžtas pažymėjimas dings iš brėžinio ir iš šio sąrašo. Grąžinti jo nebus galima.',
       confirmText: 'Ištrinti',
       destructive: true,
     }))) return;
