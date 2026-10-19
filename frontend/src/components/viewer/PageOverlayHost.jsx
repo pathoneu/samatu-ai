@@ -29,6 +29,7 @@ import { LegendLayer } from './LegendTool';
 import OutlineToolLayer from './OutlineToolLayer';
 import CalloutLayer from './CalloutLayer';
 import RoomProposalLayer from './RoomProposalLayer';
+import DrawingNoteLayer from './DrawingNoteLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -373,6 +374,10 @@ export default function PageOverlayHost({
         <div style={{ position: 'absolute', inset: 0 }}>
           <LegendLayer page={layout.pageNumber} width={width} height={height} legend={legend} />
         </div>
+      )}
+      {/* „Pastaba" pins (Pathon v3 W5-C, C11) — always shown; while the pin tool is armed the layer owns the click. */}
+      {!checkMode && adapter && (
+        <DrawingNoteLayer page={layout.pageNumber} measurements={measurements} adapter={adapter} onCommit={onMeasureCommit} onDelete={onMeasureDelete} />
       )}
       {/* Outline editor (2026-10-16) — topmost on the page being edited; it owns the pointer. */}
       {editingHere && (

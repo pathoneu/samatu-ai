@@ -1264,8 +1264,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const commitMeasurement = (m) => {
     setMeasurements((prev) => [...prev, m]);
     // Founder 2026-07-25 ("no way to get measurements"):
-    // announce the committed value + where it lives.
-    if (m.kind !== 'count') {
+    // announce the committed value + where it lives. (A „Pastaba" pin announces itself — W5-C C11.)
+    if (m.kind !== 'count' && m.kind !== 'note') {
       const sc = effectiveScales[m.page];
       const unit = m.kind === 'area' ? 'm²' : 'm';
       const label = sc?.calibrated
