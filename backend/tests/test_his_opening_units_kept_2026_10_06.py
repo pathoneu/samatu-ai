@@ -158,8 +158,8 @@ def test_the_question_says_which_windows_no_opening_takes():
     ur.reconcile_openings_with_walls([room])
     q = next(x for x in build_questions({"patalpos": [room]})["questions"] if x["kind"] == "angos")
     assert q["items"] == []
-    assert q["manual"][0]["sentence"] == ("Sąraše 3 langai, o sienose — tik 2 angos langams: 1 lango sienose neradau. "
-                                          "Atidarykite patalpą ir patikrinkite langų skaičių.")
+    assert q["manual"][0]["sentence"] == "Sąraše 3 langai, o sienose — tik 2 angos langams: 1 lango sienose neradau."
+    assert q["manual"][0]["langai"]["sienose"] == 2 and q["manual"][0]["proposed"]["langai"] == 2
 
 
 def test_without_his_mark_a_listed_count_the_walls_cannot_all_stand_is_cut_as_before():
