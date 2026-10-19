@@ -184,7 +184,7 @@ Spustelėjimų skaičiai (W5-A): pataisyti kampą 2 + n; atimti kolonėlę 3; n 
 - T2 (laikas nuo PDF iki patikrintos sąmatos) nematuotas — reikia mokamo naujo projekto skaitymo, o jo be jūsų sutikimo neleidžiame.
 
 **Nepatikrinta**
-- Viso v3 priėmimo patikra (visi backend testai, keturi tikslumo matavimai, visas automatinis ėjimas) ant `756e76e9` vyksta šio gido rašymo metu; rezultatas bus įrašytas į sujungimų žurnalą (patikrinti prieš ėjimą).
+- Viso v3 priėmimo patikra ant `756e76e9` (2026-10-19) žalia: vienetų testai 1584 / 0 klaidų, eslint švarus, build gerai, visi backend testai 5479 praėjo / 3 praleisti / 0 klaidų (9 min 18 s), keturi tikslumo matavimai lygiai tokie pat kaip prieš v3 (paprasti 22,60 % / 26,1 % / 34,7 %; pakartoti 22,88 % / 27,9 % / 39,6 %), visas automatinis ėjimas 83 iš 83 (9,7 min). Įrašyta sujungimų žurnale.
 - „Projekto atidarymas 2 lape po ~12 s šoka atgal" — nepavyko atkartoti 5 bandymais (W5-B). Jei pamatysite — pasakykite, kokiu keliu atidarėte.
 - Senesnis kambario įrankio „užstrigimas" („Skaitomas kontūras…") neatkartotas ~100 bandymų (1 kartą, su netikėtu puslapio perkrovimu). Tikėtina priežastis pašalinta (W1-D-2). Jei pasikartos — reikės serverio būsenos tuo momentu.
 - Senesni projektai su „langai" žymėmis be išsaugoto tipų sąrašo dabar rodomi rudai, ne raudonai (W1-D-2).
