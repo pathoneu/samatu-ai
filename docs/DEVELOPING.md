@@ -260,4 +260,7 @@ identical to baseline. The manager / founder decides each one on the measured re
 | `SAMATU_WALLPAPER_ROLLS` | wallpaper rolls for walls whose finish reads „tapetai" (`extractor/wallpaper_flag.py`) | off |
 | `SAMATU_NICHE_DEPTH` | niche finishing in m² = metres × depth × 3 (`extractor/niche_depth.py`) | **never default-on**: every contractor bills niche finishing in metres |
 | `SAMATU_FURNITURE_ZONES` | furniture zones off the paintable walls; panels are information only (`extractor/wall_zones.py`) | off |
+| `SAMATU_REREAD_FIGURES` (v3 W5-D D6) | the free re-read also runs step 2.44: designer's figures, the walls / floors anchors from them, room heights the plan states (`api/free_reread.read_figures_and_heights`) | off — on stored objektas_h it adds a 320 m² walls anchor the project lacks |
+| `SAMATU_DIM_LINE_TICKS` (v3 W5-D D8) | a dimension string's evidence line (`line_pct`) ends where the drawn line ends, without the stroke caps (`extractor/dimension_sum._drawn_ends`); no perimeter moves | off, four passes identical with it on |
+| `SAMATU_VISION_LEGEND` (v3 W5-D D4/D5) | the PAID raster legend / schedule readers (`api/vision_readers.py`), each run with its own OK and cost | off ("0"); a paid run needs the founder's OK |
 
