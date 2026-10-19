@@ -23,7 +23,7 @@ test('the sentence follows the state: the next point, then how to finish', () =>
   assert.match(cursorHintFor({ mode: 'distance', points: 2 }), /su Shift — tęsti/);
   assert.match(cursorHintFor({ mode: 'distance', points: 1, shift: true }), /tęsiamas/);
   assert.equal(cursorHintFor({ mode: 'area', points: 0 }), 'Spustelėkite pirmą kampą');
-  assert.equal(cursorHintFor({ mode: 'area', points: 2 }), 'Spustelėkite kitą kampą');
+  assert.equal(cursorHintFor({ mode: 'area', points: 2 }), 'Spustelėkite kitą kampą · Shift — tik tiesiai arba 45°');
   assert.match(cursorHintFor({ mode: 'area', points: 3 }), /dukart arba Enter — baigti/);
   assert.match(cursorHintFor({ mode: 'perimeter', points: 2 }), /baigti/);
   assert.equal(cursorHintFor({ mode: 'calibrate' }), 'Spustelėkite žinomo ilgio pradžią');
@@ -57,4 +57,11 @@ test('a layer can flash why its click did nothing', () => {
   assert.equal(got, 'Nieko nepasikeitė: spustelėkite patalpos viduje');
   flashCursorHint('', target);
   assert.equal(got, 'Nieko nepasikeitė: spustelėkite patalpos viduje');
+});
+
+test('W5-A follow-up: once a draft has its first point, the hint says what Shift does — never only in a tooltip', () => {
+  for (const mode of ['distance', 'area', 'perimeter']) {
+    assert.doesNotMatch(cursorHintFor({ mode, points: 0 }), /45°/, mode);
+    for (const points of [1, 2, 3, 5]) assert.match(cursorHintFor({ mode, points }), /Shift — .*tik tiesiai arba 45°/, `${mode} ${points}`);
+  }
 });

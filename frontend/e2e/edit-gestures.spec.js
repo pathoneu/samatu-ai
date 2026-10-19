@@ -382,6 +382,8 @@ test.describe('W5-A editing gestures', () => {
     await page.getByTestId('pill-shape').click();
     await expect(page.getByTestId('pill-shape')).toHaveAttribute('data-shape', 'arc');
     await page.mouse.click(...Object.values(await at(page, 0.50, 0.60)));
+    // the first point is down: the sentence beside the pointer says what Shift does (not only a tooltip)
+    await expect(page.getByTestId('cursor-hint')).toContainText('Shift — tik tiesiai arba 45°');
     await page.mouse.click(...Object.values(await at(page, 0.53, 0.58)));
     await page.mouse.move(...Object.values(await at(page, 0.56, 0.60)));
     await expect(page.locator('[data-draft-preview]')).toBeVisible();
