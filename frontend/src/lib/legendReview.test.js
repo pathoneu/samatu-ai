@@ -5,6 +5,7 @@ import {
   initialReview, journalRows, keptInstances, legendCursorHint, legendLedgerText, legendPill, legendRowsToSave,
   LEGEND_PHASES, LEGEND_SOURCE, marksWord, matchSavedLegend, MAX_ACCEPTS_PER_ROW, perPage, perPageText, proposalsFrom,
   rowName, rowsOf, rowsToCreate, syncLegendRows, blankRows, blankSamataRow, BLANK_REASON,
+  BOX_EMPTY, boxFailureText, countingText, legendGotoPage, noLegendText, onSheetsText, requestErrorText, reviewOutcome, rowsWord, summaryText,
 } from './legendReview.js';
 
 const A3 = { size: { width: 1000, height: 500 }, rotation: 0 };
@@ -218,4 +219,77 @@ test('a kept row with no mark is never counted: it becomes a blank sąmata row w
   const pill = legendPill({ phase: 'review', toCreate: 0, blanks: 2 });
   assert.equal(pill.actions[0].label, 'Sukurti kiekius (0)');
   assert.equal(pill.actions[0].disabled, false);
+});
+
+// ── B1-B: every outcome ends in one sentence ─────────────────────────────────────────────────────────
+
+test('Lithuanian forms: eilutė / eilutės / eilučių, lape / lapuose', () => {
+  assert.deepEqual([1, 2, 9, 10, 11, 14, 21, 22].map(rowsWord), ['eilutė', 'eilutės', 'eilutės', 'eilučių', 'eilučių', 'eilučių', 'eilutė', 'eilutės']);
+  assert.equal(onSheetsText(1), '1 lape');
+  assert.equal(onSheetsText(3), '3 lapuose');
+  assert.equal(summaryText({ rows: 14, marks: 38, pages: 3 }), 'Rasta 14 eilučių, 38 ženklai 3 lapuose');
+});
+
+test('the review outcome: counted, nothing found, only samples, error, out of time', () => {
+  const ok = reviewOutcome({ rows: [rowA, rowB, rowS], counts });
+  assert.equal(ok.tone, 'ok');
+  assert.equal(ok.text, 'Rasta 2 eilutės, 3 ženklai 2 lapuose.');
+  assert.equal(ok.retry, false);
+  const none = reviewOutcome({ rows: [rowB], counts });
+  assert.equal(none.tone, 'empty');
+  assert.match(none.text, /^Legendą perskaičiau \(1 eilutė\), bet ženklų plane neradau\. Pažymėkite juos „Kiekis“ įrankiu/);
+  const samples = reviewOutcome({ rows: [rowS], counts });
+  assert.match(samples.text, /tik medžiagų ar linijų pavyzdžiai/);
+  const err = reviewOutcome({ rows: [rowA], counts: {}, countError: 'serveris neatsakė per skirtą laiką' });
+  assert.equal(err.tone, 'error');
+  assert.equal(err.retry, true);
+  assert.match(err.text, /^Ženklų suskaičiuoti nepavyko: serveris neatsakė per skirtą laiką\./);
+  const partial = reviewOutcome({ rows: [rowA], counts: { 'p3-a': { ...counts['p3-a'], partial: true } } });
+  assert.equal(partial.tone, 'warn');
+  assert.equal(partial.retry, true);
+  assert.match(partial.text, /Ne visi lapai spėti peržiūrėti/);
+  for (const o of [ok, none, samples, err, partial]) assert.ok(o.short && o.short.length <= 60, o.short);
+});
+
+test('a failed request is said in Lithuanian, never in the browser\'s words', () => {
+  const named = (name, message = '') => Object.assign(new Error(message), { name });
+  assert.equal(requestErrorText(named('TimeoutError', 'signal timed out')), 'serveris neatsakė per skirtą laiką');
+  assert.equal(requestErrorText(new TypeError('Load failed')), 'nepavyko pasiekti serverio — patikrinkite ryšį');     // Safari
+  assert.equal(requestErrorText(new TypeError('Failed to fetch')), 'nepavyko pasiekti serverio — patikrinkite ryšį'); // Chrome
+  assert.equal(requestErrorText(Object.assign(new Error('Per daug užklausų.'), { status: 429 })), 'per daug užklausų iš eilės — palaukite minutę');
+  assert.equal(requestErrorText(Object.assign(new Error('HTTP 500'), { status: 500 })), 'serverio klaida');
+  assert.equal(requestErrorText(Object.assign(new Error('Tokio lapo brėžinyje nėra'), { status: 400 })), 'Tokio lapo brėžinyje nėra');
+  assert.equal(requestErrorText(new Error('something odd')), 'nežinoma klaida');
+});
+
+test('a box without a legend says so, and why when the reader said why', () => {
+  assert.equal(boxFailureText({ status: 'ok', detail: null }), `${BOX_EMPTY}.`);
+  assert.match(boxFailureText({ status: 'ok', detail: '15 teksto eil. be ženklo prie jų — ne legendos eilutės' }), /patalpų lentelė/);
+  assert.match(boxFailureText({ status: 'ok', detail: 'rėmelyje nėra teksto eilučių — nubrėžkite' }), /nėra jokio teksto/);
+  assert.match(boxFailureText({ status: 'be_teksto' }), /nėra teksto .*„Kiekis“ įrankiu/);
+  // never the reader's own words (they carry „eil." and the like)
+  assert.doesNotMatch(boxFailureText({ status: 'ok', detail: '15 teksto eil. be ženklo prie jų' }), /teksto eil\./);
+});
+
+test('no legend on this sheet: where it is, and the pill and panel offer to go there', () => {
+  assert.equal(noLegendText(1, []), 'Šiame lape legendos neradau — apveskite ją rėmeliu');
+  assert.equal(noLegendText(1, [{ page: 5, rows: 15 }]), 'Šiame lape legendos nėra. Legenda yra 5 lape — eikite ten arba apveskite ją rėmeliu čia');
+  assert.match(noLegendText(1, [{ page: 2 }, { page: 3 }]), /Legenda yra 2, 3 lapuose/);
+  assert.equal(legendGotoPage({ phase: 'box', page: 1, elsewhere: [{ page: 5 }] }), 5);
+  assert.equal(legendGotoPage({ phase: 'box', page: 1, elsewhere: [{ page: 5 }], failure: { page: 1 } }), null);
+  const pill = legendPill({ phase: 'box', notice: noLegendText(1, [{ page: 5 }]), gotoPage: 5 });
+  assert.deepEqual(pill.actions.map((a) => a.id), ['legendGoto', 'legendExit']);
+  assert.equal(pill.actions[0].label, 'Į 5 lapą');
+});
+
+test('while it works the pill counts the seconds; a failure offers „Bandyti dar kartą"', () => {
+  assert.equal(countingText(12.7), 'Skaičiuoju… 12 s — gali užtrukti iki minutės');
+  assert.equal(legendPill({ phase: 'counting', elapsed: 3 }).detail, 'Skaičiuoju… 3 s — gali užtrukti iki minutės');
+  assert.match(legendPill({ phase: 'counting' }).keys, /Esc/);
+  const failed = legendPill({ phase: 'box', outcome: { retry: true, short: 'Rėmelio perskaityti nepavyko', text: '…' } });
+  assert.equal(failed.detail, 'Rėmelio perskaityti nepavyko');
+  assert.equal(failed.actions[0].label, 'Bandyti dar kartą');
+  const review = legendPill({ phase: 'review', toCreate: 0, outcome: { retry: true, short: 'Ženklų suskaičiuoti nepavyko' } });
+  assert.deepEqual(review.actions.map((a) => a.id), ['legendRetry', 'legendCreate', 'legendRedraw', 'legendExit']);
+  assert.equal(legendPill({ phase: 'review', toCreate: 2, outcome: { short: 'Rasta 2 eilutės, 3 ženklai 2 lapuose' } }).detail, 'Rasta 2 eilutės, 3 ženklai 2 lapuose');
 });

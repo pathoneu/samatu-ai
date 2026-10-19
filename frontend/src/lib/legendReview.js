@@ -399,29 +399,141 @@ export function syncLegendRows(rows, measurements, countTypes) {
   return changed ? out : list;
 }
 
+// ── what every outcome says (B1-B, 2026-10-19) ────────────────────────────────────────────────────────
+// The founder's first walk: „it does not get calculated when I mark something". Every way the tool ends —
+// counted, nothing in the box, a legend with no marks on the plan, only material samples, an error, out of
+// time — now ends in ONE plain sentence in the pill and the panel, and the failures offer „Bandyti dar kartą".
+
+/** Lithuanian count forms: [one, few (2–9), many (0, 10–20)] by the number's last digits. */
+function form(n, [one, few, many]) {
+  const k = Math.abs(Number(n) || 0);
+  if (k % 10 === 1 && k % 100 !== 11) return one;
+  if (k % 10 >= 2 && k % 10 <= 9 && (k % 100 < 12 || k % 100 > 19)) return few;
+  return many;
+}
+export const rowsWord = (n) => form(n, ['eilutė', 'eilutės', 'eilučių']);
+/** „1 lape", „3 lapuose" — where. */
+export const onSheetsText = (n) => `${n} ${form(n, ['lape', 'lapuose', 'lapuose'])}`;
+
+/** {rows: countable rows, marks, pages} of a count answer (every mark found, before he removes any). */
+export function countSummary(rows, counts = {}) {
+  const countable = (rows || []).filter((r) => r.countable !== false);
+  const pages = new Set();
+  let marks = 0;
+  for (const r of countable) {
+    for (const inst of counts?.[r.row_id]?.instances || []) {
+      marks += 1;
+      pages.add(inst.page);
+    }
+  }
+  return { rows: countable.length, samples: (rows || []).length - countable.length, marks, pages: pages.size };
+}
+
+/** „Rasta 14 eilučių, 38 ženklai 3 lapuose" */
+export function summaryText({ rows, marks, pages }) {
+  return `Rasta ${rows} ${rowsWord(rows)}, ${marks} ${marksWord(marks)} ${onSheetsText(pages)}`;
+}
+
+/**
+ * The review's outcome sentence. state = {rows, counts, countError} → {tone: ok | empty | warn | error, text,
+ * retry} — `retry` = „Bandyti dar kartą" counts the same rows again.
+ */
+export function reviewOutcome({ rows = [], counts = {}, countError = null } = {}) {
+  const s = countSummary(rows, counts);
+  if (countError) {
+    return { tone: 'error', retry: true, short: 'Ženklų suskaičiuoti nepavyko',
+      text: `Ženklų suskaičiuoti nepavyko: ${countError}. Legendos eilutes matote — bandykite dar kartą arba žymėkite ženklus „Kiekis“ įrankiu.` };
+  }
+  if (!s.rows) {
+    return { tone: 'empty', retry: false, short: 'Tik medžiagų pavyzdžiai — matuokite plotu ar ilgiu',
+      text: 'Šioje legendoje tik medžiagų ar linijų pavyzdžiai — jie matuojami plotu ar ilgiu, ne vienetais. Prie eilutės spauskite „Matuoti plotą“ arba „Matuoti ilgį“.' };
+  }
+  const partial = (rows || []).some((r) => counts?.[r.row_id]?.partial);
+  if (!s.marks) {
+    return { tone: partial ? 'warn' : 'empty', retry: partial, short: 'Legenda perskaityta, ženklų plane nerasta',
+      text: `Legendą perskaičiau (${s.rows} ${rowsWord(s.rows)}), bet ženklų plane neradau${partial ? ' — ne visi lapai spėti peržiūrėti' : ''}. Pažymėkite juos „Kiekis“ įrankiu; eilutė su „Tinka“ sąmatoje liks tuščia, su klausimu.` };
+  }
+  if (partial) {
+    return { tone: 'warn', retry: true, short: `${summaryText(s)} · ne visi lapai`,
+      text: `${summaryText(s)}. Ne visi lapai spėti peržiūrėti per minutę — bandykite dar kartą.` };
+  }
+  return { tone: 'ok', retry: false, short: summaryText(s), text: `${summaryText(s)}.` };
+}
+
+/**
+ * A plain Lithuanian sentence for a failed request — never the browser's own words („Load failed" in Safari,
+ * „Failed to fetch" in Chrome, „signal timed out"), which used to reach the screen as they were.
+ */
+export function requestErrorText(e) {
+  const name = e?.name || '';
+  if (name === 'TimeoutError') return 'serveris neatsakė per skirtą laiką';
+  if (name === 'AbortError') return 'užklausa nutraukta';
+  if (e?.status === 429) return 'per daug užklausų iš eilės — palaukite minutę';
+  if (e?.status >= 500) return 'serverio klaida';
+  const msg = String(e?.message || '').trim();
+  if (name === 'TypeError' || /load failed|failed to fetch|networkerror|network error/i.test(msg)) {
+    return 'nepavyko pasiekti serverio — patikrinkite ryšį';
+  }
+  // the server's own Lithuanian detail is kept; anything else is not shown to him as it is
+  return e?.status && msg && !/^HTTP \d+$/.test(msg) ? msg : 'nežinoma klaida';
+}
+
+/** The legend this box holds no rows of — the plain sentence, with why when the reader said why. */
+export const BOX_EMPTY = 'Šiame rėmelyje legendos nėra — pažymėkite legendą su ženklais ir tekstu';
+export function boxFailureText(answer) {
+  if (answer?.status === 'be_teksto') {
+    return 'Šiame lape nėra teksto (jis nuskenuotas kaip paveikslėlis) — legendos perskaityti negaliu. Ženklus pažymėkite „Kiekis“ įrankiu.';
+  }
+  const why = String(answer?.detail || '');
+  if (/nėra teksto eilučių/.test(why)) return `${BOX_EMPTY}. Rėmelyje nėra jokio teksto.`;
+  if (/be ženklo/.test(why)) return `${BOX_EMPTY}. Rėmelyje tik tekstas be ženklų šalia — pvz. patalpų lentelė, pastabos ar antspaudas.`;
+  return `${BOX_EMPTY}.`;
+}
+
+/** No legend on the sheet on screen: where it is, when another sheet carries one. */
+export function noLegendText(page, elsewhere = []) {
+  const others = (elsewhere || []).map((p) => p.page).filter((p) => p !== page);
+  if (!others.length) return 'Šiame lape legendos neradau — apveskite ją rėmeliu';
+  const list = others.length === 1 ? `${others[0]} lape` : `${others.slice(0, 3).join(', ')} lapuose`;
+  return `Šiame lape legendos nėra. Legenda yra ${list} — eikite ten arba apveskite ją rėmeliu čia`;
+}
+
+/** The sheet „Eiti į N lapą" opens: the first other sheet with a legend, while he has none on screen. */
+export function legendGotoPage({ phase, page, failure, outcome, elsewhere } = {}) {
+  if (phase !== 'box' || failure || outcome) return null;
+  return (elsewhere || []).map((p) => p.page).find((p) => p !== page) || null;
+}
+
 // ── the words at the cursor and in the pill ───────────────────────────────────────────────────────────
 
 /** The sentence beside the pointer for the legend tool's phase. */
 export function legendCursorHint(phase) {
   switch (phase) {
-    case 'suggesting': return 'Ieškoma legendos šiame lape…';
+    case 'suggesting': return 'Ieškau legendos šiame lape…';
     case 'proposed': return 'Spustelėkite pasiūlytą legendą — tinka · arba tempkite rėmelį per kitą';
     case 'box': return 'Tempdami apveskite legendą — ženklus ir jų pavadinimus';
-    case 'reading': return 'Skaitomos legendos eilutės…';
-    case 'counting': return 'Skaičiuojami ženklai brėžinyje…';
+    case 'reading': return 'Skaitau rėmelį…';
+    case 'counting': return 'Skaičiuoju ženklus — gali užtrukti iki minutės';
     case 'review': return 'Spustelėkite neteisingą žymę — pašalinti · dešinėje — eilutės';
     case 'creating': return 'Kuriami kiekiai…';
     default: return null;
   }
 }
 
+/** „Skaičiuoju… 12 s — gali užtrukti iki minutės" */
+export function countingText(elapsedS = 0) {
+  const s = Math.max(0, Math.floor(Number(elapsedS) || 0));
+  return `Skaičiuoju… ${s} s — gali užtrukti iki minutės`;
+}
+
 /**
- * The bottom pill for the legend tool. state = {phase, proposals (n), toCreate (n), notice} →
- * {id, name, detail, keys, actions}
+ * The bottom pill for the legend tool. state = {phase, proposals (n), toCreate (n), blanks (n), notice, elapsed (s),
+ * outcome ({text, retry}), gotoPage} → {id, name, detail, keys, actions}
  */
-export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, notice = null } = {}) {
+export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, notice = null, elapsed = 0, outcome = null, gotoPage = null } = {}) {
   const name = 'Pažymėti legendą';
   const exit = { id: 'legendExit', label: 'Išeiti', title: 'Išeiti iš legendos įrankio (Esc) — niekas nesukuriama' };
+  const retry = { id: 'legendRetry', label: 'Bandyti dar kartą', primary: true, title: 'Paleisti dar kartą' };
   if (phase === 'proposed') {
     return {
       id: 'legend', name, detail: proposals > 1 ? `Tai legendos? (${proposals})` : 'Tai legenda?',
@@ -432,18 +544,24 @@ export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, not
       ],
     };
   }
-  if (phase === 'box' || phase === 'suggesting' || phase === 'reading' || phase === 'counting') {
-    const detail = phase === 'suggesting' ? 'Ieškoma legendos…'
-      : phase === 'reading' ? 'Skaitomos eilutės…'
-        : phase === 'counting' ? 'Skaičiuojami ženklai — gali užtrukti iki minutės'
-          : (notice || null);
-    return { id: 'legend', name, detail, keys: null, actions: [exit] };
+  if (phase === 'suggesting' || phase === 'reading' || phase === 'counting') {
+    const detail = phase === 'suggesting' ? 'Ieškau legendos šiame lape…'
+      : phase === 'reading' ? 'Skaitau rėmelį…'
+        : countingText(elapsed);
+    return { id: 'legend', name, detail, keys: 'Esc — nutraukti', actions: [exit] };
+  }
+  if (phase === 'box') {
+    const actions = [];
+    if (outcome?.retry) actions.push(retry);
+    if (gotoPage) actions.push({ id: 'legendGoto', label: `Į ${gotoPage} lapą`, primary: !outcome?.retry, title: `Eiti į ${gotoPage} lapą — ten yra legenda` });
+    return { id: 'legend', name, detail: outcome?.short || outcome?.text || notice || null, keys: null, actions: [...actions, exit] };
   }
   if (phase === 'review' || phase === 'creating') {
     return {
-      id: 'legend', name, detail: phase === 'creating' ? 'Kuriama…' : 'Peržiūrėkite eilutes dešinėje',
+      id: 'legend', name, detail: phase === 'creating' ? 'Kuriama…' : (outcome?.short || outcome?.text || 'Peržiūrėkite eilutes dešinėje'),
       keys: toCreate || blanks ? 'Enter — sukurti' : null,
       actions: [
+        ...(outcome?.retry && phase === 'review' ? [{ ...retry, primary: false, title: 'Skaičiuoti ženklus dar kartą' }] : []),
         { id: 'legendCreate', label: createLabel(toCreate), primary: true, disabled: !(toCreate || blanks) || phase === 'creating', title: toCreate || blanks ? 'Sukurti pažymėtų eilučių kiekius ir žymes brėžinyje (Enter) — eilutės be ženklų sąmatoje liks tuščios; po to galėsite atšaukti' : 'Pažymėkite bent vieną eilutę „Tinka“' },
         { id: 'legendRedraw', label: 'Kita legenda', title: 'Apvesti kitą legendą — ši peržiūra išmetama' },
         exit,

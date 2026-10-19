@@ -10,8 +10,11 @@
  *
  * €0: the legend routes read the PDF's own text and paths; nothing calls a model.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect } from './pw.js';
-import { it, openProject, restoreStart, shot, note, toast } from './helpers.js';
+import { it, openProject, restoreStart, shot, note, toast, sheetPoints, dragBetween, clickAt } from './helpers.js';
 import { api, getProject, PROJECT } from './state.js';
 
 const test = it;
@@ -172,6 +175,264 @@ test.describe('legend marking (W2-B)', () => {
     expect((await getProject()).measurements || []).toHaveLength(0);
   });
 });
+
+// ── B1-B (2026-10-19): „it does not get calculated when I mark something" — every path ends in a sentence ─────
+
+const BOX_EMPTY = 'Šiame rėmelyje legendos nėra — pažymėkite legendą su ženklais ir tekstu';
+
+async function toSheet(page, n) {
+  for (let i = 1; i < n; i += 1) await page.keyboard.press(']');
+  await expect(page.locator('[data-nav-cluster]')).toContainText(`${n} iš`);
+}
+
+/** Drag a box on sheet `n` over display-frame fractions `b` = [x0, y0, x1, y1]. */
+async function boxOn(page, n, b) {
+  const [a, c] = await sheetPoints(page, n, [[b[0], b[1]], [b[2], b[3]]]);
+  await dragBetween(page, a, c);
+}
+
+const outcome = (page) => page.getByTestId('legend-outcome');
+const pill = (page) => page.getByTestId('mode-pill');
+
+/** Open another project of the local corpus in the same viewer (coach marks and the cookie banner answered). */
+async function openOther(page, id) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('samatu_viewer_onboarded', '1');
+      localStorage.setItem('pathon_cookie_consent', JSON.stringify({ categories: { necessary: true, analytics: false, marketing: false }, timestamp: Date.now() }));
+    } catch { /* storage blocked */ }
+  });
+  await page.goto(`/project/${id}`);
+  await expect(page.locator('div[data-page-number="1"]')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText('Kraunamas dokumentas', { exact: false })).toHaveCount(0, { timeout: 90_000 });
+}
+
+test.describe('legend paths (B1-B)', () => {
+  test('(a) sheet 1 has no legend: it says where the legend is; a box on the room table, on empty paper, on the title block each end in a sentence', async ({ page }) => {
+    await openProject(page);
+    await page.keyboard.press('0');
+    await page.keyboard.press('g');
+    // within a second: the tool is on and says what it does
+    await expect(page.getByTestId('legend-review-panel')).toBeVisible({ timeout: 1_000 });
+    await expect(pill(page)).toContainText('Pažymėti legendą', { timeout: 1_000 });
+    // no legend here: the sheets that carry one are named, with a way there
+    await expect(page.getByTestId('legend-review-panel')).toContainText('Šiame lape legendos nėra. Legenda yra 2', { timeout: 30_000 });
+    await expect(pill(page).getByRole('button', { name: 'Į 2 lapą' })).toBeVisible();
+    await shot(page, 'b1b-a1-no-legend-here');
+
+    // a box around the room table (text, no symbols): said, and the box stays on the drawing
+    await boxOn(page, 1, [0.115, 0.54, 0.275, 0.675]);
+    await expect(outcome(page)).toContainText(BOX_EMPTY);
+    await expect(outcome(page)).toContainText('patalpų lentelė');
+    await expect(pill(page)).toContainText(BOX_EMPTY);
+    await expect(page.locator('[data-testid="legend-layer-1"] [data-testid="legend-drawn-box"][data-state="empty"]')).toBeVisible();
+    await shot(page, 'b1b-a2-box-room-table');
+
+    // empty paper
+    await boxOn(page, 1, [0.12, 0.74, 0.38, 0.84]);
+    await expect(outcome(page)).toContainText('Rėmelyje nėra jokio teksto');
+    await shot(page, 'b1b-a3-box-empty-paper');
+
+    // the title block: whatever is read is reviewed with a result sentence — never an empty panel
+    await boxOn(page, 1, [0.42, 0.87, 0.66, 0.95]);
+    await expect(page.getByTestId('legend-busy').or(outcome(page))).toBeVisible({ timeout: 1_000 });
+    await expect(outcome(page)).toBeVisible({ timeout: 90_000 });
+    note(`h sheet 1, title block box: ${await outcome(page).innerText()}`);
+    await shot(page, 'b1b-a4-box-title-block');
+    expect((await getProject()).measurements || []).toHaveLength(0);
+
+    // „Į 2 lapą" from a fresh start: the legend there is proposed
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('g');
+    await pill(page).getByRole('button', { name: 'Į 2 lapą' }).click({ timeout: 30_000 });
+    await expect(page.locator('[data-testid="legend-layer-2"] [data-testid="legend-proposal"]').first()).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('(b, g) sheet 3 „Taip": counting shows within a second and ticks; the review opens with „Rasta … eilučių, … ženklai … lapuose"', async ({ page }) => {
+    await openProject(page);
+    await toSheet(page, 3);
+    await page.keyboard.press('g');
+    await expect(pill(page).locator('button', { hasText: /^Taip$/ })).toBeVisible({ timeout: 60_000 });
+    // the count, slowed by 3 s here, so the ticking can be seen whatever the machine
+    await page.route('**/legend/count', async (route) => { await new Promise((r) => { setTimeout(r, 3_000); }); await route.continue(); });
+    const t0 = Date.now();
+    await pill(page).locator('button', { hasText: /^Taip$/ }).click();
+    await expect(page.getByTestId('legend-busy')).toContainText('Skaičiuoju…', { timeout: 1_000 });
+    await expect(page.getByTestId('legend-busy')).toContainText('gali užtrukti iki minutės');
+    await expect(pill(page)).toContainText('Skaičiuoju…', { timeout: 1_000 });
+    note(`counting shown after ${Date.now() - t0} ms`);
+    // the rows read are listed at once, numbers to follow
+    expect(await page.locator('[data-testid="legend-rows-pending"] li').count()).toBeGreaterThanOrEqual(10);
+    await expect(pill(page)).toContainText(/Skaičiuoju… [2-9] s/, { timeout: 4_000 });
+    await shot(page, 'b1b-b1-counting');
+    await expect(page.getByTestId('legend-create')).toBeVisible({ timeout: 150_000 });
+    await expect(outcome(page)).toHaveAttribute('data-tone', 'ok');
+    await expect(outcome(page)).toContainText(/^Rasta \d+ eilu(tė|tės|čių), \d+ ženkl(as|ai|ų) \d+ lap(e|uose)\.$/);
+    await expect(pill(page)).toContainText(/Rasta \d+ eilu/);
+    note(`h sheet 3 „Taip": ${await outcome(page).innerText()} after ${Math.round((Date.now() - t0) / 1000)} s`);
+    await shot(page, 'b1b-b2-review-outcome');
+  });
+
+  test('(c, f) „Nubrėžti kitaip" + a box over the legend counts it; Esc mid-count leaves nothing behind and G starts again', async ({ page }) => {
+    await openProject(page);
+    await toSheet(page, 3);
+    await page.keyboard.press('0');
+    await page.keyboard.press('g');
+    await expect(pill(page).getByRole('button', { name: 'Nubrėžti kitaip' })).toBeVisible({ timeout: 60_000 });
+    await pill(page).getByRole('button', { name: 'Nubrėžti kitaip' }).click();
+    await boxOn(page, 3, [0.062, 0.5, 0.226, 0.686]);
+    await expect(page.getByTestId('legend-busy')).toBeVisible({ timeout: 1_000 });
+    await expect(page.getByTestId('legend-busy')).toContainText('Skaičiuoju…', { timeout: 10_000 });
+    // Esc while it counts: the tool closes, nothing is created, the late answer changes nothing
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
+    await expect(pill(page)).toHaveCount(0);
+    await page.waitForTimeout(1_500);
+    await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
+    expect((await getProject()).measurements || []).toHaveLength(0);
+    // G again: the proposal is back at once
+    await page.keyboard.press('g');
+    await expect(pill(page).locator('button', { hasText: /^Taip$/ })).toBeVisible({ timeout: 5_000 });
+    // and the drawn box counted to the end gives the review
+    await pill(page).getByRole('button', { name: 'Nubrėžti kitaip' }).click();
+    await boxOn(page, 3, [0.062, 0.5, 0.226, 0.686]);
+    await expect(page.getByTestId('legend-create')).toBeVisible({ timeout: 150_000 });
+    await expect(outcome(page)).toContainText(/^Rasta \d+ eilu/);
+    note(`h sheet 3 drawn box: ${await outcome(page).innerText()}`);
+    await shot(page, 'b1b-c1-drawn-box-review');
+  });
+
+  test('(e) G with a room selected opens the tool; G in the middle of a measurement says to finish it first', async ({ page }) => {
+    await openProject(page);
+    await page.locator('[title^="Atidaryti psl."]').first().click();
+    await page.keyboard.press('g');
+    await expect(page.getByTestId('legend-review-panel')).toBeVisible({ timeout: 1_000 });
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Atstumas', exact: true }).click();
+    const [p] = await sheetPoints(page, 1, [[0.6, 0.45]]);
+    await clickAt(page, p);
+    await expect(pill(page).getByRole('button', { name: 'Baigti' })).toBeVisible();
+    await page.keyboard.press('g');
+    await expect(page.getByTestId('cursor-hint')).toContainText('Pirmiausia užbaikite', { timeout: 2_000 });
+    // the measurement he is drawing is still there, and no legend tool took over
+    await expect(pill(page).getByRole('button', { name: 'Baigti' })).toBeVisible();
+    await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
+    await shot(page, 'b1b-e1-g-during-draft');
+  });
+
+  test('a count that fails says so and „Bandyti dar kartą" counts again', async ({ page }) => {
+    await openProject(page);
+    await toSheet(page, 3);
+    await page.keyboard.press('g');
+    await expect(pill(page).locator('button', { hasText: /^Taip$/ })).toBeVisible({ timeout: 60_000 });
+    let fail = true;
+    await page.route('**/legend/count', async (route) => {
+      if (fail) { await route.abort('failed'); return; }
+      await route.continue();
+    });
+    await pill(page).locator('button', { hasText: /^Taip$/ }).click();
+    await expect(outcome(page)).toHaveAttribute('data-tone', 'error', { timeout: 20_000 });
+    await expect(outcome(page)).toContainText('Ženklų suskaičiuoti nepavyko: nepavyko pasiekti serverio — patikrinkite ryšį');
+    await expect(pill(page)).toContainText('Ženklų suskaičiuoti nepavyko');
+    await shot(page, 'b1b-x1-count-failed');
+    fail = false;
+    await page.getByTestId('legend-retry').click();
+    await expect(page.getByTestId('legend-busy')).toContainText('Skaičiuoju…', { timeout: 1_000 });
+    await expect(outcome(page)).toHaveAttribute('data-tone', 'ok', { timeout: 150_000 });
+    await expect(outcome(page)).toContainText(/^Rasta \d+ eilu/);
+  });
+
+  test('the count tool: one mark placed by hand offers „Rasti visus tokius" — the program looks for the rest', async ({ page }) => {
+    await openProject(page);
+    // a door swing on sheet 1 (A4 portrait, PDF point 338,5 × 344 of 595 × 842), as W5-A's A8
+    const fx = 338.52 / 595.28; const fy = 344 / 841.89;
+    const [p] = await sheetPoints(page, 1, [[fx, fy]]);
+    await page.mouse.move(p.x, p.y);
+    await page.keyboard.press('6');
+    await page.getByTestId('count-type-new-name').fill('Durys B1');
+    await page.getByTestId('count-type-new-name').press('Enter');
+    await expect(pill(page)).toContainText('Durys B1: 0 vnt.');
+    await expect(pill(page).getByRole('button', { name: 'Rasti visus tokius' })).toHaveCount(0);
+    await clickAt(page, p);
+    await expect(pill(page)).toContainText('Durys B1: 1 vnt.');
+    await expect(pill(page).getByRole('button', { name: 'Rasti visus tokius' })).toBeVisible();
+    await shot(page, 'b1b-k1-count-offer');
+    await pill(page).getByRole('button', { name: 'Rasti visus tokius' }).click();
+    await expect(page.getByTestId('symbol-review-panel')).toBeVisible();
+    await expect(page.getByTestId('symbol-type')).toHaveValue(/.+/, { timeout: 60_000 });
+    await expect(page.getByTestId('symbol-progress')).toHaveCount(0, { timeout: 60_000 });
+    note(`count tool → „Rasti visus tokius": ${await page.getByTestId('symbol-row').count()} found for review`);
+    await shot(page, 'b1b-k2-find-similar');
+    await page.keyboard.press('Escape');
+  });
+
+  test('objektas_g: G on sheet 1 says the legend is on sheet 5, goes there, „Taip" counts it', async ({ page }) => {
+    test.setTimeout(300_000);
+    await openOther(page, 'demo-objektas_g');
+    await page.keyboard.press('g');
+    await expect(page.getByTestId('legend-review-panel')).toBeVisible({ timeout: 1_000 });
+    await expect(page.getByTestId('legend-review-panel')).toContainText('Legenda yra 5 lape', { timeout: 60_000 });
+    await shot(page, 'b1b-g1-legend-elsewhere');
+    await page.getByTestId('legend-goto').click();
+    await expect(page.locator('[data-testid="legend-layer-5"] [data-testid="legend-proposal"]').first()).toBeVisible({ timeout: 60_000 });
+    await pill(page).locator('button', { hasText: /^Taip$/ }).click();
+    await expect(page.getByTestId('legend-busy')).toContainText('Skaičiuoju…', { timeout: 1_000 });
+    await expect(page.getByTestId('legend-create')).toBeVisible({ timeout: 150_000 });
+    await expect(outcome(page)).toContainText(/^Rasta \d+ eilu/);
+    note(`objektas_g sheet 5: ${await outcome(page).innerText()}`);
+    await shot(page, 'b1b-g2-review');
+  });
+
+  test('(d) objektas_c: a legend of swatches the reader cannot take glyphs from, and a legend of material samples only', async ({ page }) => {
+    test.setTimeout(300_000);
+    const pdf = findFixture(/Objektas C .*\.pdf$/);
+    test.skip(!pdf, 'objektas_c PDF is not in docs/superpowers/fixtures of this checkout');
+    const id = 'e2e-objektas_c';
+    // created for this test only — the next test's restore takes it away (database and pdf_store)
+    await api(`/api/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name: 'Objektas C (e2e)', tipas: 'interjeras', patalpos: [] }) });
+    const form = new FormData();
+    form.append('pdf_file', new Blob([fs.readFileSync(pdf)], { type: 'application/pdf' }), 'c.pdf');
+    await api(`/api/projects/${id}/pdf`, { method: 'POST', body: form });
+    await openOther(page, id);
+    await page.keyboard.press('0');
+    // sheet 6: the floor legend is swatches + words — boxed, it is said plainly that no legend rows are there
+    await toSheet(page, 6);
+    await page.keyboard.press('g');
+    await expect(page.getByTestId('legend-review-panel')).toContainText(/legendos (nėra|neradau)/, { timeout: 90_000 });
+    await boxOn(page, 6, [0.745, 0.11, 0.915, 0.225]);
+    await expect(outcome(page)).toContainText(BOX_EMPTY, { timeout: 30_000 });
+    note(`objektas_c sheet 6 box: ${await outcome(page).innerText()}`);
+    await shot(page, 'b1b-d1-swatch-legend');
+    // sheet 2: the proposed legend holds material samples only — no count to wait for, and it says why
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < 4; i += 1) await page.keyboard.press('[');
+    await expect(page.locator('[data-nav-cluster]')).toContainText('2 iš');
+    await page.keyboard.press('g');
+    await expect(pill(page).locator('button', { hasText: /^Taip$/ })).toBeVisible({ timeout: 90_000 });
+    await pill(page).locator('button', { hasText: /^Taip$/ }).click();
+    await expect(outcome(page)).toContainText('tik medžiagų ar linijų pavyzdžiai', { timeout: 30_000 });
+    await expect(page.getByTestId('legend-review-panel')).toContainText('Vienetais skaičiuoti nėra ką');
+    await shot(page, 'b1b-d2-samples-only');
+  });
+});
+
+/** The first fixture PDF whose file name matches (the corpus PDFs are untracked, copied per checkout). */
+function findFixture(re) {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'superpowers', 'fixtures');
+  const walk = (dir) => {
+    let out = null;
+    for (const e of (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : [])) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) out = out || walk(p);
+      else if (re.test(e.name)) out = out || p;
+    }
+    return out;
+  };
+  return walk(root);
+}
 
 test.describe('schedule questions in Patikra (W2-B B5)', () => {
   test('reconcile and info are answered, recorded on the project, and the table is shown on the drawing', async ({ page }) => {
