@@ -74,6 +74,20 @@ def furniture_zones(room: dict) -> list[dict]:
     return out + _typed(room, TYPED_FURNITURE_KEY, "ivesta", TYPED_FURNITURE_M2)
 
 
+def wardrobes_without_height(room: dict) -> list[float]:
+    """Lengths (m) of built-in wardrobes the plan reader saw with no height — not a zone yet, a question."""
+    out = []
+    for el in (room.get("elementai") or []) if isinstance(room, dict) else []:
+        if not isinstance(el, dict) or str(el.get("tipas") or "").lower() != "spinta_built_in":
+            continue
+        if _f(el.get("aukstis_mm")) > 0:
+            continue
+        length = _f(el.get("ilgis_m")) or _f(el.get("plotis_mm")) / 1000
+        if length > 0:
+            out.append(round(length * max(1, int(_f(el.get("kiekis")) or 1)), 2))
+    return out
+
+
 def panel_zones(room: dict) -> list[dict]:
     if not isinstance(room, dict):
         return []

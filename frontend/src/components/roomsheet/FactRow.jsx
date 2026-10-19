@@ -21,6 +21,12 @@ import { factNeedsInput, factTone, isWholeSheet, prefillValue, FACT_LABEL_KEY, S
 import EvidenceCrop from './EvidenceCrop';
 
 
+// the number field's label per fact (v3 W5-E: zones and niche depth); anything else is the perimeter's
+const EDIT_LABEL = {
+  aukstis: 'Aukstis', plotas: 'Plotas', pertvaros: 'Pertvaros',
+  baldu_zonos: 'BalduZonos', plokstes_zonos: 'PlokstesZonos', nisos_gylis: 'NisosGylis',
+};
+
 const PASKIRTIS = [
   'gyvenamoji', 'miegamoji', 'virtuve', 'vonia', 'wc', 'koridorius',
   'drabuzine', 'skalbykla', 'tamburas', 'garazas', 'sandeliukas',
@@ -317,8 +323,7 @@ export default function FactRow({
         {editing && kind === 'number' && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`f-${fact.key}`}>
-              {t(`project.roomSheet.edit${fact.key === 'aukstis' ? 'Aukstis'
-                : fact.key === 'plotas' ? 'Plotas' : fact.key === 'pertvaros' ? 'Pertvaros' : 'Perimetras'}`)}
+              {t(`project.roomSheet.edit${EDIT_LABEL[fact.key] || 'Perimetras'}`)}
             </label>
             <input
               id={`f-${fact.key}`}

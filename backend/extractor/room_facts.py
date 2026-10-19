@@ -1901,6 +1901,13 @@ def _fact_zonos(project: dict, room: dict, region: list[float] | None) -> list[d
     on = wz.enabled()
     page = room.get("puslapio_nr")
     out = []
+    loose = wz.wardrobes_without_height(room)
+    if on and t["_baldu_zonos_m2"] <= 0 and loose and room.get(wz.TYPED_FURNITURE_M2) is None:
+        lengths = " ir ".join(f"{lt_num(x)} m" for x in loose)
+        out.append(_fact("baldu_zonos", None, "m²", "missing", "planas", page, region_on_page(room, page, region),
+                         f"Plane įmontuota spinta ({lengths} ilgio), bet jos aukščio brėžinyje neradau — jei už jos "
+                         f"siena nedažoma, įrašykite spintos plotą (ilgis × aukštis).",
+                         {"field": wz.TYPED_FURNITURE_M2, "kind": "number"}))
     for key, zones, total, field, what, src_lt in (
             ("baldu_zonos", t["baldu_zonos"], t["_baldu_zonos_m2"], wz.TYPED_FURNITURE_M2,
              "Įmontuoti baldai prie sienų", {"brezinys": "plane", "ivesta": "įrašėte patys"}),

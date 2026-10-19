@@ -110,3 +110,14 @@ def test_niche_depth_fact(monkeypatch):
     monkeypatch.setenv(nd.FLAG_ENV, "1")
     f = _facts(_project(_room(**niche)))["nisos_gylis"]
     assert f["status"] == "missing" and f["value"] is None and not user_text.is_banned(f["sentence"])
+
+
+def test_wardrobe_length_without_height_asks(monkeypatch):
+    room = _room(elementai=[{"tipas": "spinta_built_in", "kiekis": 1, "ilgis_m": 2.5}])
+    assert wz.wardrobes_without_height(room) == [2.5]
+    monkeypatch.delenv(wz.FLAG_ENV, raising=False)
+    assert "baldu_zonos" not in _facts(_project(room))
+    monkeypatch.setenv(wz.FLAG_ENV, "1")
+    f = _facts(_project(room))["baldu_zonos"]
+    assert f["status"] == "missing" and f["value"] is None and "2,50 m ilgio" in f["sentence"]
+    assert not user_text.is_banned(f["sentence"])
