@@ -18,9 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { displayPointOf, outlineFailureKey } from '@/lib/roomOutline';
-import {
-  roomForToolClick, pickCandidates, retryNrFor, noWallSentence, proposalLines, rasterProposalLines, commitBody, insideProposal,
-} from '@/lib/roomTool';
+import { roomForToolClick, pickCandidates, commitBody, insideProposal, readOutlineProposal } from '@/lib/roomTool';
 import { fetchSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
 
 const IDLE = { phase: 'idle', proposal: null, reading: null, picking: null };
@@ -59,43 +57,10 @@ export default function useRoomTool({
     const stale = () => read !== readRef.current;
     setState({ ...IDLE, phase: 'reading', reading: where });
     try {
-      let tried = nr;
-      let answer = await onPreview(tried, where);
-      if (stale()) return;
-      const again = how === 'number' ? retryNrFor(answer, tried) : null;
-      if (again && roomByNr(again)) {
-        tried = again;
-        answer = await onPreview(tried, where);
-        if (stale()) return;
-      }
-      const noWall = noWallSentence(tried, answer);
-      if (noWall && (how === 'outline' || tried !== nr)) {
-        toast.error(noWall);
-        setState(IDLE);
-        return;
-      }
-      if (answer?.status === 'ok' && Array.isArray(answer.room?.polygon_pct)) {
-        const room = roomByNr(tried);
-        setState({
-          ...IDLE,
-          phase: 'proposed',
-          proposal: { kind: 'vector', nr: String(tried), page: where.page, ring: answer.room.polygon_pct, answer, lines: proposalLines(room, answer) },
-        });
-        return;
-      }
-      if (answer?.status === 'no_walls' && onRasterPreview) {
-        const raster = await onRasterPreview(tried, where).catch(() => null);
-        if (stale()) return;
-        if (raster?.ring) {
-          setState({
-            ...IDLE,
-            phase: 'proposed',
-            proposal: { kind: 'raster', nr: String(tried), page: where.page, ring: raster.ring, data: raster.data, lines: rasterProposalLines(roomByNr(tried), raster.ring) },
-          });
-          return;
-        }
-      }
-      toast.error(failure(answer));
+      const out = await readOutlineProposal({ nr, where, how, onPreview, onRasterPreview, roomByNr, stale });
+      if (!out) return;
+      if (out.proposal) { setState({ ...IDLE, phase: 'proposed', proposal: out.proposal }); return; }
+      toast.error(out.error || failure(out.failure));
       setState(IDLE);
     } catch (e) {
       if (stale()) return;
