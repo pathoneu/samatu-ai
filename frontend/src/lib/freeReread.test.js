@@ -245,3 +245,13 @@ test('the floor sheet key lines land whole, and a read without them keeps the st
   const stored = { ...base(), _meta: { ...base()._meta, grindu_legenda: key } };
   assert.deepEqual(mergeFreeReread(stored, result(), 'T').project._meta.grindu_legenda, key);
 });
+
+test('the designer figures and anchors (sent only with the server flag on) land, the figures list included (W5-D D6)', () => {
+  const figures = [{ page: 6, label: 'Sienų dažai', value: 320, unit: 'm2' }];
+  const read = { ...result(), _autoriaus_kiekiai: figures, _walls_anchor: { total_area_m2: 320 } };
+  const { project } = mergeFreeReread(base(), read, 'T');
+  assert.deepEqual(project._autoriaus_kiekiai, figures);
+  assert.equal(project._walls_anchor.total_area_m2, 320);
+  const kept = mergeFreeReread({ ...base(), _autoriaus_kiekiai: figures }, result(), 'T').project;
+  assert.deepEqual(kept._autoriaus_kiekiai, figures, 'never overwritten by their absence');
+});

@@ -191,6 +191,47 @@ def dimlen(projects: list[str]) -> None:
               f"drawn length {pct(statistics.median(by_drawn))}")
 
 
+# ── D6 ───────────────────────────────────────────────────────────────────────
+
+def figures(projects: list[str]) -> None:
+    """The free re-read with SAMATU_REREAD_FIGURES off and on, on the STORED demo projects (backend/data/samatu.db,
+    ids demo-<codename>): which rooms' heights the plan's own statements change, which anchors appear, and what
+    the stored project already carries — the paid reading's step 2.44, brought to a stored project."""
+    import os
+    import sqlite3
+    from api.free_reread import FIGURES_FLAG, read_drawing
+    from storage import get_storage, pdf_key
+    con = sqlite3.connect(REPO / "backend" / "data" / "samatu.db")
+    for code in projects or ["objektas_g", "objektas_h"]:
+        row = con.execute("select data from projects where id = ?", (f"demo-{code}",)).fetchone()
+        if not row:
+            print(f"{code}: no stored demo project")
+            continue
+        project = json.loads(row[0])
+        project["id"] = f"demo-{code}"
+        pdf = get_storage().get(pdf_key(f"demo-{code}"))
+        runs = {}
+        for flag in ("0", "1"):
+            os.environ[FIGURES_FLAG] = flag
+            runs[flag] = read_drawing(project, pdf)
+        os.environ.pop(FIGURES_FLAG, None)
+        off = {str(r.get("nr")): r for r in runs["0"]["patalpos"]}
+        on = {str(r.get("nr")): r for r in runs["1"]["patalpos"]}
+        changed = [(nr, off[nr].get("lubu_aukstis_m"), on[nr].get("lubu_aukstis_m")) for nr in on
+                   if nr in off and off[nr].get("lubu_aukstis_m") != on[nr].get("lubu_aukstis_m")]
+        hs = (runs["1"].get("_meta") or {}).get("plan_height_statement")
+        print(f"== {code}: heights changed {len(changed)} {changed}; plan height statement {hs}")
+        for key in ("_autoriaus_kiekiai", "_walls_anchor", "_floor_anchors"):
+            got = runs["1"].get(key)
+            stored = project.get(key)
+            norm = lambda v: json.loads(json.dumps(v), parse_int=float)  # noqa: E731 — 320 and 320.0 are the same figure
+            same = norm(got) == norm(stored)
+            n = len(got) if isinstance(got, list) else (sorted(got) if isinstance(got, dict) else got)
+            print(f"    {key}: flag on → {n if not isinstance(got, dict) or key != '_walls_anchor' else got.get('total_area_m2')}"
+                  f"; stored project {'has the same' if same else ('has another' if stored else 'has none')}")
+        assert all(k not in runs["0"] for k in ("_autoriaus_kiekiai", "_walls_anchor", "_floor_anchors"))
+
+
 def main() -> int:
     global NO_LABELS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -199,7 +240,7 @@ def main() -> int:
     ap.add_argument("--no-labels", action="store_true")
     args = ap.parse_args()
     NO_LABELS = args.no_labels
-    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types, "dimlen": dimlen}.get(args.what)
+    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types, "dimlen": dimlen, "figures": figures}.get(args.what)
     if fn is None:
         print(f"unknown report: {args.what}")
         return 2
