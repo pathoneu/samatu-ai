@@ -356,6 +356,54 @@ def _iou(a, b) -> float:
     return inter / union if union > 0 else 0.0
 
 
+def letter_centres(pdf: bytes, page: int) -> list[tuple[float, float]]:
+    """Centres of the text layer's letters and digits on a 1-based sheet, in DISPLAY-frame fractions (PDFium under
+    PDFIUM_LOCK). [] for a sheet without text or one that cannot be read."""
+    from .pdf_vectors import _to_display
+    from .pdfium_guard import PDFIUM_LOCK
+    import pypdfium2 as pdfium
+    out: list[tuple[float, float]] = []
+    with PDFIUM_LOCK:
+        try:
+            doc = pdfium.PdfDocument(pdf)
+        except Exception:  # noqa: BLE001
+            return out
+        try:
+            if not 1 <= page <= len(doc):
+                return out
+            pg = doc[page - 1]
+            try:
+                W, H = (float(v) for v in pg.get_size())
+                k = (int(pg.get_rotation() or 0) // 90) % 4
+                Wu, Hu = (H, W) if k in (1, 3) else (W, H)
+                tp = pg.get_textpage()
+                try:
+                    text = tp.get_text_range()
+                    for i in range(min(tp.count_chars(), len(text))):
+                        if not text[i].isalnum():
+                            continue
+                        left, bottom, right, top = tp.get_charbox(i)
+                        x, y = _to_display((left + right) / 2, (bottom + top) / 2, Wu, Hu, k)
+                        out.append((x / W, y / H))
+                finally:
+                    tp.close()
+            finally:
+                pg.close()
+        except Exception:  # noqa: BLE001
+            return out
+        finally:
+            doc.close()
+    return out
+
+
+def _letters_under(pct: list[float], letters: list[tuple[float, float]], shrink: float = 0.15) -> bool:
+    """A letter's centre inside the box, the box shrunk by `shrink` of its size on each side (a label written
+    right beside a symbol does not touch its middle)."""
+    dx, dy = (pct[2] - pct[0]) * shrink, (pct[3] - pct[1]) * shrink
+    x0, y0, x1, y1 = pct[0] + dx, pct[1] + dy, pct[2] - dx, pct[3] - dy
+    return any(x0 <= x <= x1 and y0 <= y <= y1 for x, y in letters)
+
+
 def batch_find_symbol(project_pdf: bytes, template_page: int, box_pt, pages=None, min_score: float = 0.70, *,
                       margin: float = BATCH_MARGIN, max_per_page: int = BATCH_MAX_PER_PAGE, zones: bool = True,
                       exclude: dict | None = None, time_budget_s: float = BATCH_TIME_BUDGET_S) -> dict:
@@ -369,7 +417,9 @@ def batch_find_symbol(project_pdf: bytes, template_page: int, box_pt, pages=None
      candidates: [{box_pt, box_pct, score, scale, rotation, mirrored, is_source}]}], partial, pages_not_read,
      elapsed_s}. `candidates` are the kept ones (see WHICH CANDIDATES above); the template's own box is in
     them with `is_source: true`; none inside a legend, table or title-block zone (`zones`) or inside
-    `exclude` ({page: [bbox_pct, …]}, DISPLAY fractions — the legend box the person drew). `box_pct` is the
+    `exclude` ({page: [bbox_pct, …]}, DISPLAY fractions — the legend box the person drew) and none on letters of
+    the text layer (with `zones`; W5-D D2) — those are listed per sheet in `uz_zonu` [{box_pct, score, zona}] and
+    never become marks. `box_pct` is the
     DISPLAY frame. Never raises."""
     import time
 
@@ -424,19 +474,44 @@ def _batch(pdf: bytes, tpage: int, box: list[float], pages, min_score: float, ma
         return templates[dpi]
 
     zone_cache: dict[int, list] = {}
+    text_cache: dict[int, list] = {}
 
-    def in_no_mark_zone(page: int, cx: float, cy: float) -> bool:
-        if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in (exclude.get(page) or exclude.get(str(page)) or [])):
-            return True
-        if not zones:
-            return False
-        from .sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones, zone_at
+    def page_zones(page: int) -> list:
+        from .sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones
         if page not in zone_cache:
             zone_cache[page] = read_zones(pdf, page, table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
-        z = zone_at(zone_cache[page], cx, cy)
-        return z is not None and z.get("kind") in BATCH_ZONE_KINDS_WITHOUT_MARKS
+        return zone_cache[page]
+
+    def no_mark_reason(page: int, pct: list[float]) -> str | None:
+        """Why a candidate is listed but never a mark (Pathon v3 W5-D, D2): the box the person drew
+        („legenda"), a legend / table / title-block zone (its kind) or letters of the text layer under it
+        („tekstas" — the sheet title „APŠVIETIMO PLANAS" on objektas_h p3 scored above every real switch).
+        None: a candidate."""
+        cx, cy = (pct[0] + pct[2]) / 2, (pct[1] + pct[3]) / 2
+        if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in (exclude.get(page) or exclude.get(str(page)) or [])):
+            return "legenda"
+        if not zones:
+            return None
+        from .sheet_zones import zone_at
+        z = zone_at(page_zones(page), cx, cy)
+        if z is not None and z.get("kind") in BATCH_ZONE_KINDS_WITHOUT_MARKS:
+            return str(z.get("kind"))
+        if not template_has_text and _letters_under(pct, page_letters(page)):
+            return "tekstas"
+        # NOT „outside every plan zone": a plan zone need not cover the whole plan (the synthetic sheets' marks
+        # stand below theirs), so a mounting detail beside the plan stays a proposal he can remove
+        return None
+
+    def page_letters(page: int) -> list:
+        if page not in text_cache:
+            text_cache[page] = letter_centres(pdf, page)
+        return text_cache[page]
+
+    # a template that itself holds letters („SD" inside a detector's circle) is matched on its letters too
+    template_has_text = bool(zones) and _letters_under(_box_pct(box, tw, th, trot), page_letters(tpage), shrink=0.0)
 
     raw_pages: list[dict] = []
+    ref_extra: list[float] = []
     for k, page in enumerate(order):
         if time.monotonic() - started > budget:
             out["partial"] = True
@@ -451,7 +526,7 @@ def _batch(pdf: bytes, tpage: int, box: list[float], pages, min_score: float, ma
         raster = render_page(pdf, page - 1, dpi)
         share = ink_share(raster)
         entry = {"page": page, "dpi": dpi, "page_ink_share": round(share, 4), "skipped": None, "raw_count": 0,
-                 "truncated": False, "top_scores": [], "candidates": []}
+                 "truncated": False, "top_scores": [], "candidates": [], "uz_zonu": []}
         if share > RASTER_INK_SHARE:
             entry["skipped"] = "raster"
             raw_pages.append(entry)
@@ -459,18 +534,27 @@ def _batch(pdf: bytes, tpage: int, box: list[float], pages, min_score: float, ma
         found = find_symbol_by_shape(raster, template, min_score=min_score, max_results=300, dpi=dpi)
         rh, rw = raster.shape[:2]
         cands = []
+        listed: list[dict] = []
         for c in found["candidates"]:
             bpt = px_box_to_pt(c["bbox"], pw, ph, prot, rw, rh)
             pct = _box_pct(bpt, pw, ph, prot)
             is_source = page == tpage and _iou(bpt, box) > 0.3
-            if not is_source and in_no_mark_zone(page, (pct[0] + pct[2]) / 2, (pct[1] + pct[3]) / 2):
+            why = None if is_source else no_mark_reason(page, pct)
+            if why is not None:
+                if why == "tekstas":
+                    # still a twin of the template for the floor below (W2-A's calibration is unchanged);
+                    # only the mark goes
+                    ref_extra.append(c["score"])
+                if c["score"] >= min_score and len(listed) < max_per_page:
+                    listed.append({"box_pct": pct, "score": c["score"], "zona": why})
                 continue
             cands.append({"box_pt": bpt, "box_pct": pct, "score": c["score"], "scale": c["scale"],
                           "rotation": c["rotation"], "mirrored": c["mirrored"], "is_source": is_source})
+        entry["uz_zonu"] = listed
         entry.update(raw_count=len(cands), truncated=found["truncated"],
                      top_scores=[c["score"] for c in cands if not c["is_source"]][:5], candidates=cands)
         raw_pages.append(entry)
-    others = [c["score"] for e in raw_pages for c in e["candidates"] if not c["is_source"]]
+    others = [c["score"] for e in raw_pages for c in e["candidates"] if not c["is_source"]] + ref_extra
     reference = max(others) if others else None
     floor = max(min_score, reference - margin) if reference is not None else min_score
     for e in raw_pages:

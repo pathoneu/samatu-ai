@@ -552,7 +552,7 @@ def _answer(t: dict) -> dict:
     return {"row_id": t.get("row_id"), "status": "ok", "defined": False, "count": 0, "anchors": 0, "parts": 0,
             "per_page": [], "instances": [], "kiti": [], "fallback": False, "legend_copies": 0, "partial": False,
             "pages_not_read": [],
-            "pages_skipped": [], "detail": None}
+            "pages_skipped": [], "uz_zonu": [], "detail": None}
 
 
 def count_glyph_instances_many(pdf_bytes: bytes, templates: list[dict], pages: list[int] | None = None, *,
@@ -566,7 +566,8 @@ def count_glyph_instances_many(pdf_bytes: bytes, templates: list[dict], pages: l
     {row_id, status: ok|nera_zenklo|no_page|failed, defined, count, anchors, parts,
      per_page: [{page, count, kartojasi, legenda_lape}], instances: [{page, box_pct, x_pct, y_pct}] (DISPLAY
      fractions; a repeated sheet's are not listed), kiti: [instance] (sheets without the legend, not counted),
-     legend_copies, partial, pages_not_read, pages_skipped: [{page, reason}], detail}. `nera_zenklo`: the row's
+     legend_copies, partial, pages_not_read, pages_skipped: [{page, reason}], uz_zonu: [{page, x_pct, y_pct,
+     zona}] (matches inside a legend / table / title-block zone — listed, never counted), detail}. `nera_zenklo`: the row's
      glyph is no coloured path — the shape search counts it. Never raises."""
     answers = [_answer(t) for t in templates]
     if not templates:
@@ -667,7 +668,7 @@ def _count_many(pdf_bytes, templates, pages, zones, exclude, other_sheets, budge
                 words = None
                 for i in live:
                     found, copies, words = _instances_on(pdf, pg, info, templates[i], groups[i], exclude, zones,
-                                                         page_zones, words, zone_at)
+                                                         page_zones, words, zone_at, answers[i]["uz_zonu"])
                     answers[i]["legend_copies"] += copies
                     if not found:
                         continue
@@ -712,8 +713,10 @@ def _count_many(pdf_bytes, templates, pages, zones, exclude, other_sheets, budge
     return answers
 
 
-def _instances_on(pdf, pg, info, t, tpls, exclude, zones, page_zones, words, zone_at):
-    """(instances, legend copies dropped, words) of one template on one read sheet."""
+def _instances_on(pdf, pg, info, t, tpls, exclude, zones, page_zones, words, zone_at, listed=None):
+    """(instances, legend copies dropped, words) of one template on one read sheet. A match inside a legend,
+    table or title-block zone is no instance; it is appended to `listed` as {page, x_pct, y_pct, zona}
+    (W5-D D2: listed, never a mark)."""
     glyphs = info["glyphs"]
     W, H, ox, oy = info["W"], info["H"], info["ox"], info["oy"]
     drop = [tuple(float(v) for v in b) for b in (exclude.get(pg) or exclude.get(str(pg)) or [])]
@@ -732,6 +735,8 @@ def _instances_on(pdf, pg, info, t, tpls, exclude, zones, page_zones, words, zon
             if zones:
                 z = zone_at(page_zones(pg), cx, cy)
                 if z is not None and z.get("kind") in ZONE_KINDS_WITHOUT_MARKS:
+                    if listed is not None and len(listed) < 200:
+                        listed.append({"page": pg, "x_pct": round(cx, 4), "y_pct": round(cy, 4), "zona": str(z.get("kind"))})
                     continue
             bx = _instance_box(g, tp, glyphs)
             if first:
