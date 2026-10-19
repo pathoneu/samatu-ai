@@ -2373,6 +2373,36 @@
       "familiesSomeOffNote": "Nuimtų sričių eilučių sąmatoje nebus — kartu su joms priklausančiomis medžiagomis. Skyriai, kurie nepatenka nė į vieną sritį (pvz. ventiliacija), lieka visada."
     }
   },
+  "runTeaching": {
+    "title": "Kol skaitoma",
+    "nowLabel": "Dabar ({{step}} iš {{steps}}):",
+    "stage": {
+      "rendering": "atsiverčiu lapus ir ieškau aukšto planų.",
+      "renderingPages": "atsiverčiu {{count}} lapų ir ieškau aukšto planų.",
+      "pass1": "skaitau patalpų lentelę ir planus — ieškau patalpų.",
+      "pass1Rooms": "radau patalpų: {{count}}. Skaitau jų plotus ir apdailą.",
+      "zoom": "tikslinu kiekvienos patalpos matmenis.",
+      "zoomProgress": "tikslinu patalpų matmenis — {{done}} iš {{total}}.",
+      "post": "skaičiuoju kiekius ir ruošiu sąmatą.",
+      "finishing": "baigiu skaičiuoti serveryje — liko nedaug."
+    },
+    "afterLabel": "Kai baigsiu:",
+    "after": "atsidarys Patikra — keli klausimai apie tai, ko brėžinys nepasako (aukštis, durys, grindys). Prie kiekvieno — mano siūlomas atsakymas, Enter jį patvirtina.",
+    "timeLabel": "Laikas:",
+    "time": "paprastai {{estimate}} min. Praėjo {{minutes}} min.",
+    "canLeave": "Šį langą galima uždaryti — skaitymas tęsiasi serveryje, o projektas pats atsiras sąraše „Projektai“.",
+    "waitToLeave": "Palaukite, kol skaitymas prasidės serveryje — tada šį langą bus galima uždaryti.",
+    "scope": {
+      "title": "Ką programa perskaito",
+      "dismiss": "Supratau",
+      "yesWord": "Skaito:",
+      "yes": "interjero planus — patalpas, sienas, duris ir langus, apdailą iš lentelių.",
+      "noWord": "Neskaito:",
+      "no": "fasadų ir stogų — jų kiekių sąmatoje nebus.",
+      "slowWord": "Lėčiau:",
+      "slow": "skenuotus brėžinius (nuotraukas be teksto) skaito lėčiau ir ne taip tiksliai — patikrinti reikės atidžiau."
+    }
+  },
   "upload": {
     "zone": {
       "defaultLabel": "PDF arba Excel failas",
