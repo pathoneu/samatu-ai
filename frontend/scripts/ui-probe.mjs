@@ -204,7 +204,8 @@ function measureInPage() {
     || first('.text-foreground', (e) => (e.textContent || '').trim().length > 1));
   named.mutedText = textRatio(first('.text-muted-foreground', (e) => (e.textContent || '').trim().length > 1));
   named.units = textRatio(first('[data-testid="room-row-unit"]') || first('span', (e) => (e.textContent || '').trim() === 'm²'));
-  named.provenance = textRatio(first('[data-testid^="provenance-chip-"] button'));
+  // B1-D: the source is said once in the room list's header (a per-row chip only where a row differs)
+  named.provenance = textRatio(first('[data-testid^="provenance-chip-"] button') || first('[data-testid="rooms-source-line"] span'));
   return { texts, strokes, named, viewport: [vw, vh] };
 }
 
