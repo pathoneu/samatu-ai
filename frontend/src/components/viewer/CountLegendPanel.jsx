@@ -137,7 +137,7 @@ export default function CountLegendPanel({
                 <span className="max-w-full truncate">{type.label}</span>
                 {ai > 0 && (
                   <span
-                    className="inline-flex items-center gap-0.5 px-1 rounded-sm text-meta leading-4 bg-[hsl(var(--ov-proposed)/0.10)] text-[hsl(var(--ov-proposed))]"
+                    className="inline-flex items-center gap-0.5 px-1 rounded-sm text-meta leading-4 bg-ov-proposed/10 text-ov-proposed"
                     title={`${ai} iš ${tally} rasta automatiškai („Rasti panašius") — tuščiavidurės žymės brėžinyje, patikrinkite`}
                     data-testid={`clegend-ai-${type.id}`}
                   >

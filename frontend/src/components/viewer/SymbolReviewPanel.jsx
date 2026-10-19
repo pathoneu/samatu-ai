@@ -251,7 +251,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
         </p>
       )}
       {s.error && (
-        <p className="px-1 text-xs text-[hsl(var(--conf-low))] leading-snug" role="alert">{s.error} — apveskite simbolį dar kartą.</p>
+        <p className="px-1 text-xs text-conf-low leading-snug" role="alert">{s.error} — apveskite simbolį dar kartą.</p>
       )}
 
       {s.progress && (
@@ -278,13 +278,13 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
             <span className="whitespace-nowrap">Riba</span>
             <input type="range" min={MIN_THRESHOLD} max={1} step={0.01} value={s.threshold}
               onChange={(e) => s.setThreshold(Number(e.target.value))}
-              className="flex-1 accent-[hsl(var(--viewer-chrome-active))]" aria-label="Panašumo riba" data-testid="symbol-threshold" />
+              className="flex-1 accent-viewer-chrome-active" aria-label="Panašumo riba" data-testid="symbol-threshold" />
             <span className="mono tabular w-8 text-right text-foreground">{formatScore(s.threshold)}</span>
           </label>
 
           {hasUnusual && (
-            <div className="mx-1 my-1 p-2 rounded border border-[hsl(var(--conf-med)/0.5)] bg-[hsl(var(--conf-med)/0.08)] text-meta leading-snug" data-testid="symbol-unusual">
-              <div className="flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 text-[hsl(var(--conf-med))]" />
+            <div className="mx-1 my-1 p-2 rounded border border-conf-med/50 bg-conf-med/[0.08] text-meta leading-snug" data-testid="symbol-unusual">
+              <div className="flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 text-conf-med" />
                 <span>{UNUSUAL_WARNING} (lap. {pageRanges(unusualList)}).</span></div>
               <label className="mt-1.5 flex items-center gap-1.5">
                 <input type="checkbox" checked={checkedUnusual} onChange={(e) => setCheckedUnusual(e.target.checked)} />
@@ -311,11 +311,11 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
                   <button type="button" className="hover:underline" onClick={() => scrollApi?.scrollToPage({ pageNumber: g.page, behavior: 'smooth' })}
                     title={`Rodyti ${g.page} lapą`}>{g.page} lapas</button>
                   <span className="ml-auto tabular-nums">{g.items.length} vnt.</span>
-                  {s.unusual[g.page] && <AlertTriangle className="ml-1 w-3 h-3 text-[hsl(var(--conf-med))]" aria-label="Neįprastai daug" />}
+                  {s.unusual[g.page] && <AlertTriangle className="ml-1 w-3 h-3 text-conf-med" aria-label="Neįprastai daug" />}
                 </div>
                 {g.items.map((c) => (
                   <div key={c.id}
-                    className={`flex items-center gap-2 px-2 py-0.5 text-xs ${s.hoveredId === c.id ? 'bg-[hsl(var(--ov-proposed)/0.12)]' : ''}`}
+                    className={`flex items-center gap-2 px-2 py-0.5 text-xs ${s.hoveredId === c.id ? 'bg-ov-proposed/[0.12]' : ''}`}
                     onMouseEnter={() => s.setHoveredId(c.id)} onMouseLeave={() => s.setHoveredId(null)}
                     data-testid="symbol-row">
                     <button type="button" className="mono tabular w-6 text-right text-muted-foreground hover:underline"
@@ -331,7 +331,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
                     {c.isSource && <span className="text-meta text-muted-foreground" title="Tai jūsų apvestas pavyzdys">pavyzdys</span>}
                     <button type="button" onClick={() => s.remove(c.id)} aria-label={`Pašalinti ${s.numbers[c.id]}`}
                       title="Ne tas simbolis — pašalinti" data-testid="symbol-remove"
-                      className="p-0.5 rounded text-muted-foreground hover:bg-[hsl(var(--conf-low))] hover:text-white">
+                      className="p-0.5 rounded text-muted-foreground hover:bg-conf-low hover:text-white">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
@@ -377,7 +377,7 @@ export default function SymbolReviewPanel({ documentId, search, countTypes = [],
             )}
             <button type="button" disabled={!canAdd}
               onClick={() => s.add({ typeId: typeChoice === '__new' ? null : typeChoice, newLabel })}
-              className="px-2 py-1.5 rounded bg-[hsl(var(--viewer-chrome-active))] text-white text-xs font-medium disabled:opacity-50"
+              className="px-2 py-1.5 rounded bg-viewer-chrome-active text-white text-xs font-medium disabled:opacity-50"
               title={hasUnusual && !checkedUnusual
                 ? 'Pirmiausia peržiūrėkite įspėjimą viršuje'
                 : 'Rodomos žymės taps kiekio žymėmis (geltonos — rastos automatiškai, patikrinkite)'}
