@@ -788,9 +788,9 @@ export default function InteriorWorkspace({
         hoveredRoomNrExternal={hoveredRoomNr}
         projectId={project.id}
         pdfBlob={pdfBlob}
-        renderToolbarAddon={(page, total) => (
+        renderToolbarAddon={(page, total, ctx) => (
           <>
-            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} />
+            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} scaleGate={ctx?.scaleGate || null} onSetScale={ctx?.onSetScale || null} />
             <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} />
           </>
         )}

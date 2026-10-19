@@ -12,7 +12,7 @@ import { scaleChipModel } from '@/lib/scaleChip';
 import { SCALE_STATE_LT } from '@/lib/scaleLabel';
 import { visiblePageOf } from '@/lib/visiblePage';
 
-export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12 }) {
+export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12, openNonce = 0 }) {
   const { state: scroll } = useScroll(documentId);
   const page = visiblePageOf(scroll);
   const chip = useMemo(
@@ -22,6 +22,8 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   useEffect(() => { setOpen(false); }, [page]);
+  // „Nustatyti mastelį“ beside the detection button opens this card (W5-B B7, #25) — a new nonce, one opening
+  useEffect(() => { if (openNonce) setOpen(true); }, [openNonce]);
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };

@@ -60,6 +60,9 @@ import ViewSettingsPopover, { CleanBgFilter, ViewCrosshair } from './ViewSetting
 import { readViewSettings, viewCss, writeViewSettings } from '@/lib/viewSettings';
 import { cachedSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
 import { flashCursorHint } from '@/lib/cursorHints';
+import { scaleGateFromScale } from '@/lib/scaleGate';
+import { pageScaleIn } from '@/lib/pageScales';
+import { focusFrameForRoom } from '@/lib/focusFrame';
 import ModePill from './ModePill';
 import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
@@ -184,12 +187,12 @@ const chromeBtn = 'h-8 min-w-8 px-1.5 inline-flex items-center justify-center ro
 const chromeCard = 'pointer-events-auto rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
 
 /** Top right: „Perskaityti iš naujo" and „Palyginti leidimus" (renderToolbarAddon), then the text search. */
-function CanvasHeader({ documentId, totalPages, addon = null, searchOpen, onToggleSearch, onCloseSearch }) {
+function CanvasHeader({ documentId, totalPages, addon = null, addonContext = null, searchOpen, onToggleSearch, onCloseSearch }) {
   const { state: scroll } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
   return (
     <div className={chromeCard} data-canvas-header>
-      {addon && <span className="inline-flex items-center gap-1 px-0.5">{addon(cur, totalPages || 1)}</span>}
+      {addon && <span className="inline-flex items-center gap-1 px-0.5">{addon(cur, totalPages || 1, addonContext ? addonContext(cur) : null)}</span>}
       {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
       <button
         type="button"
@@ -439,8 +442,10 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
 // focused room the old effect re-ran scrollToPage on EVERY tick — the viewer
 // literally fought the user's navigation. Jump ONCE per new target; re-arm
 // only when the focus object itself changes (clicking a room again re-jumps).
-function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null }) {
+function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null, rooms = null, onFrame = null }) {
   const { provides: scrollApi, state: scroll } = useScroll(documentId);
+  const retriesRef = useRef(0);
+  const lastPageRef = useRef(null);
   // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
   // zone layer and this scroller must never disagree about a room's page.
   const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
@@ -452,14 +457,25 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   useEffect(() => { doneRef.current = null; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || !scrollApi?.scrollToPage) return;
-    if (doneRef.current === targetPage) return; // one jump per target — never re-yank
-    doneRef.current = targetPage;
+    if (doneRef.current === focusKey) return; // one jump per focus — never re-yank (scrollApi churns)
+    doneRef.current = focusKey;
     // A room he clicked ON the drawing is already on screen (Pathon v3 W1-D): jumping to its page would
     // throw the view back to the sheet's top-left corner under his cursor.
     const skip = skipJumpRef?.current;
-    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) return;
+    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) { lastPageRef.current = targetPage; return; }
+    // A room focused from outside the drawing (a list row, Patikra, a search hit) is FRAMED — the room, not the
+    // top of its sheet (W5-B B7, #132; lib/focusFrame). The host's FocusZoomer waits for the layout itself, so
+    // the page-jump retries below stand down.
+    if (focusedRoom && onFrame) {
+      const full = (rooms || []).find((r) => String(r?.nr) === String(focusedRoom.nr)) || focusedRoom;
+      const frame = focusFrameForRoom(full);
+      if (frame) { retriesRef.current = 99; lastPageRef.current = frame.page; onFrame(frame); return; }
+    }
+    // No frame: the page, as before — and not again for another room on the page already shown.
+    if (lastPageRef.current === targetPage && focusedRoom) return;
+    lastPageRef.current = targetPage;
     scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
-  }, [targetPage, scrollApi]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetPage, scrollApi, focusKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE JUMP CAN LAND ON NOTHING (2026-09-04, measured). `scrollToPage` is
   // callable before the pages have been measured, and calling it then computes
@@ -473,7 +489,6 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   // moment the viewport is off page 1 — which is also what makes it safe. A
   // user who scrolls anywhere during that first second has left page 1, so this
   // can never fight him (founder bug 2026-07-25 "scrolls by itself").
-  const retriesRef = useRef(0);
   useEffect(() => { retriesRef.current = 0; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || targetPage <= 1 || !scrollApi?.scrollToPage) return;
@@ -800,6 +815,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [scalesOpen, setScalesOpen] = useState(false);
   // The last „Patikrinti mastelį" readout: {page, readout} | null. Nothing is saved.
   const [scaleCheck, setScaleCheck] = useState(null);
+  // „Nustatyti mastelį“ next to the detection button (W5-B B7, #25): the scale chip's card opens (a nonce per click).
+  const [scaleChipOpen, setScaleChipOpen] = useState(0);
   const confirmScales = (pages) => {
     setMeasureScales((prev) => confirmLaneScales(prev, pages, laneScales || {}));
     toast.success(pages.length > 1 ? `Patvirtinta ${pages.length} lapų mastelis` : `Patvirtintas ${pages[0]} lapo mastelis`, {
@@ -1532,7 +1549,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const chromeLeft = sheetRailWidth({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
-          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef} />}
+          {!check && (
+            <FocusScroller
+              documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef}
+              rooms={rooms}
+              onFrame={(f) => { frameNonce.current += 1; setFrameFocus({ page: f.page, rect: f.rect, nonce: `focus-${frameNonce.current}` }); }}
+            />
+          )}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
@@ -1686,6 +1709,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   documentId={activeDocumentId}
                   totalPages={totalPages}
                   addon={check ? null : renderToolbarAddon}
+                  addonContext={project ? (page) => ({ scaleGate: scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
                   searchOpen={searchOpen}
                   onToggleSearch={() => setSearchOpen((v) => !v)}
                   onCloseSearch={() => setSearchOpen(false)}
@@ -1779,6 +1803,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 onCalibrate={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
                 onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
                 onOverview={() => setScalesOpen(true)}
+                openNonce={scaleChipOpen}
               />
             )}
             {(scalesOpen || scaleCheck) && !check && project && (
@@ -1977,8 +2002,9 @@ export default function TakeoffViewer({
   // jumps to a place and fits it. Absent → the viewer is exactly what it was.
   check = null,
   focus = null,
-  // (currentPage, totalPages) => node — a control at the head of the toolbar, after the page-rail toggle
-  // („Perskaityti lapą", components/viewer/DetectRunButton). Not drawn in the check sheet.
+  // (currentPage, totalPages, {scaleGate, onSetScale} | null) => node — a control at the head of the toolbar
+  // („Perskaityti lapą", components/viewer/DetectRunButton; the third argument is the sheet's scale gate, W5-B B7).
+  // Not drawn in the check sheet.
   renderToolbarAddon = null,
   // Sheets (Togal-v2 W7): the classification (`project.puslapiai`), the user's
   // `project.sheet_overrides` and their setter; `sheetLinksVersion` changes once a rename has been
