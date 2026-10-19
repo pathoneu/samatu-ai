@@ -131,6 +131,52 @@ def api_legend_rows(request: Request, project_id: str, body: RowsBody):
             "rows": [r for leg in legends for r in leg["rows"]]}
 
 
+# ── GET …/legend/sheets ─────────────────────────────────────────────────────
+
+SHEETS_BUDGET_S = 20.0
+
+
+# Plain `def` for the same reason as the rows route. B1-B (2026-10-19): G on a sheet without a legend used to
+# say only „apveskite ją rėmeliu" — on objektas_g the legend stands on sheet 5 of 16 and he boxed whatever was
+# on screen. This answers WHERE the legends are, so the tool can say „Legenda yra 5 lape — eiti".
+@router.get("/{project_id}/legend/sheets")
+def api_legend_sheets(request: Request, project_id: str):
+    """The sheets that carry a legend the tool can propose: {pages: [{page, rows}], partial, pages_not_read}.
+    Sheet zones are read (and cached) per sheet within SHEETS_BUDGET_S; a sheet not reached in time is listed in
+    `pages_not_read`, never guessed. Read-only, €0, owner first."""
+    project = _project_for(request, project_id)            # ownership before anything about the request
+    from main import _check_rate_limit, _client_key
+    _check_rate_limit(_client_key(request), "legend_sheets")
+    pdf_bytes = _pdf(project_id)
+
+    from extractor.cv_match import _mediabox_geometry
+    from extractor.legend_rows import suggest_legend_rows
+    from extractor.sheet_zones import read_zones
+    try:
+        n = len(_mediabox_geometry(pdf_bytes))
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail="Brėžinio atidaryti nepavyko")
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    stored_all = meta.get("zonos") if isinstance(meta.get("zonos"), dict) else {}
+    started = time.monotonic()
+    pages: list[dict] = []
+    not_read: list[int] = []
+    for p in range(1, n + 1):
+        if time.monotonic() - started > SHEETS_BUDGET_S:
+            not_read.append(p)
+            continue
+        stored = stored_all.get(str(p))
+        zones = stored if isinstance(stored, list) else (read_zones(pdf_bytes, p).get("zones") or [])
+        if not any(z.get("kind") == "legenda" for z in zones if isinstance(z, dict)):
+            continue
+        sug = suggest_legend_rows(pdf_bytes, p, zones)
+        rows = sum(len(leg.get("rows") or []) for leg in sug.get("legends") or [])
+        if rows:
+            pages.append({"page": p, "rows": rows})
+    return {"pages": pages, "partial": bool(not_read), "pages_not_read": not_read,
+            "elapsed_s": round(time.monotonic() - started, 2)}
+
+
 # ── POST …/legend/count ─────────────────────────────────────────────────────
 
 
