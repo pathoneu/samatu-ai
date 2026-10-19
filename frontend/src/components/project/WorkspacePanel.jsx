@@ -41,6 +41,7 @@ import {
 import { measureDragProps, useMeasureRows } from './measure/useMeasureRows';
 import MeasureRowPicker from './measure/MeasureRowPicker';
 import MeasuredChip from './measure/MeasuredChip';
+import NotesList from './measure/NotesList';
 import { floorAreaTotal } from '@/lib/floorArea';
 import { roomAreaText } from '@/lib/roomZones';
 import { cleanUserText } from '@/lib/userText';
@@ -701,9 +702,20 @@ export default function WorkspacePanel({
           );
         })}
         {!collapsed.rooms && filteredRooms.length === 0 && (
-          <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-            {filter ? `Patalpų nerasta pagal „${filter}“` : 'Patalpų dar nėra.'}
+          <div className="px-3 py-3 text-ui text-muted-foreground" data-testid="empty-rooms">
+            {/* an empty state says what to do next (C9, #133) */}
+            {filter
+              ? `Patalpų nerasta pagal „${filter}“ — išvalykite paiešką viršuje.`
+              : 'Patalpų dar nėra. Paspauskite „Perskaityti iš naujo“ virš brėžinio — programa nemokamai perskaitys patalpas iš plano ir lentelių.'}
           </div>
+        )}
+
+        {/* no measurements yet: what to do to make one (C9, #133) */}
+        {measCountRows.length === 0 && measGeomRows.length === 0 && (
+          <p className="flex items-start gap-2 border-t border-border/60 px-3 py-3 text-ui text-muted-foreground" data-testid="empty-measurements">
+            <Ruler className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>Matavimų dar nėra. Kairėje pasirinkite „Atstumas“, „Plotas“ arba „Kiekis“ ir spustelėkite brėžinyje — matavimas atsiras čia.</span>
+          </p>
         )}
 
         {/* MATAVIMAI — viewer measurements (counts + lengths/areas) */}
@@ -819,6 +831,9 @@ export default function WorkspacePanel({
             })}
           </>
         )}
+
+        {/* „Pastaba" pins listed with the measurements (C11) */}
+        <NotesList project={project} onJumpToPage={onJumpToPage} />
 
         {/* KIEKIAI section */}
         <SectionHeader
@@ -1391,17 +1406,11 @@ const PositionRow = memo(function PositionRow({
               the kainynas shipped and nothing read it — so a price the matcher
               guessed at from a merely SIMILAR row looked exactly like one the
               contractor typed. Amber says "check this one". (2026-09-02) */}
+          {/* in words, not a dot (C8, #213) */}
           {row.kaina && kainynasPriced && (
-            <span
-              aria-hidden="true"
-              className="shrink-0 rounded-full"
-              style={{
-                width: 5, height: 5,
-                background: approxMatch
-                  ? 'hsl(var(--warning, 38 92% 50%))'
-                  : 'hsl(var(--primary) / 0.5)',
-              }}
-            />
+            <span className="shrink-0 text-ui text-muted-foreground" data-testid="price-source">
+              {approxMatch ? t('project.mainView.priceWordSimilar') : t('project.mainView.priceWord')}
+            </span>
           )}
         </span>
       )}

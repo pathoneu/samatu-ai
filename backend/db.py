@@ -1757,6 +1757,8 @@ HELD_RESULT_DAYS = 3
 # Archiving is a flag on the blob and drops nothing.
 
 VERSION_SOURCES = ("issaugota", "perskaityta", "lapas", "klausimas", "grazinta", "kita")
+# The sources a fresh read of the drawing is saved under; the state before one always gets a row.
+VERSION_READ_SOURCES = ("perskaityta", "lapas")
 VERSION_KEEP_LAST = 30
 VERSION_DAILY_DAYS = 90
 VERSION_COALESCE_S = 90
@@ -1859,11 +1861,19 @@ def _record_version(c, project_id: str, old_row, new_text: str, saltinis: str,
     if old_sha is not None and old_sha == new_sha:
         return                                       # nothing changed
     last = c.execute(
-        "SELECT id, created_at, saltinis, pavadinimas FROM project_versions "
+        "SELECT id, created_at, saltinis, pavadinimas, sha FROM project_versions "
         "WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()
     if last is None and old_sha is not None:
         _insert_version(c, project_id, old_row["data"], old_sha, "kita",
                         "Pradinė būsena", created)
+    elif (saltinis in VERSION_READ_SOURCES and old_sha and last is not None
+          and last["sha"] != old_sha):
+        # The state a fresh read replaces must be a row of its own, or „Atšaukti" on the read
+        # („Kas pasikeitė", lib/changeSummary.rereadUndoTarget picks the row just before the read)
+        # would put back an older one. It has no row of its own right after a restore: the restore
+        # writes only the state it REPLACES ('grazinta'), never the restored state (Pathon v3 W4-A).
+        _insert_version(c, project_id, old_row["data"], old_sha, "kita",
+                        "Prieš perskaitymą", created)
     elif (last is not None and saltinis == "issaugota" and not pavadinimas
           and last["saltinis"] == "issaugota" and not last["pavadinimas"]):
         try:

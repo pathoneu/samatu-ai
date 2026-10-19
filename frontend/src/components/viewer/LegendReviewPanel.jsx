@@ -12,6 +12,8 @@ import { Check, Loader2, PenLine, Ruler, Trash2, Undo2, X } from 'lucide-react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { API_BASE } from '@/lib/apiBase';
 import Notice from '@/components/ui/Notice';
+import FeedbackThumbs from '@/components/ui/FeedbackThumbs';
+import { feedbackBody, sendFeedback, validBoxPct } from '@/lib/feedback';
 import { createLabel, keptInstances, perPage, perPageText, rowName } from '@/lib/legendReview';
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border px-2.5 text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
@@ -114,6 +116,32 @@ function Row({ row, count, review, removed, projectId, legend, onPage, onMeasure
         </div>
       )}
 
+      {/* 👍 / 👎 on what was found (C10, #203): „ne tie" marks the found marks „neieškoti tokių" — the next
+          „Rasti panašius" search leaves out what looks like them — and drops the row */}
+      {!sample && kept.length > 0 && projectId && (
+        <FeedbackThumbs
+          className="mt-2"
+          testId="legend-feedback"
+          upLabel="Rasti ženklai tie"
+          downLabel="Ne tie — neieškoti tokių"
+          downNote="Kitą kartą „Rasti panašius“ tokių nesiūlys, o ši eilutė kiekių nesukurs."
+          sentText="Įrašyta."
+          onSend={async ({ up, line }) => {
+            const marks = kept.filter((i) => validBoxPct(i.box_pct)).slice(0, up ? 1 : 3);
+            for (const inst of marks) {
+              await sendFeedback(projectId, feedbackBody({ kind: 'simbolis', up, line, page: inst.page, boxPct: inst.box_pct, klass: name }));
+            }
+            legend.setKeep(row.row_id, up);
+          }}
+          onUndo={async () => {
+            for (const inst of kept.filter((i) => validBoxPct(i.box_pct)).slice(0, 3)) {
+              await sendFeedback(projectId, feedbackBody({ kind: 'simbolis', undo: true, page: inst.page, boxPct: inst.box_pct }));
+            }
+            legend.setKeep(row.row_id, keep);
+          }}
+        />
+      )}
+
       {naming && !sample && (
         <form
           className="mt-2 flex gap-1.5"
@@ -193,6 +221,13 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           <p className="mx-3 mt-3 text-[14px] text-[hsl(var(--ink-2))]">Pritaikyta ankstesnė legenda — patikrinkite eilutes.</p>
         )}
 
+        {/* nothing read in the box: what to do next (C9, #133) */}
+        {legend.phase === 'review' && (legend.rows || []).length === 0 && (
+          <p className="px-3 py-3 text-[14px] leading-snug text-[hsl(var(--ink-2))]" data-testid="legend-empty">
+            Šiame rėmelyje legendos eilučių neradau. Apveskite kitą vietą — ženklus kartu su jų pavadinimais — arba
+            skaičiuokite patys įrankiu „Kiekis“ kairėje.
+          </p>
+        )}
         {(legend.phase === 'review' || legend.phase === 'creating') && (
           <>
             <ul className="mt-2" data-testid="legend-rows">

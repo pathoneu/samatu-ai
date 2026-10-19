@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FolderPlus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import ProjectCard from '@/components/dashboard/ProjectCard';
+import ProjectRow from '@/components/dashboard/ProjectRow';
 import EmptyState from '@/components/dashboard/EmptyState';
 import UsageMeter from '@/components/billing/UsageMeter';
 import { getProjects, pullProjectsFromBackend, purgeExpiredArchive } from '@/lib/projectStore';
@@ -130,12 +130,21 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* status rows (C6): name · state · last change · totals · the one next step */}
           {filtered.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {filtered.map(project => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
+            <section className="rounded-[2px] border border-border bg-card" aria-label={t('dashboard.title')}>
+              <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_9rem_minmax(0,1.3fr)] gap-x-4 border-b border-border px-4 py-2 text-ui text-muted-foreground md:grid md:pr-[15rem]">
+                <span>{t('dashboard.row.head.name')}</span>
+                <span>{t('dashboard.row.head.state')}</span>
+                <span>{t('dashboard.row.head.lastChange')}</span>
+                <span>{t('dashboard.row.head.totals')}</span>
+              </div>
+              <ul data-testid="project-rows">
+                {filtered.map(project => (
+                  <ProjectRow key={project.id} project={project} />
+                ))}
+              </ul>
+            </section>
           ) : (
             <div
               className="text-center"

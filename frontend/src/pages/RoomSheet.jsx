@@ -65,6 +65,10 @@ import { StepBar } from '@/components/project/StepRail';
 import { useWorkspaceHost } from '@/components/project/workspaceHost';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
+import RoomNameChips from '@/components/roomsheet/RoomNameChips';
+import { namePatch } from '@/lib/roomNames';
+import { roomPickerItems, typedDigit } from '@/lib/roomSheetNav';
+import { openLayerInDocument } from '@/lib/escOrder';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
   + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
@@ -101,6 +105,9 @@ export default function RoomSheet() {
   // chosen from room to room. Hovering a fact row lights its rectangle.
   const [wholeSheet, setWholeSheet] = useState(true);
   const [activeFactKey, setActiveFactKey] = useState(null);
+  // the fact he last clicked or tabbed into (not hovered): a digit typed now goes into its number field (C7)
+  const [focusedFactKey, setFocusedFactKey] = useState(null);
+  const [typed, setTyped] = useState(null);                  // {key, char, nonce}
   // „Rodyti brėžinyje" on a fact: the drawing pane jumps to that fact's own place
   // ({key, nonce} — the nonce lets the same fact be asked for twice).
   const [focusRequest, setFocusRequest] = useState(null);
@@ -155,6 +162,17 @@ export default function RoomSheet() {
     setParams(next, { replace: false });
   }, [params, setParams]);
 
+  // the room picker's list (C7): every room with its state in words
+  const pickerItems = useMemo(
+    () => roomPickerItems(rooms, (nr) => isRoomIncluded(project?._apimtis, nr), roomNr)
+      .map((it) => {
+        // merged-into lives on the stored room (the drawing-order list may be an older copy)
+        const stored = (project?.patalpos || []).find((r) => String(r?.nr) === it.nr);
+        return stored?._sujungta_i && it.state !== 'merged' ? { ...it, state: 'merged', mergedInto: String(stored._sujungta_i) } : it;
+      }),
+    [rooms, project, roomNr],
+  );
+
   const goToGeneral = useCallback(() => {
     const next = new URLSearchParams(params);
     next.set('etapas', 'bendri');
@@ -187,8 +205,35 @@ export default function RoomSheet() {
     setLastFix(null);
     setPicking(false);
     setHighlightCorners(false);
+    setFocusedFactKey(null);
+    setTyped(null);
     // the setters are stable; this runs when the ROOM changes (loadFacts is keyed on it)
   }, [loadFacts]);
+
+  // Digits typed straight into the focused fact (C7): no „Pataisyti" click first.
+  const typingRef = useRef({});
+  typingRef.current = {
+    busy, kind: (facts?.facts || []).find((f) => f.key === focusedFactKey)?.editable?.kind || null, key: focusedFactKey,
+  };
+  useEffect(() => {
+    const onKey = (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      const cur = typingRef.current;
+      if (!cur.key) return;
+      const char = typedDigit(e, {
+        targetTag: target?.tagName,
+        targetEditable: Boolean(target?.closest?.('[contenteditable="true"]')),
+        layerOpen: openLayerInDocument(),
+        busy: cur.busy,
+        factKind: cur.kind,
+      });
+      if (char == null) return;
+      e.preventDefault();
+      setTyped((prev) => ({ key: cur.key, char, nonce: (prev?.nonce || 0) + 1 }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // `alsoRooms`: the other rooms that ask the same question (fact.same_question) — one answer, one
   // recompute, one consequence strip, one undo for all of them.
@@ -228,6 +273,13 @@ export default function RoomSheet() {
     await land(result, { fromInterior: true });
     toast.success(t('project.roomSheet.roomAdded', { nr: room.nr }));
   }), [run, project, land, t, pilot]);
+
+  // „Ar tai virtuvė? [Taip]" (C3): the name and kind he picks, down the room edit path — one undo
+  const saveName = useCallback((choice) => run(async () => {
+    pilot('room_name', { kind: 'fact', id: 'pavadinimas' });
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, namePatch(choice))),
+      { fromInterior: true, factKey: 'pavadinimas', summary: t('project.roomNames.saved', { name: choice.pavadinimas }) });
+  }), [run, project, roomNr, land, pilot, t]);
 
   const saveChoice = useCallback((field, value) => run(async () => {
     pilot('fact_choice', { kind: 'fact', id: field });
@@ -474,6 +526,7 @@ export default function RoomSheet() {
         onNext={() => goToRoom(rooms[idx + 1].nr)}
         hasPrev={idx > 0}
         hasNext={idx < rooms.length - 1}
+        picker={{ items: pickerItems, onPick: goToRoom }}
       />
       {/* What THIS room puts into the sąmata — before any row is opened. */}
       {totals.length > 0 && (
@@ -553,6 +606,13 @@ export default function RoomSheet() {
                 onChange={(on) => saveScope(withRoomIncluded(project?._apimtis, roomNr, on))}
                 onFamily={(fam, on) => saveScope(withRoomFamily(project?._apimtis, roomNr, fam, on))}
               />
+              <RoomNameChips projectId={id} room={(project?.patalpos || []).find((r) => String(r?.nr) === String(roomNr)) || room} busy={busy} onAnswer={saveName} />
+              {lastFix?.factKey === 'pavadinimas' && (
+                <div className="px-4 pb-2" data-testid="room-name-saved">
+                  {lastFix.summary && <p className="pb-1 text-[15px] font-semibold">{lastFix.summary}</p>}
+                  <FixConsequence consequence={lastFix.consequence} busy={busy} onUndo={undoLastFix} />
+                </div>
+              )}
               <h2 className="flex items-baseline justify-between px-4 pb-2 pt-3 text-[17px] font-semibold">
                 {t('project.roomSheet.factsTitle')}
                 <span className="font-mono text-[13px] font-medium text-muted-foreground">
@@ -565,7 +625,10 @@ export default function RoomSheet() {
                   key={fact.key}
                   onMouseEnter={() => setActiveFactKey(fact.key)}
                   onMouseLeave={() => setActiveFactKey((k) => (k === fact.key ? null : k))}
-                  onFocusCapture={() => setActiveFactKey(fact.key)}
+                  onFocusCapture={() => { setActiveFactKey(fact.key); setFocusedFactKey(fact.key); }}
+                  onMouseDown={() => setFocusedFactKey(fact.key)}
+                  data-fact-focused={focusedFactKey === fact.key ? '1' : undefined}
+                  data-testid={`fact-${fact.key}`}
                 >
                   <FactRow
                     fact={fact}
@@ -584,6 +647,7 @@ export default function RoomSheet() {
                     onPickOutline={fact.key === 'perimetras' ? () => setPicking('outline') : null}
                     onSplitSpace={fact.key === 'perimetras' ? () => setPicking('split') : null}
                     onShowOnDrawing={() => setFocusRequest((cur) => ({ key: fact.key, nonce: (cur?.nonce || 0) + 1 }))}
+                    typed={typed?.key === fact.key ? typed : null}
                   />
                   {lastFix?.factKey === fact.key && (
                     <FixConsequence consequence={lastFix.consequence} busy={busy} onUndo={undoLastFix} />
