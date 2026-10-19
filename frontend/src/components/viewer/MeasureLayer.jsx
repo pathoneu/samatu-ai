@@ -13,6 +13,7 @@ import {
 } from '@/lib/polygonGeometry.js';
 import { pickSnap } from '@/lib/drawingSnap.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
+import { boxMode, marksInBox } from '@/lib/editGestures.js';
 import { flashCursorHint } from '@/lib/cursorHints.js';
 import { isAiMark } from '@/lib/symbolSearch.js';
 import {
@@ -76,6 +77,9 @@ export default function MeasureLayer({
   onDraftAction = null,
   calibA: calibAProp = null,
   onCalibAChange = null,
+  // „Žymėti" box selection (W5-A A5): ({ids, a, b, mode, add}) — a, b the box corners in PDF points, mode
+  // 'window' (dragged left→right: whole shapes) or 'crossing' (right→left: touched ones).
+  onBoxSelect = null,
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -91,6 +95,7 @@ export default function MeasureLayer({
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
   const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
   const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
+  const [box, setBox] = useState(null);           // {from, to (px), add} while a „Žymėti" box is dragged (A5)
   // Right-click while drawing (v3 W1-B B5, Kreo „Create / Reset"): „Baigti" / „Atšaukti" at the pointer.
   const [finishMenu, setFinishMenu] = useState(null);   // {x, y} in SVG px, or null
   const selectedSet = useMemo(
@@ -178,6 +183,14 @@ export default function MeasureLayer({
   }, []);
 
   const handlePointerMove = useCallback((e) => {
+    if (box) {
+      const p = localPx(e);
+      if (!box.moved && Math.hypot(p.x - box.from.x, p.y - box.from.y) >= 4) {
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ }
+      }
+      setBox((cur) => (cur ? { ...cur, to: p, moved: cur.moved || Math.hypot(p.x - cur.from.x, p.y - cur.from.y) >= 4 } : cur));
+      return;
+    }
     if (tool === 'lasso') {
       if (!lasso) return;
       const p = localPx(e);
@@ -193,7 +206,7 @@ export default function MeasureLayer({
     setCursor(point);
     setSnapPt(snapped ? point : null);
     setSnapKind(snapped ? kind : null);
-  }, [tool, applySnap, eventToPdf, lasso, localPx]);
+  }, [tool, applySnap, eventToPdf, lasso, box, localPx]);
 
   const handlePointerDown = useCallback((e) => {
     if (tool === 'pan') return;
@@ -211,6 +224,11 @@ export default function MeasureLayer({
       const raw = eventToPdf(e);
       const hitId = hitTest(raw, measurements, pageNr, SNAP_TOL_PX / adapter.scale);
       onSelect?.(hitId);
+      // on empty paper a drag draws a selection box (A5); a plain click stays a click (the room under it)
+      if (!hitId && e.button === 0 && onBoxSelect) {
+        const p = localPx(e);
+        setBox({ from: p, to: p, add: e.shiftKey });
+      }
       return;
     }
 
@@ -278,9 +296,19 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu, onBoxSelect]);
 
   const handlePointerUp = useCallback((e) => {
+    if (box) {
+      const b = box;
+      setBox(null);
+      if (!b.moved) return;
+      const a = adapter.toPdf(b.from);
+      const z = adapter.toPdf(b.to);
+      const mode = boxMode(b.from, b.to);
+      onBoxSelect?.({ ids: marksInBox(measurements, pageNr, a, z, mode), a, b: z, mode, add: b.add, pageNr });
+      return;
+    }
     if (tool !== 'lasso' || !lasso) return;
     const loop = lasso.px;
     const prev = [...selectedSet];
@@ -293,7 +321,7 @@ export default function MeasureLayer({
       ids = lassoSelect(measurements, pageNr, loop.map((p) => adapter.toPdf(p)));
     }
     onSelect?.(lasso.add ? [...new Set([...prev, ...ids])] : ids);
-  }, [tool, lasso, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect]);
+  }, [tool, lasso, box, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect, onBoxSelect]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;
@@ -390,7 +418,7 @@ export default function MeasureLayer({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => setLasso(null)}
+      onPointerCancel={() => { setLasso(null); setBox(null); }}
       onPointerLeave={() => setCursor(null)}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
@@ -431,6 +459,17 @@ export default function MeasureLayer({
         />
       )}
 
+      {box?.moved && (() => {
+        const x = Math.min(box.from.x, box.to.x); const y = Math.min(box.from.y, box.to.y);
+        const w = Math.abs(box.to.x - box.from.x); const h = Math.abs(box.to.y - box.from.y);
+        const words = boxMode(box.from, box.to) === 'window' ? 'Visos viduje' : 'Paliestos';
+        return (
+          <g pointerEvents="none" data-select-box={boxMode(box.from, box.to)}>
+            <rect x={x} y={y} width={w} height={h} style={paint({ fill: INK, stroke: INK })} fillOpacity={0.06} strokeOpacity={0.7} strokeWidth={1.5} />
+            <ReadoutChip x={x + 4} y={y - 6} text={words} anchor="start" />
+          </g>
+        );
+      })()}
       {lasso && lasso.px.length > 1 && (
         <polygon
           points={lasso.px.map((p) => `${p.x},${p.y}`).join(' ')}

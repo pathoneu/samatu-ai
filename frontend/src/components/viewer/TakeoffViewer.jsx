@@ -23,7 +23,7 @@ import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
-import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
+import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf, roomTypeWord } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { fetchHoleAt } from '@/lib/roomOutlineApi';
@@ -69,7 +69,7 @@ import useOutlineTool, { roomHoles } from './useOutlineTool';
 import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
 import VertexPopover from './VertexPopover';
-import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap } from '@/lib/editGestures';
+import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms } from '@/lib/editGestures';
 import { openingForEdge, addEdgeOpening, openingText } from '@/lib/openingEdit';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
@@ -1272,8 +1272,29 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     }
   } : null;
 
+  // „Žymėti" box selection (W5-A A5): the marks the box took, and the rooms — left→right whole ones, right→left
+  // touched ones; Shift adds to what is selected. The click the browser sends after the drag is not a room click.
+  const boxEndedRef = useRef(0);
+  const handleBoxSelect = ({ ids, a, b, mode, add, pageNr }) => {
+    boxEndedRef.current = Date.now();
+    setSelectedMeasureIds((cur) => (add ? [...new Set([...cur, ...ids])] : ids));
+    const pg = pageSizeOf(pageNr);
+    if (!pg?.size) return;
+    const rot = displayRotationFor(pg.rotation ?? 0);
+    const A = rotatePctPoint(a.x / pg.size.width, a.y / pg.size.height, rot);
+    const B = rotatePctPoint(b.x / pg.size.width, b.y / pg.size.height, rot);
+    const nrs = roomsInBox(rooms, pageNr, A, B, mode, hiddenRoomNrs);
+    if (add) {
+      const all = [...new Set([...(focusedRoomNr != null ? [String(focusedRoomNr)] : []), ...extraRoomNrs.map(String), ...nrs])];
+      applyRoomSelection({ focused: all[0] ?? null, extra: all.slice(1) });
+    } else {
+      applyRoomSelection({ focused: nrs[0] ?? null, extra: nrs.slice(1) });
+    }
+  };
+
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
+    if (Date.now() - boxEndedRef.current < 400) return;   // the click that ends a selection box (A5)
     if (legend.active) return;   // so does the legend tool (LegendLayer)
     if (roomToolArmed) { roomTool.click(pt); return; }   // the room tool R (Pathon v3 W1-D)
     if (fillFor == null) {
@@ -1592,6 +1613,18 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onExclude: projectId ? () => openRoomSheet(barRoom.nr) : null,
     onEvidence: projectId ? () => openRoomSheet(barRoom.nr) : null,
     onFill: onRoomPolygonFill ? () => startFill(barRoom.nr) : null,
+    // „Pažymėti panašias" (W5-A A5): the rooms of the same purpose / the same floor covering join the selection
+    similar: {
+      paskirtis: barRoom.paskirtis ? similarRooms(rooms, barRoom.nr, 'paskirtis').length : 0,
+      grindu_danga: barRoom.grindu_danga ? similarRooms(rooms, barRoom.nr, 'grindu_danga').length : 0,
+      paskirtisWord: barRoom.paskirtis ? roomTypeWord(barRoom.paskirtis) || barRoom.paskirtis : null,
+      grinduWord: ({ plyteles: 'plytelės', minksta: 'parketas ar laminatas', be_dangos: 'be dangos' })[barRoom.grindu_danga] || barRoom.grindu_danga || null,
+    },
+    onSimilar: (by) => {
+      const like = similarRooms(rooms, barRoom.nr, by);
+      applyRoomSelection({ focused: String(barRoom.nr), extra: like });
+      toast.success(like.length ? `Pažymėta ${like.length + 1} patalpos` : 'Panašių patalpų nėra');
+    },
   } : null;
   const roomLabelSelectors = focusedRoomNr != null
     ? [`[data-room-label="${focusedRoomNr}"]`, `[data-room-ring="${focusedRoomNr}"]`, `[data-room-zone="${focusedRoomNr}"]`] : [];
@@ -1819,6 +1852,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                         rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
                       }))}
                       onMeasureSelect={setSelectedMeasureId}
+                      onMeasureBoxSelect={handleBoxSelect}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}

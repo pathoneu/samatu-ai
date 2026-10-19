@@ -113,6 +113,8 @@ export default function PageOverlayHost({
   onMeasureCommit = null,
   onMeasureCalibrate = null,
   onMeasureSelect = null,
+  // „Žymėti" box selection (W5-A A5) → TakeoffViewer.handleBoxSelect.
+  onMeasureBoxSelect = null,
   onMeasureDelete = null,
   // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
   onMeasureContextMenu = null,
@@ -319,6 +321,7 @@ export default function PageOverlayHost({
             onCommit={onMeasureCommit}
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
+            onBoxSelect={onMeasureBoxSelect}
             onDelete={onMeasureDelete}
             selectedIds={selectedMeasureIds}
             draft={measureDraft}

@@ -189,6 +189,40 @@ test.describe('W5-A editing gestures', () => {
     await expect.poll(async () => JSON.stringify((await stored(page)).rooms['06'].elementai || [])).toBe(JSON.stringify(before));
   });
 
+  test('A5: „Žymėti" box — left→right takes whole rooms, right→left touched ones; „Pažymėti panašias"', async ({ page }) => {
+    await openProject(page);
+    const { rooms } = await stored(page);
+    const bb = (nr) => {
+      const r = rooms[nr].polygon_pct;
+      return { x0: Math.min(...r.map((p) => p[0])), y0: Math.min(...r.map((p) => p[1])), x1: Math.max(...r.map((p) => p[0])), y1: Math.max(...r.map((p) => p[1])) };
+    };
+    const a = bb('07'); const b = bb('08');
+    const box = { x0: Math.min(a.x0, b.x0) - 0.004, y0: Math.min(a.y0, b.y0) - 0.004, x1: Math.max(a.x1, b.x1) + 0.004, y1: Math.max(a.y1, b.y1) + 0.004 };
+    await bringIntoView(page, (box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
+    await page.keyboard.press('1');
+    const k = counter();
+    await k.drag(page, await at(page, box.x0, box.y0), await at(page, box.x1, box.y1));
+    const bar = page.getByTestId('selection-bar');
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText('07');
+    await expect(bar).toContainText('08');
+    note(`dvi patalpos rėmeliu: ${k.text()}`);
+    await shot(page, 'w5a-a5-box-window');
+    // right→left, a box that only touches 07's middle: 07 alone (08 lies outside it)
+    const mx = (a.x0 + a.x1) / 2; const my = (a.y0 + a.y1) / 2;
+    await k.drag(page, await at(page, mx + 0.004, my - 0.004), await at(page, mx - 0.004, my + 0.004));
+    await expect(bar).toContainText('07');
+    await expect(bar).not.toContainText('08');
+    // 06 Vaiko kambarys + „Pažymėti panašias" → the other bedroom joins
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await bringIntoView(page, ...ROOM_06);
+    await page.mouse.click(...Object.values(await at(page, ...ROOM_06)));
+    await page.getByTestId('selection-similar').click();
+    await page.getByTestId('selection-similar-paskirtis').click();
+    await expect(bar).toContainText('06 + 09');
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);
