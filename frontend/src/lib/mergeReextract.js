@@ -161,6 +161,8 @@ export function carryUserFacts(oldRoom, freshRoom) {
     if (was.langai !== now.langai) carried.push({ key: 'langai', kept: was.langai, read: now.langai });
     room.elementai = oldRoom.elementai;
     room._angos_user_at = oldRoom._angos_user_at;
+    // his answer to „Durys ir langai“ on the question card (2026-10-19) goes with the openings it set
+    if (oldRoom._angos_patikrinta_at) room._angos_patikrinta_at = oldRoom._angos_patikrinta_at;
   }
   if (oldRoom._paskirtis_user_at && oldRoom.paskirtis != null) {
     if (src(oldRoom.paskirtis) !== src(freshRoom.paskirtis)) {
