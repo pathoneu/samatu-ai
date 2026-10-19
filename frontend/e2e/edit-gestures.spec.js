@@ -367,7 +367,8 @@ test.describe('W5-A editing gestures', () => {
     const start = await count();
     // Plotas as a rectangle: two clicks
     await page.keyboard.press('3');
-    await page.getByTestId('pill-shape-rect').click();
+    await page.getByTestId('pill-shape').click();                      // Laisvai → Stačiakampis
+    await expect(page.getByTestId('pill-shape')).toHaveAttribute('data-shape', 'rect');
     await page.mouse.click(...Object.values(await at(page, 0.50, 0.50)));
     await page.mouse.click(...Object.values(await at(page, 0.56, 0.56)));
     await expect(toast(page, 'Plotas:')).toBeVisible();
@@ -377,7 +378,9 @@ test.describe('W5-A editing gestures', () => {
     // Perimetras with an arc: start, then „Lankas": a point on it, its end; Enter
     await page.keyboard.press('Escape');
     await page.keyboard.press('4');
-    await page.getByTestId('pill-shape-arc').click();
+    // the shape stays what he chose last (Stačiakampis): one more step → Lankas
+    await page.getByTestId('pill-shape').click();
+    await expect(page.getByTestId('pill-shape')).toHaveAttribute('data-shape', 'arc');
     await page.mouse.click(...Object.values(await at(page, 0.50, 0.60)));
     await page.mouse.click(...Object.values(await at(page, 0.53, 0.58)));
     await page.mouse.move(...Object.values(await at(page, 0.56, 0.60)));

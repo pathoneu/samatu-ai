@@ -83,7 +83,7 @@ export function modePillFor(state = {}) {
     const drawing = draftPoints > 0;
     // „Kaip braižyti" (A11): corner by corner, a rectangle from two corners, or the next segment as an arc
     const shapes = tool === 'distance' ? null : [
-      { id: 'free', label: 'Laisvai', title: 'Kampas po kampo' },
+      { id: 'free', label: 'Laisvai', title: 'Kampas po kampo · Shift — tik tiesiai arba 45°' },
       { id: 'rect', label: 'Stačiakampis', title: 'Du priešingi kampai — stačiakampis' },
       { id: 'arc', label: 'Lankas', title: 'Kita atkarpa — lankas: spustelėkite tašką ant lanko, tada jo galą' },
     ].map((x) => ({ ...x, pressed: x.id === (drawShape || 'free') }));
@@ -94,7 +94,9 @@ export function modePillFor(state = {}) {
       detail: null,
       keys: drawing
         ? `${hintText(['draftFinish', 'draftStepBack'], { mac })} · skaičiai — kitos atkarpos ilgis`
-        : (tool === 'distance' ? 'Antras spustelėjimas įrašo · Shift — tęsti, tik tiesiai arba 45°' : 'Shift — tik tiesiai arba 45°'),
+        // Plotas / Perimetras at rest carry the shape choice instead (W5-A A11): „Shift — tik tiesiai arba 45°" moves to
+        // the sentence beside the pointer, so the pill keeps one line beside the zoom column at 1280 px
+        : (tool === 'distance' ? 'Antras spustelėjimas įrašo · Shift — tęsti, tik tiesiai arba 45°' : null),
       actions: drawing
         ? [
             {
