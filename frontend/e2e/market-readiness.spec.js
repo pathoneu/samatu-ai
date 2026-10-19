@@ -66,7 +66,7 @@ test.describe('help and onboarding (M6)', () => {
 
 // B1-E (founder 2026-10-19): a one-sentence first-use hint per tool, used up by the first click.
 test.describe('first-use hints (B1-E)', () => {
-  test('the first time R or G is on, one sentence stands above the pointer hint; the first click uses it up', async ({ page }) => {
+  test('the first time R or Kiekis is on, one sentence stands above the pointer hint; the first click uses it up', async ({ page }) => {
     await page.addInitScript(() => { try { localStorage.removeItem('samatu_first_use_seen'); } catch { /* blocked */ } });
     await openProject(page);
     const canvas = await page.getByTestId('viewer-canvas').boundingBox();
@@ -81,20 +81,28 @@ test.describe('first-use hints (B1-E)', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('mode-pill')).toHaveCount(0);
-    await page.keyboard.press('g');
+    // Kiekis: its own sentence (nothing clicked — a click would place a mark)
+    await page.keyboard.press('6');
     await page.mouse.move(x + 8, y + 8);
-    await expect(first).toHaveText(/legendos ženklus/);
+    await expect(first).toHaveText('Kiekvienas spustelėjimas prideda vieną vienetą.');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    // R again: not used yet, so still there; one click on the drawing uses it up (a proposal, nothing saved)
+    await page.keyboard.press('r');
+    await page.mouse.move(x + 10, y + 10);
+    await expect(first).toBeVisible();
     await page.mouse.down();
     await page.mouse.up();
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
-    await page.keyboard.press('g');
+    await page.keyboard.press('r');
     await page.mouse.move(x + 12, y + 12);
     await expect(page.getByTestId('cursor-hint')).toBeVisible();
     await expect(first, 'used up after the first click').toHaveCount(0);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('samatu_first_use_seen')))).toContain('legend');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('samatu_first_use_seen')))).toEqual(['room']);
     await page.keyboard.press('Escape');
-    note('first-use: R and G each one sentence, gone after use');
+    await page.keyboard.press('Escape');
+    note('first-use: R and Kiekis each one sentence; R gone after its first click');
   });
 });
 
