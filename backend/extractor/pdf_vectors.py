@@ -23,13 +23,15 @@ stroke-only paths are not walked at all unless asked for: objektas_b's 65
 sheets carry millions of them, and the first version spent 93 s there.
 
 Everything is in the DISPLAY frame the strings and badges use: PDF points,
-origin top-left, y down, /Rotate applied.
+origin top-left, y down, /Rotate applied. The frame is the PAGE's (`page_frames`),
+never guessed from where the paths lie (2026-10-18).
 """
 from __future__ import annotations
 
 import collections
 import ctypes
 import hashlib
+import logging
 import math
 import warnings
 from typing import Sequence
@@ -45,6 +47,7 @@ _CACHE_PAGES = 12
 _CACHE_PATHS = 150_000      # …and at most this many paths in all: objektas_g's furniture sheet alone has 50 000
 
 _pages: "collections.OrderedDict[tuple[bytes, int, bool], dict]" = collections.OrderedDict()
+_log = logging.getLogger("samatu.pdf_vectors")
 
 
 def _doc_key(pdf_bytes: bytes) -> bytes:
@@ -62,6 +65,36 @@ def _to_display(x: float, y: float, W: float, H: float, quarter_turns: int) -> t
     if quarter_turns == 3:
         return y, W - x
     return x, y
+
+
+def page_frames(page) -> tuple[float, float, float, float, int]:
+    """(W, H, Wd, Hd, rotation) of an open PDFium page — the caller holds PDFIUM_LOCK.
+
+    W × H is the page BEFORE /Rotate: the frame PDFium's path points and
+    character boxes live in, what `_to_display` turns. Wd × Hd is the page AS
+    DISPLAYED, which is what `get_size` returns — PDFium swaps width and height
+    for /Rotate 90 and 270 (objektas_e: MediaBox 842 × 1191, /Rotate 270 →
+    1191 × 842; sheet_zones.display_frame). Shared by the wall, character and
+    hairline readers.
+
+    Until 2026-10-18 each reader guessed W × H from where its content lay
+    ("the frame that contains the boxes is theirs"). A turned sheet whose
+    drawing stays inside the short side fits both frames and got the wrong
+    one — objektas_e: the text turned on 17 sheets, the walls on 3."""
+    Wd, Hd = (float(v) for v in page.get_size())
+    rotation = int(page.get_rotation() or 0) % 360
+    W, H = (Hd, Wd) if rotation in (90, 270) else (Wd, Hd)
+    return W, H, Wd, Hd, rotation
+
+
+def check_content_frame(W: float, H: float, xmax: float, ymax: float, reader: str, page_nr: int) -> None:
+    """A cross-check that never decides: content past the page's own frame
+    that would fit the turned one is what the old guess took for a turned
+    frame. Logged, so a file whose content really disagrees with its page
+    shows up instead of being placed quietly elsewhere."""
+    if (xmax > W + 1 or ymax > H + 1) and xmax <= H + 1 and ymax <= W + 1:
+        _log.debug("%s p%s: content reaches %.0f × %.0f, past the page's %.0f × %.0f — read in the page's frame",
+                   reader, page_nr, xmax, ymax, W, H)
 
 
 def _colour(r: int, g: int, b: int) -> tuple[float, float, float]:
@@ -101,8 +134,7 @@ def _read_page_unlocked(pdf_bytes: bytes, page_nr: int, strokes: bool) -> dict:
             return empty
         page = doc[page_nr - 1]
         try:
-            Ws, Hs = (float(v) for v in page.get_size())
-            rotation = int(page.get_rotation() or 0) % 360
+            W, H, Wd, Hd, rotation = page_frames(page)
             raw_paths: list[tuple] = []
             xmax = ymax = 0.0
             fill_mode, stroked = ctypes.c_int(), ctypes.c_int()
@@ -154,17 +186,11 @@ def _read_page_unlocked(pdf_bytes: bytes, page_nr: int, strokes: bool) -> dict:
                     subpaths.append(cur)
                 if subpaths:
                     raw_paths.append((fill, stroke, float(width.value) * scale, subpaths))
-            # PDFium's get_size is the unrotated page for some files and the
-            # /Rotate-d one for others; the frame that contains the paths is
-            # theirs (same settling as the text and hairline readers).
-            W, H = Ws, Hs
-            if (xmax > Ws + 1 or ymax > Hs + 1) and xmax <= Hs + 1 and ymax <= Ws + 1:
-                W, H = Hs, Ws
+            check_content_frame(W, H, xmax, ymax, "pdf_vectors", page_nr)
             k = (rotation // 90) % 4
             paths = [{"fill": fill, "stroke": stroke, "width": round(w, 3),
                       "subpaths": [[_to_display(x, y, W, H, k) for x, y in sub] for sub in subs]}
                      for fill, stroke, w, subs in raw_paths]
-            Wd, Hd = (H, W) if k in (1, 3) else (W, H)
             return {"width": Wd, "height": Hd, "rotation": rotation, "paths": paths}
         finally:
             page.close()

@@ -203,5 +203,16 @@ def test_status_a_project_read_at_lane_version_11_is_offered_the_evidence_refres
     _isolate(tmp_path, monkeypatch)
     _store(blob=_blob(geometrija={"versija": 11}))
     body = TestClient(app).get("/api/projects/p1/free-reread").json()
-    assert gl.LANE_VERSION == 12
+    assert gl.LANE_VERSION >= 12
     assert body["needed"] is True and body["projekto_versija"] == 11
+
+
+def test_status_a_project_read_at_lane_version_12_is_offered_the_reader_frame_reread(tmp_path, monkeypatch):
+    """LANE_VERSION 13 (2026-10-18): the readers take the display frame from the page — a turned sheet whose
+    drawing sits inside the short side was read in the wrong orientation; a project read at 12 is offered the
+    free re-read."""
+    _isolate(tmp_path, monkeypatch)
+    _store(blob=_blob(geometrija={"versija": 12}))
+    body = TestClient(app).get("/api/projects/p1/free-reread").json()
+    assert gl.LANE_VERSION == 13
+    assert body["needed"] is True and body["projekto_versija"] == 12

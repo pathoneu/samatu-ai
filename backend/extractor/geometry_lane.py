@@ -155,7 +155,11 @@ def _forget_open_space(room: dict) -> None:
 # of that area could be (104: 13,98 → 14,96 m around 13,51 m²); the outline's own length stays beside it.
 # 12 (2026-10-16): the drawn length each dimension string's scale ratio used (`ilgis_pt`) rides with the string into the
 # walls' evidence, also on a room whose walls were summed before — the viewer's scale check needs it; no quantity changes.
-LANE_VERSION = 12
+# 13 (2026-10-18): the wall, character and hairline readers take the display frame from the page (PDFium `get_size`,
+# pdf_vectors.page_frames) instead of guessing it from where the content lies — a /Rotate 90/270 sheet whose drawing
+# sits inside the short side was read in the wrong orientation (objektas_e: text on 17 sheets, walls on 3), so its
+# walls, strings and outlines landed elsewhere; the re-read is free. The corpus's other projects read identically.
+LANE_VERSION = 13
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

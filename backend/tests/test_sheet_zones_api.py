@@ -141,7 +141,7 @@ def test_the_free_reread_stores_zones_of_the_lane_sheets_and_changes_no_room_key
     assert "zonos" not in without["_meta"]
     meta = {k: v for k, v in with_zones["_meta"].items() if k != "zonos"}
     assert meta.keys() == without["_meta"].keys()
-    assert with_zones["_meta"]["geometrija"]["versija"] == gl.LANE_VERSION == 12   # not raised for zones
+    assert with_zones["_meta"]["geometrija"]["versija"] == gl.LANE_VERSION == 13   # raised for the reader frame (2026-10-18), not for zones
 
 
 def test_the_reread_lays_out_tables_only_on_light_sheets(monkeypatch):

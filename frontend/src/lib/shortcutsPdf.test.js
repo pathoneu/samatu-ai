@@ -37,4 +37,7 @@ test('drawShortcutSheet draws every row label on the page', () => {
     for (const it of r.items) assert.ok(all.includes(it.label.split(' ')[0]), it.id);
   }
   for (const d of drawn) assert.ok(d.y < 1754 && d.x < 1240, `"${d.t}" drawn off the page at ${d.x},${d.y}`);
+  // the list ends above the footer line (one A4 page, v3: the body shrinks to fit when the table grows)
+  const footer = drawn.find((d) => d.t.startsWith('Pathon ·'));
+  for (const d of drawn.filter((x) => x !== footer)) assert.ok(d.y < footer.y, `"${d.t}" runs into the footer`);
 });

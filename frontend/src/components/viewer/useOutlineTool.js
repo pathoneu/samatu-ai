@@ -75,7 +75,9 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
   const [tool, setTool] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const start = useCallback((mode) => {
+  // `opts.targetNr` (merge, Pathon v3 W1-B): a room already picked — Shift+click on the drawing — so the merge
+  // is proposed at once instead of waiting for a click on it (OutlineToolLayer measures it on its sheet).
+  const start = useCallback((mode, opts = {}) => {
     const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
     const ring = roomRing(r);
     if (!ring) {
@@ -93,6 +95,7 @@ export default function useOutlineTool({ rooms, focusedRoom, onSave, onBeforeSta
       tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
       history: [],
       ...(mode === 'subtract' ? { shape: 'rect', draft: [], dirty: false } : {}),
+      ...(mode === 'merge' && opts.targetNr && String(opts.targetNr) !== String(r.nr) ? { pendingTargetNr: String(opts.targetNr) } : {}),
     });
   }, [focusedRoom, rooms, onBeforeStart]);
 
