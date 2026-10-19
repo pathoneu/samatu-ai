@@ -14,7 +14,7 @@ import LegalLayout, {
   Section, P, Term, UL, LI, Callout,
 } from '@/components/legal/LegalLayout';
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 export default function Terms() {
   const { t, i18n } = useTranslation();

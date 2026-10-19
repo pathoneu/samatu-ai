@@ -11,7 +11,7 @@
  */
 
 import { useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { X, MapPin, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {

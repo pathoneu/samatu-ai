@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ArrowRight, Check, CircleHelp, Loader2, MinusCircle, PenLine } from 'lucide-react';
 
 import { toast } from 'sonner';

@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { toast } from 'sonner';
 import { fetchExtractionJob, waitForExtraction, runEndText } from '@/lib/extractionRun';
 import {

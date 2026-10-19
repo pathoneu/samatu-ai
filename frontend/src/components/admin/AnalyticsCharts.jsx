@@ -6,7 +6,7 @@
  * Uses analytics.series (densified so the x-axis is a continuous calendar).
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';

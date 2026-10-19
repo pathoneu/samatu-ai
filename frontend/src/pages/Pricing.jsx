@@ -11,7 +11,7 @@
 
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Button } from '@/components/ui/button';
 import { Check, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';

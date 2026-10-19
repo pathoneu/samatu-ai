@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 export default function EksplikacijaSourcePopover({ room, anchorRect, onClose }) {
   const { t } = useTranslation();

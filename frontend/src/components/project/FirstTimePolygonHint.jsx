@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 const STORAGE_KEY = 'samatu_polygon_hint_seen';
 

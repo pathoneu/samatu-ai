@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ltCount } from '@/lib/ltPlural';
 import { VAT_RATES, VAT_REVERSE, VAT_STANDARD, vatChoice, vatRateOf } from '@/lib/vatMode';
 import { getSettings } from '@/lib/projectStore';

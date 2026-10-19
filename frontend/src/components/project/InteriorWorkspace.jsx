@@ -18,7 +18,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Layers, Upload, Map as MapIcon, Maximize2, Minimize2 } from 'lucide-react';
 import PlanViewer from './PlanViewer';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';

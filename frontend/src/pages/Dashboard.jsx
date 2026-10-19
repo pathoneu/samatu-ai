@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { useQuery } from '@tanstack/react-query';
 import { FolderPlus, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';

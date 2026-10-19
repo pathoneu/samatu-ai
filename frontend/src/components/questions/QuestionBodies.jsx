@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Check, ExternalLink, MapPin } from 'lucide-react';
 
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';

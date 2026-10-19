@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function SectionHeader({ name, rowCount, subtotal, isCollapsed, onToggle }) {

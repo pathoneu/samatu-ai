@@ -24,7 +24,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import {
   ChevronDown, ChevronRight, ShieldCheck, AlertTriangle, AlertCircle, CheckCircle2,
   Check, X, Pencil, GraduationCap,

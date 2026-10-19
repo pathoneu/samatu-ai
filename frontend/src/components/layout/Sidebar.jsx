@@ -12,7 +12,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import {
   Home, FileText, Plus, Sliders, Settings, ShieldCheck, LogOut, CreditCard, Layers, LifeBuoy,
 } from 'lucide-react';

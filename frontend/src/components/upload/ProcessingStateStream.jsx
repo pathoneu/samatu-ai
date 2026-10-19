@@ -6,7 +6,7 @@
  * grows the patalpos list as Pass-2 zoom finishes each room.
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileSearch, Brain, Search, CheckCircle2, AlertCircle, Home,

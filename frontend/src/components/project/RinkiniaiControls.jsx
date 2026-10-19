@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Layers } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Button } from '@/components/ui/button';
 import { listAssemblies } from '@/lib/assembliesApi';
 import { applyAssembliesToPositions, hasPrices } from '@/lib/assemblyPricing';

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Upload, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

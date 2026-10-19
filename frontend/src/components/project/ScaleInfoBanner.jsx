@@ -11,7 +11,7 @@
  * complained, info otherwise (was its own amber box with dark-theme leftovers).
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Ruler, AlertTriangle, CheckCircle2, AlertOctagon } from 'lucide-react';
 import Notice from '@/components/ui/Notice';
 

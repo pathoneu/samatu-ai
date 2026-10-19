@@ -10,7 +10,7 @@
  * project goes back to exactly what it was, not to a recomputation of it.
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Undo2 } from 'lucide-react';
 import { ltNumber } from '@/lib/ledger';
 import { ltPlural } from '@/lib/ltPlural';
