@@ -83,7 +83,7 @@ export function useDetectRun(project, onProjectChange) {
       await flushProjectSaves();          // the server reads the stored project: his last edit must be there
       const snapshot = await startDetectRun(id, requestBody(pages, features));
       if (!alive.current) return;
-      setRun({ pages, features, snapshot, client: null });
+      setRun({ pages, features, snapshot, client: null, job: snapshot.job });
       follow(snapshot.job, pages, features);
     } catch (err) {
       console.error('[detectRun] start failed:', err);
@@ -97,7 +97,22 @@ export function useDetectRun(project, onProjectChange) {
 
   const dismiss = useCallback(() => { clearTimeout(timer.current); setRun(null); }, []);
 
+  // „Bandyti dar kartą" (C5, #169): a lost connection picks the SAME job's progress up again (the server kept
+  // reading); a start that did not go starts again with the same sheets and features
+  const runRef = useRef(run);
+  runRef.current = run;
+  const retry = useCallback(() => {
+    const r = runRef.current;
+    if (!r) return;
+    clearTimeout(timer.current);
+    if (r.startError) { start(r.pages, r.features); return; }
+    if (r.lost && r.job) {
+      setRun((cur) => cur && { ...cur, lost: null });
+      follow(r.job, r.pages, r.features);
+    }
+  }, [start, follow]);
+
   const view = run && (run.snapshot || !run.startError) ? viewOf(run.snapshot, run.client) : null;
   const busy = Boolean(run && !run.startError && !run.lost && !(view && view.terminal));
-  return { run, view, busy, start, dismiss };
+  return { run, view, busy, start, dismiss, retry };
 }

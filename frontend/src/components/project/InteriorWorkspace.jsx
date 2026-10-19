@@ -995,9 +995,10 @@ export default function InteriorWorkspace({
           ? (isMobile ? { height: STRIP_WIDTH } : { width: STRIP_WIDTH })
           : (isMobile ? { height: '60%' } : undefined)}
       >
+        {/* the run pill — bottom centre, above the mode pill's row, clear of the top row of tool cards (C5) */}
         {detectRun.run && !strip && (
-          <div className="pointer-events-none absolute right-3 top-11 z-30">
-            <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-14 z-30 flex justify-center px-4">
+            <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} onRetry={detectRun.retry} />
           </div>
         )}
         {detecting && !strip && (
