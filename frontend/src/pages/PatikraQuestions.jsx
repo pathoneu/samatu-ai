@@ -46,6 +46,7 @@ import { PANEL_TWO_COLUMNS_MIN, useWorkspaceHost } from '@/components/project/wo
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ReadRating from '@/components/project/ReadRating';
 import RemindersNotice from '@/components/project/RemindersNotice';
+import NoticeFold from '@/components/project/NoticeFold';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
 import {
@@ -510,11 +511,15 @@ export default function PatikraQuestions() {
         )}
       </div>
 
-      <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
-      {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
-      <ReadRating project={project} className="mx-4 mt-3" />
-      {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
-      <RemindersNotice projectId={id} where="patikra" reloadKey={project?.updated_at || 0} className="mx-4 mt-3" />
+      {/* two or more of these fold into one „Pranešimai (N)" line that names them (v3 W6-A: at 1280×720
+          they pushed the first question below the panel); what the last answer moved stays outside */}
+      <NoticeFold className="mx-4 mt-3">
+        <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
+        {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
+        <ReadRating project={project} className="mx-4 mt-3" />
+        {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
+        <RemindersNotice projectId={id} where="patikra" reloadKey={project?.updated_at || 0} className="mx-4 mt-3" />
+      </NoticeFold>
 
       {/* what the LAST answer moved — above the next question, with the way back */}
       {lastFix && (
