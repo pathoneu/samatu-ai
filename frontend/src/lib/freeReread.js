@@ -64,6 +64,8 @@ export function mergeReadMeta(storedMeta, readMeta) {
   if (isObj(readMeta.lenteles)) out.lenteles = readMeta.lenteles;
   // the floor sheet's key lines (Pathon v3 W5-D, D1) — a record of the floor sheet, taken whole
   if (Array.isArray(readMeta.grindu_legenda)) out.grindu_legenda = readMeta.grindu_legenda;
+  // the wall / partition types the legends name (W5-D D9) — a record of the drawing, taken whole
+  if (isObj(readMeta.sienu_tipai)) out.sienu_tipai = readMeta.sienu_tipai;
   const zonos = mergeZones(base.zonos, readMeta.zonos);
   if (zonos !== undefined) out.zonos = zonos;
   return out;

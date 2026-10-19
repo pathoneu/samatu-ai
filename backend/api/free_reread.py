@@ -220,6 +220,11 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
     figures = read_figures_and_heights(parsed, pdf_bytes, project.get("id"))
+    # the wall and partition types the legends name (Pathon v3 W5-D, D9) — evidence beside the walls fact
+    from extractor.wall_types import read_wall_types
+    walls = read_wall_types(pdf_bytes)
+    if walls["eilutes"] or walls["neperskaityta"]:
+        parsed.setdefault("_meta", {})["sienu_tipai"] = walls
     # the schedules' codes counted where the plan writes them (Pathon v3 W5-D, D10 — extractor/schedule_tags.py):
     # evidence on the schedule record for the Patikra question `lentele_zymos`; no quantity reads it
     from extractor.schedule_tags import count_schedule_tags

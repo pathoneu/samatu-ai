@@ -1869,6 +1869,8 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
         fact["crop_url"] = evidence_url(project_id, page, rect, d)
         for ev in fact.get("lenteles") or []:
             ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
+        for ev in fact.get("sienu_tipai") or []:
+            ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
         leg = fact.get("legenda")
         if isinstance(leg, dict) and leg.get("page"):
             leg["crop_url"] = evidence_url(project_id, leg.get("page"), leg.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
@@ -1885,6 +1887,26 @@ def _table_entry(kind: str, page: Any, rect: Any, sentence: str) -> dict | None:
     if not p or not sentence:
         return None
     return {"kind": kind, "page": int(p), "rect_pct": box, "sentence": sentence, "crop_url": None}
+
+
+def wall_type_evidence(project: dict) -> list[dict]:
+    """`_meta.sienu_tipai` (extractor/wall_types.py, written by the free re-read) as evidence entries
+    {page, rect_pct, sentence, crop_url}: one per legend row naming a wall or partition type, and one per sheet
+    whose wall legend could not be read (a broken font) — never quoted, only pointed at."""
+    from .wall_types import wall_type_sentence
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    rec = meta.get("sienu_tipai") if isinstance(meta.get("sienu_tipai"), dict) else {}
+    out = []
+    for e in rec.get("eilutes") or []:
+        if isinstance(e, dict) and e.get("page") and e.get("tekstas"):
+            rect = e.get("rect_pct")
+            out.append({"page": int(e["page"]), "rect_pct": _clamp_rect(list(rect)) if isinstance(rect, list) and len(rect) == 4 else None,
+                        "sentence": wall_type_sentence(e), "crop_url": None})
+    for page in rec.get("neperskaityta") or []:
+        out.append({"page": int(page), "rect_pct": None, "crop_url": None,
+                    "sentence": f"Sienų tipų legenda ({int(page)} psl.) brėžinyje užrašyta šriftu, kurio perskaityti "
+                                "negaliu, — sienų tipus žiūrėkite brėžinyje."})
+    return out[:12]
 
 
 def table_evidence(project: dict, room: dict) -> dict[str, list[dict]]:
@@ -2089,6 +2111,12 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
     for fact in facts:
         if tables.get(fact["key"]):
             fact["lenteles"] = tables[fact["key"]]
+    # the wall and partition types the drawing's legends name (Pathon v3 W5-D, D9) — evidence beside the
+    # partitions (or the walls) fact; which wall is which type is not decided here
+    walls = wall_type_evidence(project)
+    target = next((f for f in facts if f["key"] == "pertvaros"), None) or next((f for f in facts if f["key"] == "apdaila"), None)
+    if walls and target is not None:
+        target["sienu_tipai"] = walls
     quantities, excluded = room_quantities(project, room_nr)
     return {
         "room": {
