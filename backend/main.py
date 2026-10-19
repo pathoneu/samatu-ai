@@ -417,6 +417,7 @@ from api.free_reread import router as free_reread_router
 from api.detect_run import router as detect_run_router
 from api.room_outline import router as room_outline_router
 from api.page_geometry import router as page_geometry_router
+from api.room_names import router as room_names_router
 from api.sheet_zones import router as sheet_zones_router
 from api.legend_count import router as legend_count_router
 from api.sheet_links import router as sheet_links_router
@@ -776,6 +777,7 @@ app.include_router(free_reread_router)
 app.include_router(detect_run_router)
 app.include_router(room_outline_router)
 app.include_router(page_geometry_router)
+app.include_router(room_names_router)
 app.include_router(sheet_zones_router)
 app.include_router(legend_count_router)
 app.include_router(sheet_links_router)

@@ -65,6 +65,8 @@ import { StepBar } from '@/components/project/StepRail';
 import { useWorkspaceHost } from '@/components/project/workspaceHost';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
+import RoomNameChips from '@/components/roomsheet/RoomNameChips';
+import { namePatch } from '@/lib/roomNames';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
   + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
@@ -228,6 +230,13 @@ export default function RoomSheet() {
     await land(result, { fromInterior: true });
     toast.success(t('project.roomSheet.roomAdded', { nr: room.nr }));
   }), [run, project, land, t, pilot]);
+
+  // „Ar tai virtuvė? [Taip]" (C3): the name and kind he picks, down the room edit path — one undo
+  const saveName = useCallback((choice) => run(async () => {
+    pilot('room_name', { kind: 'fact', id: 'pavadinimas' });
+    await land(await saveRoomEdit(project, patchRoom(project, roomNr, namePatch(choice))),
+      { fromInterior: true, factKey: 'pavadinimas', summary: t('project.roomNames.saved', { name: choice.pavadinimas }) });
+  }), [run, project, roomNr, land, pilot, t]);
 
   const saveChoice = useCallback((field, value) => run(async () => {
     pilot('fact_choice', { kind: 'fact', id: field });
@@ -553,6 +562,13 @@ export default function RoomSheet() {
                 onChange={(on) => saveScope(withRoomIncluded(project?._apimtis, roomNr, on))}
                 onFamily={(fam, on) => saveScope(withRoomFamily(project?._apimtis, roomNr, fam, on))}
               />
+              <RoomNameChips projectId={id} room={(project?.patalpos || []).find((r) => String(r?.nr) === String(roomNr)) || room} busy={busy} onAnswer={saveName} />
+              {lastFix?.factKey === 'pavadinimas' && (
+                <div className="px-4 pb-2" data-testid="room-name-saved">
+                  {lastFix.summary && <p className="pb-1 text-[15px] font-semibold">{lastFix.summary}</p>}
+                  <FixConsequence consequence={lastFix.consequence} busy={busy} onUndo={undoLastFix} />
+                </div>
+              )}
               <h2 className="flex items-baseline justify-between px-4 pb-2 pt-3 text-[17px] font-semibold">
                 {t('project.roomSheet.factsTitle')}
                 <span className="font-mono text-[13px] font-medium text-muted-foreground">

@@ -1668,6 +1668,15 @@
       "colTotal": "Suma, €",
       "totalNoVat": "Iš viso be PVM"
     },
+    "roomNames": {
+      "question": "Ar tai {{name}}?",
+      "evidence": "Plane šioje patalpoje užrašyta: „{{word}}“.",
+      "yes": "Taip",
+      "other": "Kita…",
+      "ownLabel": "Kitas pavadinimas",
+      "save": "Įrašyti",
+      "saved": "Patalpa pavadinta: {{name}}."
+    },
     "questions": {
       "title": "Patikra",
       "headOpen": "Brėžinį perskaičiau. Liko {{count}} {{word}}.",
