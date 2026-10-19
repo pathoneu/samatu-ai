@@ -232,3 +232,42 @@ def test_a_second_user_cannot_read_or_promote_the_first_users_architect_legend(m
                   json={"architect": "ArchX", "opt_in": True, "verified_in_projects": ["p1"]}).status_code == 404
     # and nothing B did touched A's aggregate
     assert len(a.get("/api/legends/architect/ArchX").json()["rows"]) == 3
+
+
+# ── where the legends are (B1-B, 2026-10-19) ────────────────────────────────
+
+def test_legend_sheets_lists_the_sheets_whose_legend_the_tool_can_propose():
+    # sheets 1–3 carry the legend, sheet 4 has none: G there must be able to say „Legenda yra 1 lape"
+    _store(pdf=_counting_plan(Sheet(title="")))
+    c = TestClient(app)
+    r = c.get("/api/projects/p1/legend/sheets")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [p["page"] for p in body["pages"]] == [1, 2, 3]
+    assert all(p["rows"] == 3 for p in body["pages"])
+    assert body["partial"] is False and body["pages_not_read"] == []
+    # the rows route proposes nothing on sheet 4 — the same answer
+    assert c.post("/api/projects/p1/legend/rows", json={"page": 4}).json()["legends"] == []
+    assert len(c.post("/api/projects/p1/legend/rows", json={"page": 2}).json()["legends"]) == 1
+
+
+def test_legend_sheets_stops_at_its_budget_and_says_which_sheets_it_did_not_read(monkeypatch):
+    from api import legend_count
+    _store(pdf=_counting_plan(Sheet(title="")))
+    monkeypatch.setattr(legend_count, "SHEETS_BUDGET_S", -1.0)
+    body = TestClient(app).get("/api/projects/p1/legend/sheets").json()
+    assert body["pages"] == [] and body["partial"] is True and body["pages_not_read"] == [1, 2, 3, 4]
+
+
+def test_legend_sheets_without_a_drawing_and_for_someone_else(monkeypatch):
+    _store("p2", with_pdf=False)
+    c = TestClient(app)
+    assert c.get("/api/projects/p2/legend/sheets").status_code == 404
+    assert c.get("/api/projects/nera/legend/sheets").status_code == 404
+    monkeypatch.setattr(auth, "AUTH_DISABLED", False)
+    c2 = TestClient(app)
+    _store(user_id=_register(c2, "owner2@example.com"))
+    c2.post("/api/auth/logout")
+    _register(c2, "other2@example.com")
+    foreign, missing = c2.get("/api/projects/p1/legend/sheets"), c2.get("/api/projects/pX/legend/sheets")
+    assert foreign.status_code == 404 and foreign.json() == missing.json()

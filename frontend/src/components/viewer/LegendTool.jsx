@@ -11,15 +11,15 @@
  * Every reading starts from a proposal (founder decision 3, 2026-10-18); nothing exists before the click;
  * the routes it calls save nothing and cost nothing (lib/legendApi).
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  boxFromPctDrag, buildCreate, decisionsFor, initialReview, instanceId, journalRows, legendRowsToSave,
-  blankRows, matchSavedLegend, pointInBox, proposalsFrom, rowsOf, rowsToCreate,
+  BOX_EMPTY, boxFailureText, boxFromPctDrag, buildCreate, decisionsFor, initialReview, instanceId, journalRows, legendRowsToSave,
+  blankRows, matchSavedLegend, noLegendText, pointInBox, proposalsFrom, reviewOutcome, rowsOf, rowsToCreate,
 } from '@/lib/legendReview';
 import {
-  countLegendRows, fetchLegendRows, loadArchitectLegend, loadProjectLegend, promoteArchitectLegend, readArchitects,
-  rememberArchitect, saveProjectLegend, sendLegendLearning,
+  countLegendRows, fetchLegendRows, fetchLegendSheets, loadArchitectLegend, loadProjectLegend, promoteArchitectLegend, readArchitects,
+  rememberArchitect, requestErrorText, saveProjectLegend, sendLegendLearning,
 } from '@/lib/legendApi';
 import { klassFor } from '@/lib/symbolSearch';
 import { flashCursorHint } from '@/lib/cursorHints';
@@ -28,6 +28,9 @@ import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } fr
 const EMPTY = {
   phase: null, page: null, proposals: [], legends: [], rows: [], counts: {}, review: {}, removed: new Set(),
   notice: null, reuse: null, architect: '', hoveredId: null, hoveredRowId: null,
+  // B1-B: the outcome sentence ({tone, text, short, retry}), the box he drew while it is read / when it held no
+  // legend, the count's error, what „Bandyti dar kartą" repeats, the sheets that carry a legend, when work began
+  outcome: null, failure: null, countError: null, retryOf: null, elsewhere: [], startedAt: null,
 };
 
 /** The earlier legend this one matches, if any: this project's own saved one first, then his architects'. */
@@ -58,21 +61,58 @@ async function findReuse(projectId, rows) {
 export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   const [s, setS] = useState(EMPTY);
   const runRef = useRef(0);
+  // the request in flight: Esc, G again or another sheet aborts it (B1-B — it used to run on behind his back)
+  const abortRef = useRef(null);
+  // the sheet's proposal, read once per session per sheet: scrolling through the sheets with the tool on used to
+  // ask the server again on every pass and ran into its 30-a-minute limit
+  const suggestCache = useRef(new Map());
+  // where the legends are (GET …/legend/sheets), asked once per project the first time a sheet has none
+  const sheetsRef = useRef({ projectId: null, promise: null, pages: null });
   const set = (patch) => setS((cur) => ({ ...cur, ...(typeof patch === 'function' ? patch(cur) : patch) }));
+  const begin = () => {
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    return { run: ++runRef.current, signal: ctl.signal };
+  };
 
-  const count = async (rows, run, legends) => {
-    set({ phase: 'counting', legends, rows, counts: {}, review: {}, removed: new Set(), notice: null, reuse: null });
+  // While the tool works the seconds tick in the pill and the panel — he sees within a second that it started.
+  const busy = s.phase === 'suggesting' || s.phase === 'reading' || s.phase === 'counting';
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!busy) return undefined;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [busy, s.startedAt]);
+  const elapsed = busy && s.startedAt ? Math.max(0, Math.floor((now - s.startedAt) / 1000)) : 0;
+
+  const legendSheets = () => {
+    const cur = sheetsRef.current;
+    if (cur.projectId === projectId && cur.promise) return cur.promise;
+    const promise = fetchLegendSheets(projectId).then((r) => {
+      sheetsRef.current.pages = Array.isArray(r?.pages) ? r.pages : [];
+      return sheetsRef.current.pages;
+    }).catch(() => { sheetsRef.current = { projectId: null, promise: null, pages: null }; return []; });
+    sheetsRef.current = { projectId, promise, pages: null };
+    return promise;
+  };
+
+  const count = async (rows, run, legends, signal) => {
+    set({ phase: 'counting', legends, rows, counts: {}, review: {}, removed: new Set(), notice: null, reuse: null,
+      countError: null, outcome: null, failure: null, startedAt: Date.now() });
     const countable = rows.filter((r) => r.countable !== false);
     let counts = {};
+    let countError = null;
     try {
       if (countable.length) {
-        const res = await countLegendRows(projectId, countable);
+        const res = await countLegendRows(projectId, countable, { signal });
         if (run !== runRef.current) return;
         counts = Object.fromEntries((res.rows || []).map((r) => [r.row_id, r]));
       }
     } catch (e) {
       if (run !== runRef.current) return;
-      toast.error(`Ženklų suskaičiuoti nepavyko: ${e?.message || 'klaida'}`, { description: 'Eilutes vis tiek galite peržiūrėti ir pažymėti ženklus rankiniu būdu.' });
+      countError = requestErrorText(e);
     }
     for (const r of rows) {
       if (!counts[r.row_id]) {
@@ -81,34 +121,60 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
       }
     }
     if (run !== runRef.current) return;
-    set({ phase: 'review', counts, review: initialReview(rows, counts) });
+    set({ phase: 'review', counts, review: initialReview(rows, counts), countError, outcome: reviewOutcome({ rows, counts, countError }), startedAt: null });
     const reuse = await findReuse(projectId, rows);
     if (run !== runRef.current || !reuse) return;
     set({ reuse });
   };
 
-  const suggest = async (page) => {
-    const run = ++runRef.current;
-    set({ ...EMPTY, architect: s.architect, phase: 'suggesting', page });
-    try {
-      const res = await fetchLegendRows(projectId, { page });
+  const showSuggestion = (page, res, run) => {
+    const proposals = proposalsFrom(res);
+    if (proposals.length) {
+      set({ phase: 'proposed', proposals, notice: res.detail || null, startedAt: null });
+      return;
+    }
+    if (res?.status === 'be_teksto') {
+      set({ phase: 'box', notice: null, startedAt: null, outcome: { tone: 'empty', retry: false, short: 'Lape nėra teksto', text: boxFailureText(res) } });
+      return;
+    }
+    const known = sheetsRef.current.projectId === projectId ? sheetsRef.current.pages : null;
+    set({ phase: 'box', notice: noLegendText(page, known || []), startedAt: null, elsewhere: known || [] });
+    if (known) return;
+    legendSheets().then((pages) => {
       if (run !== runRef.current) return;
-      const proposals = proposalsFrom(res);
-      if (proposals.length) set({ phase: 'proposed', proposals, notice: res.detail || null });
-      else set({ phase: 'box', notice: 'Šiame lape legendos neradau — apveskite ją rėmeliu' });
+      set((cur) => (cur.phase === 'box' && cur.page === page && !cur.failure ? { notice: noLegendText(page, pages), elsewhere: pages } : {}));
+    });
+  };
+
+  const suggest = async (page) => {
+    const { run, signal } = begin();
+    set({ ...EMPTY, architect: s.architect, phase: 'suggesting', page, startedAt: Date.now() });
+    const cached = suggestCache.current.get(`${projectId}:${page}`);
+    if (cached) { showSuggestion(page, cached, run); return; }
+    try {
+      const res = await fetchLegendRows(projectId, { page, signal });
+      if (run !== runRef.current) return;
+      suggestCache.current.set(`${projectId}:${page}`, res);
+      showSuggestion(page, res, run);
     } catch (e) {
       if (run !== runRef.current) return;
-      set({ phase: 'box', notice: e?.message ? `Legendos pasiūlyti nepavyko — apveskite ją rėmeliu (${e.message})` : 'Apveskite legendą rėmeliu' });
+      set({ phase: 'box', startedAt: null, retryOf: { kind: 'suggest', page },
+        outcome: { tone: 'error', retry: true, short: 'Legendos pasiūlyti nepavyko', text: `Legendos pasiūlyti nepavyko: ${requestErrorText(e)}. Bandykite dar kartą arba apveskite ją rėmeliu.` } });
     }
   };
 
   const open = (page) => { suggest(page || 1); };
-  const close = () => { runRef.current += 1; setS((cur) => ({ ...EMPTY, architect: cur.architect })); };
+  const close = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    runRef.current += 1;
+    setS((cur) => ({ ...EMPTY, architect: cur.architect }));
+  };
 
   // He scrolled to another sheet before choosing: propose that sheet's legend instead.
   const pageShown = (page) => {
     if (!page || page === s.page) return;
-    if (s.phase === 'proposed' || (s.phase === 'box' && !s.rows.length)) suggest(page);
+    if (s.phase === 'proposed' || s.phase === 'suggesting' || (s.phase === 'box' && !s.rows.length)) suggest(page);
   };
 
   const accept = (proposalId = null) => {
@@ -116,31 +182,50 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
     const legends = proposalId ? s.proposals.filter((p) => p.id === proposalId) : s.proposals;
     const rows = rowsOf(legends);
     if (!rows.length) return;
-    const run = ++runRef.current;
-    count(rows, run, legends);
+    const { run, signal } = begin();
+    count(rows, run, legends, signal);
   };
 
   const redraw = () => {
+    abortRef.current?.abort();
     runRef.current += 1;
-    set({ phase: 'box', proposals: [], legends: [], rows: [], counts: {}, review: {}, removed: new Set(), notice: null, reuse: null });
+    set({ phase: 'box', proposals: [], legends: [], rows: [], counts: {}, review: {}, removed: new Set(), notice: null, reuse: null,
+      outcome: null, failure: null, countError: null, retryOf: null, startedAt: null });
   };
 
   const box = async (page, bboxPct) => {
     if (!bboxPct) { flashCursorHint('Rėmelis per mažas — apveskite visą legendą'); return; }
-    const run = ++runRef.current;
-    set({ phase: 'reading', page, proposals: [], notice: null });
+    const { run, signal } = begin();
+    // the box he drew stays on the drawing while it is read, and after, when it holds no legend
+    set({ phase: 'reading', page, proposals: [], notice: null, outcome: null, failure: { page, bbox_pct: bboxPct, reading: true },
+      retryOf: null, startedAt: Date.now() });
     try {
-      const res = await fetchLegendRows(projectId, { page, bboxPct });
+      const res = await fetchLegendRows(projectId, { page, bboxPct, signal });
       if (run !== runRef.current) return;
       const rows = res.rows || [];
       if (!rows.length) {
-        set({ phase: 'box', notice: res.detail || 'Rėmelyje legendos eilučių neradau — apveskite ženklus kartu su jų pavadinimais' });
+        set({ phase: 'box', startedAt: null, failure: { page, bbox_pct: bboxPct },
+          outcome: { tone: 'empty', retry: false, short: res.status === 'be_teksto' ? 'Lape nėra teksto' : BOX_EMPTY, text: boxFailureText(res) } });
         return;
       }
-      count(rows, run, [{ id: `${page}:remelis`, page, bbox_pct: bboxPct, rows }]);
+      set({ failure: null });
+      count(rows, run, [{ id: `${page}:remelis`, page, bbox_pct: bboxPct, rows }], signal);
     } catch (e) {
       if (run !== runRef.current) return;
-      set({ phase: 'box', notice: e?.message || 'Eilučių perskaityti nepavyko' });
+      set({ phase: 'box', startedAt: null, failure: { page, bbox_pct: bboxPct }, retryOf: { kind: 'box', page, bboxPct },
+        outcome: { tone: 'error', retry: true, short: 'Rėmelio perskaityti nepavyko', text: `Rėmelio perskaityti nepavyko: ${requestErrorText(e)}.` } });
+    }
+  };
+
+  // „Bandyti dar kartą": the same request again — the count of the same rows, the same box, the same sheet.
+  const retry = () => {
+    if (s.phase === 'review' && s.outcome?.retry && s.rows.length) {
+      const { run, signal } = begin();
+      count(s.rows, run, s.legends, signal);
+    } else if (s.retryOf?.kind === 'box') box(s.retryOf.page, s.retryOf.bboxPct);
+    else if (s.retryOf?.kind === 'suggest') {
+      suggestCache.current.delete(`${projectId}:${s.retryOf.page}`);
+      suggest(s.retryOf.page);
     }
   };
 
@@ -209,7 +294,7 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   }, [s.rows, s.counts, s.removed, s.review]);
 
   return {
-    ...s, active: s.phase != null, toCreate, blanks, open, close, pageShown, accept, redraw, box, setKeep, rename,
+    ...s, active: s.phase != null, elapsed, retry, toCreate, blanks, open, close, pageShown, accept, redraw, box, setKeep, rename,
     removeInstance, restoreRow, setHovered, setHoveredRow, setArchitect, applyReuse, dismissReuse, create, instancesOn,
   };
 }
@@ -308,6 +393,18 @@ export function LegendLayer({ page, width, height, legend }) {
           </g>
         );
       })}
+      {/* the box he drew: kept while it is read, and after, when it held no legend — so his box never just vanishes */}
+      {legend.failure && legend.failure.page === page && !drag && (() => {
+        const r = rect(legend.failure.bbox_pct);
+        const reading = !!legend.failure.reading;
+        return (
+          <g pointerEvents="none" data-testid="legend-drawn-box" data-state={reading ? 'reading' : 'empty'}>
+            <rect x={r.x} y={r.y} width={r.w} height={r.h} style={paint({ fill: ov('editing'), stroke: ov('editing') })}
+              fillOpacity={0.06} strokeWidth={STROKE_PX} strokeDasharray={DASH} />
+            {tag(r.x, r.y - 2, reading ? 'Skaitau…' : 'Čia legendos nėra', ov('editing'))}
+          </g>
+        );
+      })()}
       {instances.map((inst) => {
         const r = rect(inst.box_pct);
         const hot = inst.id === legend.hoveredId || inst.rowId === legend.hoveredRowId;

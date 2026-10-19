@@ -91,7 +91,7 @@ import { historyReducer, initHistory, describeChange } from '@/lib/measureHistor
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
 import { useLegendTool } from './LegendTool';
 import LegendReviewPanel from './LegendReviewPanel';
-import { applyCreate } from '@/lib/legendReview';
+import { applyCreate, legendGotoPage } from '@/lib/legendReview';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
 import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, sheetRailWidth, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
@@ -617,9 +617,11 @@ function FocusZoomer({ documentId, focus, pages }) {
 
 // „Pažymėti legendą" (W2-B): which sheet is on screen — the legend is proposed on it, and proposed again when he
 // scrolls to another sheet before choosing.
-function LegendPageWatcher({ documentId, pageRef, onPage }) {
-  const { state: scroll } = useScroll(documentId);
+function LegendPageWatcher({ documentId, pageRef, onPage, gotoRef = null }) {
+  const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
+  // B1-B: the pill's „Į 5 lapą" (the legend stands on another sheet) scrolls through this
+  if (gotoRef) gotoRef.current = (page) => scrollApi?.scrollToPage({ pageNumber: page, behavior: 'smooth' });
   // W5-B B10: the sheet on screen is also told to the Matavimai list's „Šis lapas“ filter (MeasureGroups)
   useEffect(() => { pageRef.current = cur; onPage?.(cur); window.__pathonViewerPage = cur; window.dispatchEvent(new CustomEvent('samatu:viewer-page', { detail: { page: cur } })); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
@@ -1092,6 +1094,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   legendTypesRef.current = countTypes;
   const docPagesRef = useRef(null);
   const visiblePageRef = useRef(1);
+  const legendGotoRef = useRef(null);
   const createFromLegend = (plan, { label, undoLegend } = {}) => {
     const beforeM = legendMeasRef.current || [];
     const beforeT = legendTypesRef.current || [];
@@ -1250,6 +1253,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // „Pažymėti legendą" owns the pointer alone too: G again (or Esc) leaves it, nothing created.
   const toggleLegend = () => {
     if (legend.active) { legend.close(); return; }
+    // B1-B: G in the middle of a drawing used to throw the drawing away without a word — say so instead
+    if (draftPoints > 0 || outlineEdit?.history?.length || outlineTools.tool?.history?.length) {
+      flashCursorHint('Pirmiausia užbaikite arba atšaukite braižomą (Enter / Esc), tada G — legenda');
+      return;
+    }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null); outlineTools.cancel();
     if (symbol.active) symbol.close();
     legend.open(visiblePageRef.current || 1);
@@ -1625,9 +1633,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     fill: fillFor != null ? { nr: fillFor, busy: fillBusy } : null,
     symbolActive: symbol.active,
     selectionCount: selectedMeasureIds.length,
-    countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
+    countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0, findable: !!projectId } : null,
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
-    legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, blanks: legend.blanks.length, notice: legend.notice } : null,
+    legend: legend.active ? {
+      phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, blanks: legend.blanks.length,
+      notice: legend.notice, elapsed: legend.elapsed, outcome: legend.outcome, gotoPage: legendGotoPage(legend),
+    } : null,
     mac,
     drawShape,
   });
@@ -1663,7 +1674,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     else if (id === 'legendRedraw') legend.redraw();
     else if (id === 'legendCreate') legend.create();
     else if (id === 'legendExit') legend.close();
-    else if (id === 'draftFinish') {
+    else if (id === 'legendRetry') legend.retry();
+    else if (id === 'legendGoto') { const p = legendGotoPage(legend); if (p) legendGotoRef.current?.(p); }
+    else if (id === 'countFindSimilar') {
+      // B1-B: he marked one symbol with „Kiekis" and expected the rest to be counted — the mark on screen (the
+      // newest of the type) is the template for „Rasti panašius"; what it finds is a proposal he reviews
+      const mine = measurements.filter((m) => m.kind === 'count' && m.typeId === activeCountTypeId);
+      const here = mine.filter((m) => m.page === visiblePageRef.current);
+      const m = (here.length ? here : mine)[(here.length ? here : mine).length - 1];
+      if (m) findSimilarFrom(m);
+    } else if (id === 'draftFinish') {
       const pts = draftCommitPoints(draftSlot.draft.points, measureTool);
       if (pts && draftSlot.pageNr != null) commitMeasurement(makeMeasurement(measureTool, draftSlot.pageNr, pts));
       setDraftSlot({ pageNr: null, draft: EMPTY_DRAFT });
@@ -1945,7 +1965,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
-          <LegendPageWatcher documentId={activeDocumentId} pageRef={visiblePageRef} onPage={legend.active ? legend.pageShown : null} />
+          <LegendPageWatcher documentId={activeDocumentId} pageRef={visiblePageRef} gotoRef={legendGotoRef} onPage={legend.active ? legend.pageShown : null} />
           {frameFocus && <FocusZoomer documentId={activeDocumentId} focus={frameFocus} pages={documentState?.document?.pages} />}
           {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
               „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}

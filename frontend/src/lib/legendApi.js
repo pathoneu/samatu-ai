@@ -3,6 +3,7 @@
  *
  *   POST /api/projects/{id}/legend/rows    the sheet's suggested legends, or the rows of a box he drew (€0)
  *   POST /api/projects/{id}/legend/count   how many of each row's symbol the drawing carries (€0)
+ *   GET  /api/projects/{id}/legend/sheets  which sheets carry a legend (€0) — „Legenda yra 5 lape"
  *   GET/POST /api/legends/{id}             the project's legend — written only when he creates the counts
  *   GET /api/projects/{id}/legend/architect, POST …/legend/architect/promote — reuse on the next project
  *   POST /api/cv/record-decision           each mark he kept or removed → the training corpus
@@ -17,35 +18,72 @@ import { browserStorage } from './browserStorage.js';
 const DECISION_GAP_MS = 2_100;
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
-async function call(path, { method = 'GET', body = null, timeoutMs = 90_000 } = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
+export { requestErrorText } from './legendReview.js';
+
+/** One signal for „he left" (Esc, G again) and „the time is up" — without AbortSignal.any (Safari < 17.4). */
+function joinSignals(signal, timeoutMs) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => {
+    ctl.abort(typeof DOMException === 'function' ? new DOMException('timeout', 'TimeoutError') : undefined);
+  }, timeoutMs);
+  const onAbort = () => ctl.abort(signal.reason);
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
   }
-  return data;
+  return { signal: ctl.signal, done: () => { clearTimeout(timer); signal?.removeEventListener?.('abort', onAbort); } };
+}
+
+async function call(path, { method = 'GET', body = null, timeoutMs = 90_000, signal = null } = {}) {
+  const joined = joinSignals(signal, timeoutMs);
+  try {
+    let res;
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method,
+        credentials: 'include',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: joined.signal,
+      });
+    } catch (e) {
+      // the abort reason says which: his own leaving (AbortError) or the time running out (TimeoutError)
+      const reason = joined.signal.reason;
+      if (joined.signal.aborted && reason?.name) throw reason;
+      throw e;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  } finally {
+    joined.done();
+  }
 }
 
 const pid = (projectId) => encodeURIComponent(projectId);
 
 /** The sheet's suggested legends (`bboxPct` absent) or the rows inside his box. */
-export function fetchLegendRows(projectId, { page, bboxPct = null }) {
+export function fetchLegendRows(projectId, { page, bboxPct = null, signal = null }) {
   return call(`/api/projects/${pid(projectId)}/legend/rows`, {
-    method: 'POST', body: { page: Number(page), ...(bboxPct ? { bbox_pct: bboxPct } : {}) }, timeoutMs: 60_000,
+    method: 'POST', body: { page: Number(page), ...(bboxPct ? { bbox_pct: bboxPct } : {}) }, timeoutMs: 45_000, signal,
   });
 }
 
-/** Counts for the rows (the route's own budget is 60 s; a little more here for the network). */
-export function countLegendRows(projectId, rows) {
-  return call(`/api/projects/${pid(projectId)}/legend/count`, { method: 'POST', body: { rows }, timeoutMs: 120_000 });
+/** How long the browser waits for a count: the route's own budget is 60 s; after that „Bandyti dar kartą". */
+export const COUNT_TIMEOUT_MS = 75_000;
+
+/** Counts for the rows. */
+export function countLegendRows(projectId, rows, { signal = null } = {}) {
+  return call(`/api/projects/${pid(projectId)}/legend/count`, { method: 'POST', body: { rows }, timeoutMs: COUNT_TIMEOUT_MS, signal });
+}
+
+/** The sheets that carry a legend the tool can propose: {pages: [{page, rows}], partial} (€0, read-only). */
+export function fetchLegendSheets(projectId, { signal = null } = {}) {
+  return call(`/api/projects/${pid(projectId)}/legend/sheets`, { timeoutMs: 45_000, signal });
 }
 
 export function loadProjectLegend(projectId) {
