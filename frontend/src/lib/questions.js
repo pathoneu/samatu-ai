@@ -12,6 +12,7 @@
  */
 
 import { addOpening, alreadyInUse, heightsForRooms, openingsPatch, userEditPatch } from './roomSheet.js';
+import { setRoomOpeningCounts } from './openingCounts.js';
 import { ltNumber } from './ledger.js';
 
 const nrOf = (item) => String(item?.room_nr ?? '');
@@ -121,13 +122,22 @@ export function wallsAnswer(project, items, values = {}) {
   return touched.length ? { table, touched } : null;
 }
 
+/** The room key that says he answered its door and window count on the question card (project_questions.py). */
+export const CHECKED_OPENINGS_KEY = '_angos_patikrinta_at';
+
 /**
  * The openings he left ticked (`picked[i]` — all of them when nothing was unticked), added to their rooms the
  * way „+ Durys" adds one on the room sheet. `edits[i]` (2026-09-23, the founder: „durys 1,40 pločio nebus
  * tikrai") — the width, height or kind he corrected on that opening, in mm and 'duris' | 'langas'; anything
- * else in it is ignored. → `{rooms, touched, added, edited}` for `saveRoomEdit`, or null.
+ * else in it is ignored.
+ *
+ * `manual` + `counts` (2026-10-19, „negaliu iškart vietoje pataisyti"): the rooms the card asks to check, each
+ * with the number of doors and windows he left in its fields (`counts[nr] = {durys, langai}`, the proposal when
+ * untouched) — set on the room first (lib/openingCounts), the ticked openings added on top; every such room is
+ * marked as checked (`_angos_patikrinta_at`) and its openings as his. → `{rooms, touched, added, edited,
+ * counted, sameValue}` for `saveRoomEdit`, or null when nothing is sent.
  */
-export function openingsAnswer(project, items, picked, edits = {}) {
+export function openingsAnswer(project, items, picked, edits = {}, { manual = [], counts = {}, now = new Date().toISOString() } = {}) {
   let edited = 0;
   const list = (Array.isArray(items) ? items : []).map((item, i) => {
     const e = edits && typeof edits === 'object' ? edits[i] : null;
@@ -148,16 +158,31 @@ export function openingsAnswer(project, items, picked, edits = {}) {
     (byRoom[nr] = byRoom[nr] || []).push(item);
     added += 1;
   });
-  if (!added) return null;
+  const rows = Object.fromEntries((Array.isArray(manual) ? manual : []).filter((m) => nrOf(m)).map((m) => [nrOf(m), m]));
+  if (!added && !Object.keys(rows).length) return null;
   const patches = {};
+  let changed = false;
   for (const room of roomsOf(project)) {
-    const mine = byRoom[String(room?.nr)];
-    if (!mine) continue;
-    const elementai = mine.reduce((acc, opening) => addOpening(acc, opening), room.elementai || []);
-    patches[String(room.nr)] = openingsPatch(elementai);
+    const nr = String(room?.nr);
+    const mine = byRoom[nr];
+    const row = rows[nr];
+    if (!mine && !row) continue;
+    let elementai = room.elementai || [];
+    if (row) {
+      const want = { durys: row.proposed?.durys, langai: row.proposed?.langai, ...(counts?.[nr] || {}) };
+      const set = setRoomOpeningCounts(elementai, want, row);
+      elementai = set.elementai;
+      changed = changed || set.changed;
+    }
+    if (mine) elementai = mine.reduce((acc, opening) => addOpening(acc, opening), elementai);
+    patches[nr] = { ...openingsPatch(elementai, now), ...(row ? { [CHECKED_OPENINGS_KEY]: now } : {}) };
   }
   const touched = Object.keys(patches);
-  return touched.length ? { rooms: patchedRooms(project, patches), touched, added, edited } : null;
+  if (!touched.length) return null;
+  return {
+    rooms: patchedRooms(project, patches), touched, added, edited,
+    counted: touched.filter((nr) => rows[nr]), sameValue: !added && !changed,
+  };
 }
 
 /**
@@ -210,6 +235,9 @@ export function answerSummary(question, answer, t) {
   if (question?.kind === 'konturas' && answer?.accepted) key = 'answeredOutlineAccepted';
   if (question?.kind === 'konturas' && answer?.typed) key = 'answeredPerimeterTyped';
   if (question?.kind === 'konturas' && answer?.joined) key = 'answeredJoin';
+  // the door and window count answered on the card (2026-10-19) — with or without openings added beside it
+  if (question?.kind === 'angos' && answer?.counted?.length) key = answer?.added ? 'answeredOpeningsCounted' : 'answeredCounts';
+  if (question?.kind === 'angos' && answer?.placed) key = 'answeredOpeningPlaced';
   // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
   const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
   // the door question answers with a LABEL („beapvadinės" / „su apvadais"), not a number
