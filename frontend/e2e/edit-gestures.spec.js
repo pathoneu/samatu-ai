@@ -439,7 +439,13 @@ test.describe('W5-A editing gestures', () => {
     const start = (await stored(page)).measurements.length;
     await page.keyboard.press('s');
     // the sheet's wall solid has arrived (the walls layer draws it) before the click
-    await expect(page.locator('[data-drawing-geometry-layer] polygon').first()).toBeAttached({ timeout: 30_000 });
+    // (a sheet whose geometry call was refused by the rate limit draws no walls: turn the layer off and on again)
+    const walls1 = page.locator('[data-takeoff-viewer] [data-page-number="1"] [data-drawing-geometry-layer] polygon');
+    await expect.poll(async () => {
+      if (await walls1.count()) return true;
+      await page.keyboard.press('s'); await page.waitForTimeout(300); await page.keyboard.press('s'); await page.waitForTimeout(2500);
+      return (await walls1.count()) > 0;
+    }, { timeout: 90_000, intervals: [500] }).toBe(true);
     await page.waitForTimeout(300);
     await page.mouse.click(...Object.values(await at(page, fx, fy)));
     const made = toast(page, 'Sienos ilgis:');
