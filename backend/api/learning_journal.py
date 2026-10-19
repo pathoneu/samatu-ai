@@ -22,6 +22,11 @@ QUESTION_TOPICS = {
     "durys": "vidaus duris",
     "grindys": "grindų dangas",
     "apdaila": "sienų apdailą",
+    # the drawing's schedules against what was read elsewhere (Pathon v3 W3-A; answered in Patikra since W2-B)
+    "lentele_durys": "durų žiniaraštį",
+    "lentele_langai": "langų žiniaraštį",
+    "lentele_apdaila": "apdailos lentelę",
+    "lentele_suma": "eksplikacijos sumą",
 }
 
 # `_konturas.saltinis` (api/room_outline.py) → what the person did to the outline.
@@ -148,6 +153,23 @@ def sentence_for(c: dict, rows: dict[str, dict] | None = None) -> str:
         verb = "patvirtinote" if decision == "accept" else "atmetėte"
         where = f"Lapas {page}" if page else "Brėžinys"
         return f"{where}: rastą simbolį „{klass}“ {verb}" if klass else f"{where}: rastą simbolį {verb}"
+    if source == "legenda":
+        # „Pažymėti legendą" (Pathon v3 W2-B): one row per legend row he reviewed
+        parts = _path(c)
+        page = parts[1] if len(parts) >= 3 else None
+        new_d = new if isinstance(new, dict) else {}
+        old_d = old if isinstance(old, dict) else {}
+        name = str(new_d.get("pavadinimas") or old_d.get("eilute") or "").strip()
+        where = f"Lapas {page}" if page else "Brėžinys"
+        what = f"legendos eilutę „{name}“" if name else "legendos eilutę"
+        if new_d.get("sprendimas") == "accept":
+            n = new_d.get("kiekis")
+            tail = f" — {n} vnt." if isinstance(n, (int, float)) else ""
+            gone = new_d.get("pasalinta")
+            if isinstance(gone, (int, float)) and gone > 0:
+                tail += f", {int(gone)} rastų pašalinote"
+            return f"{where}: {what} patvirtinote{tail}"
+        return f"{where}: {what} atmetėte"
     if source in ("pokalbis_taip", "pokalbis_ne"):
         return "Pokalbis: atsakymas tiko" if source == "pokalbis_taip" else "Pokalbis: atsakymas netiko"
     # Prielaidos and anything older: the setting, the room, before → after when both are numbers

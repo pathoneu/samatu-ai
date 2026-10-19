@@ -130,6 +130,20 @@ def test_a_symbol_decision_is_one_journal_row_too(env):  # noqa: F811
     assert row["old_value"] == {"pasitikejimas": 0.81}
 
 
+def test_a_legend_mark_decision_is_a_sample_but_no_journal_row(env):  # noqa: F811
+    """„Pažymėti legendą" (Pathon v3 W2-B) journals one row per legend row from the browser; the marks behind it
+    are recorded as training crops only."""
+    cl = _login("owner@x.lt")
+    with patch("api.cv_tools.record_label") as rec:
+        r = cl.post("/api/cv/record-decision", json={
+            "project_id": "proj-A", "page_idx": 0, "box_pt": _door_box(*DOORS[1]),
+            "klass": "rozete", "decision": "accept", "confidence": None, "source": "legenda",
+        })
+    assert r.status_code == 200, r.text
+    assert rec.call_count == 1
+    assert db.list_corrections("proj-A") == []
+
+
 # ── one act, one row: a Patikra answer that lands through an outline endpoint ───────────
 
 def test_an_accepted_outline_proposal_is_exactly_one_konturas_row_carrying_the_question(tmp_path, monkeypatch):

@@ -176,10 +176,30 @@ export function doorsAnswer(project, items, values = {}) {
   return { value, label, touched: [], sameValue: Boolean((project?._overrides || {}).vidaus_durys_beapvadines === value) };
 }
 
+/**
+ * A schedule question (Pathon v3 W3-A kinds, answered since W2-B): `reconcile` (the schedule's count against the
+ * openings drawn in the walls) records which one he holds right — `value` 'brezinys' | 'ziniarastis', the estimate
+ * itself is not changed by it; `info` (a table's sum against the rooms') records that he saw it ('matyta'). Both
+ * land in `_lenteliu_sprendimai[question.id]`, the record the server reads to stop asking. → `{decisions, previous,
+ * value, label, touched: [], sameValue}`, or null.
+ */
+export function tableDecisionAnswer(project, question, value) {
+  if (!question?.id || value == null || value === '') return null;
+  const own = project?._lenteliu_sprendimai;
+  const previous = own && typeof own === 'object' && !Array.isArray(own) ? own : {};
+  const label = (question.choices || []).find((c) => String(c.value) === String(value))?.label
+    || (question.answer === 'info' ? 'pažymėta, kad matėte' : String(value));
+  return {
+    decisions: { ...previous, [question.id]: value }, previous, value, label, touched: [],
+    sameValue: previous[question.id] === value,
+  };
+}
+
 const SUMMARY_KEY = {
   aukstis: 'answeredHeight', konturas: 'answeredOutline', erdve: 'answeredSplit', perimetras: 'answeredNumbers',
   plotas: 'answeredNumbers', angos: 'answeredOpenings', durys: 'answeredDoors', grindys: 'answeredChoices',
   apdaila: 'answeredChoices',
+  lentele_durys: 'answeredTable', lentele_langai: 'answeredTable', lentele_apdaila: 'answeredChoices', lentele_suma: 'answeredInfo',
 };
 
 /** What was just answered, in one plain sentence for the strip above the next question. */
@@ -193,7 +213,7 @@ export function answerSummary(question, answer, t) {
   // `touched` — room NUMBERS; an answer's `rooms` is the rooms array that is sent, never text
   const rooms = (answer?.touched || []).map(String).sort((a, b) => a.localeCompare(b, 'lt', { numeric: true }));
   // the door question answers with a LABEL („beapvadinės" / „su apvadais"), not a number
-  const value = question?.kind === 'durys' ? (answer?.label || '')
+  const value = question?.kind === 'durys' || question?.kind === 'lentele_durys' || question?.kind === 'lentele_langai' ? (answer?.label || '')
     : Number.isFinite(Number(answer?.value)) && answer?.value !== '' && answer?.value != null
       ? ltNumber(Number(answer.value), 2) : answer?.value;
   return t(`project.questions.${key}`, {

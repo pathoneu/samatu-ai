@@ -8,7 +8,7 @@ const ev = (key, mods = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: f
 test('the rail holds the planned cards in order', () => {
   assert.deepEqual(RAIL_GROUPS.map((g) => g.id), ['navigate', 'measure', 'read', 'layers']);
   assert.deepEqual(RAIL_TOOLS.map((t) => t.id), [
-    'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'room', 'findSimilar', 'calibrate', 'zones', 'walls',
+    'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'room', 'legend', 'findSimilar', 'calibrate', 'zones', 'walls',
   ]);
 });
 

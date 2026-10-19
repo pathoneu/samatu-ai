@@ -25,6 +25,7 @@ import DrawingGeometryLayer from './DrawingGeometryLayer';
 import RevisionOverlayLayer from './RevisionOverlayLayer';
 import OutlineEditLayer from './OutlineEditLayer';
 import SymbolSearchLayer from './SymbolSearchLayer';
+import { LegendLayer } from './LegendTool';
 import OutlineToolLayer from './OutlineToolLayer';
 import CalloutLayer from './CalloutLayer';
 import RoomProposalLayer from './RoomProposalLayer';
@@ -126,6 +127,8 @@ export default function PageOverlayHost({
   checkData = null,
   // „Rasti panašius" (2026-10-16): the useSymbolSearch session from TakeoffViewer, or null.
   symbolSearch = null,
+  // „Pažymėti legendą" (W2-B): the session from useLegendTool while it is on — it owns the pointer
+  legend = null,
   // Sheet links (Togal-v2 W7): { sheets, version } — references on this sheet to other sheets,
   // underlined; `sheets` is the rail's model so the hover names a sheet the way the rail does.
   sheetLinks = null,
@@ -347,6 +350,12 @@ export default function PageOverlayHost({
             onRemove={symbolSearch.remove}
             onHover={symbolSearch.setHoveredId}
           />
+        </div>
+      )}
+      {/* „Pažymėti legendą" (W2-B) — the proposals, his box, the found marks; above the measurements, owns the pointer. */}
+      {!checkMode && legend && width > 0 && (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <LegendLayer page={layout.pageNumber} width={width} height={height} legend={legend} />
         </div>
       )}
       {/* Outline editor (2026-10-16) — topmost on the page being edited; it owns the pointer. */}

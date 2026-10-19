@@ -176,9 +176,12 @@ export function rejectionsToRecord(all, removed) {
   return all.filter((c) => removed.has(c.id)).map((c) => ({ c, decision: 'reject' }));
 }
 
-/** Whether a measurement is a „Rasti panašius" mark (drawn hollow, listed apart). */
+// Marks created from a reviewed legend (lib/legendReview LEGEND_SOURCE, v3 W2-B) are found by the program too.
+const FOUND_SOURCES = new Set([SYMBOL_SOURCE, 'legenda']);
+
+/** Whether a measurement is a mark the program found („Rasti panašius", a legend) — drawn hollow, listed apart. */
 export function isAiMark(m) {
-  return m?.kind === 'count' && m.source === SYMBOL_SOURCE;
+  return m?.kind === 'count' && FOUND_SOURCES.has(m.source);
 }
 
 /** {typeId: n} of AI-found marks — the count legend shows them per type. */
@@ -190,5 +193,5 @@ export function aiTallies(measurements) {
 
 /** AI-found marks of a count type that nobody has checked yet. */
 export function aiMarkCount(measurements, typeId) {
-  return (measurements || []).filter((m) => m.kind === 'count' && m.typeId === typeId && m.source === SYMBOL_SOURCE).length;
+  return (measurements || []).filter((m) => m.typeId === typeId && isAiMark(m)).length;
 }

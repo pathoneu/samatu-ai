@@ -14,6 +14,8 @@
  *    or arrow keys on the focused handle); `final` marks the end of a drag, when the owner stores it.
  *  - `notices`: shown above the tabs — outside the drawing's column, so a notice never takes its height.
  *  - `tabBarExtra`: one control at the right end of the tab strip.
+ *  - `cover`: a node laid over the tabs and their contents while a tool needs the panel (the legend review,
+ *    v3 W2-B); the panels stay mounted underneath and come back as they were.
  */
 
 import { useRef } from 'react';
@@ -33,6 +35,7 @@ export default function RightPanelHost({
   notices = null,
   // One control at the right end of the tab strip (the Sąmata „Išskleisti" switch).
   tabBarExtra = null,
+  cover = null,
   className = '',
 }) {
   const dragRef = useRef(null);
@@ -141,6 +144,9 @@ export default function RightPanelHost({
           </div>
         );
       })}
+      {cover && (
+        <div className="absolute inset-0 z-10 flex flex-col bg-background" data-testid="right-panel-cover">{cover}</div>
+      )}
     </aside>
   );
 }

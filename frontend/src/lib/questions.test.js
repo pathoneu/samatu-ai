@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   answerSummary, doorsAnswer, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
-  questionAfterAnswer, wallsAnswer,
+  questionAfterAnswer, tableDecisionAnswer, wallsAnswer,
 } from './questions.js';
 
 const Q = (id, extra = {}) => ({ id, kind: id.split(':')[0], items: [], manual: [], ...extra });
@@ -194,4 +194,23 @@ test('doors: one choice for the whole project — the proposal or his pick, said
   assert.equal(doorsAnswer({}, []), null);
   const t = (key, params) => `${key}|${params.value}`;
   assert.equal(answerSummary({ kind: 'durys' }, his, t), 'project.questions.answeredDoors|su apvadais');
+});
+
+
+test('a schedule question records his answer in _lenteliu_sprendimai, keeping the earlier ones (v3 W2-B)', () => {
+  const t = (key, params) => `${key} ${JSON.stringify(params)}`;
+  const q = { id: 'lentele_durys', kind: 'lentele_durys', answer: 'reconcile', proposed: 'brezinys',
+    choices: [{ value: 'brezinys', label: 'Kaip nubraižyta sienose — 5' }, { value: 'ziniarastis', label: 'Kaip žiniaraštyje — 7' }] };
+  const project = { _lenteliu_sprendimai: { lentele_suma: 'matyta' } };
+  const a = tableDecisionAnswer(project, q, 'ziniarastis');
+  assert.deepEqual(a.decisions, { lentele_suma: 'matyta', lentele_durys: 'ziniarastis' });
+  assert.deepEqual(a.previous, { lentele_suma: 'matyta' });
+  assert.equal(a.label, 'Kaip žiniaraštyje — 7');
+  assert.equal(a.sameValue, false);
+  assert.match(answerSummary(q, a, t), /answeredTable .*Kaip žiniaraštyje — 7/);
+  const info = tableDecisionAnswer({}, { id: 'lentele_suma', kind: 'lentele_suma', answer: 'info' }, 'matyta');
+  assert.deepEqual(info.decisions, { lentele_suma: 'matyta' });
+  assert.match(answerSummary({ kind: 'lentele_suma' }, info, t), /answeredInfo/);
+  assert.equal(tableDecisionAnswer(project, q, ''), null);
+  assert.equal(tableDecisionAnswer(project, null, 'brezinys'), null);
 });

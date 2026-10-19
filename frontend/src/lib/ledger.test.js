@@ -169,6 +169,12 @@ test('a row without a ledger still gets an honest explanation', () => {
     ledgerFallback({ id: 'abc', saltinis: 'simboliai_brezinyje' }),
     { kind: 'unwired', source: 'brėžinyje suskaičiuoti simboliai' });
   assert.deepEqual(ledgerFallback({ id: 'abc' }), { kind: 'unwired', source: null });
+  // a legend count row (v3 W2-B) says how it was counted, even with its rnk- id
+  assert.deepEqual(ledgerFallback({ id: 'rnk-legenda-x', ledger_note_lt: ' suskaičiuota pagal legendą: eilutė „A", 2 ženklai lape 1 ' }),
+    { kind: 'note', text: 'suskaičiuota pagal legendą: eilutė „A", 2 ženklai lape 1' });
+  // a row whose quantity is measurements (v3 W4-A matavimai) lists their lines
+  assert.deepEqual(ledgerFallback({ id: 'rnk-1', matavimai: [{ tekstas: 'matavimas 4,20 m (lapas 1)' }, { tekstas: '+ matavimas 1,00 m (lapas 2)' }] }),
+    { kind: 'note', text: 'matavimas 4,20 m (lapas 1); + matavimas 1,00 m (lapas 2)' });
 });
 
 test('contribution and exclusion readers tolerate old blobs', () => {

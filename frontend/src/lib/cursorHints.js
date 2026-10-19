@@ -6,10 +6,12 @@
 // says the next action for the mode's current state; a click that changed nothing can say why for a
 // moment (flashCursorHint). Pure; CursorHint.jsx renders it.
 
+import { legendCursorHint } from './legendReview.js';
+
 /** Every mode that has a hint. Rest (no tool) has none: the drawing stays quiet. */
 export const CURSOR_HINT_MODES = [
   'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'calibrate', 'scalecheck',
-  'room', 'findSimilar', 'outlineEdit', 'split', 'merge', 'subtract', 'fill',
+  'room', 'findSimilar', 'legend', 'outlineEdit', 'split', 'merge', 'subtract', 'fill',
 ];
 
 /** The window event a layer fires to say, for a moment, why its click did nothing. */
@@ -28,12 +30,13 @@ export const CURSOR_HINT_FLASH_MS = 2600;
  *   selectionCount = 0,        // marks selected with „Žymėti" / „Laso"
  *   outlineTool = null,        // useOutlineTool's state for split / merge / subtract
  *   roomPhase = null,          // the room tool R (W1-D): idle | reading | proposed | saving | picking
+ *   legendPhase = null,        // „Pažymėti legendą" (W2-B): lib/legendReview LEGEND_PHASES
  * }
  * → the sentence, or null.
  */
 export function cursorHintFor(state = {}) {
   const { mode = null, points = 0, shift = false, calibPoint = false, countType = null, symbolPhase = 'box',
-    fill = null, selectionCount = 0, outlineTool = null, roomPhase = null } = state;
+    fill = null, selectionCount = 0, outlineTool = null, roomPhase = null, legendPhase = null } = state;
   switch (mode) {
     // with a selection the keys are in the pill and the actions in the bar above it — the hint says what a click does
     case 'select':
@@ -72,6 +75,8 @@ export function cursorHintFor(state = {}) {
       if (symbolPhase === 'searching') return 'Ieškoma panašių simbolių…';
       if (symbolPhase === 'review') return 'Spustelėkite neteisingą žymę — pašalinti · naujas rėmelis — nauja paieška';
       return 'Tempdami apveskite vieną simbolį kuo glaudžiau';
+    case 'legend':
+      return legendCursorHint(legendPhase) || 'Spustelėkite pasiūlytą legendą arba apveskite ją rėmeliu';
     case 'outlineEdit':
       return 'Tempkite kampą ar kraštinę · spustelėkite kampą — veiksmai · Enter — išsaugoti';
     case 'split':

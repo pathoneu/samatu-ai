@@ -31,6 +31,7 @@
 
 import { measurementValue } from './measurements.js';
 import { effectivePageScales, pageScaleIn } from './pageScales.js';
+import { legendTypeText } from './legendReview.js';
 
 export const KAIP = Object.freeze(['kiekis', 'pridėti', 'atimti']);
 export const KAIP_LABELS = Object.freeze({
@@ -298,7 +299,9 @@ function countTypeSource(id, measurements, types) {
   const marks = measurements.filter((m) => m?.kind === 'count' && m.typeId === id);
   const pages = [...new Set(marks.map((m) => m.page).filter((p) => num(p) != null))].sort((a, b) => a - b);
   const type = types.find((t) => t?.id === id);
-  return { key: `type:${id}`, value: marks.length, unit: 'vnt.', pages, pavadinimas: String(type?.label || id) };
+  // a count made from a legend row (v3 W2-B) says so on its row: „suskaičiuota pagal legendą: eilutė „…“, …"
+  const legend = type?.legend_row_id ? { tekstas: legendTypeText(type, measurements) } : {};
+  return { key: `type:${id}`, value: marks.length, unit: 'vnt.', pages, pavadinimas: String(type?.label || id), ...legend };
 }
 
 /**

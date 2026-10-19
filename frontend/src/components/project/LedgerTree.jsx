@@ -51,7 +51,9 @@ export default function LedgerTree({
           color: 'hsl(var(--muted-foreground))',
         }}
       >
-        {fallback.kind === 'manual' ? (
+        {fallback.kind === 'note' ? (
+          <span className="text-foreground" data-testid="ledger-note">{fallback.text.charAt(0).toUpperCase() + fallback.text.slice(1)}</span>
+        ) : fallback.kind === 'manual' ? (
           <>
             <span className="font-medium text-foreground">{t('project.ledger.manualRow')}</span>
             {' — '}

@@ -34,6 +34,7 @@ const MODE_CURSORS = {
   scalecheck: 'place',
   room: 'place',
   findSimilar: 'box',
+  legend: 'box',            // „Pažymėti legendą" (W2-B): a box round the legend, or a click on the proposed one
   outlineEdit: 'rest',
   measureEdit: 'rest',
   split: 'place',
