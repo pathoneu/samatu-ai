@@ -169,6 +169,28 @@ def test_restore_keeps_the_replaced_state_and_survives_twice_in_a_row(env):
     assert kiekiai == {10, 20}
 
 
+def test_a_read_right_after_a_restore_keeps_the_restored_state_as_its_own_row(env):
+    """„Kas pasikeitė → Atšaukti" (Pathon v3 W4-A) puts back the row just before the read. After a
+    restore the restored state had no row of its own (the restore writes only the state it replaces),
+    so the row before the read was the 'grazinta' one — an older state. Now the read keeps it."""
+    db.upsert_project("p1", _blob(10), now=T0)
+    db.upsert_project("p1", _blob(20), now=T0 + 600)
+    first = _rows()[0]["id"]
+    db.restore_project_version("p1", first, now=T0 + 1200)          # current = 10, rows: 10, 20, grazinta(20)
+    db.upsert_project("p1", _blob(30), now=T0 + 1300, version_source="perskaityta")
+    rows = _rows()
+    assert [r["saltinis"] for r in rows] == ["issaugota", "issaugota", "grazinta", "kita", "perskaityta"]
+    assert rows[-2]["pavadinimas"] == "Prieš perskaitymą"
+    assert db.get_project_version("p1", rows[-2]["id"])["data"]["darbu_sarasas"][0]["kiekis"] == 10
+
+
+def test_a_read_after_an_ordinary_save_adds_no_extra_row(env):
+    db.upsert_project("p1", _blob(10), now=T0)
+    db.upsert_project("p1", _blob(11), now=T0 + 10, version_source="lapas")
+    db.upsert_project("p1", _blob(12), now=T0 + 20, version_source="perskaityta")
+    assert [r["saltinis"] for r in _rows()] == ["issaugota", "lapas", "perskaityta"]
+
+
 def test_restore_moves_updated_at_and_marks_the_current_version(env):
     before = db.upsert_project("p1", _blob(10), now=T0)
     db.upsert_project("p1", _blob(20), now=T0 + 600)
