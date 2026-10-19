@@ -12,7 +12,7 @@ Output of the reader: ``_baldu_zonos_m2`` / ``_plokstes_zonos_m2`` and, per zone
 page and box (the crop the check sheet shows; a zone without its own box shows the room on its sheet).
 
 DEDUCTION, behind flag ``SAMATU_FURNITURE_ZONES`` (default off — nothing changes with it off): calc_room_quantities
-takes both totals off the room's paintable wall area (never below 0).
+takes the FURNITURE total off the room's paintable wall area (never below 0). Panels are information only.
 """
 from __future__ import annotations
 
@@ -109,9 +109,8 @@ def zone_totals(room: dict) -> dict:
 
 
 def deduction_m2(room: dict, walls_gross_m2: float, doors_deducted_m2: float) -> float:
-    """Σ furniture + panel zones for the deduction — computed from the calculator's OWN wall area (the stored
-    `walls_gross_m2` is the previous run's)."""
-    probe = dict(room)
-    probe["walls_gross_m2"], probe["doors_deducted_m2"] = walls_gross_m2, doors_deducted_m2
-    t = zone_totals(probe)
-    return round(t["_baldu_zonos_m2"] + t["_plokstes_zonos_m2"], 2)
+    """Σ FURNITURE zones for the deduction (typed m² / zones, wardrobe width × height). Panel zones are never
+    deducted (manager decision 2026-10-19, measured: objektas_a billed paint 1,7 % → 9,0 % off): walls under
+    panels stay skimmed and billed, as the engine rule says — the panel share is a Patikra fact only.
+    The arguments are kept for the call site; furniture zones do not depend on the wall area."""
+    return round(sum(z["m2"] for z in furniture_zones(room)), 2)

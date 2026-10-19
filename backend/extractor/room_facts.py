@@ -1916,8 +1916,11 @@ def _fact_zonos(project: dict, room: dict, region: list[float] | None) -> list[d
         if total <= 0 or not (on or room.get(field) is not None):
             continue       # flag off and nothing typed: today's sheet, unchanged
         parts = "; ".join(f"{_zone_phrase(z)} ({src_lt.get(z['saltinis'], '')})" for z in zones)
-        tail = ("Šis plotas atimtas iš dažomo sienų ploto." if on else
-                "Kol kas šis plotas į dažomą sienų plotą įskaičiuotas — patikrinkite, ar už jų siena dažoma.")
+        if key == "plokstes_zonos":   # never deducted: walls under panels are skimmed and billed
+            tail = "Sienos po plokštėmis glaistomos, todėl šis plotas lieka dažomame sienų plote."
+        else:
+            tail = ("Šis plotas atimtas iš dažomo sienų ploto." if on else
+                    "Kol kas šis plotas į dažomą sienų plotą įskaičiuotas — patikrinkite, ar už jų siena dažoma.")
         own = next((z for z in zones if z.get("rect_pct") and z.get("page")), None)
         z_page = own["page"] if own else page
         rect = own["rect_pct"] if own else region_on_page(room, page, region)

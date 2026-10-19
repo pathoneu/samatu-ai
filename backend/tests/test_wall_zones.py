@@ -121,3 +121,16 @@ def test_wardrobe_length_without_height_asks(monkeypatch):
     f = _facts(_project(room))["baldu_zonos"]
     assert f["status"] == "missing" and f["value"] is None and "2,50 m ilgio" in f["sentence"]
     assert not user_text.is_banned(f["sentence"])
+
+
+def test_panels_are_never_deducted(monkeypatch):
+    monkeypatch.setenv(wz.FLAG_ENV, "1")
+    plain = calc_room_quantities(_room())
+    panels = calc_room_quantities(_room(sienu_apdailos_breakdown={"dazymas_share": 0.8, "plokste_share": 0.2},
+                                        **{wz.TYPED_PANEL_M2: 3.0}))
+    assert "_zonos_atimta_m2" not in panels
+    f = _facts(_project(_room(sienu_apdailos_breakdown={"dazymas_share": 0.8, "plokste_share": 0.2})))["plokstes_zonos"]
+    assert "lieka dažomame sienų plote" in f["sentence"] and not user_text.is_banned(f["sentence"])
+    typed = calc_room_quantities(_room(**{wz.TYPED_FURNITURE_M2: 2.0}))
+    assert typed["_zonos_atimta_m2"] == 2.0
+    assert typed["walls_paintable_m2"] == round(plain["walls_paintable_m2"] - 2.0, 2)
