@@ -16,6 +16,7 @@ import { mergeReextract } from '@/lib/mergeReextract';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { saveRoomEdit } from '@/lib/roomSheetApi';
 import { recordPilot } from '@/lib/telemetry';
+import { withChanges } from '@/lib/changeSummary';
 import { forgetRereadRun } from '@/lib/heldReread';
 
 /**
@@ -29,7 +30,7 @@ export async function projectAfterReread(base, result) {
   try {
     const re = await saveRoomEdit(merged, merged.patalpos);
     const notes = [];
-    return {
+    const out = {
       ...merged,
       ...re,
       name: base.name,
@@ -42,9 +43,11 @@ export async function projectAfterReread(base, result) {
       _reread_diff: merged._reread_diff,
       darbu_sarasas: mergeDarbuSarasasEdits(re.darbu_sarasas, base.darbu_sarasas, notes),
     };
+    // „Kas pasikeitė" (Pathon v3 W4-A): the rows and the reads this read moved, beside its rooms
+    return { ...out, _reread_diff: withChanges(merged._reread_diff, base, out) };
   } catch (e) {
     console.warn('[reextract] rebuilding rows on the merged rooms failed — keeping the merged read:', e);
-    return merged;
+    return { ...merged, _reread_diff: withChanges(merged._reread_diff, base, merged) };
   }
 }
 

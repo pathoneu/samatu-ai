@@ -202,9 +202,10 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
     '24 angos (langų: 9, durų: 9).', '6 perimetrai iš matmenų.', 'Danga perskaityta 11 iš 11 patalpų.']) {
     await expect(stages).toContainText(line);
   }
-  // the one-line re-read chip (W1-C): nothing moved; „Rodyti" opens today's read (writes nothing)
+  // the one-line re-read chip (W1-C; „Kas pasikeitė" since W4-A): nothing moved; „Peržiūrėti" opens today's
+  // read (writes nothing)
   const chipNotice = page.getByTestId('reread-diff-banner');
-  await expect(chipNotice).toContainText('Brėžinys perskaitytas iš naujo');
+  await expect(chipNotice).toContainText('Kas pasikeitė');
   await expect(chipNotice).toContainText('skaičiai nepasikeitė');
   await page.getByTestId('reread-diff-toggle').click();
   await expect(chipNotice).toContainText('Skaičiai nepasikeitė — visos patalpos perskaitytos taip pat.');

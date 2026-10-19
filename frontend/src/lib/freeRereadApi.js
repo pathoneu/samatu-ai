@@ -11,6 +11,7 @@ import { API_BASE } from '@/lib/apiBase';
 import { saveRoomEdit } from '@/lib/roomSheetApi';
 import { mergeDarbuSarasasEdits } from '@/lib/mergeDarbuSarasas';
 import { mergeFreeReread } from '@/lib/freeReread';
+import { withChanges } from '@/lib/changeSummary';
 
 const url = (projectId) => `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/free-reread`;
 
@@ -71,5 +72,7 @@ export async function landFreeRereadResult(base, result) {
     _geometrija_perskaityta_at: merged._geometrija_perskaityta_at,
     darbu_sarasas: mergeDarbuSarasasEdits(re.darbu_sarasas, base.darbu_sarasas, notes),
   };
-  return { project, diff, santrauka: result.santrauka || null };
+  // „Kas pasikeitė" (Pathon v3 W4-A): the rows and the reads this read moved, beside its rooms
+  project._reread_diff = withChanges(diff, base, project);
+  return { project, diff: project._reread_diff, santrauka: result.santrauka || null };
 }
