@@ -4836,6 +4836,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym or None,
                               san_concealed["vonia"], san_source["vonia"],
                               saltinis="simboliai_brezinyje", emitted=san_emitted)
+        # v3 W5-E E5, flag SAMATU_BATH_DRAIN_ROWS (default off → nothing): the bathtub itself from the tub-only
+        # count, floor drains from a legend count (extractor/fixture_rows_flag.py)
+        from .fixture_rows_flag import fixture_rows as _fixture_rows
+        pozicijos.extend(_fixture_rows(parsed, tubs_read=(n_vonios_sym if _tubs_read is not None else None),
+                                       tub_or_tray_glance=int(_sym.get("vonios") or 0), skyrius=SK_SAN))
         # Virtuvė / skalbykla — plautuvė + jos maišytuvas. Both consume
         # `n_plautuves`, so the sink and its mixer can never drift apart, and
         # neither is billed a second time inside the praustuvė lines above.
