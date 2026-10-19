@@ -4,6 +4,8 @@ import { realPathLengthM, netAreaM2 } from './measureGeometry.js';
 let _seq = 0;
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID)
   ? crypto.randomUUID() : `m_${Date.now()}_${_seq++}`;
+/** A fresh measurement id (a copy, a paste — Pathon v3 W5-A A11). */
+export const newMeasurementId = uid;
 
 export const DEFAULT_COUNT_TYPES = [
   { id: 'rozetes', label: 'Rozetės', color: '#2a6fb5', shape: 'circle' },

@@ -26,14 +26,15 @@ const nameOf = (tool) => railTool(tool)?.name || null;
  *   selectionCount = 0,   // measurements selected with „Žymėti" / „Laso"
  *   countType = null,     // { label, n } — the count tool's active type
  *   roomPhase = null,     // the room tool R (W1-D useRoomTool): idle | reading | proposed | saving | picking
+ *   drawShape = 'free',   // Plotas / Perimetras (W5-A A11): free | rect | arc — the pill's „Kaip braižyti" choice
  *   legend = null,        // „Pažymėti legendą" (W2-B): { phase, proposals, toCreate, notice } while its session is open
  *   mac,
  * }
- * → null | { id, name, detail, keys, actions: [{ id, label, primary?, disabled?, title? }] }
+ * → null | { id, name, detail, keys, actions: [{ id, label, primary?, disabled?, title? }], shapes?: [{ id, label, title, pressed }] }
  */
 export function modePillFor(state = {}) {
   const { tool = null, draftPoints = 0, finishable = false, calibPoint = false, outlineEdit = null, fill = null,
-    symbolActive = false, selectionCount = 0, countType = null, roomPhase = null, legend = null, mac = false } = state;
+    symbolActive = false, selectionCount = 0, countType = null, roomPhase = null, legend = null, mac = false, drawShape = 'free' } = state;
   const exit = { id: 'toolExit', label: 'Išeiti', title: 'Išeiti iš įrankio (Esc)' };
 
   if (outlineEdit) {
@@ -80,12 +81,19 @@ export function modePillFor(state = {}) {
 
   if (DRAFT_TOOLS.has(tool)) {
     const drawing = draftPoints > 0;
+    // „Kaip braižyti" (A11): corner by corner, a rectangle from two corners, or the next segment as an arc
+    const shapes = tool === 'distance' ? null : [
+      { id: 'free', label: 'Laisvai', title: 'Kampas po kampo' },
+      { id: 'rect', label: 'Stačiakampis', title: 'Du priešingi kampai — stačiakampis' },
+      { id: 'arc', label: 'Lankas', title: 'Kita atkarpa — lankas: spustelėkite tašką ant lanko, tada jo galą' },
+    ].map((x) => ({ ...x, pressed: x.id === (drawShape || 'free') }));
     return {
+      ...(shapes ? { shapes } : {}),
       id: tool,
       name: nameOf(tool),
       detail: null,
       keys: drawing
-        ? hintText(['draftFinish', 'draftStepBack'], { mac })
+        ? `${hintText(['draftFinish', 'draftStepBack'], { mac })} · skaičiai — kitos atkarpos ilgis`
         : (tool === 'distance' ? 'Antras spustelėjimas įrašo · Shift — tęsti, tik tiesiai arba 45°' : 'Shift — tik tiesiai arba 45°'),
       actions: drawing
         ? [

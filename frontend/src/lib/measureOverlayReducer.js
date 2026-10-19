@@ -17,6 +17,8 @@ export function draftReducer(state, action) {
       const min = action.tool === 'area' ? 3 : 2;
       return { points: state.points, committed: state.points.length >= min };
     }
+    // several points at once — an arc segment (Pathon v3 W5-A A11)
+    case 'extend': return { points: [...state.points, ...(action.points || [])], committed: false };
     case 'undo':  return { points: state.points.slice(0, -1), committed: false };
     case 'reset': return { points: [], committed: false };
     default:      return state;

@@ -360,6 +360,80 @@ test.describe('W5-A editing gestures', () => {
     await expect.poll(async () => (await entry())?.plotis_mm).toBe(pick.el.plotis_mm);
   });
 
+  test('A11: a rectangle in two clicks, an arc segment, a typed length; Ctrl+C / Ctrl+D / Ctrl+V', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, 0.6, 0.55);
+    const count = async () => (await stored(page)).measurements.length;
+    const start = await count();
+    // Plotas as a rectangle: two clicks
+    await page.keyboard.press('3');
+    await page.getByTestId('pill-shape-rect').click();
+    await page.mouse.click(...Object.values(await at(page, 0.50, 0.50)));
+    await page.mouse.click(...Object.values(await at(page, 0.56, 0.56)));
+    await expect(toast(page, 'Plotas:')).toBeVisible();
+    await expect.poll(count).toBe(start + 1);
+    expect((await stored(page)).measurements.at(-1).points).toHaveLength(4);
+    note('stačiakampis: 2 spustelėjimai (po „Stačiakampis" pasirinkimo)');
+    // Perimetras with an arc: start, then „Lankas": a point on it, its end; Enter
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('4');
+    await page.getByTestId('pill-shape-arc').click();
+    await page.mouse.click(...Object.values(await at(page, 0.50, 0.60)));
+    await page.mouse.click(...Object.values(await at(page, 0.53, 0.58)));
+    await page.mouse.move(...Object.values(await at(page, 0.56, 0.60)));
+    await expect(page.locator('[data-draft-preview]')).toBeVisible();
+    await page.mouse.click(...Object.values(await at(page, 0.56, 0.60)));
+    await shot(page, 'w5a-a11-arc');
+    await page.keyboard.press('Enter');
+    await expect.poll(count).toBe(start + 2);
+    expect((await stored(page)).measurements.at(-1).points.length).toBeGreaterThan(10);
+    // Atstumas of a typed length: start, point the direction, type 3,5 and Enter
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('2');
+    await page.mouse.click(...Object.values(await at(page, 0.50, 0.65)));
+    await page.mouse.move(...Object.values(await at(page, 0.60, 0.65)), { steps: 4 });
+    await page.keyboard.type('3,5');
+    await expect(page.locator('svg text').filter({ hasText: 'Kita atkarpa: 3,5 m' })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(toast(page, 'Atstumas: 3,50 m')).toBeVisible();
+    await expect.poll(count).toBe(start + 3);
+    // Ctrl+D duplicates the selected measurement beside itself, Ctrl+C + Ctrl+V pastes another copy
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('1');
+    await page.mouse.click(...Object.values(await at(page, 0.53, 0.65)));
+    await expect(page.getByTestId('selection-bar')).toContainText('Atstumas');
+    await page.keyboard.press('Control+d');
+    await expect.poll(count).toBe(start + 4);
+    await page.keyboard.press('Control+c');
+    await page.keyboard.press('Control+v');
+    await expect.poll(count).toBe(start + 5);
+    await expect(toast(page, 'Įklijuota 1 į 1 lapą')).toBeVisible();
+  });
+
+  test('A12: walls layer on, a click on a wall face → its length as a distance', async ({ page }) => {
+    await openProject(page);
+    const { rooms } = await stored(page);
+    const ring = rooms['06'].polygon_pct;
+    // a point on 06's outline, which runs along the wall faces: a third of the way along its longest edge
+    let best = null;
+    ring.forEach((p, i) => { const q = ring[(i + 1) % ring.length]; const len = Math.hypot(q[0] - p[0], q[1] - p[1]); if (!best || len > best.len) best = { p, q, len }; });
+    const fx = best.p[0] + (best.q[0] - best.p[0]) / 3; const fy = best.p[1] + (best.q[1] - best.p[1]) / 3;
+    await bringIntoView(page, fx, fy);
+    const start = (await stored(page)).measurements.length;
+    await page.keyboard.press('s');
+    await page.waitForTimeout(800);
+    await page.mouse.click(...Object.values(await at(page, fx, fy)));
+    const made = toast(page, 'Sienos ilgis:');
+    await expect(made).toBeVisible({ timeout: 20_000 });
+    await expect.poll(async () => (await stored(page)).measurements.length).toBe(start + 1);
+    const m = (await stored(page)).measurements.at(-1);
+    expect(m.kind).toBe('distance');
+    expect(m.name).toBe('Siena');
+    await shot(page, 'w5a-a12-wall-face');
+    await made.getByRole('button', { name: 'Atšaukti' }).click();
+    await expect.poll(async () => (await stored(page)).measurements.length).toBe(start);
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);

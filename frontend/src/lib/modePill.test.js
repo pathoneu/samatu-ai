@@ -28,8 +28,16 @@ test('a measurement being drawn: Baigti (only when it can finish) and Atšaukti 
   const three = modePillFor({ tool: 'area', draftPoints: 3, finishable: true });
   assert.equal(three.actions[0].disabled, false);
   assert.equal(three.actions[0].primary, true);
-  assert.equal(three.keys, 'Enter — baigti · Esc — atgal');
+  assert.equal(three.keys, 'Enter — baigti · Esc — atgal · skaičiai — kitos atkarpos ilgis');
   assert.match(modePillFor({ tool: 'distance' }).keys, /Antras spustelėjimas įrašo/);
+});
+
+test('W5-A A11: Plotas and Perimetras offer „Laisvai · Stačiakampis · Lankas", the chosen one pressed; Atstumas none', () => {
+  const rect = modePillFor({ tool: 'area', drawShape: 'rect' });
+  assert.deepEqual(rect.shapes.map((s) => s.id), ['free', 'rect', 'arc']);
+  assert.deepEqual(rect.shapes.filter((s) => s.pressed).map((s) => s.id), ['rect']);
+  assert.deepEqual(modePillFor({ tool: 'perimeter' }).shapes.filter((s) => s.pressed).map((s) => s.id), ['free']);
+  assert.equal(modePillFor({ tool: 'distance' }).shapes, undefined);
 });
 
 test('the pill shows only the active mode — outline edit wins over an armed tool', () => {

@@ -14,7 +14,7 @@ import {
 import { alignGuide, pickSnap } from '@/lib/drawingSnap.js';
 import { cursorForMode } from '@/lib/cursors.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
-import { boxMode, marksInBox } from '@/lib/editGestures.js';
+import { arcPoints, boxMode, marksInBox, pointAtLength, rectanglePoints, typedLength } from '@/lib/editGestures.js';
 import { flashCursorHint } from '@/lib/cursorHints.js';
 import { isAiMark } from '@/lib/symbolSearch.js';
 import {
@@ -91,6 +91,9 @@ export default function MeasureLayer({
   onSnapChange = null,
   // Count tool, right-click (W5-A A7): ({x, y} screen px) — the type picker opens there.
   onTypeMenu = null,
+  // How Plotas / Perimetras draw (W5-A A11): 'free' (corner by corner) | 'rect' (two corners) | 'arc' (the next
+  // segment is an arc through a point on it).
+  drawShape = 'free',
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -108,6 +111,8 @@ export default function MeasureLayer({
   const [guides, setGuides] = useState([]);        // alignment guides [{from, axis}] (A6)
   const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
   const [box, setBox] = useState(null);           // {from, to (px), add} while a „Žymėti" box is dragged (A5)
+  const [arcMid, setArcMid] = useState(null);     // the arc's middle point, clicked before its end (A11)
+  const [typed, setTyped] = useState('');         // digits typed while drawing: the next segment's length (A11)
   // Right-click while drawing (v3 W1-B B5, Kreo „Create / Reset"): „Baigti" / „Atšaukti" at the pointer.
   const [finishMenu, setFinishMenu] = useState(null);   // {x, y} in SVG px, or null
   const selectedSet = useMemo(
@@ -315,6 +320,22 @@ export default function MeasureLayer({
     }
 
     if (POLY_TOOLS.has(tool)) {
+      // A rectangle (A11): two opposite corners — the second click finishes it.
+      const shape = tool === 'distance' ? 'free' : drawShape;
+      if (shape === 'rect') {
+        if (draft.points.length === 0) { dispatch({ type: 'click', tool, point }); return; }
+        const rect = rectanglePoints(draft.points[0], point);
+        commitDraft(tool === 'area' ? rect : [...rect, rect[0]]);
+        return;
+      }
+      // An arc segment (A11): after the start, one click on the arc, one at its end.
+      if (shape === 'arc' && draft.points.length >= 1) {
+        if (!arcMid) { setArcMid(point); return; }
+        const last = draft.points[draft.points.length - 1];
+        dispatch({ type: 'extend', points: arcPoints(last, arcMid, point, 12).slice(1) });
+        setArcMid(null);
+        return;
+      }
       // Distance ends on its second click (v3 W1-B B5); Shift + click keeps the chain going instead, and the
       // next plain click ends it there.
       if (tool === 'distance' && draft.points.length >= 1 && !e.shiftKey) {
@@ -329,7 +350,7 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu, onBoxSelect]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu, onBoxSelect, drawShape, arcMid]);
 
   const handlePointerUp = useCallback((e) => {
     if (box) {
@@ -414,6 +435,46 @@ export default function MeasureLayer({
   // Bound ONLY on the page that owns a non-empty draft: this component is
   // mounted once per virtualized page, and with the draft lifted upstream every
   // mounted copy would otherwise apply the same undo/finish (5 pages = 5 undos).
+  // The arc's middle point and the typed digits go with the draft.
+  useEffect(() => { if (!draft.points.length) { setArcMid(null); setTyped(''); } }, [draft.points.length]);
+  useEffect(() => { setArcMid(null); }, [drawShape, tool]);
+  // A typed length (A11 [#104]): digits while drawing fix the next segment — toward the pointer — to that many
+  // metres; Enter places it. Caught before the viewer's keys (2 / 3 / 4 / 6 arm tools there) only while drawing.
+  const typedRef = useRef(typed);
+  typedRef.current = typed;
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
+  useEffect(() => {
+    if (!POLY_TOOLS.has(tool) || draft.points.length === 0 || !onCommit) return undefined;
+    const onKey = (e) => {
+      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const buf = typedRef.current;
+      if (/^[0-9]$/.test(e.key) || ((e.key === ',' || e.key === '.') && buf && !/[.,]/.test(buf))) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        setTyped(buf + e.key);
+        return;
+      }
+      if (!buf) return;
+      if (e.key === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); setTyped(buf.slice(0, -1)); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setTyped(''); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const len = typedLength(buf);
+        const last = draft.points[draft.points.length - 1];
+        const toward = cursorRef.current;
+        if (!scale?.calibrated) { flashCursorHint('Lapo mastelis nenustatytas — ilgio metrais įvesti negalima'); return; }
+        if (!len || !toward || (toward.x === last.x && toward.y === last.y)) { flashCursorHint('Parodykite žymekliu kryptį, tada Enter'); return; }
+        const p = pointAtLength(last, toward, len, scale);
+        setTyped('');
+        if (tool === 'distance') { commitDraft([...draft.points, p]); return; }
+        dispatch({ type: 'click', tool, point: p });
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [tool, draft, dispatch, commitDraft, scale, onCommit]);
+
   useEffect(() => {
     if (!POLY_TOOLS.has(tool) || draft.points.length === 0) return undefined;
     const onKey = (e) => {
@@ -478,6 +539,15 @@ export default function MeasureLayer({
         tool={tool}
         draft={draft}
         cursor={cursor}
+        typed={typed}
+        preview={(() => {
+          // what the click will place, drawn before it: the rectangle, the arc through its middle point
+          const shape = tool === 'distance' ? 'free' : drawShape;
+          if (!cursor || !draft.points.length) return null;
+          if (shape === 'rect') { const r = rectanglePoints(draft.points[0], cursor); return [...r, r[0]]; }
+          if (shape === 'arc' && arcMid) return arcPoints(draft.points[draft.points.length - 1], arcMid, cursor, 12);
+          return null;
+        })()}
         adapter={adapter}
         scale={scale}
         snapPt={snapPt}
@@ -695,7 +765,7 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   return <g pointerEvents="none">{mark}</g>;
 }
 
-function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = null, decimals }) {
+function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = null, decimals, typed = '', preview = null }) {
   if (!POLY_TOOLS.has(tool)) {
     // Still show the snap indicator for non-poly tools that snap (the count tool on a wall corner).
     return snapPt ? <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} /> : null;
@@ -720,6 +790,8 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
       chip = `Ilgis: ${formatNumberLT(len, decimals)} m`;
     }
   }
+  // digits typed while drawing (A11): the next segment's length, placed toward the pointer by Enter
+  if (typed && cursor) chip = `Kita atkarpa: ${typed.replace('.', ',')} m — Enter`;
 
   const cur = cursor ? adapter.toViewport(cursor) : null;
 
@@ -757,6 +829,10 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
           strokeDasharray={DASH}
           strokeOpacity={0.5}
         />
+      )}
+      {preview && preview.length > 1 && (
+        <polyline points={preview.map((p) => { const q = adapter.toViewport(p); return `${q.x},${q.y}`; }).join(' ')}
+          fill="none" style={paint({ stroke: USER })} strokeWidth={1.5} strokeDasharray={DASH} pointerEvents="none" data-draft-preview />
       )}
       {sp.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={3} style={paint({ fill: USER })} />

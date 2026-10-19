@@ -27,7 +27,8 @@ import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf, roomTypeWord } from '@/
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
 import { fetchHoleAt } from '@/lib/roomOutlineApi';
-import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
+import { fetchPageGeometry } from '@/lib/pageGeometryApi';
+import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue, newMeasurementId } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale, draftCommitPoints } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms, confirmLaneScales } from '@/lib/durableScale';
@@ -72,7 +73,7 @@ import { RoomPickPanel } from './RoomProposalLayer';
 import VertexPopover from './VertexPopover';
 import CountTypePicker from './CountTypePicker';
 import OpeningPopover from './OpeningPopover';
-import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms } from '@/lib/editGestures';
+import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms, copyMeasurement, wallFaceAt } from '@/lib/editGestures';
 import { openingForEdge, addEdgeOpening, openingText, openingAt, openingState, applyOpeningEdit } from '@/lib/openingEdit';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
@@ -400,7 +401,7 @@ function RailHost({ documentId, compact, activeTool, onTool, available, layers, 
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onToggleLegend = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
+function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, onDuplicateMarks = null, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onToggleLegend = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -450,6 +451,10 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
       toolLasso: () => tool('lasso'),
       deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
       undo: () => (onUndo ? (onUndo(), true) : false),
+      // W5-A A11: his measurements copied, pasted onto the sheet on screen, duplicated beside themselves
+      copyMarks: () => (onCopyMarks ? onCopyMarks() : false),
+      pasteMarks: () => (onPasteMarks ? onPasteMarks(visiblePageOf(scrollRef.current)) : false),
+      duplicateMarks: () => (onDuplicateMarks ? onDuplicateMarks() : false),
       redo: () => (onRedo ? (onRedo(), true) : false),
       // One Esc = one step back (lib/escOrder): a point, the tool, a panel, then the selection.
       escape: () => (onEscape ? onEscape() : false),
@@ -469,7 +474,7 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onToggleLegend, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onToggleLegend, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract, onCopyMarks, onPasteMarks, onDuplicateMarks]);
   return null;
 }
 
@@ -977,6 +982,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [guideOpen, setGuideOpen] = useState(false);
   // Right-click on a committed mark: { id, clientX, clientY } | null (MeasureContextMenu).
   const [measureMenu, setMeasureMenu] = useState(null);
+  // How Plotas / Perimetras draw (W5-A A11): 'free' | 'rect' | 'arc' — chosen in the pill.
+  const [drawShape, setDrawShape] = useState('free');
   // What the pointer snaps to right now (W5-A A6) — the status line names it.
   const [snapKind, setSnapKind] = useState(null);
   const menuMeasurement = measureMenu ? measurements.find((m) => m.id === measureMenu.id) || null : null;
@@ -1098,6 +1105,37 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [legend.active, active]);
+  // Copy / paste / duplicate his measurements (W5-A A11 [#102]): Ctrl+C keeps the selected ones, Ctrl+V lays copies
+  // on the sheet on screen (same place on the sheet; a hair aside on the sheet they came from), Ctrl+D copies them
+  // beside themselves. One „Istorija" entry each, „Atšaukti" in the toast; a copy keeps no sąmata row link.
+  const clipboardRef = useRef(null);
+  const PASTE_OFFSET_PT = 12;
+  const placeCopies = (copies, what) => {
+    const ids = new Set(copies.map((c) => c.id));
+    setMeasurements((prev) => [...prev, ...copies]);
+    if (measureTool === 'select' || measureTool === 'lasso') setSelectedMeasureIds([...ids]);
+    toast.success(what, { duration: 10_000, action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => prev.filter((m) => !ids.has(m.id))) } });
+  };
+  const copyMarks = () => {
+    const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+    if (!marks.length) return false;
+    clipboardRef.current = marks;
+    toast(`Nukopijuota: ${marks.length} — Ctrl+V įklijuoja matomame lape`);
+    return true;
+  };
+  const pasteMarks = (page) => {
+    const marks = clipboardRef.current;
+    if (!marks?.length || !page) return false;
+    const d = marks.some((m) => m.page === page) ? PASTE_OFFSET_PT : 0;
+    placeCopies(marks.map((m) => copyMeasurement(m, { page, dx: d, dy: d, id: newMeasurementId() })), `Įklijuota ${marks.length} į ${page} lapą`);
+    return true;
+  };
+  const duplicateMarks = () => {
+    const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+    if (!marks.length) return false;
+    placeCopies(marks.map((m) => copyMeasurement(m, { dx: PASTE_OFFSET_PT, dy: PASTE_OFFSET_PT, id: newMeasurementId() })), `Padvigubinta: ${marks.length}`);
+    return true;
+  };
   // „Rasti panašius" from a count mark (W5-A A8 [#218]): the template box is the mark's own (a found mark keeps the
   // box it was found by) or a symbol-sized box round it; the found marks join the mark's type, so the type's row
   // link (W4-A `type:<id>` / a legend row's `eilute_id`) counts them on the same sąmata row.
@@ -1321,6 +1359,32 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     }
   } : null;
 
+  // A wall face clicked with the walls layer on (W5-A A12 [#116]): the face's two ends (the wall solid the layer
+  // draws, api/page_geometry) become a distance measurement — his, in „Matavimai", with „Atšaukti".
+  const WALL_FACE_PX = 6;
+  const measureWallFace = async (pt) => {
+    const where = displayPointOf(pt);
+    if (!where || !(pt.renderedWidth > 0) || !(pt.renderedHeight > 0)) return false;
+    let geometry = null;
+    try { geometry = await fetchPageGeometry(projectId, where.page); } catch { return false; }
+    const W = pt.renderedWidth; const H = pt.renderedHeight;
+    const rings = (Array.isArray(geometry?.walls_pct) ? geometry.walls_pct : []).map((r) => r.map(([x, y]) => ({ x: x * W, y: y * H })));
+    const face = wallFaceAt(rings, { x: where.x_pct * W, y: where.y_pct * H }, WALL_FACE_PX);
+    if (!face) return false;
+    const points = pctToPoints([[face.a.x / W, face.a.y / H], [face.b.x / W, face.b.y / H]],
+      { width: pt.pageWidth, height: pt.pageHeight, rotation: pt.pageRotation ?? 0 });
+    const m = makeMeasurement('distance', where.page, points, { name: 'Siena' });
+    setMeasurements((prev) => [...prev, m]);
+    const sc = effectiveScales[where.page];
+    const text = sc?.calibrated ? `${measurementValue(m, sc).value.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m` : 'lapo mastelis nenustatytas';
+    toast.success(`Sienos ilgis: ${text}`, {
+      description: 'Įrašyta dešinės pusės skydelyje „Matavimai".',
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => prev.filter((x) => x.id !== m.id)) },
+    });
+    return true;
+  };
+
   // „Žymėti" box selection (W5-A A5): the marks the box took, and the rooms — left→right whole ones, right→left
   // touched ones; Shift adds to what is selected. The click the browser sends after the drag is not a room click.
   const boxEndedRef = useRef(0);
@@ -1370,6 +1434,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             setOpeningEdit({ o: opening, nr: opening.nr, state: openingState(room, opening), x: pt.clientX ?? 400, y: pt.clientY ?? 300 });
             return;
           }
+          // a wall face on the walls layer (W5-A A12): its length becomes a distance measurement
+          if (!onMark && wallsLayerVisible && projectId && await measureWallFace(pt)) return;
           if (!onMark) selectRoomAt(pt);
         }
         if (measureTool == null) onPagePoint?.(pt);
@@ -1512,6 +1578,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
     legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, notice: legend.notice } : null,
     mac,
+    drawShape,
   });
   // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
   // armed fill, „Rasti panašius", then the measure tool. Nothing at rest.
@@ -1535,6 +1602,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     legendPhase: legend.phase,
   });
   const onPillAction = (id) => {
+    if (id.startsWith('shape:')) { setDrawShape(id.slice(6)); return; }
     if (id === 'outlineUndo') undoOutline();
     else if (id === 'outlineSave') saveOutlineEdit();
     else if (id === 'outlineCancel') cancelOutlineEdit();
@@ -1840,6 +1908,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onRoomEdit={onRoomEdit}
             onRoomMerge={onRoomMerge}
             onRoomSubtract={onRoomSubtract}
+            onCopyMarks={check ? null : copyMarks}
+            onPasteMarks={check ? null : pasteMarks}
+            onDuplicateMarks={check ? null : duplicateMarks}
           />}
           {panning && <style>{PAN_CURSOR_CSS}</style>}
           <div className="relative flex flex-1 min-h-0">
@@ -1914,6 +1985,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onMeasureBoxSelect={handleBoxSelect}
                       onMeasureSnapChange={setSnapKind}
                       onCountTypeMenu={measureTool === 'count' ? setCountPicker : null}
+                      drawShape={drawShape}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}

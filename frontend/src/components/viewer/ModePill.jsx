@@ -16,6 +16,24 @@ export default function ModePill({ pill, onAction }) {
       <span className="font-semibold whitespace-nowrap">{pill.name}</span>
       {pill.detail && <span className="text-foreground">{pill.detail}</span>}
       {pill.keys && <span className="text-muted-foreground">{pill.keys}</span>}
+      {Array.isArray(pill.shapes) && (
+        <span role="radiogroup" aria-label="Kaip braižyti" className="inline-flex items-center rounded border border-border overflow-hidden" data-testid="pill-shapes">
+          {pill.shapes.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="radio"
+              aria-checked={s.pressed}
+              title={s.title}
+              onClick={() => onAction?.(`shape:${s.id}`)}
+              data-testid={`pill-shape-${s.id}`}
+              className={`h-8 px-2.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${s.pressed ? 'bg-muted font-semibold' : 'bg-card hover:bg-muted'}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </span>
+      )}
       {pill.actions.length > 0 && (
         <span className="inline-flex items-center gap-1.5">
           {pill.actions.map((a) => (

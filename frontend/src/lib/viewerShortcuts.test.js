@@ -91,7 +91,12 @@ test('matchViewerHotkey: plain keys, modifiers and shift', () => {
   // plain Z is the draft / outline undo, not the global one
   assert.equal(matchViewerHotkey(ev('z')), null);
   // browser combos stay with the browser
-  assert.equal(matchViewerHotkey(ev('c', { ctrlKey: true })), null);
+  // (W5-A A11: Ctrl+C / V / D are his measurements' copy, paste, duplicate — the handler declines without a
+  // selection or a copy, and then the browser keeps the key)
+  assert.equal(matchViewerHotkey(ev('c', { ctrlKey: true })), 'copyMarks');
+  assert.equal(matchViewerHotkey(ev('v', { metaKey: true })), 'pasteMarks');
+  assert.equal(matchViewerHotkey(ev('d', { ctrlKey: true })), 'duplicateMarks');
+  assert.equal(matchViewerHotkey(ev('x', { ctrlKey: true })), null);
   assert.equal(matchViewerHotkey(ev('2', { ctrlKey: true })), null);
   assert.equal(matchViewerHotkey(ev('z', { ctrlKey: true, altKey: true })), null);
 });

@@ -121,6 +121,8 @@ export default function PageOverlayHost({
   onMeasureSnapChange = null,
   // Count tool right-click → the type picker (W5-A A7).
   onCountTypeMenu = null,
+  // Plotas / Perimetras: free | rect | arc (W5-A A11).
+  drawShape = 'free',
   onMeasureDelete = null,
   // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
   onMeasureContextMenu = null,
@@ -330,6 +332,7 @@ export default function PageOverlayHost({
             onBoxSelect={onMeasureBoxSelect}
             onSnapChange={onMeasureSnapChange}
             onTypeMenu={onCountTypeMenu}
+            drawShape={drawShape}
             onDelete={onMeasureDelete}
             selectedIds={selectedMeasureIds}
             draft={measureDraft}

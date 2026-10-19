@@ -104,6 +104,6 @@ export const LEGENDS = {
     { key: 'wall', swatch: 'fill', stroke: 'wall', fill: 'wall', label: 'Sienos, kurias programa perskaitė' },
     { key: 'outline-read', swatch: 'line', stroke: 'read', dash: null, label: 'Kontūras pagal sienas arba patvirtintas' },
     { key: 'outline-estimated', swatch: 'line', stroke: 'estimated', dash: DASH, label: 'Kontūras apytikslis' },
-    { key: 'opening', swatch: 'bar', stroke: 'opening', dash: null, label: 'Anga: D — durys, L — langas; spustelėkite angą — keisti' },
+    { key: 'opening', swatch: 'bar', stroke: 'opening', dash: null, label: 'Anga: D — durys, L — langas; spustelėkite angą — keisti, sienos kraštą — jo ilgis' },
   ],
 };
