@@ -9,6 +9,7 @@
  *           layer toggles, then flip to default + delete PlanViewer.
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 import { EmbedPDF } from '@embedpdf/core/react';
@@ -69,6 +70,9 @@ import { RoomPickPanel } from './RoomProposalLayer';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
+import { useLegendTool } from './LegendTool';
+import LegendReviewPanel from './LegendReviewPanel';
+import { applyCreate } from '@/lib/legendReview';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
 import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, sheetRailWidth, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
@@ -381,7 +385,7 @@ function RailHost({ documentId, compact, activeTool, onTool, available, layers, 
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
+function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onToggleLegend = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -420,6 +424,8 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
       toolPan: () => tool('pan'),
       toolCalibrate: () => tool('calibrate'),
       toolFindSimilar: () => (fillArmed || !onToggleSymbolSearch ? false : (onToggleSymbolSearch(), true)),
+      // G — „Pažymėti legendą" (Pathon v3 W2-B): the legend proposed, counted, reviewed, then created
+      toolLegend: () => (fillArmed || !onToggleLegend ? false : (onToggleLegend(), true)),
       // R — the room tool (W1-D): one click inside a room, its outline off the walls, proposed, then saved.
       toolRoom: () => (fillArmed || !onRoomTool ? false : (onRoomTool(), true)),
       toolDistance: () => tool('distance'),
@@ -448,7 +454,7 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onToggleLegend, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract]);
   return null;
 }
 
@@ -601,7 +607,16 @@ function FocusZoomer({ documentId, focus, pages }) {
   return <span ref={anchorRef} hidden data-focus-zoomer />;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true }) {
+// „Pažymėti legendą" (W2-B): which sheet is on screen — the legend is proposed on it, and proposed again when he
+// scrolls to another sheet before choosing.
+function LegendPageWatcher({ documentId, pageRef, onPage }) {
+  const { state: scroll } = useScroll(documentId);
+  const cur = visiblePageOf(scroll);
+  useEffect(() => { pageRef.current = cur; onPage?.(cur); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -899,6 +914,58 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       if (marks[0]?.typeId) setActiveCountTypeId(marks[0].typeId);
     },
   });
+  // „Pažymėti legendą" (Pathon v3 W2-B): the legend's rows counted and reviewed — NOTHING exists before „Sukurti
+  // kiekius"; that click lands here as one history entry, with „Atšaukti" in its toast (types, marks, saved legend).
+  const legendMeasRef = useRef(measurements);
+  legendMeasRef.current = measurements;
+  const legendTypesRef = useRef(countTypes);
+  legendTypesRef.current = countTypes;
+  const docPagesRef = useRef(null);
+  const visiblePageRef = useRef(1);
+  const createFromLegend = (plan, { label, undoLegend } = {}) => {
+    const beforeM = legendMeasRef.current || [];
+    const beforeT = legendTypesRef.current || [];
+    const next = applyCreate(beforeM, beforeT, plan);
+    const added = new Set(plan.marks.map((m) => m.id));
+    const kept = new Set(next.measurements);
+    const gone = beforeM.filter((m) => !kept.has(m));
+    const newTypeIds = new Set(plan.types.map((t) => t.id));
+    const oldTypes = new Map(beforeT.map((t) => [t.id, t]));
+    setCountTypes(next.countTypes);
+    dispatchMeasureHist({ type: 'apply', update: next.measurements, label, at: Date.now() });
+    if (plan.made[0]?.type?.id) setActiveCountTypeId(plan.made[0].type.id);
+    const undo = () => {
+      setMeasurements((prev) => [...prev.filter((m) => !added.has(m.id)), ...gone]);
+      setCountTypes((prev) => prev.filter((t) => !newTypeIds.has(t.id)).map((t) => oldTypes.get(t.id) || t));
+      undoLegend?.();
+      toast('Atšaukta: kiekiai pagal legendą pašalinti');
+    };
+    toast.success(`Sukurta pagal legendą: ${plan.made.length} kiek., ${plan.marks.length} žym. brėžinyje`, {
+      description: 'Žymės tuščiavidurės — rastos automatiškai. Sąmatos eilutės skaičiuojasi pačios (skyrius „Matavimai").',
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: undo },
+    });
+  };
+  const legend = useLegendTool({ projectId, countTypes, pagesRef: docPagesRef, onCreate: createFromLegend });
+  // The host opens its right panel for the review while the tool is on (InteriorWorkspace → RightPanelHost `cover`).
+  const onLegendPanelChangeRef = useRef(onLegendPanelChange);
+  onLegendPanelChangeRef.current = onLegendPanelChange;
+  useEffect(() => { onLegendPanelChangeRef.current?.(legend.active); }, [legend.active]);
+  useEffect(() => () => { onLegendPanelChangeRef.current?.(false); }, []);
+  // Enter: „Taip" on the proposed legend, „Sukurti kiekius" in the review (design §5) — never while typing.
+  const legendKeyRef = useRef(null);
+  legendKeyRef.current = legend;
+  useEffect(() => {
+    if (!legend.active || !active) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Enter' || e.target?.closest?.('input, textarea, select, [contenteditable], button')) return;
+      const l = legendKeyRef.current;
+      if (l.phase === 'proposed') { e.preventDefault(); l.accept(); }
+      else if (l.phase === 'review' && l.toCreate.length) { e.preventDefault(); l.create(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [legend.active, active]);
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   // The selection: one mark („Žymėti") or several („Laso", 2026-10-16) — ONE list either way.
@@ -945,6 +1012,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     }
     setFillFor(null);
     if (symbol.active) symbol.close();
+    if (legend.active) legend.close();
     // Arming the count tool with no types yet would be a silent no-op (clicks
     // do nothing without an active type) — make the "Sukurkite tipą" hint
     // visible even if the legend was left collapsed.
@@ -955,12 +1023,20 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       return next;
     });
   };
-  const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); if (symbol.active) symbol.close(); setFillFor(nr); };
+  const startFill = (nr) => { setMeasureTool(null); setSelectedMeasureId(null); if (symbol.active) symbol.close(); if (legend.active) legend.close(); setFillFor(nr); };
   // „Rasti panašius" owns the pointer alone: every other tool steps aside, and they close it in turn.
   const toggleSymbolSearch = () => {
     if (symbol.active) { symbol.close(); return; }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
+    if (legend.active) legend.close();
     symbol.open();
+  };
+  // „Pažymėti legendą" owns the pointer alone too: G again (or Esc) leaves it, nothing created.
+  const toggleLegend = () => {
+    if (legend.active) { legend.close(); return; }
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null); outlineTools.cancel();
+    if (symbol.active) symbol.close();
+    legend.open(visiblePageRef.current || 1);
   };
   // External fill arming (review-queue pencil → „Kontūras paspaudus" armed here).
   // {nr, t} — t is a nonce so re-clicking the same room re-arms after Esc.
@@ -1000,6 +1076,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     setOutlineEdit(null);
     outlineTools.cancel();
     if (symbol.active) symbol.close();
+    if (legend.active) legend.close();
   }, [inCheck]); // eslint-disable-line react-hooks/exhaustive-deps
   // A finished measurement (MeasureLayer, or the pill's „Baigti"): one history entry, and the value said aloud.
   const commitMeasurement = (m) => {
@@ -1102,6 +1179,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
 
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
+    if (legend.active) return;   // so does the legend tool (LegendLayer)
     if (roomToolArmed) { roomTool.click(pt); return; }   // the room tool R (Pathon v3 W1-D)
     if (fillFor == null) {
       // Plain canvas click (no fill, no measure tool) — Pathon v3 W1-D: the room under the click is SELECTED
@@ -1217,9 +1295,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // preview and the save; otherwise the card stays disabled with its reason.
   const onRoomTool = !check && onRoomToolPreview && onRoomToolCommit ? () => armMeasureTool('room') : null;
   // The tool the cards show pressed: the armed mode, „Rasti panašius" while its session is open.
-  const railActiveTool = symbol.active ? 'findSimilar' : (measureTool === 'scalecheck' ? null : measureTool);
+  const railActiveTool = symbol.active ? 'findSimilar' : legend.active ? 'legend' : (measureTool === 'scalecheck' ? null : measureTool);
   const onRailTool = (id) => {
     if (id === 'findSimilar') { toggleSymbolSearch(); return; }
+    if (id === 'legend') { toggleLegend(); return; }
     if (id === 'room') { onRoomTool?.(); return; }
     armMeasureTool(id);
   };
@@ -1240,6 +1319,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     selectionCount: selectedMeasureIds.length,
     countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
+    legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, notice: legend.notice } : null,
     mac,
   });
   // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
@@ -1248,7 +1328,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     : outlineTools.tool ? outlineTools.tool.mode
       : fillFor != null ? 'fill'
         : symbol.active ? 'findSimilar'
-          : measureTool;
+          : legend.active ? 'legend'
+            : measureTool;
   const resolveCursorHint = ({ shift }) => cursorHintFor({
     mode: hintMode,
     points: draftPoints,
@@ -1260,6 +1341,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     selectionCount: selectedMeasureIds.length,
     outlineTool: outlineTools.tool,
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
+    legendPhase: legend.phase,
   });
   const onPillAction = (id) => {
     if (id === 'outlineUndo') undoOutline();
@@ -1267,6 +1349,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     else if (id === 'outlineCancel') cancelOutlineEdit();
     else if (id === 'fillCancel') setFillFor(null);
     else if (id === 'symbolClose') symbol.close();
+    else if (id === 'legendAccept') legend.accept();
+    else if (id === 'legendRedraw') legend.redraw();
+    else if (id === 'legendCreate') legend.create();
+    else if (id === 'legendExit') legend.close();
     else if (id === 'draftFinish') {
       const pts = draftCommitPoints(draftSlot.draft.points, measureTool);
       if (pts && draftSlot.pageNr != null) commitMeasurement(makeMeasurement(measureTool, draftSlot.pageNr, pts));
@@ -1293,6 +1379,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       outlineEdit: !!outlineEdit,
       outlineTool: !!outlineTools.tool,
       outlineToolSteps: outlineTools.tool?.history?.length || 0,
+      legend: legend.active,
       symbolSearch: symbol.active,
       fillArmed: fillFor != null,
       measureSelection: measureTool === 'select' || measureTool === 'lasso' ? selectedMeasureIds.length : 0,
@@ -1308,6 +1395,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       case 'outlineEdit': setOutlineEdit(null); return true;
       case 'outlineToolStep': outlineTools.undo(); return true;
       case 'outlineTool': outlineTools.cancel(); return true;
+      case 'legend': legend.close(); return true;
       case 'symbolSearch': symbol.close(); return true;
       case 'fill': setFillFor(null); return true;
       case 'measureSelection': setSelectedMeasureIds([]); return true;
@@ -1326,7 +1414,6 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // Shift+F / „." — the selection in the whole window: the selected marks, else the selected room.
   const frameNonce = useRef(0);
   const [frameFocus, setFrameFocus] = useState(null);
-  const docPagesRef = useRef(null);
   const frameSelection = () => {
     const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
     const room = focusedRoom ? (rooms || []).find((r) => String(r?.nr) === String(focusedRoom.nr)) || focusedRoom : null;
@@ -1358,7 +1445,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     ? (rooms || []).find((r) => String(r?.nr) === String(focusedRoomNr)) || null : null;
   const selectedMarks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
   const marksBarOn = !check && (measureTool === 'select' || measureTool === 'lasso') && selectedMarks.length > 0;
-  const roomBarOn = !!barRoom && !marksBarOn && !outlineEdit && !outlineTools.tool && fillFor == null && !symbol.active
+  const roomBarOn = !!barRoom && !marksBarOn && !outlineEdit && !outlineTools.tool && fillFor == null && !symbol.active && !legend.active
     && (measureTool == null || measureTool === 'pan' || measureTool === 'select' || measureTool === 'lasso');
   const openRoomSheet = (nr) => {
     if (!projectId) return;
@@ -1451,6 +1538,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
+          <LegendPageWatcher documentId={activeDocumentId} pageRef={visiblePageRef} onPage={legend.active ? legend.pageShown : null} />
           {frameFocus && <FocusZoomer documentId={activeDocumentId} focus={frameFocus} pages={documentState?.document?.pages} />}
           {/* `active` = false while the workspace keeps this viewer mounted behind a strip (Sąmata
               „Išskleisti", Siųsti): a key typed there must not arm a tool or undo a mark nobody sees. */}
@@ -1469,6 +1557,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleZoneFills={check ? null : () => setZoneFillsVisible((v) => !v)}
             onToggleWallsLayer={check ? null : () => setWallsLayerVisible(!wallsLayerVisible)}
             onToggleSymbolSearch={check ? null : toggleSymbolSearch}
+            onToggleLegend={check || !projectId ? null : toggleLegend}
             onRoomTool={check ? null : onRoomTool}
             onFrameSelection={check ? null : frameSelection}
             onRoomEdit={onRoomEdit}
@@ -1500,6 +1589,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       checkMode={!!check}
                       checkData={check?.pages?.[layout.pageNumber] || null}
                       symbolSearch={symbol.active ? symbol : null}
+                      legend={legend.active ? legend : null}
                       focusedRoomNr={focusedRoomNr}
                       selectedRoomNrs={extraRoomNrs}
                       hiddenRoomNrs={hiddenRoomNrs}
@@ -1570,7 +1660,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                     compact={railCompact}
                     activeTool={railActiveTool}
                     onTool={onRailTool}
-                    available={{ room: onRoomTool ? undefined : 'Patalpos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.' }}
+                    available={{
+                      room: onRoomTool ? undefined : 'Patalpos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.',
+                      legend: projectId ? undefined : 'Legendos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.',
+                    }}
                     layers={{ zones: zoneFillsVisible, walls: wallsLayerVisible }}
                     onToggleLayer={(id) => (id === 'zones' ? setZoneFillsVisible((v) => !v) : setWallsLayerVisible(!wallsLayerVisible))}
                     onDownload={handleDownload}
@@ -1721,6 +1814,24 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 <SymbolReviewPanel documentId={activeDocumentId} search={symbol} countTypes={countTypes} totalPages={totalPages || 1} />
               </div>
             )}
+            {/* „Pažymėti legendą" review (W2-B): in the workspace's right panel when the host gives a place there,
+                else beside the drawing like the „Rasti panašius" list. */}
+            {legend.active && (() => {
+              const panel = (
+                <LegendReviewPanel
+                  documentId={activeDocumentId}
+                  projectId={projectId}
+                  legend={legend}
+                  onMeasure={(tool) => { legend.close(); armMeasureTool(tool); }}
+                />
+              );
+              if (legendPanelSlot) return createPortal(panel, legendPanelSlot);
+              return (
+                <div className="absolute top-2 bottom-2 z-30 w-80 overflow-hidden rounded-panel border border-border shadow-lg" style={{ left: panelLeft }}>
+                  {panel}
+                </div>
+              );
+            })()}
             {/* Floating count-type legend while the count tool is armed. */}
             {measureTool === 'count' && (
               <div
@@ -1872,6 +1983,10 @@ export default function TakeoffViewer({
   // false while the project workspace keeps the viewer mounted out of sight (InteriorWorkspace strip mode):
   // no keyboard shortcuts, no first-run coach marks. Default true — every other host is unchanged.
   active = true,
+  // „Pažymėti legendą" (W2-B): a DOM node in the host's right panel for the review, and a callback telling the
+  // host when the tool is on (so it can show that node). Absent → the review floats beside the drawing.
+  legendPanelSlot = null,
+  onLegendPanelChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -1916,6 +2031,8 @@ export default function TakeoffViewer({
           sheetLinksVersion={sheetLinksVersion}
           revisionOverlay={revisionOverlay}
           active={active}
+          legendPanelSlot={legendPanelSlot}
+          onLegendPanelChange={onLegendPanelChange}
         />
       </EmbedPDF>
     </div>

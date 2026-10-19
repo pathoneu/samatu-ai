@@ -9,6 +9,7 @@
 
 import { hintText } from './viewerShortcuts.js';
 import { railTool } from './toolRail.js';
+import { legendPill } from './legendReview.js';
 
 const DRAFT_TOOLS = new Set(['distance', 'area', 'perimeter']);
 
@@ -25,13 +26,14 @@ const nameOf = (tool) => railTool(tool)?.name || null;
  *   selectionCount = 0,   // measurements selected with „Žymėti" / „Laso"
  *   countType = null,     // { label, n } — the count tool's active type
  *   roomPhase = null,     // the room tool R (W1-D useRoomTool): idle | reading | proposed | saving | picking
+ *   legend = null,        // „Pažymėti legendą" (W2-B): { phase, proposals, toCreate, notice } while its session is open
  *   mac,
  * }
  * → null | { id, name, detail, keys, actions: [{ id, label, primary?, disabled?, title? }] }
  */
 export function modePillFor(state = {}) {
   const { tool = null, draftPoints = 0, finishable = false, calibPoint = false, outlineEdit = null, fill = null,
-    symbolActive = false, selectionCount = 0, countType = null, roomPhase = null, mac = false } = state;
+    symbolActive = false, selectionCount = 0, countType = null, roomPhase = null, legend = null, mac = false } = state;
   const exit = { id: 'toolExit', label: 'Išeiti', title: 'Išeiti iš įrankio (Esc)' };
 
   if (outlineEdit) {
@@ -64,6 +66,7 @@ export function modePillFor(state = {}) {
       actions: [{ id: 'fillCancel', label: 'Atšaukti', title: 'Atšaukti (Esc) — niekas nepakeičiama' }],
     };
   }
+  if (legend?.phase) return legendPill(legend);
   if (symbolActive) {
     return {
       id: 'findSimilar',

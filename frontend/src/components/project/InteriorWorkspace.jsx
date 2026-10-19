@@ -47,6 +47,7 @@ import {
 } from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
+import { syncLegendRows } from '@/lib/legendReview';
 
 // Patikra's question list / room sheet (its own chunk, as when it was a separate route).
 const PatikraEntry = lazy(() => import('@/pages/PatikraEntry'));
@@ -203,6 +204,9 @@ export default function InteriorWorkspace({
   // there ('patalpos' | 'kiekiai' | 'pokalbis'); Patikra and Sąmata show their own. The drawing tabs stay
   // mounted while hidden so their filters / folds survive a switch.
   const [drawingTab, setDrawingTab] = useState('patalpos');
+  // „Pažymėti legendą" (v3 W2-B): while the tool is on, its review covers the right panel (the tabs stay mounted)
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendSlot, setLegendSlot] = useState(null);
   const rightTab = tabForView(view, drawingTab);
   const setRightTab = useCallback((tab) => {
     const next = selectTab(view, tab);
@@ -500,10 +504,14 @@ export default function InteriorWorkspace({
     for (const hit of sheetsCrossingLimit(project?.measurements, measurements)) {
       toast.warning(sheetLimitMessage(hit), { id: `measure-limit-${hit.page}`, duration: 12000 });
     }
+    // v3 W2-B: a count made from a legend row keeps its sąmata row in step with the marks (no „Į sąmatą" click)
+    const rows = getProject(project.id)?.darbu_sarasas || project.darbu_sarasas || [];
+    const synced = syncLegendRows(rows, measurements, countTypes || project.countTypes || []);
     const updated = updateProject(project.id, {
       measurements,
       pageScalesDurable: measureScales,
       ...(countTypes ? { countTypes } : {}),
+      ...(synced !== rows ? { darbu_sarasas: synced } : {}),
     });
     if (updated) onProjectChange?.(updated);
   };
@@ -801,6 +809,8 @@ export default function InteriorWorkspace({
         project={project}
         initialCountTypes={project?.countTypes || null}
         onMeasureDataChange={handleMeasureDataChange}
+        legendPanelSlot={legendSlot}
+        onLegendPanelChange={setLegendOpen}
         sheetPages={project?.puslapiai || project?.v8_pages || []}
         sheetOverrides={project?.sheet_overrides || null}
         onSheetOverridesChange={handleSheetOverridesChange}
@@ -1061,6 +1071,7 @@ export default function InteriorWorkspace({
           notices={notices}
           tabBarExtra={samataToggle}
           panels={panels}
+          cover={legendOpen && !strip ? <div ref={setLegendSlot} className="h-full min-h-0" data-testid="legend-panel-slot" /> : null}
         />
       )}
     </div>

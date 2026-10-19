@@ -10,7 +10,7 @@
 //   3. a calibration's first point; the room tool's proposal or its „Kuri tai patalpa?" list (W1-D)
 //   4. an outline being edited            — left without saving
 //   5. an outline tool's last click (Padalyti / Sujungti / Atimti), then the tool itself
-//   6. „Rasti panašius", then an armed „Kontūras paspaudus"
+//   6. „Pažymėti legendą" (nothing created), „Rasti panašius", then an armed „Kontūras paspaudus"
 //   7. the marks selected with „Žymėti" / „Laso"
 //   8. the armed tool                     — back to rest
 //   9. open panels: search, Masteliai, Istorija, the scale check card
@@ -27,6 +27,7 @@ export const ESC_STEPS = [
   { id: 'outlineEdit', when: (s) => !!s.outlineEdit },
   { id: 'outlineToolStep', when: (s) => !!s.outlineTool && (s.outlineToolSteps || 0) > 0 },
   { id: 'outlineTool', when: (s) => !!s.outlineTool },
+  { id: 'legend', when: (s) => !!s.legend },
   { id: 'symbolSearch', when: (s) => !!s.symbolSearch },
   { id: 'fill', when: (s) => !!s.fillArmed },
   { id: 'measureSelection', when: (s) => (s.measureSelection || 0) > 0 },
