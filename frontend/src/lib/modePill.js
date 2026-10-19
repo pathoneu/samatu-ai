@@ -119,7 +119,10 @@ export function modePillFor(state = {}) {
       name: nameOf('count'),
       detail: countType ? `${countType.label}: ${countType.n} vnt.` : 'Pirmiausia pasirinkite arba sukurkite tipą',
       keys: null,
-      actions: [exit],
+      // B1-B: one mark placed by hand counts one — the founder expected the rest to be found. Say how, in the pill.
+      actions: countType?.findable && countType.n > 0
+        ? [{ id: 'countFindSimilar', label: 'Rasti visus tokius', title: 'Programa paieškos brėžinyje tokių pat ženklų kaip jūsų pažymėtas — pirma parodys, jūs patvirtinsite' }, exit]
+        : [exit],
     };
   }
   if (tool === 'calibrate' || tool === 'scalecheck') {

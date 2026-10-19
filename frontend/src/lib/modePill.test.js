@@ -53,6 +53,11 @@ test('the pill shows only the active mode — outline edit wins over an armed to
 test('count shows its type and tally; calibration its points', () => {
   assert.equal(modePillFor({ tool: 'count', countType: { label: 'Rozetės', n: 12 } }).detail, 'Rozetės: 12 vnt.');
   assert.match(modePillFor({ tool: 'count' }).detail, /tipą/);
+  // B1-B: after a mark placed by hand the pill says how the program finds the rest
+  assert.deepEqual(ids(modePillFor({ tool: 'count', countType: { label: 'Jungiklis', n: 1, findable: true } })), ['countFindSimilar', 'toolExit']);
+  assert.equal(modePillFor({ tool: 'count', countType: { label: 'Jungiklis', n: 1, findable: true } }).actions[0].label, 'Rasti visus tokius');
+  assert.deepEqual(ids(modePillFor({ tool: 'count', countType: { label: 'Jungiklis', n: 0, findable: true } })), ['toolExit']);
+  assert.deepEqual(ids(modePillFor({ tool: 'count', countType: { label: 'Jungiklis', n: 3 } })), ['toolExit']);
   assert.deepEqual(ids(modePillFor({ tool: 'calibrate', calibPoint: true })), ['calibCancel', 'toolExit']);
   assert.equal(modePillFor({ tool: 'scalecheck' }).name, 'Mastelio patikra');
 });
