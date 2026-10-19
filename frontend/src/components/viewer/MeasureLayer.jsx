@@ -11,8 +11,10 @@ import {
   pointInPolygon,
   polygonCentroid,
 } from '@/lib/polygonGeometry.js';
-import { pickSnap } from '@/lib/drawingSnap.js';
+import { alignGuide, pickSnap } from '@/lib/drawingSnap.js';
+import { cursorForMode } from '@/lib/cursors.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
+import { arcPoints, boxMode, marksInBox, pointAtLength, rectanglePoints, typedLength } from '@/lib/editGestures.js';
 import { flashCursorHint } from '@/lib/cursorHints.js';
 import { isAiMark } from '@/lib/symbolSearch.js';
 import {
@@ -32,6 +34,12 @@ const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
 
 // Pixel tolerance (screen px) for vertex/edge snap, poly-close, and select hit-testing.
 const SNAP_TOL_PX = 8;
+// Ctrl (⌘) held: the pointer jumps to the nearest snap target this far away (W5-A A6 [#106]).
+const JUMP_TOL_PX = 48;
+// A count click on a mark placed less than this long ago is the same click twice, not a removal (A7 [#114]).
+const SECOND_CLICK_MS = 700;
+// An alignment guide catches within this many screen px of a vertex's x or y (A6 [#56]).
+const ALIGN_TOL_PX = 5;
 
 const EMPTY_DRAFT = { points: [], committed: false };
 
@@ -76,6 +84,16 @@ export default function MeasureLayer({
   onDraftAction = null,
   calibA: calibAProp = null,
   onCalibAChange = null,
+  // „Žymėti" box selection (W5-A A5): ({ids, a, b, mode, add}) — a, b the box corners in PDF points, mode
+  // 'window' (dragged left→right: whole shapes) or 'crossing' (right→left: touched ones).
+  onBoxSelect = null,
+  // The snap under the pointer changed (A6): (kind | null) — the status line names it.
+  onSnapChange = null,
+  // Count tool, right-click (W5-A A7): ({x, y} screen px) — the type picker opens there.
+  onTypeMenu = null,
+  // How Plotas / Perimetras draw (W5-A A11): 'free' (corner by corner) | 'rect' (two corners) | 'arc' (the next
+  // segment is an arc through a point on it).
+  drawShape = 'free',
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -89,14 +107,24 @@ export default function MeasureLayer({
   const setCalibA = onCalibAChange || setLocalCalibA;
   const [cursor, setCursor] = useState(null);   // snapped PDF point under the pointer
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
-  const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
+  const [snapKind, setSnapKind] = useState(null); // a key of drawingSnap.SNAP_KIND_TEXT
+  const [guides, setGuides] = useState([]);        // alignment guides [{from, axis}] (A6)
   const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
+  const [box, setBox] = useState(null);           // {from, to (px), add} while a „Žymėti" box is dragged (A5)
+  const [arcMid, setArcMid] = useState(null);     // the arc's middle point, clicked before its end (A11)
+  const [typed, setTyped] = useState('');         // digits typed while drawing: the next segment's length (A11)
   // Right-click while drawing (v3 W1-B B5, Kreo „Create / Reset"): „Baigti" / „Atšaukti" at the pointer.
   const [finishMenu, setFinishMenu] = useState(null);   // {x, y} in SVG px, or null
   const selectedSet = useMemo(
     () => new Set(Array.isArray(selectedIds) ? selectedIds : (selectedId != null ? [selectedId] : [])),
     [selectedIds, selectedId],
   );
+
+  // The status line names the snap (A6): told when it changes, and cleared when this layer stops snapping.
+  const onSnapChangeRef = useRef(onSnapChange);
+  onSnapChangeRef.current = onSnapChange;
+  useEffect(() => { onSnapChangeRef.current?.(snapKind); }, [snapKind]);
+  useEffect(() => () => onSnapChangeRef.current?.(null), []);
 
   // Reset the draft whenever the active tool changes. In controlled mode the
   // OWNER resets (this component re-mounts on every scroll-back, and resetting
@@ -133,10 +161,12 @@ export default function MeasureLayer({
   // Order (lib/drawingSnap.pickSnap): a wall corner of the drawing, a measurement vertex, a wall face,
   // a measurement edge — the drawing wins because it is what the person is measuring.
   const applySnap = useCallback((raw, e) => {
-    const tol = SNAP_TOL_PX / (adapter?.scale || 1);
+    const jump = !!(e && (e.ctrlKey || e.metaKey));
+    const tol = (jump ? JUMP_TOL_PX : SNAP_TOL_PX) / (adapter?.scale || 1);
     let point = raw;
     let snapped = false;
     let snapKind = null;
+    let guideList = [];
 
     if (snapEnabled && (drawingSnapPolygons.length || snapPolygons.length)) {
       const hit = pickSnap(raw, { drawing: drawingSnapPolygons, measurements: snapPolygons }, tol);
@@ -145,6 +175,12 @@ export default function MeasureLayer({
         snapped = true;
         snapKind = hit.kind;
       }
+    }
+    // Nothing to snap to: line up with a point already placed (this drawing's corners, his measurements' points).
+    if (!snapped && snapEnabled && (POLY_TOOLS.has(tool) || tool === 'calibrate')) {
+      const vertices = [...draft.points, ...snapPolygons.flatMap((p) => p.points)];
+      const g = alignGuide(raw, vertices, ALIGN_TOL_PX / (adapter?.scale || 1));
+      if (g) { point = g.point; snapped = true; snapKind = 'align'; guideList = g.guides; }
     }
 
     const shiftHeld = !!(e && e.shiftKey);
@@ -156,7 +192,7 @@ export default function MeasureLayer({
       // sub-point rounding is well below drawing precision.
       point = orthoSnap(prev, point, { orthoEnabled: orthoEnabled || shiftHeld, shiftHeld, altHeld });
     }
-    return { point, snapped, snapKind };
+    return { point, snapped, snapKind, guides: guideList };
   }, [adapter?.scale, snapEnabled, snapPolygons, drawingSnapPolygons, orthoEnabled, tool, draft.points]);
 
   // ---- pointer handlers ---------------------------------------------------
@@ -178,6 +214,14 @@ export default function MeasureLayer({
   }, []);
 
   const handlePointerMove = useCallback((e) => {
+    if (box) {
+      const p = localPx(e);
+      if (!box.moved && Math.hypot(p.x - box.from.x, p.y - box.from.y) >= 4) {
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ }
+      }
+      setBox((cur) => (cur ? { ...cur, to: p, moved: cur.moved || Math.hypot(p.x - cur.from.x, p.y - cur.from.y) >= 4 } : cur));
+      return;
+    }
     if (tool === 'lasso') {
       if (!lasso) return;
       const p = localPx(e);
@@ -189,11 +233,12 @@ export default function MeasureLayer({
       setCursor(null);
       return;
     }
-    const { point, snapped, snapKind: kind } = applySnap(eventToPdf(e), e);
+    const { point, snapped, snapKind: kind, guides: g } = applySnap(eventToPdf(e), e);
     setCursor(point);
     setSnapPt(snapped ? point : null);
     setSnapKind(snapped ? kind : null);
-  }, [tool, applySnap, eventToPdf, lasso, localPx]);
+    setGuides(g || []);
+  }, [tool, applySnap, eventToPdf, lasso, box, localPx]);
 
   const handlePointerDown = useCallback((e) => {
     if (tool === 'pan') return;
@@ -211,6 +256,11 @@ export default function MeasureLayer({
       const raw = eventToPdf(e);
       const hitId = hitTest(raw, measurements, pageNr, SNAP_TOL_PX / adapter.scale);
       onSelect?.(hitId);
+      // on empty paper a drag draws a selection box (A5); a plain click stays a click (the room under it)
+      if (!hitId && e.button === 0 && onBoxSelect) {
+        const p = localPx(e);
+        setBox({ from: p, to: p, add: e.shiftKey });
+      }
       return;
     }
 
@@ -253,7 +303,13 @@ export default function MeasureLayer({
         pageNr,
         SNAP_TOL_PX / adapter.scale,
       );
-      if (hitId) { onDelete?.(hitId); toast.info('Žymė pašalinta'); return; }
+      if (hitId) {
+        // a second click on the spot he JUST marked (a double-click, a twitch) is ignored — never place-then-remove (A7)
+        const hit = measurements.find((m) => m.id === hitId);
+        const age = hit?.created_at ? Date.now() - Date.parse(hit.created_at) : Infinity;
+        if (age < SECOND_CLICK_MS) { flashCursorHint('Čia jau pažymėta'); return; }
+        onDelete?.(hitId); toast.info('Žymė pašalinta'); return;
+      }
       const type = countTypes.find((t) => t.id === activeCountTypeId) || {};
       onCommit?.(makeMeasurement('count', pageNr, [point], {
         typeId: activeCountTypeId,
@@ -264,6 +320,22 @@ export default function MeasureLayer({
     }
 
     if (POLY_TOOLS.has(tool)) {
+      // A rectangle (A11): two opposite corners — the second click finishes it.
+      const shape = tool === 'distance' ? 'free' : drawShape;
+      if (shape === 'rect') {
+        if (draft.points.length === 0) { dispatch({ type: 'click', tool, point }); return; }
+        const rect = rectanglePoints(draft.points[0], point);
+        commitDraft(tool === 'area' ? rect : [...rect, rect[0]]);
+        return;
+      }
+      // An arc segment (A11): after the start, one click on the arc, one at its end.
+      if (shape === 'arc' && draft.points.length >= 1) {
+        if (!arcMid) { setArcMid(point); return; }
+        const last = draft.points[draft.points.length - 1];
+        dispatch({ type: 'extend', points: arcPoints(last, arcMid, point, 12).slice(1) });
+        setArcMid(null);
+        return;
+      }
       // Distance ends on its second click (v3 W1-B B5); Shift + click keeps the chain going instead, and the
       // next plain click ends it there.
       if (tool === 'distance' && draft.points.length >= 1 && !e.shiftKey) {
@@ -278,9 +350,19 @@ export default function MeasureLayer({
         dispatch({ type: 'click', tool, point, closeTolerance });
       }
     }
-  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu]);
+  }, [tool, eventToPdf, applySnap, measurements, pageNr, adapter?.scale, onSelect, onDelete, activeCountTypeId, countTypes, onCommit, onCalibrate, calibA, setCalibA, draft, dispatch, commitDraft, localPx, finishMenu, onBoxSelect, drawShape, arcMid]);
 
   const handlePointerUp = useCallback((e) => {
+    if (box) {
+      const b = box;
+      setBox(null);
+      if (!b.moved) return;
+      const a = adapter.toPdf(b.from);
+      const z = adapter.toPdf(b.to);
+      const mode = boxMode(b.from, b.to);
+      onBoxSelect?.({ ids: marksInBox(measurements, pageNr, a, z, mode), a, b: z, mode, add: b.add, pageNr });
+      return;
+    }
     if (tool !== 'lasso' || !lasso) return;
     const loop = lasso.px;
     const prev = [...selectedSet];
@@ -293,7 +375,7 @@ export default function MeasureLayer({
       ids = lassoSelect(measurements, pageNr, loop.map((p) => adapter.toPdf(p)));
     }
     onSelect?.(lasso.add ? [...new Set([...prev, ...ids])] : ids);
-  }, [tool, lasso, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect]);
+  }, [tool, lasso, box, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect, onBoxSelect]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;
@@ -321,11 +403,17 @@ export default function MeasureLayer({
   // Right-click while drawing → „Baigti" / „Atšaukti" at the pointer. Off a draft the right-click stays the
   // measurement menu (PageOverlayHost) — this handler lets it through.
   const handleContextMenu = useCallback((e) => {
+    if (tool === 'count' && onTypeMenu) {
+      e.preventDefault();
+      e.stopPropagation();
+      onTypeMenu({ x: e.clientX, y: e.clientY });
+      return;
+    }
     if (!drafting) return;
     e.preventDefault();
     e.stopPropagation();
     setFinishMenu(localPx(e));
-  }, [drafting, localPx]);
+  }, [drafting, localPx, tool, onTypeMenu]);
   // The pop-up closes with the draft (finished, cancelled, stepped back to nothing, tool changed).
   useEffect(() => { if (!drafting) setFinishMenu(null); }, [drafting]);
   // Esc closes the pop-up only — the draft keeps its points (the viewer's Esc step never sees this press).
@@ -347,6 +435,46 @@ export default function MeasureLayer({
   // Bound ONLY on the page that owns a non-empty draft: this component is
   // mounted once per virtualized page, and with the draft lifted upstream every
   // mounted copy would otherwise apply the same undo/finish (5 pages = 5 undos).
+  // The arc's middle point and the typed digits go with the draft.
+  useEffect(() => { if (!draft.points.length) { setArcMid(null); setTyped(''); } }, [draft.points.length]);
+  useEffect(() => { setArcMid(null); }, [drawShape, tool]);
+  // A typed length (A11 [#104]): digits while drawing fix the next segment — toward the pointer — to that many
+  // metres; Enter places it. Caught before the viewer's keys (2 / 3 / 4 / 6 arm tools there) only while drawing.
+  const typedRef = useRef(typed);
+  typedRef.current = typed;
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
+  useEffect(() => {
+    if (!POLY_TOOLS.has(tool) || draft.points.length === 0 || !onCommit) return undefined;
+    const onKey = (e) => {
+      if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const buf = typedRef.current;
+      if (/^[0-9]$/.test(e.key) || ((e.key === ',' || e.key === '.') && buf && !/[.,]/.test(buf))) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        setTyped(buf + e.key);
+        return;
+      }
+      if (!buf) return;
+      if (e.key === 'Backspace') { e.preventDefault(); e.stopImmediatePropagation(); setTyped(buf.slice(0, -1)); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setTyped(''); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const len = typedLength(buf);
+        const last = draft.points[draft.points.length - 1];
+        const toward = cursorRef.current;
+        if (!scale?.calibrated) { flashCursorHint('Lapo mastelis nenustatytas — ilgio metrais įvesti negalima'); return; }
+        if (!len || !toward || (toward.x === last.x && toward.y === last.y)) { flashCursorHint('Parodykite žymekliu kryptį, tada Enter'); return; }
+        const p = pointAtLength(last, toward, len, scale);
+        setTyped('');
+        if (tool === 'distance') { commitDraft([...draft.points, p]); return; }
+        dispatch({ type: 'click', tool, point: p });
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [tool, draft, dispatch, commitDraft, scale, onCommit]);
+
   useEffect(() => {
     if (!POLY_TOOLS.has(tool) || draft.points.length === 0) return undefined;
     const onKey = (e) => {
@@ -385,13 +513,13 @@ export default function MeasureLayer({
         position: 'absolute',
         inset: 0,
         pointerEvents: tool === 'pan' ? 'none' : 'auto',
-        cursor: tool === 'select' ? 'default' : 'crosshair',
+        cursor: cursorForMode(tool),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => setLasso(null)}
-      onPointerLeave={() => setCursor(null)}
+      onPointerCancel={() => { setLasso(null); setBox(null); }}
+      onPointerLeave={() => { setCursor(null); setSnapPt(null); setSnapKind(null); setGuides([]); }}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
@@ -411,6 +539,15 @@ export default function MeasureLayer({
         tool={tool}
         draft={draft}
         cursor={cursor}
+        typed={typed}
+        preview={(() => {
+          // what the click will place, drawn before it: the rectangle, the arc through its middle point
+          const shape = tool === 'distance' ? 'free' : drawShape;
+          if (!cursor || !draft.points.length) return null;
+          if (shape === 'rect') { const r = rectanglePoints(draft.points[0], cursor); return [...r, r[0]]; }
+          if (shape === 'arc' && arcMid) return arcPoints(draft.points[draft.points.length - 1], arcMid, cursor, 12);
+          return null;
+        })()}
         adapter={adapter}
         scale={scale}
         snapPt={snapPt}
@@ -431,6 +568,21 @@ export default function MeasureLayer({
         />
       )}
 
+      {box?.moved && (() => {
+        const x = Math.min(box.from.x, box.to.x); const y = Math.min(box.from.y, box.to.y);
+        const w = Math.abs(box.to.x - box.from.x); const h = Math.abs(box.to.y - box.from.y);
+        const words = boxMode(box.from, box.to) === 'window' ? 'Visos viduje' : 'Paliestos';
+        return (
+          <g pointerEvents="none" data-select-box={boxMode(box.from, box.to)}>
+            <rect x={x} y={y} width={w} height={h} style={paint({ fill: INK, stroke: INK })} fillOpacity={0.06} strokeOpacity={0.7} strokeWidth={1.5} />
+            <ReadoutChip x={x + 4} y={y - 6} text={words} anchor="start" />
+          </g>
+        );
+      })()}
+      {cursor && guides.map((g, i) => {
+        const a = adapter.toViewport(g.from); const b = adapter.toViewport(cursor);
+        return <line key={`guide${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={paint({ stroke: EDITING })} strokeWidth={1} strokeDasharray={DASH} pointerEvents="none" data-align-guide={g.axis} />;
+      })}
       {lasso && lasso.px.length > 1 && (
         <polygon
           points={lasso.px.map((p) => `${p.x},${p.y}`).join(' ')}
@@ -613,7 +765,7 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   return <g pointerEvents="none">{mark}</g>;
 }
 
-function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = null, decimals }) {
+function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = null, decimals, typed = '', preview = null }) {
   if (!POLY_TOOLS.has(tool)) {
     // Still show the snap indicator for non-poly tools that snap (the count tool on a wall corner).
     return snapPt ? <SnapDot p={adapter.toViewport(snapPt)} kind={snapKind} /> : null;
@@ -638,6 +790,8 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
       chip = `Ilgis: ${formatNumberLT(len, decimals)} m`;
     }
   }
+  // digits typed while drawing (A11): the next segment's length, placed toward the pointer by Enter
+  if (typed && cursor) chip = `Kita atkarpa: ${typed.replace('.', ',')} m — Enter`;
 
   const cur = cursor ? adapter.toViewport(cursor) : null;
 
@@ -676,6 +830,10 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
           strokeOpacity={0.5}
         />
       )}
+      {preview && preview.length > 1 && (
+        <polyline points={preview.map((p) => { const q = adapter.toViewport(p); return `${q.x},${q.y}`; }).join(' ')}
+          fill="none" style={paint({ stroke: USER })} strokeWidth={1.5} strokeDasharray={DASH} pointerEvents="none" data-draft-preview />
+      )}
       {sp.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={3} style={paint({ fill: USER })} />
       ))}
@@ -712,19 +870,29 @@ function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) 
 
 function SnapDot({ p, kind = null }) {
   // One colour for every snap mark (the tool-at-work orange) — the SHAPE says what the click will land
-  // on: a wall corner of the DRAWING is a square, a wall face a diamond, his own measurement a circle.
+  // on: a wall corner of the DRAWING is a square, a wall face a diamond, his own measurement a circle,
+  // a middle a triangle, where two lines cross an ×, a point in line with another a small plus (W5-A A6).
+  if (kind === 'drawing-midpoint' || kind === 'measure-midpoint') {
+    return <path d={`M ${p.x} ${p.y - 6} L ${p.x + 6} ${p.y + 5} L ${p.x - 6} ${p.y + 5} Z`} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
+  if (kind === 'intersection') {
+    return <path d={`M ${p.x - 5} ${p.y - 5} L ${p.x + 5} ${p.y + 5} M ${p.x + 5} ${p.y - 5} L ${p.x - 5} ${p.y + 5}`} style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
+  if (kind === 'align') {
+    return <path d={`M ${p.x - 4} ${p.y} L ${p.x + 4} ${p.y} M ${p.x} ${p.y - 4} L ${p.x} ${p.y + 4}`} style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
   if (kind === 'drawing-vertex' || kind === 'drawing-edge') {
     const r = kind === 'drawing-vertex' ? 6 : 5;
     return (
       <rect
         x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
-        fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none"
+        fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind}
         transform={kind === 'drawing-edge' ? `rotate(45 ${p.x} ${p.y})` : undefined}
       />
     );
   }
   return (
-    <circle cx={p.x} cy={p.y} r={5} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" />
+    <circle cx={p.x} cy={p.y} r={5} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind || 'measure'} />
   );
 }
 

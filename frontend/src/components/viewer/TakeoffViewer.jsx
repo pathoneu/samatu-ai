@@ -23,10 +23,12 @@ import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
 import { ChevronUp, ChevronDown, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
-import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
+import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf, roomTypeWord } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
-import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
+import { fetchHoleAt } from '@/lib/roomOutlineApi';
+import { fetchPageGeometry } from '@/lib/pageGeometryApi';
+import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue, newMeasurementId } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale, draftCommitPoints } from '@/lib/measureGeometry';
 import { autoPageScalesFromRooms, confirmLaneScales } from '@/lib/durableScale';
@@ -36,6 +38,7 @@ import { scaleCheckReadout } from '@/lib/scaleCheck';
 import { visiblePageOf } from '@/lib/visiblePage';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
+import { SNAP_KIND_TEXT } from '@/lib/drawingSnap';
 import { selfIntersects } from '@/lib/polygonGeometry';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { roomAtPoint, nextRoomSelection } from '@/lib/roomHitTest';
@@ -59,7 +62,6 @@ import ZoomCluster from './ZoomCluster';
 import ViewSettingsPopover, { CleanBgFilter, ViewCrosshair } from './ViewSettingsPopover';
 import { readViewSettings, viewCss, writeViewSettings } from '@/lib/viewSettings';
 import { cachedSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
-import { flashCursorHint } from '@/lib/cursorHints';
 import { scaleGateFromScale } from '@/lib/scaleGate';
 import { pageScaleIn } from '@/lib/pageScales';
 import { focusFrameForRoom } from '@/lib/focusFrame';
@@ -69,7 +71,7 @@ import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
 import { pickSpot } from '@/lib/selectionPlacement';
 import CursorHint from './CursorHint';
-import { cursorHintFor } from '@/lib/cursorHints';
+import { cursorHintFor, flashCursorHint } from '@/lib/cursorHints';
 import { escStep, openLayerInDocument } from '@/lib/escOrder';
 import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
@@ -78,6 +80,11 @@ import useMiddlePan from './useMiddlePan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
+import VertexPopover from './VertexPopover';
+import CountTypePicker from './CountTypePicker';
+import OpeningPopover from './OpeningPopover';
+import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms, copyMeasurement, wallFaceAt } from '@/lib/editGestures';
+import { openingForEdge, addEdgeOpening, openingText, openingAt, openingState, applyOpeningEdit } from '@/lib/openingEdit';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
@@ -87,6 +94,11 @@ import { applyCreate } from '@/lib/legendReview';
 import { aiTallies as aiTalliesOf } from '@/lib/symbolSearch';
 import SheetRail from './SheetRail';
 import { buildSheetRail, setSheetOverride, clearSheetOverride, overrideFor, floatingPanelLeft, sheetRailWidth, readSheetRailFull, writeSheetRailFull } from '@/lib/sheetRail';
+
+// A measurement's kind as the toasts and the selection bar say it.
+const MEASURE_KIND_NAMES = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
+// The doorway „Iškirpti angą" cuts out of a length (W5-A A2): the standard interior door opening.
+const DOORWAY_GAP_M = 0.9;
 
 // Empty measurement draft (shape of measureOverlayReducer's state).
 const EMPTY_DRAFT = { points: [], committed: false };
@@ -231,7 +243,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false, snapKind = null }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -252,7 +264,10 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
   // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
   // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
-  const snapNote = snapsHere && !symbolHint && !outlineEdit ? (SNAP_NOTE[geometryStatus] || '') : '';
+  // the snap under the pointer is named (W5-A A6); otherwise what this sheet snaps to
+  const snapNote = snapsHere && !symbolHint && !outlineEdit
+    ? (snapKind && SNAP_KIND_TEXT[snapKind] ? `Prilimpa: ${SNAP_KIND_TEXT[snapKind]} · laikykite Ctrl — peršokti iki artimiausio` : (SNAP_NOTE[geometryStatus] || ''))
+    : '';
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
@@ -361,7 +376,7 @@ function RailHost({ documentId, compact, activeTool, onTool, available, layers, 
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
  */
-function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onToggleLegend = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
+function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, onDuplicateMarks = null, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch = null, onToggleLegend = null, onRoomTool = null, onFrameSelection = null, onRoomEdit = null, onRoomMerge = null, onRoomSubtract = null }) {
   const { provides: zoomApi } = useZoom(documentId);
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { provides: printApi } = usePrint(documentId);
@@ -411,6 +426,10 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
       toolLasso: () => tool('lasso'),
       deleteSelected: () => (canDeleteSelected ? (onDeleteSelected?.(), true) : false),
       undo: () => (onUndo ? (onUndo(), true) : false),
+      // W5-A A11: his measurements copied, pasted onto the sheet on screen, duplicated beside themselves
+      copyMarks: () => (onCopyMarks ? onCopyMarks() : false),
+      pasteMarks: () => (onPasteMarks ? onPasteMarks(visiblePageOf(scrollRef.current)) : false),
+      duplicateMarks: () => (onDuplicateMarks ? onDuplicateMarks() : false),
       redo: () => (onRedo ? (onRedo(), true) : false),
       // One Esc = one step back (lib/escOrder): a point, the tool, a panel, then the selection.
       escape: () => (onEscape ? onEscape() : false),
@@ -430,7 +449,7 @@ function ViewerHotkeys({ documentId, fillArmed, onEscape, onToggleThumbs, onMeas
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onToggleLegend, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract]);
+  }, [zoomApi, scrollApi, printApi, fillArmed, onEscape, onToggleThumbs, onMeasureToolKey, canDeleteSelected, onDeleteSelected, onOpenSearch, onUndo, onRedo, onOpenGuide, onToggleZoneFills, onToggleWallsLayer, onToggleSymbolSearch, onToggleLegend, onRoomTool, onFrameSelection, onRoomEdit, onRoomMerge, onRoomSubtract, onCopyMarks, onPasteMarks, onDuplicateMarks]);
   return null;
 }
 
@@ -605,7 +624,7 @@ function LegendPageWatcher({ documentId, pageRef, onPage }) {
   return null;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null, onLegendBlankRows = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, onRoomOpenings = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null, onLegendBlankRows = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -720,23 +739,64 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // server side) → the usual samatu:project-recompute path. Nothing is saved until „Išsaugoti".
   const [outlineEdit, setOutlineEdit] = useState(null);
   const [outlineSaving, setOutlineSaving] = useState(false);
-  const startOutlineEdit = () => {
-    const r = focusedRoom && (rooms || []).find((x) => String(x?.nr) === String(focusedRoom.nr));
+  const startOutlineEdit = (nrArg = null) => {
+    const want = nrArg != null && typeof nrArg !== 'object' ? String(nrArg) : (focusedRoom ? String(focusedRoom.nr) : null);
+    const r = want != null && (rooms || []).find((x) => String(x?.nr) === want);
     if (!r || !Array.isArray(r.polygon_pct) || r.polygon_pct.length < 3) {
       toast.info('Ši patalpa dar neturi kontūro — pirmiausia „Kontūras paspaudus"');
       return;
     }
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close(); outlineTools.cancel();
     setOutlineEdit({
+      target: 'room',
       nr: String(r.nr),
       page: roomPageOf(r),
       points: r.polygon_pct.map(([x, y]) => [Number(x), Number(y)]),
       holes: roomHoles(r),       // „Atimti" cut-outs ride along: a vertex edit keeps them
       history: [],
+      selected: [],
       tableAreaM2: Number(r.plotas_m2) > 0 ? Number(r.plotas_m2) : null,
     });
   };
-  const cancelOutlineEdit = () => setOutlineEdit(null);
+  const cancelOutlineEdit = () => { setOutlineEdit(null); setVertexMenu(null); };
+  // A measurement edited point by point (Pathon v3 W5-A A1: double-click it): the same vertex editor, in the
+  // display frame; „Išsaugoti" writes its points back as one entry of „Istorija" (Ctrl+Z, „Atšaukti").
+  const pageSizeOf = (page) => docPagesRef.current?.[page - 1] || null;
+  const startMeasureEdit = (id) => {
+    const m = measurements.find((x) => x.id === id);
+    const pg = m && pageSizeOf(m.page);
+    if (!m || !['distance', 'perimeter', 'area'].includes(m.kind) || !pg?.size || !Array.isArray(m.points) || m.points.length < 2) return;
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close(); outlineTools.cancel();
+    setOutlineEdit({
+      target: 'measure',
+      id: m.id,
+      kind: m.kind,
+      nr: null,
+      page: m.page,
+      points: pointsToPct(m.points, { width: pg.size.width, height: pg.size.height, rotation: pg.rotation ?? 0 }),
+      holes: [],
+      history: [],
+      selected: [],
+      closed: m.kind === 'area',
+      minPoints: minPointsOf(m.kind),
+    });
+  };
+  // An opening being edited on the drawing (A9): {o, nr, state, x, y} | null.
+  const [openingEdit, setOpeningEdit] = useState(null);
+  const saveOpeningEdit = async ({ kind, plotisMm }) => {
+    const ed = openingEdit;
+    setOpeningEdit(null);
+    if (!ed || !onRoomOpenings) return;
+    try {
+      const saved = await onRoomOpenings(ed.nr, (el) => applyOpeningEdit(el, ed.o, { kind, plotisMm }));
+      if (!saved) { toast.info('Anga nepasikeitė'); return; }
+      toast.success(`Patalpa ${ed.nr}: ${openingText(kind, plotisMm).toLowerCase()}`, { description: 'Kiekiai perskaičiuojami.', ...undoAction(saved) });
+    } catch (e) {
+      toast.error(e?.message || 'Angos išsaugoti nepavyko');
+    }
+  };
+  // The corner / edge pop-up (A2): {kind, index, t?, x, y} | null.
+  const [vertexMenu, setVertexMenu] = useState(null);
   // Undo: every drag / insert / delete snapshots the ring first (OutlineEditLayer.onGestureStart);
   // Z or the toolbar arrow steps back. Bounded, like the measurement draft's undo.
   const snapshotOutline = () => setOutlineEdit((cur) => (cur
@@ -745,8 +805,28 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const undoOutline = () => setOutlineEdit((cur) => (cur && cur.history?.length
     ? { ...cur, points: cur.history[cur.history.length - 1], history: cur.history.slice(0, -1) }
     : cur));
-  const outlineInvalid = !!outlineEdit && selfIntersects(outlineEdit.points.map(([x, y]) => ({ x, y })));
+  const outlineInvalid = !!outlineEdit && outlineEdit.closed !== false && selfIntersects(outlineEdit.points.map(([x, y]) => ({ x, y })));
+  const saveMeasureEdit = () => {
+    const ed = outlineEdit;
+    const pg = pageSizeOf(ed.page);
+    if (!pg?.size) return;
+    const before = measurements.find((m) => m.id === ed.id);
+    if (!before) { setOutlineEdit(null); return; }
+    const points = pctToPoints(ed.points, { width: pg.size.width, height: pg.size.height, rotation: pg.rotation ?? 0 });
+    setMeasurements((prev) => prev.map((m) => (m.id === ed.id ? { ...m, points } : m)));
+    setOutlineEdit(null);
+    setVertexMenu(null);
+    toast.success(`${MEASURE_KIND_NAMES[before.kind] || 'Matavimas'}: taškai išsaugoti`, {
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => prev.map((m) => (m.id === before.id ? { ...m, points: before.points } : m))) },
+    });
+  };
   const saveOutlineEdit = async () => {
+    if (outlineEdit?.target === 'measure') {
+      if (outlineInvalid) { toast.error('Plotas kertasi pats su savimi — pataisykite taškus prieš išsaugant'); return; }
+      saveMeasureEdit();
+      return;
+    }
     if (!outlineEdit || !onRoomOutlineEdit) return;
     if (outlineInvalid) { toast.error('Kontūras kertasi pats su savimi — pataisykite viršūnes prieš išsaugant'); return; }
     setOutlineSaving(true);
@@ -755,14 +835,46 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       // „Atšaukti" for 10 s (Pathon v3 W1-D): the host PUTs the room's previous geometry back.
       toast.success(`Patalpos ${outlineEdit.nr} kontūras išsaugotas — sienos perskaitytos iš naujo`, undoAction(saved));
       setOutlineEdit(null);
+      setVertexMenu(null);
     } catch (e) {
       toast.error(e?.userMessage || e?.message || 'Nepavyko išsaugoti kontūro');
     } finally {
       setOutlineSaving(false);
     }
   };
-  // Focus moving to another room abandons an unsaved edit (the editor is bound to the focused room).
-  useEffect(() => { setOutlineEdit(null); }, [focusedRoomNr]);
+  // Focus moving to another room abandons an unsaved outline edit (the editor is bound to the focused room) — a
+  // measurement being edited is not the room's; a double-click that moved the focus starts its edit here (A1).
+  const pendingEditRef = useRef(null);
+  useEffect(() => {
+    const pending = pendingEditRef.current;
+    pendingEditRef.current = null;
+    if (pending != null && focusedRoomNr != null && String(focusedRoomNr) === pending) { startOutlineEdit(pending); return; }
+    setOutlineEdit((cur) => (cur?.target === 'measure' ? cur : null));
+  }, [focusedRoomNr]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The selected corners (A3): Delete removes them (never below the shape's minimum), the arrows nudge them.
+  const editPageRect = (page) => tvRootRef.current?.querySelector(`[data-page-number="${page}"]`)?.getBoundingClientRect() || null;
+  const vertexActions = {
+    deleteSelected: () => {
+      const ed = outlineEdit;
+      if (!ed?.selected?.length) return false;
+      const res = deleteVertices(ed.points, ed.selected, ed.minPoints || 3);
+      if (res.refused) { flashCursorHint(`Mažiau nei ${ed.minPoints || 3} kampų likti negali`); return true; }
+      snapshotOutline();
+      setOutlineEdit((cur) => (cur ? { ...cur, points: res.points, selected: [] } : cur));
+      setVertexMenu(null);
+      return true;
+    },
+    nudge: (dxPx, dyPx) => {
+      const ed = outlineEdit;
+      const r = ed?.selected?.length ? editPageRect(ed.page) : null;
+      if (!r?.width || !r?.height) return false;
+      snapshotOutline();
+      setOutlineEdit((cur) => (cur ? { ...cur, points: nudgeVertices(cur.points, cur.selected, dxPx / r.width, dyPx / r.height) } : cur));
+      return true;
+    },
+  };
+  const vertexActionsRef = useRef(vertexActions);
+  vertexActionsRef.current = vertexActions;
   // Keyboard while editing: Enter saves, Z undoes (Esc is a step of ViewerHotkeys' lib/escOrder: leaves without saving).
   const saveOutlineEditRef = useRef(saveOutlineEdit);
   useEffect(() => { saveOutlineEditRef.current = saveOutlineEdit; });
@@ -772,6 +884,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
       if (e.key === 'Enter') { e.preventDefault(); saveOutlineEditRef.current?.(); }
       else if ((e.key === 'z' || e.key === 'Z') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); undoOutline(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); vertexActionsRef.current?.deleteSelected(); }
+      else if (e.key.startsWith('Arrow')) {
+        // A3: the arrow keys nudge the selected corners one screen pixel (Shift = 10)
+        const step = e.shiftKey ? 10 : 1;
+        const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+        if (d && vertexActionsRef.current?.nudge(d[0], d[1])) e.preventDefault();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -893,6 +1012,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [guideOpen, setGuideOpen] = useState(false);
   // Right-click on a committed mark: { id, clientX, clientY } | null (MeasureContextMenu).
   const [measureMenu, setMeasureMenu] = useState(null);
+  // How Plotas / Perimetras draw (W5-A A11): 'free' | 'rect' | 'arc' — chosen in the pill.
+  const [drawShape, setDrawShape] = useState('free');
+  // What the pointer snaps to right now (W5-A A6) — the status line names it.
+  const [snapKind, setSnapKind] = useState(null);
   const menuMeasurement = measureMenu ? measurements.find((m) => m.id === measureMenu.id) || null : null;
   const renameMeasurement = (id, name) => setMeasurements((prev) => prev.map((m) => {
     if (m.id !== id) return m;
@@ -926,10 +1049,25 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     dispatchMeasureHist({ type: 'redo' });
     toast(`Grąžinta: ${next.label}`);
   };
-  const addCountType = (label) => {
-    const t = makeCountType(label, countTypes);
+  const addCountType = (label, shape = null) => {
+    const t = makeCountType(label, countTypes, shape ? { shape } : {});
     setCountTypes((prev) => [...prev, t]);
     setActiveCountTypeId(t.id);
+  };
+  // The count-type picker beside the pointer (W5-A A7): {x, y} | null — opens when the count tool is armed and on
+  // a right-click while it is; the last pointer position inside the viewer says where.
+  const [countPicker, setCountPicker] = useState(null);
+  const lastPointerRef = useRef(null);
+  useEffect(() => {
+    const el = tvRootRef.current;
+    if (!el) return undefined;
+    const onMove = (e) => { lastPointerRef.current = { x: e.clientX, y: e.clientY }; };
+    el.addEventListener('pointermove', onMove, { passive: true });
+    return () => el.removeEventListener('pointermove', onMove);
+  });
+  const openCountPicker = () => {
+    const r = tvRootRef.current?.getBoundingClientRect();
+    setCountPicker(lastPointerRef.current || (r ? { x: r.left + r.width / 2, y: r.top + r.height / 3 } : { x: 400, y: 300 }));
   };
   const removeCountType = (typeId) => {
     setCountTypes((prev) => prev.filter((t) => t.id !== typeId));
@@ -1000,6 +1138,47 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [legend.active, active]);
+  // Copy / paste / duplicate his measurements (W5-A A11 [#102]): Ctrl+C keeps the selected ones, Ctrl+V lays copies
+  // on the sheet on screen (same place on the sheet; a hair aside on the sheet they came from), Ctrl+D copies them
+  // beside themselves. One „Istorija" entry each, „Atšaukti" in the toast; a copy keeps no sąmata row link.
+  const clipboardRef = useRef(null);
+  const PASTE_OFFSET_PT = 12;
+  const placeCopies = (copies, what) => {
+    const ids = new Set(copies.map((c) => c.id));
+    setMeasurements((prev) => [...prev, ...copies]);
+    if (measureTool === 'select' || measureTool === 'lasso') setSelectedMeasureIds([...ids]);
+    toast.success(what, { duration: 10_000, action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => prev.filter((m) => !ids.has(m.id))) } });
+  };
+  const copyMarks = () => {
+    const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+    if (!marks.length) return false;
+    clipboardRef.current = marks;
+    toast(`Nukopijuota: ${marks.length} — Ctrl+V įklijuoja matomame lape`);
+    return true;
+  };
+  const pasteMarks = (page) => {
+    const marks = clipboardRef.current;
+    if (!marks?.length || !page) return false;
+    const d = marks.some((m) => m.page === page) ? PASTE_OFFSET_PT : 0;
+    placeCopies(marks.map((m) => copyMeasurement(m, { page, dx: d, dy: d, id: newMeasurementId() })), `Įklijuota ${marks.length} į ${page} lapą`);
+    return true;
+  };
+  const duplicateMarks = () => {
+    const marks = measurements.filter((m) => selectedMeasureIds.includes(m.id));
+    if (!marks.length) return false;
+    placeCopies(marks.map((m) => copyMeasurement(m, { dx: PASTE_OFFSET_PT, dy: PASTE_OFFSET_PT, id: newMeasurementId() })), `Padvigubinta: ${marks.length}`);
+    return true;
+  };
+  // „Rasti panašius" from a count mark (W5-A A8 [#218]): the template box is the mark's own (a found mark keeps the
+  // box it was found by) or a symbol-sized box round it; the found marks join the mark's type, so the type's row
+  // link (W4-A `type:<id>` / a legend row's `eilute_id`) counts them on the same sąmata row.
+  const findSimilarFrom = (m) => {
+    const p = m?.points?.[0];
+    if (!p) return;
+    const box = Array.isArray(m.box) && m.box.length === 4 ? m.box : [p.x - 16, p.y - 16, p.x + 16, p.y + 16];
+    setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); setOutlineEdit(null);
+    symbol.openWith({ page: m.page, box, typeId: m.typeId || null });
+  };
   // Floating count legend collapse — it swallows placement clicks underneath.
   const [countLegendCollapsed, setCountLegendCollapsed] = useState(false);
   // The selection: one mark („Žymėti") or several („Laso", 2026-10-16) — ONE list either way.
@@ -1051,6 +1230,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     // do nothing without an active type) — make the "Sukurkite tipą" hint
     // visible even if the legend was left collapsed.
     if (tool === 'count' && countTypes.length === 0) setCountLegendCollapsed(false);
+    if (tool === 'count' && measureTool !== 'count') openCountPicker();
+    else setCountPicker(null);
     setMeasureTool((cur) => {
       const next = cur === tool ? null : tool;
       if (next == null) setSelectedMeasureId(null);
@@ -1226,8 +1407,55 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     }
   } : null;
 
+  // A wall face clicked with the walls layer on (W5-A A12 [#116]): the face's two ends (the wall solid the layer
+  // draws, api/page_geometry) become a distance measurement — his, in „Matavimai", with „Atšaukti".
+  const WALL_FACE_PX = 6;
+  const measureWallFace = async (pt) => {
+    const where = displayPointOf(pt);
+    if (!where || !(pt.renderedWidth > 0) || !(pt.renderedHeight > 0)) return false;
+    let geometry = null;
+    try { geometry = await fetchPageGeometry(projectId, where.page); } catch { return false; }
+    const W = pt.renderedWidth; const H = pt.renderedHeight;
+    const rings = (Array.isArray(geometry?.walls_pct) ? geometry.walls_pct : []).map((r) => r.map(([x, y]) => ({ x: x * W, y: y * H })));
+    const face = wallFaceAt(rings, { x: where.x_pct * W, y: where.y_pct * H }, WALL_FACE_PX);
+    if (!face) return false;
+    const points = pctToPoints([[face.a.x / W, face.a.y / H], [face.b.x / W, face.b.y / H]],
+      { width: pt.pageWidth, height: pt.pageHeight, rotation: pt.pageRotation ?? 0 });
+    const m = makeMeasurement('distance', where.page, points, { name: 'Siena' });
+    setMeasurements((prev) => [...prev, m]);
+    const sc = effectiveScales[where.page];
+    const text = sc?.calibrated ? `${measurementValue(m, sc).value.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m` : 'lapo mastelis nenustatytas';
+    toast.success(`Sienos ilgis: ${text}`, {
+      description: 'Įrašyta dešinės pusės skydelyje „Matavimai".',
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => prev.filter((x) => x.id !== m.id)) },
+    });
+    return true;
+  };
+
+  // „Žymėti" box selection (W5-A A5): the marks the box took, and the rooms — left→right whole ones, right→left
+  // touched ones; Shift adds to what is selected. The click the browser sends after the drag is not a room click.
+  const boxEndedRef = useRef(0);
+  const handleBoxSelect = ({ ids, a, b, mode, add, pageNr }) => {
+    boxEndedRef.current = Date.now();
+    setSelectedMeasureIds((cur) => (add ? [...new Set([...cur, ...ids])] : ids));
+    const pg = pageSizeOf(pageNr);
+    if (!pg?.size) return;
+    const rot = displayRotationFor(pg.rotation ?? 0);
+    const A = rotatePctPoint(a.x / pg.size.width, a.y / pg.size.height, rot);
+    const B = rotatePctPoint(b.x / pg.size.width, b.y / pg.size.height, rot);
+    const nrs = roomsInBox(rooms, pageNr, A, B, mode, hiddenRoomNrs);
+    if (add) {
+      const all = [...new Set([...(focusedRoomNr != null ? [String(focusedRoomNr)] : []), ...extraRoomNrs.map(String), ...nrs])];
+      applyRoomSelection({ focused: all[0] ?? null, extra: all.slice(1) });
+    } else {
+      applyRoomSelection({ focused: nrs[0] ?? null, extra: nrs.slice(1) });
+    }
+  };
+
   const handlePagePoint = async (pt) => {
     if (symbol.active) return;   // the box search owns the pointer (SymbolSearchLayer)
+    if (Date.now() - boxEndedRef.current < 400) return;   // the click that ends a selection box (A5)
     if (legend.active) return;   // so does the legend tool (LegendLayer)
     if (roomToolArmed) { roomTool.click(pt); return; }   // the room tool R (Pathon v3 W1-D)
     if (fillFor == null) {
@@ -1244,6 +1472,18 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         } else {
           const tol = MEASURE_HIT_TOL_PX / (Number(pt.scale) > 0 ? Number(pt.scale) : 1);
           const onMark = measureTool === 'select' && hitTestMeasurement({ x: pt.x, y: pt.y }, measurements, pt.pageIndex + 1, tol);
+          // an opening on the walls layer (W5-A A9): its pop-up, not a room click
+          const where = !onMark && wallsLayerVisible && onRoomOpenings ? displayPointOf(pt) : null;
+          const opening = where ? openingAt(rooms, where.page, [where.x_pct, where.y_pct], {
+            w: pt.renderedWidth, h: pt.renderedHeight, preferNr: focusedRoomNr,
+          }) : null;
+          if (opening) {
+            const room = (rooms || []).find((r) => String(r?.nr) === opening.nr);
+            setOpeningEdit({ o: opening, nr: opening.nr, state: openingState(room, opening), x: pt.clientX ?? 400, y: pt.clientY ?? 300 });
+            return;
+          }
+          // a wall face on the walls layer (W5-A A12): its length becomes a distance measurement
+          if (!onMark && wallsLayerVisible && projectId && await measureWallFace(pt)) return;
           if (!onMark) selectRoomAt(pt);
         }
         if (measureTool == null) onPagePoint?.(pt);
@@ -1294,6 +1534,22 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     } finally {
       setFillBusy(false);
     }
+  };
+
+  // Double-click (Pathon v3 W5-A A1, design §5 Select: „room → edit outline; measurement → edit"): at rest or
+  // with „Žymėti". The two clicks before it already selected the room; a room the focus has not reached yet
+  // starts its edit once it has (pendingEditRef).
+  const handlePageDoubleClick = (pt) => {
+    if (check || outlineEdit || outlineTools.tool || symbol.active || fillFor != null) return;
+    if (!(measureTool == null || measureTool === 'select')) return;
+    if (pt.measureId) { startMeasureEdit(pt.measureId); return; }
+    if (!onRoomOutlineEdit) return;
+    const where = displayPointOf(pt);
+    const hit = where ? roomAtPoint(rooms, where, { renderedWidth: pt.renderedWidth, renderedHeight: pt.renderedHeight, hidden: hiddenRoomNrs }) : null;
+    if (!hit) return;
+    if (focusedRoomNr != null && String(focusedRoomNr) === hit.nr) { startOutlineEdit(hit.nr); return; }
+    pendingEditRef.current = hit.nr;
+    applyRoomSelection({ focused: hit.nr, extra: [] });
   };
 
   // Damp DISCRETE mouse-wheel ctrl+zoom (pre-prod QA P2: EmbedPDF's gesture
@@ -1364,7 +1620,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     draftPoints,
     finishable: !!draftCommitPoints(draftSlot.draft.points, measureTool),
     calibPoint: calibSlot.point != null,
-    outlineEdit: outlineEdit ? { nr: outlineEdit.nr, canUndo: !!outlineEdit.history?.length, invalid: outlineInvalid, saving: outlineSaving } : null,
+    outlineEdit: outlineEdit ? { nr: outlineEdit.nr, name: outlineEdit.target === 'measure' ? `${MEASURE_KIND_NAMES[outlineEdit.kind] || 'Matavimas'} · taškai` : null, saveLabel: outlineEdit.target === 'measure' ? 'Išsaugoti' : null, canUndo: !!outlineEdit.history?.length, invalid: outlineInvalid, saving: outlineSaving } : null,
     fill: fillFor != null ? { nr: fillFor, busy: fillBusy } : null,
     symbolActive: symbol.active,
     selectionCount: selectedMeasureIds.length,
@@ -1372,6 +1628,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
     legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, blanks: legend.blanks.length, notice: legend.notice } : null,
     mac,
+    drawShape,
   });
   // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
   // armed fill, „Rasti panašius", then the measure tool. Nothing at rest.
@@ -1395,6 +1652,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     legendPhase: legend.phase,
   });
   const onPillAction = (id) => {
+    if (id.startsWith('shape:')) { setDrawShape(id.slice(6)); return; }
     if (id === 'outlineUndo') undoOutline();
     else if (id === 'outlineSave') saveOutlineEdit();
     else if (id === 'outlineCancel') cancelOutlineEdit();
@@ -1536,6 +1794,18 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onExclude: projectId ? () => openRoomSheet(barRoom.nr) : null,
     onEvidence: projectId ? () => openRoomSheet(barRoom.nr) : null,
     onFill: onRoomPolygonFill ? () => startFill(barRoom.nr) : null,
+    // „Pažymėti panašias" (W5-A A5): the rooms of the same purpose / the same floor covering join the selection
+    similar: {
+      paskirtis: barRoom.paskirtis ? similarRooms(rooms, barRoom.nr, 'paskirtis').length : 0,
+      grindu_danga: barRoom.grindu_danga ? similarRooms(rooms, barRoom.nr, 'grindu_danga').length : 0,
+      paskirtisWord: barRoom.paskirtis ? roomTypeWord(barRoom.paskirtis) || barRoom.paskirtis : null,
+      grinduWord: ({ plyteles: 'plytelės', minksta: 'parketas ar laminatas', be_dangos: 'be dangos' })[barRoom.grindu_danga] || barRoom.grindu_danga || null,
+    },
+    onSimilar: (by) => {
+      const like = similarRooms(rooms, barRoom.nr, by);
+      applyRoomSelection({ focused: String(barRoom.nr), extra: like });
+      toast.success(like.length ? `Pažymėta ${like.length + 1} patalpos` : 'Panašių patalpų nėra');
+    },
   } : null;
   const roomLabelSelectors = focusedRoomNr != null
     ? [`[data-room-label="${focusedRoomNr}"]`, `[data-room-ring="${focusedRoomNr}"]`, `[data-room-zone="${focusedRoomNr}"]`] : [];
@@ -1571,6 +1841,80 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip, r.zoom].filter(Boolean) });
   })();
 
+  // The pop-up's actions for the corner / edge it was opened on (A2).
+  const vertexMenuActions = (() => {
+    const ed = outlineEdit;
+    const menu = vertexMenu;
+    if (!ed || !menu) return null;
+    const min = ed.minPoints || 3;
+    const at = menu.kind === 'vertex'
+      ? ed.points[menu.index]
+      : (() => { const a = ed.points[menu.index]; const b = ed.points[(menu.index + 1) % ed.points.length]; const t = menu.t ?? 0.5; return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]; })();
+    const out = {
+      onDelete: () => {
+        const res = deleteVertices(ed.points, [menu.index], min);
+        if (res.refused) return;
+        snapshotOutline();
+        setOutlineEdit((cur) => (cur ? { ...cur, points: res.points, selected: [] } : cur));
+      },
+      deleteDisabled: ed.points.length <= min ? `Mažiau nei ${min} kampų likti negali` : null,
+      onInsert: () => {
+        snapshotOutline();
+        setOutlineEdit((cur) => (cur ? { ...cur, points: insertVertex(cur.points, menu.index, at), selected: [menu.index + 1] } : cur));
+      },
+    };
+    if (ed.target === 'measure') {
+      if (ed.kind === 'area') {
+        out.onCut = null;
+        out.cutDisabled = 'Plote angos neiškerpamos — anga iškerpama perimetre ar atstume';
+        return out;
+      }
+      const scale = effectiveScales[ed.page];
+      out.cutLabel = `Iškirpti angą (${DOORWAY_GAP_M.toFixed(2).replace('.', ',')} m)`;
+      out.cutTitle = 'Iš šios atkarpos išpjaunamas durų angos tarpas — lieka dvi atkarpos be angos';
+      if (!scale?.calibrated) { out.onCut = null; out.cutDisabled = 'Lapo mastelis nenustatytas — angos plotis metrais nežinomas'; return out; }
+      out.onCut = () => {
+        const pg = pageSizeOf(ed.page);
+        const before = measurements.find((m) => m.id === ed.id);
+        if (!pg?.size || !before) return;
+        const pts = pctToPoints(ed.points, { width: pg.size.width, height: pg.size.height, rotation: pg.rotation ?? 0 });
+        const pos = menu.kind === 'vertex'
+          ? pathPositionM(pts, scale, { vertex: menu.index })
+          : pathPositionM(pts, scale, { edge: menu.index, t: menu.t ?? 0.5 });
+        const pieces = cutGap(pts, scale, pos, DOORWAY_GAP_M);
+        if (!pieces) { flashCursorHint('Atkarpa per trumpa angai'); return; }
+        const { id: _id, points: _p, created_at: _c, ...rest } = before;
+        const parts = pieces.map((points, i) => (i === 0 ? { ...before, points } : makeMeasurement(before.kind, before.page, points, { ...rest })));
+        setMeasurements((prev) => prev.flatMap((m) => (m.id === before.id ? parts : [m])));
+        setOutlineEdit(null);
+        const ids = new Set(parts.map((x) => x.id));
+        toast.success(`Iškirpta ${DOORWAY_GAP_M.toFixed(2).replace('.', ',')} m anga — ${parts.length === 2 ? 'liko dvi atkarpos' : 'liko viena atkarpa'}`, {
+          duration: 10_000,
+          action: { label: 'Atšaukti', onClick: () => setMeasurements((prev) => [...prev.filter((m) => !ids.has(m.id)), before]) },
+        });
+      };
+      return out;
+    }
+    if (!onRoomOpenings) return out;
+    const room = (rooms || []).find((r) => String(r?.nr) === String(ed.nr));
+    const r = editPageRect(ed.page);
+    const choice = openingForEdge(room, ed.page, at, { w: r?.width || 1000, h: r?.height || 1000 });
+    const what = openingText(choice.kind, choice.plotisMm);
+    out.cutLabel = `Iškirpti angą — ${what.toLowerCase()}`;
+    out.cutTitle = choice.from === 'walls'
+      ? `Šioje sienoje programa perskaitė angą (${what.toLowerCase()}) — ji bus skaičiuojama patalpoje ${ed.nr}`
+      : `Šioje vietoje programa angos neperskaitė — patalpai ${ed.nr} pridedamos standartinės durys 0,90 × 2,10 m; dydį pakeisite spustelėję angą sienų sluoksnyje`;
+    out.onCut = async () => {
+      try {
+        const saved = await onRoomOpenings(ed.nr, (el) => addEdgeOpening(el, choice));
+        if (!saved) { toast.info(`Ši anga patalpoje ${ed.nr} jau skaičiuojama`); return; }
+        toast.success(`Patalpai ${ed.nr} pridėta: ${what.toLowerCase()}`, { description: 'Kiekiai perskaičiuojami.', ...undoAction(saved) });
+      } catch (e) {
+        toast.error(e?.message || 'Angos pridėti nepavyko');
+      }
+    };
+    return out;
+  })();
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
   return (
     <DocumentContent documentId={activeDocumentId}>
@@ -1625,6 +1969,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onRoomEdit={onRoomEdit}
             onRoomMerge={onRoomMerge}
             onRoomSubtract={onRoomSubtract}
+            onCopyMarks={check ? null : copyMarks}
+            onPasteMarks={check ? null : pasteMarks}
+            onDuplicateMarks={check ? null : duplicateMarks}
           />}
           {panning && <style>{PAN_CURSOR_CSS}</style>}
           {viewRules && <style>{viewRules}</style>}
@@ -1665,8 +2012,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onOutlineGestureStart={snapshotOutline}
                       outlineTool={outlineTools.tool}
                       onOutlineToolChange={outlineTools.change}
+                      onRequestHole={projectId && outlineTools.tool?.mode === 'subtract' ? (point) => fetchHoleAt(projectId, outlineTools.tool.nr, point) : null}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
+                      onPageDoubleClick={handlePageDoubleClick}
+                      onOutlineSelect={(selected) => setOutlineEdit((cur) => (cur ? { ...cur, selected } : cur))}
+                      onOutlineMenu={setVertexMenu}
                       measureTool={pageTool === 'scalecheck' ? 'calibrate' : pageTool}
                       measurements={measurements}
                       measureScale={effectiveScales[layout.pageNumber] || null}
@@ -1694,6 +2045,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                         rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
                       }))}
                       onMeasureSelect={setSelectedMeasureId}
+                      onMeasureBoxSelect={handleBoxSelect}
+                      onMeasureSnapChange={setSnapKind}
+                      onCountTypeMenu={measureTool === 'count' ? setCountPicker : null}
+                      drawShape={drawShape}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}
@@ -1944,6 +2299,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             outlineEdit={outlineEdit}
             projectId={projectId}
             symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
+            snapKind={snapKind}
           />
           <CalibrateDialog
             request={calibRequest}
@@ -1972,6 +2328,17 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onClose={() => setCalibRequest(null)}
           />
           <ShortcutsGuide open={guideOpen} onOpenChange={setGuideOpen} />
+          <OpeningPopover key={openingEdit ? `${openingEdit.nr}-${openingEdit.o.k}` : 'none'} target={openingEdit} onSave={saveOpeningEdit} onClose={() => setOpeningEdit(null)} />
+          <CountTypePicker
+            at={measureTool === 'count' ? countPicker : null}
+            countTypes={countTypes}
+            activeId={activeCountTypeId}
+            tallies={countTallies}
+            onPick={(id) => { setActiveCountTypeId(id); setCountPicker(null); }}
+            onCreate={(label, shape) => { addCountType(label, shape); setCountPicker(null); }}
+            onClose={() => setCountPicker(null)}
+          />
+          <VertexPopover menu={outlineEdit ? vertexMenu : null} actions={vertexMenuActions || {}} onClose={() => setVertexMenu(null)} />
           <RenameDialog
             state={renaming}
             onCancel={() => setRenaming(null)}
@@ -1992,6 +2359,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onChangeType={changeCountType}
               onDelete={deleteMeasurementWithUndo}
               onReveal={revealMeasurement}
+              onFindSimilar={projectId ? findSimilarFrom : null}
             />
           )}
           <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
@@ -2014,6 +2382,8 @@ export default function TakeoffViewer({
   // (nr, outline-set body) => Promise<{undo?}> — saves the outline he reviewed.
   onRoomToolPreview = null,
   onRoomToolCommit = null,
+  // (nr, elementai => elementai) => Promise<{undo}> — a door or window changed on the drawing (W5-A A2 / A9).
+  onRoomOpenings = null,
   rooms = [],
   focusedRoom = null,
   focusedPage = null,
@@ -2089,6 +2459,7 @@ export default function TakeoffViewer({
           onOutlineTool={onOutlineTool}
           onRoomToolPreview={onRoomToolPreview}
           onRoomToolCommit={onRoomToolCommit}
+          onRoomOpenings={onRoomOpenings}
           check={check}
           focus={focus}
           rooms={rooms}

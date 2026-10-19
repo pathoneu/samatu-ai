@@ -206,7 +206,7 @@ export default function OutlineToolPanel({
         <p className="text-muted-foreground">
           {tool.shape === 'poly'
             ? 'Spustelėkite kampus; uždarykite spustelėję pirmą tašką arba dukart. '
-            : 'Tempkite stačiakampį patalpos viduje (kolona, įmontuota spinta, šachta). '}
+            : 'Tempkite stačiakampį patalpos viduje (kolona, įmontuota spinta, šachta) arba spustelėkite ją brėžinyje — programa pasiūlys jos kontūrą (Enter — atimti). '}
           Sąmatoje grindų ir lubų plotas lieka iš lentelės: išpjova keičia nubrėžtą plotą, rodomą šalia.
           {' '}{walled.length > 0
             ? `Kolonos / šachtos (${walled.length}) sienos pridedamos prie dažomų sienų ir grindjuosčių${walledM != null ? ` (+${formatNumberLT(walledM, 2)} m sienų ilgio)` : ''}, jų išoriniai kampai — prie kampų.`

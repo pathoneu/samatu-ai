@@ -80,11 +80,17 @@ export const VIEWER_SHORTCUTS = [
   { id: 'roomEditOutline', group: 'room', bound: 'hotkeys', label: 'Taisyti kontūrą — tempti kampus, prilimpa prie sienų', combos: [{ keys: ['e', 'E'] }] },
   { id: 'roomMerge', group: 'room', bound: 'hotkeys', label: 'Sujungti su gretima patalpa', combos: [{ keys: ['m', 'M'] }] },
   { id: 'roomSubtract', group: 'room', bound: 'hotkeys', label: 'Atimti koloną, spintą ar šachtą iš patalpos', combos: [{ keys: ['x', 'X'] }] },
+  { id: 'roomDoubleClick', group: 'room', bound: 'mouse', label: 'Taisyti patalpos kontūrą (kaip E); ant matavimo — taisyti jo taškus', display: 'Dukart spustelėti patalpą ar matavimą' },
 
   // ── Kontūro taisymas
   { id: 'outlineDrag', group: 'outline', bound: 'mouse', label: 'Perkelti viršūnę (prilimpa prie sienų)', display: 'Tempti kampą' },
-  { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti vidurio tašką' },
+  { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti kraštinę ar jos vidurio tašką' },
   { id: 'outlineRemove', group: 'outline', bound: 'mouse', label: 'Pašalinti viršūnę', display: 'Dukart spustelėti kampą' },
+  { id: 'outlineEdgeDrag', group: 'outline', bound: 'mouse', label: 'Perkelti visą kraštinę (abu kampai prilimpa prie sienų)', display: 'Tempti kraštinę' },
+  { id: 'outlineVertexMenu', group: 'outline', bound: 'mouse', label: 'Kampo veiksmai: ištrinti, iškirpti angą', display: 'Spustelėti kampą arba dešinysis klavišas' },
+  { id: 'outlineBox', group: 'outline', bound: 'mouse', label: 'Pažymėti kelis kampus (su Ctrl — pridėti po vieną)', display: 'Tempti rėmelį tuščioje vietoje' },
+  { id: 'outlineDeleteSelected', group: 'outline', bound: 'outline', label: 'Ištrinti pažymėtus kampus', hint: 'ištrinti kampus', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
+  { id: 'outlineNudge', group: 'outline', bound: 'outline', label: 'Pastumti pažymėtus kampus (su Shift — 10 kartų toliau)', combos: [{ keys: ['ArrowLeft'] }, { keys: ['ArrowRight'] }, { keys: ['ArrowUp'] }, { keys: ['ArrowDown'] }] },
   { id: 'outlineUndo', group: 'outline', bound: 'outline', label: 'Atšaukti paskutinį viršūnės pakeitimą', hint: 'atgal', combos: [{ keys: ['z', 'Z'] }] },
   { id: 'outlineSave', group: 'outline', bound: 'outline', label: 'Išsaugoti kontūrą', hint: 'išsaugoti', combos: [{ keys: ['Enter'] }] },
   { id: 'outlineCancel', group: 'outline', bound: 'esc', label: 'Atšaukti redagavimą (niekas neišsaugoma)', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
@@ -93,6 +99,10 @@ export const VIEWER_SHORTCUTS = [
   { id: 'deleteSelected', group: 'selection', bound: 'hotkeys', label: 'Ištrinti pažymėtus matavimus („Žymėti" arba „Laso" įrankiu)', hint: 'ištrinti pažymėtus', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
   { id: 'lassoAdd', group: 'selection', bound: 'mouse', label: 'Laso — pridėti prie pažymėtų', display: 'Laikyti Shift apvedant' },
   { id: 'contextMenu', group: 'selection', bound: 'mouse', label: 'Matavimo meniu: pervadinti, keisti tipą, ištrinti, rodyti sąraše; su laso — veiksmai su visais pažymėtais', display: 'Dešinysis pelės klavišas ant matavimo' },
+  { id: 'copyMarks', group: 'selection', bound: 'hotkeys', label: 'Kopijuoti pažymėtus matavimus', combos: [{ keys: ['c', 'C'], mod: 'primary' }] },
+  { id: 'pasteMarks', group: 'selection', bound: 'hotkeys', label: 'Įklijuoti nukopijuotus matavimus į matomą lapą', combos: [{ keys: ['v', 'V'], mod: 'primary' }] },
+  { id: 'duplicateMarks', group: 'selection', bound: 'hotkeys', label: 'Padvigubinti pažymėtus matavimus šalia', combos: [{ keys: ['d', 'D'], mod: 'primary' }] },
+  { id: 'typedLength', group: 'measure', bound: 'draft', label: 'Braižant įveskite skaičius — kita atkarpa bus tokio ilgio žymeklio kryptimi (Enter)', hint: 'atkarpos ilgis', combos: [{ keys: ['0'] }, { keys: ['9'] }] },
   { id: 'undo', group: 'selection', bound: 'hotkeys', label: 'Atšaukti paskutinį veiksmą su matavimais ir žymėmis', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: false }] },
   { id: 'redo', group: 'selection', bound: 'hotkeys', label: 'Grąžinti atšauktą veiksmą', combos: [{ keys: ['z', 'Z'], mod: 'primary', shift: true }, { keys: ['y', 'Y'], mod: 'primary' }] },
   { id: 'escape', group: 'selection', bound: 'hotkeys', label: 'Žingsnis atgal: taškas → įrankis → skydelis → pažymėjimas (patalpa lieka, kol atidarytas skydelis)', combos: [{ keys: ['Escape'] }] },
@@ -127,6 +137,7 @@ export function isMacPlatform(nav = (typeof navigator !== 'undefined' ? navigato
 
 const KEY_NAMES = {
   PageDown: 'PgDn', PageUp: 'PgUp', Escape: 'Esc', '-': '−', ' ': 'Tarpas',
+  ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
 };
 
 function keyName(k) {

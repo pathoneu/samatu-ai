@@ -50,6 +50,8 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
     onClick: (pos, evt) => onPagePoint?.({
       pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation,
       shiftKey: !!evt?.shiftKey, scale, renderedWidth, renderedHeight,
+      // where on screen (W5-A A9: a pop-up opens beside the click)
+      clientX: evt?.clientX ?? null, clientY: evt?.clientY ?? null,
     }),
   }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale, renderedWidth, renderedHeight]);
   return null;
@@ -90,8 +92,16 @@ export default function PageOverlayHost({
   // Outline tools (2026-10-16): the active split / merge / subtract state (useOutlineTool) and its setter.
   outlineTool = null,
   onOutlineToolChange = null,
+  // „Atimti" in one click (W5-A A4): (pct point) => Promise<hole-at answer>.
+  onRequestHole = null,
   onRoomZoneClick,
   onPagePoint,
+  // Double-click on the sheet (Pathon v3 W5-A A1): ({measureId?, pageIndex, x, y, …}) — a measurement under it, or
+  // the point (unrotated PDF points, like a click) for the room under it.
+  onPageDoubleClick = null,
+  // The vertex editor's corner selection and pop-up (W5-A A2 / A3).
+  onOutlineSelect = null,
+  onOutlineMenu = null,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
   measureTool = null,
   measurements = [],
@@ -107,6 +117,14 @@ export default function PageOverlayHost({
   onMeasureCommit = null,
   onMeasureCalibrate = null,
   onMeasureSelect = null,
+  // „Žymėti" box selection (W5-A A5) → TakeoffViewer.handleBoxSelect.
+  onMeasureBoxSelect = null,
+  // The snap under the pointer (W5-A A6) → the status line.
+  onMeasureSnapChange = null,
+  // Count tool right-click → the type picker (W5-A A7).
+  onCountTypeMenu = null,
+  // Plotas / Perimetras: free | rect | arc (W5-A A11).
+  drawShape = 'free',
   onMeasureDelete = null,
   // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
   onMeasureContextMenu = null,
@@ -190,8 +208,22 @@ export default function PageOverlayHost({
     onMeasureContextMenu({ id: id || null, clientX: e.clientX, clientY: e.clientY });
   } : undefined;
 
+  // A measurement being edited point by point is drawn by the vertex editor alone (W5-A A1).
+  const editingMeasureId = outlineEdit?.target === 'measure' ? outlineEdit.id : null;
+  const shownMeasurements = editingMeasureId ? (measurements || []).filter((m) => m.id !== editingMeasureId) : (measurements || []);
+  const handleDoubleClick = (onPageDoubleClick && adapter && !checkMode && !editingHere && !toolHere
+    && (measureTool == null || measureTool === 'select')) ? (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
+      const measureId = hitTestMeasurement(raw, (measurements || []).filter((m) => ['distance', 'perimeter', 'area'].includes(m.kind)), layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
+      onPageDoubleClick({
+        measureId: measureId || null, pageIndex: layout.pageIndex, x: raw.x, y: raw.y, pageWidth: pageWidthPt, pageHeight: pageHeightPt,
+        pageRotation, renderedWidth: width, renderedHeight: height,
+      });
+    } : undefined;
+
   return (
-    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }} onContextMenu={handleContextMenu}>
+    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }} onContextMenu={handleContextMenu} onDoubleClick={handleDoubleClick}>
       {/* ── Rotated page content ─────────────────────────────────────────────
           EmbedPDF draws ALL page content in UNROTATED mediabox space:
           <RenderLayer>'s raster ignores /Rotate (PDFium matrix render path),
@@ -297,7 +329,7 @@ export default function PageOverlayHost({
             pageNr={layout.pageNumber}
             tool={measureTool || 'pan'}
             scale={measureScale || uncalibratedScale()}
-            measurements={measurements || []}
+            measurements={shownMeasurements}
             countTypes={countTypes}
             activeCountTypeId={activeCountTypeId}
             snapEnabled={snapEnabled}
@@ -306,6 +338,10 @@ export default function PageOverlayHost({
             onCommit={onMeasureCommit}
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
+            onBoxSelect={onMeasureBoxSelect}
+            onSnapChange={onMeasureSnapChange}
+            onTypeMenu={onCountTypeMenu}
+            drawShape={drawShape}
             onDelete={onMeasureDelete}
             selectedIds={selectedMeasureIds}
             draft={measureDraft}
@@ -365,6 +401,11 @@ export default function PageOverlayHost({
             pageRotation={pageRotation}
             tableAreaM2={outlineEdit.tableAreaM2 ?? null}
             holes={outlineEdit.holes || []}
+            closed={outlineEdit.closed !== false}
+            minPoints={outlineEdit.minPoints || 3}
+            selected={outlineEdit.selected || []}
+            onSelect={onOutlineSelect}
+            onMenu={onOutlineMenu}
           />
         </div>
       )}
@@ -380,6 +421,7 @@ export default function PageOverlayHost({
             scale={measureScale}
             pageSizePt={pageSizePt}
             pageRotation={pageRotation}
+            onRequestHole={onRequestHole ? (p) => onRequestHole({ page: layout.pageNumber, x_pct: p[0], y_pct: p[1] }) : null}
           />
         </div>
       )}

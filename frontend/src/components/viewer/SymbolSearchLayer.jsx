@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { boxFromDrag, formatScore } from '@/lib/symbolSearch';
 import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
+import { cursorOf } from '@/lib/cursors';
 
 /**
  * SymbolSearchLayer — one page's part of „Rasti panašius": drag a box around a
@@ -76,7 +77,7 @@ export default function SymbolSearchLayer({
       ref={svgRef}
       width={adapter.width}
       height={adapter.height}
-      style={{ position: 'absolute', inset: 0, cursor: canDraw ? 'crosshair' : 'default', touchAction: 'none' }}
+      style={{ position: 'absolute', inset: 0, cursor: cursorOf(canDraw ? 'box' : 'rest'), touchAction: 'none' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -97,7 +98,7 @@ export default function SymbolSearchLayer({
         return (
           <g
             key={c.id}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: cursorOf('pick') }}
             onPointerDown={(e) => { e.stopPropagation(); }}
             onClick={(e) => { e.stopPropagation(); onRemove?.(c.id); }}
             onPointerEnter={() => onHover?.(c.id)}

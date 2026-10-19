@@ -807,3 +807,141 @@ def api_room_outline_merge_undo(request: Request, project_id: str, room_nr: str,
 def api_room_split_space_undo(request: Request, project_id: str, room_nr: str, body: OutlineRestore):
     """Undo a space divided by a line: both rooms' geometry as it was."""
     return _restore(request, project_id, room_nr, body, "padalijimas", GEOMETRY_ROOM_KEYS)
+
+
+# ── „Atimti" in one click (Pathon v3 W5-A A4, design §2 T1 „subtract a column 3") ─────────────────────────────
+
+class HoleAt(BaseModel):
+    """A click inside a room's outline while „Atimti" is on: which closed shape of the drawing is under it."""
+    page: int = Field(ge=1)
+    x_pct: float = Field(ge=0.0, le=1.0)
+    y_pct: float = Field(ge=0.0, le=1.0)
+
+
+HOLE_SIMPLIFY_PT = 0.35          # a third of a point, like the wall solid the browser snaps to
+HOLE_MAX_SHARE = 0.5             # a „hole" bigger than half the room is a room, not a column
+HOLE_MIN_PT2 = 40.0              # without a scale: about 2 × 2 mm on paper
+HOLE_MIN_M2 = 0.02               # with one: 14 × 14 cm — a speck of hatch is no column
+
+
+def hole_at(pdf_bytes: bytes, page: int, x_pct: float, y_pct: float, room_ring_pct, m_per_pt: float | None = None) -> dict:
+    """The smallest CLOSED shape the drawing has around the click, inside the room — proposed as a hole.
+
+    Where it is looked for, in the drawing's own vectors (extractor/pdf_vectors), never a guess:
+      · a piece of the wall solid standing alone in the room — a column („kolona"); the dominant wall colour's
+        fills of ANY shape, since a square column is not wall-shaped (`_is_wall_shape` wants a long thin piece);
+      · a void ringed by wall solid — a shaft („šachta");
+      · a closed figure of drawn lines — a built-in closet, a shaft drawn in lines („nubraižyta figūra").
+    → {status: "ok", hole_pct, kind, plotas_m2?} | {status: "outside"} | {status: "none"}. Saves nothing."""
+    from shapely.geometry import LineString, Point, Polygon
+    from shapely.ops import polygonize, unary_union
+
+    from extractor.pdf_vectors import dominant_wall_colour, filled_shapes, page_paths
+
+    W, H, _ = page_geometry(pdf_bytes, page)
+    room = Polygon([(float(x) * W, float(y) * H) for x, y in room_ring_pct])
+    if not room.is_valid:
+        room = room.buffer(0)
+    pt = Point(x_pct * W, y_pct * H)
+    if room.is_empty or not room.contains(pt):
+        return {"status": "outside"}
+    min_area = HOLE_MIN_M2 / (m_per_pt * m_per_pt) if m_per_pt else HOLE_MIN_PT2
+    near = room.buffer(1.5)
+
+    cands: list[tuple[str, Polygon]] = []
+    shapes = filled_shapes(pdf_bytes, page)
+    col = dominant_wall_colour(shapes)
+    if col is not None:
+        solid = unary_union([poly for c, poly in shapes if c == col])
+        for part in (list(solid.geoms) if solid.geom_type == "MultiPolygon" else [solid]):
+            if part.geom_type != "Polygon" or part.is_empty:
+                continue
+            if part.contains(pt):
+                cands.append(("kolona", Polygon(part.exterior)))
+            for ring in part.interiors:
+                void = Polygon(ring)
+                if void.contains(pt):
+                    cands.append(("šachta", void))
+    lines = []
+    for path in page_paths(pdf_bytes, page, strokes=True):
+        if path.get("stroke") is None or path.get("fill") is not None:
+            continue
+        for sub in path["subpaths"]:
+            if len(sub) < 2:
+                continue
+            seg = LineString(sub)
+            if seg.length > 0 and seg.intersects(near):
+                lines.append(seg)
+    if lines:
+        for face in polygonize(unary_union(lines)):
+            if face.contains(pt):
+                cands.append(("nubraižyta figūra", face))
+
+    best = None
+    for kind, shape in cands:
+        if not shape.is_valid:
+            shape = shape.buffer(0)
+        if shape.is_empty or shape.geom_type != "Polygon":
+            continue
+        if not near.contains(shape) or not (min_area <= shape.area <= HOLE_MAX_SHARE * room.area):
+            continue
+        if best is None or shape.area < best[1].area:
+            best = (kind, shape)
+    if best is None:
+        return {"status": "none"}
+    kind, shape = best
+    shape = shape.simplify(HOLE_SIMPLIFY_PT, preserve_topology=True)
+    if not room.contains(shape):
+        # a column standing in the outline's line: the hole is the part inside the room (outline-set wants it inside)
+        shape = shape.intersection(room.buffer(-0.05))
+        if shape.geom_type == "MultiPolygon":
+            shape = max(shape.geoms, key=lambda g: g.area)
+        if shape.is_empty or shape.geom_type != "Polygon" or shape.area < min_area:
+            return {"status": "none"}
+    ring = [[round(x / W, 5), round(y / H, 5)] for x, y in list(shape.exterior.coords)[:-1]]
+    if len(ring) < 3:
+        return {"status": "none"}
+    out = {"status": "ok", "page": page, "hole_pct": ring, "kind": kind}
+    if m_per_pt:
+        out["plotas_m2"] = round(shape.area * m_per_pt * m_per_pt, 2)
+    return out
+
+
+def _room_ring_on(room: dict, page: int):
+    """The room's stored outline when it lies on `page` (the frame the click comes in), else None."""
+    poly = room.get("polygon_pct")
+    if not isinstance(poly, list) or len(poly) < 3:
+        return None
+    src = int((room.get("_konturas") or {}).get("page") or room.get("puslapio_nr") or 0)
+    return poly if src == int(page) else None
+
+
+# Plain `def`: PDFium parsing and shapely — the threadpool's job.
+@router.post("/{project_id}/rooms/{room_nr}/hole-at")
+def api_room_hole_at(request: Request, project_id: str, room_nr: str, body: HoleAt):
+    """„Atimti" in one click: the closed shape under the click PROPOSED as the room's hole — the viewer shows it
+    dashed and his Enter saves it through `outline-set` (Undo there). Read only; no journal row."""
+    project = _project_for(request, project_id)          # ownership FIRST (tests/test_route_ownership_policy.py)
+    from main import _check_rate_limit, _client_key
+    _check_rate_limit(_client_key(request), "room_hole")   # its own bucket: a click must not eat the sheets' geometry fetches
+    wanted = str(room_nr).strip()
+    room = next((r for r in (project.get("patalpos") or []) if isinstance(r, dict) and _nr(r) == wanted), None)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Patalpa nerasta")
+    ring = _room_ring_on(room, body.page)
+    if ring is None:
+        raise HTTPException(status_code=400, detail="Šios patalpos kontūro šiame lape nėra")
+    from storage import get_storage, pdf_key
+    try:
+        pdf_bytes = get_storage().get(pdf_key(project_id))
+    except Exception as exc:  # noqa: BLE001 — an R2 hiccup is a 502, not a 500
+        log.warning("hole-at pdf fetch failed for %s: %r", project_id, exc)
+        raise HTTPException(status_code=502, detail="Nepavyko pasiekti brėžinio saugyklos")
+    if not pdf_bytes:
+        raise HTTPException(status_code=404, detail=NO_PDF)
+    W, H, _ = page_geometry(pdf_bytes, body.page)
+    if W <= 0 or H <= 0:
+        raise HTTPException(status_code=400, detail="Tokio lapo brėžinyje nėra")
+    geo = ((project.get("_meta") or {}).get("geometrija") or {})
+    m_per_pt = ((geo.get("masteliai") or {}).get(str(body.page)) or {}).get("m_per_pt")
+    return hole_at(pdf_bytes, body.page, body.x_pct, body.y_pct, ring, float(m_per_pt) if m_per_pt else None)

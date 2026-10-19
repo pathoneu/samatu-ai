@@ -27,6 +27,8 @@ import {
   displaySizePt, holeFit, holesInside, pctRingToPts, ptsRingToPct, rectRing, ringAt, splitRingByLine, unionTouchingRings,
 } from '@/lib/outlineTools';
 import { roomHoles, roomHoleWalls } from './useOutlineTool';
+import { flashCursorHint } from '@/lib/cursorHints';
+import { cursorForMode, cursorOf } from '@/lib/cursors';
 import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
 
 const SNAP_PX = 8;
@@ -72,8 +74,16 @@ function Chip({ at, text, tone = 'dark' }) {
   );
 }
 
+const HOLE_KIND = { kolona: 'kolona', 'šachta': 'šachta', 'nubraižyta figūra': 'figūra' };
+const HOLE_NONE = {
+  none: 'Čia brėžinyje uždaros figūros nėra — tempkite stačiakampį',
+  outside: 'Spustelėkite patalpos kontūro viduje',
+};
+
 export default function OutlineToolLayer({
   tool, onChange, rooms = [], geometry = null, renderedSize, scale = null, pageSizePt = null, pageRotation = 0,
+  // „Atimti" in one click (W5-A A4): (pct point) => Promise<hole-at answer> — the drawing's closed shape under it.
+  onRequestHole = null,
 }) {
   const { width, height } = renderedSize || {};
   const svgRef = useRef(null);
@@ -164,8 +174,20 @@ export default function OutlineToolLayer({
   const addHole = (ring) => {
     const fit = holeFit(pts(ring), pts(tool.ring), (tool.holes || []).map(pts));
     if (fit !== 'ok') { toast.error(HOLE_REFUSED[fit] || HOLE_REFUSED.outside); return false; }
-    onChange((cur) => ({ ...cur, holes: [...(cur.holes || []), ring], draft: [], dirty: true }));
+    onChange((cur) => ({ ...cur, holes: [...(cur.holes || []), ring], draft: [], dirty: true, proposedHole: null }));
     return true;
+  };
+  // A click (no drag) inside the outline: the drawing's closed shape there is PROPOSED (dashed) — Enter saves it.
+  const proposeHoleAt = async (p) => {
+    if (!onRequestHole) return;
+    flashCursorHint('Ieškoma figūros brėžinyje…');
+    let ans = null;
+    try { ans = await onRequestHole(p); } catch (e) { toast.error(e?.userMessage || e?.message || 'Figūros rasti nepavyko'); return; }
+    if (ans?.status !== 'ok' || !Array.isArray(ans.hole_pct)) { flashCursorHint(HOLE_NONE[ans?.status] || HOLE_NONE.none); return; }
+    const ring = ans.hole_pct.map(([x, y]) => [Number(x), Number(y)]);
+    const fit = holeFit(pts(ring), pts(tool.ring), (tool.holes || []).map(pts));
+    if (fit !== 'ok') { toast.error(HOLE_REFUSED[fit] || HOLE_REFUSED.outside); return; }
+    onChange((cur) => ({ ...cur, proposedHole: { ring, kind: ans.kind || null } }));
   };
   const dragRect = tool.mode === 'subtract' && dragFrom && cursor
     ? ptsRingToPct(rectRing(toPt(dragFrom), toPt(cursor)), size) : null;
@@ -226,6 +248,7 @@ export default function OutlineToolLayer({
       const a = toPx(dragFrom);
       const b = toPx(cursor);
       if (Math.abs(a.x - b.x) > 4 && Math.abs(a.y - b.y) > 4) addHole(dragRect);
+      else if (Math.hypot(a.x - b.x, a.y - b.y) < 4) proposeHoleAt(dragFrom);
       setDragFrom(null);
     }
   };
@@ -247,7 +270,7 @@ export default function OutlineToolLayer({
       width={width}
       height={height}
       data-outline-tool-layer={tool.mode}
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'auto', overflow: 'visible', cursor: tool.mode === 'merge' ? (hovered ? 'pointer' : 'default') : 'crosshair' }}
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'auto', overflow: 'visible', cursor: tool.mode === 'merge' ? cursorOf(hovered ? 'pick' : 'rest') : cursorForMode(tool.mode) }}
       onPointerMove={onPointerMove}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
@@ -323,6 +346,14 @@ export default function OutlineToolLayer({
       {tool.mode === 'subtract' && (
         <g pointerEvents="none">
           {dragRect && <path d={pathOf([dragRect], toPx)} style={paint({ fill: HOLE, stroke: HOLE })} fillOpacity={0.18} strokeWidth={STROKE_PX} strokeDasharray={DASH} />}
+          {tool.proposedHole?.ring && (
+            <g data-proposed-hole={tool.proposedHole.kind || ''}>
+              <path d={pathOf([tool.proposedHole.ring], toPx)} style={paint({ fill: HOLE, stroke: HOLE })} fillOpacity={0.22} strokeWidth={2.5} strokeDasharray={DASH} />
+              {/* under the figure, clear of the room's own label (which sits at the outline's centre) */}
+              <Chip at={{ x: centreOf(tool.proposedHole.ring).x, y: Math.max(...tool.proposedHole.ring.map((p) => toPx(p).y)) + 16 }} tone="keep"
+                text={`Siūloma: ${HOLE_KIND[tool.proposedHole.kind] || 'figūra'} ${fmt(m2(tool.proposedHole.ring))} — Enter: atimti`} />
+            </g>
+          )}
           {(tool.draft || []).length > 0 && (
             <polyline points={[...tool.draft, ...(cursor ? [cursor] : [])].map((p) => { const q = toPx(p); return `${q.x},${q.y}`; }).join(' ')}
               fill="none" style={paint({ stroke: HOLE })} strokeWidth={STROKE_PX} strokeDasharray={DASH} />

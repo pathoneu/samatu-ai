@@ -78,7 +78,7 @@ export function cursorHintFor(state = {}) {
     case 'legend':
       return legendCursorHint(legendPhase) || 'Spustelėkite pasiūlytą legendą arba apveskite ją rėmeliu';
     case 'outlineEdit':
-      return 'Tempkite kampą · vidurio taškas — pridėti · Enter — išsaugoti';
+      return 'Tempkite kampą ar kraštinę · spustelėkite kampą — veiksmai · Enter — išsaugoti';
     case 'split':
       if (!outlineTool?.a) return 'Spustelėkite, kur prasideda skirianti linija';
       if (!outlineTool?.b) return 'Spustelėkite, kur linija baigiasi';
@@ -89,7 +89,7 @@ export function cursorHintFor(state = {}) {
     case 'subtract':
       return outlineTool?.shape === 'poly'
         ? 'Spustelėkite kampus patalpos viduje · dukart — baigti'
-        : 'Tempkite stačiakampį patalpos viduje';
+        : 'Spustelėkite koloną ar spintą · arba tempkite stačiakampį';
     case 'fill':
       if (fill?.busy) return `Ieškoma patalpos ${fill.nr} kontūro…`;
       return fill?.nr != null ? `Spustelėkite patalpos ${fill.nr} viduje` : 'Spustelėkite patalpos viduje';

@@ -13,7 +13,7 @@
  * label or the chrome's own cards (`avoid`). With an `anchor` it would stand right above it instead.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Pentagon, Scissors, Combine, SquareDashed, CircleSlash, FileSearch, MoreHorizontal, SquarePen, Pencil, Shapes, ListTree, Trash2, X } from 'lucide-react';
+import { Pentagon, Scissors, Combine, SquareDashed, CircleSlash, FileSearch, MoreHorizontal, SquarePen, Pencil, Shapes, ListTree, Trash2, X, CopyCheck } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
@@ -78,7 +78,7 @@ export default function SelectionBar({ frame, anchor, avoid = [], insetLeft = 8,
 }
 
 function RoomActions({ room }) {
-  const { nr, onEdit, onSplit, onMerge, onSubtract, onExclude, onEvidence, onFill } = room;
+  const { nr, onEdit, onSplit, onMerge, onSubtract, onExclude, onEvidence, onFill, onSimilar, similar } = room;
   return (
     <>
       <span className="px-2 text-ui font-semibold text-foreground whitespace-nowrap mono tabular" title={room.name || undefined}>{nr}</span>
@@ -102,6 +102,24 @@ function RoomActions({ room }) {
               title={withKeyTitle(`Atimti iš patalpos ${nr} kontūro koloną, spintą ar šachtą: nubrėžkite stačiakampį arba daugiakampį jo viduje`, 'roomSubtract')} />
           )}
         </span>
+      )}
+      {onSimilar && similar && (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className={btn} data-testid="selection-similar" title="Pažymėti tos pačios paskirties ar tos pačios grindų dangos patalpas">
+              <CopyCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>Pažymėti panašias</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-80 rounded-panel">
+            <DropdownMenuItem className="text-ui" disabled={!similar.paskirtis} onSelect={() => onSimilar('paskirtis')} data-testid="selection-similar-paskirtis">
+              Tos pačios paskirties{similar.paskirtisWord ? ` (${similar.paskirtisWord})` : ''} — {similar.paskirtis}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-ui" disabled={!similar.grindu_danga} onSelect={() => onSimilar('grindu_danga')} data-testid="selection-similar-grindys">
+              Tos pačios grindų dangos{similar.grinduWord ? ` (${similar.grinduWord})` : ''} — {similar.grindu_danga}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
       {onExclude && (
         <Action Icon={CircleSlash} label="Neskaičiuoti…" testId="selection-exclude" onClick={onExclude}
