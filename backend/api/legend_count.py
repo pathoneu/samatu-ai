@@ -336,9 +336,40 @@ def _raster_count(pdf_bytes: bytes, row: dict, geo, wanted: list[int], min_score
             "raster_pages": [e["page"] for e in res["pages"] if e["skipped"] == "raster"]}
 
 
+IN_WORD_GAP_EM = 0.2           # a neighbour character this close (line heights) on the glyph's line makes it a letter of a
+                               # word: letters inside a word stand ≤ 0,13 apart on the corpus, words ≥ 0,25 (a space)
+
+
+def _in_word(tp, idx: int, n: int, boxes: list) -> bool:
+    """True when the hit is letters of a longer word the text layer split (B2-A): PDFium's whole-word search
+    answers „Ž" inside „UŽSAKOVAS" (objektas_h title block, the neighbours 0,27–0,46 pt away at a 3,6 pt line)
+    and „I" inside „IŠKLOTINĖS" (objektas_a). A symbol standing alone has no character of its line that close."""
+    left, bottom = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    right, top = max(b[2] for b in boxes), max(b[3] for b in boxes)
+    h = max(max(b[3] - b[1], b[2] - b[0]) for b in boxes) or 1.0
+    total = tp.count_chars()
+    for j, step in ((idx - 1, -1), (idx + n, 1)):
+        # past a space the text layer may have made up — a space that takes no room still leaves one word
+        for _ in range(2):
+            if 0 <= j < total and not tp.get_text_range(j, 1).strip():
+                j += step
+        if not (0 <= j < total) or not tp.get_text_range(j, 1).isalnum():
+            continue                                   # a bracket or a dot ends a word: „JD(2)" is the symbol JD
+        x0, y0, x1, y1 = tp.get_charbox(j)
+        if min(top, y1) - max(bottom, y0) >= 0.5 * min(top - bottom, y1 - y0):         # the same line, read along x
+            gap = max(x0 - right, left - x1)
+        elif min(right, x1) - max(left, x0) >= 0.5 * min(right - left, x1 - x0):       # turned text, read along y
+            gap = max(y0 - top, bottom - y1)
+        else:
+            continue
+        if -0.5 * h < gap < IN_WORD_GAP_EM * h:
+            return True
+    return False
+
+
 def _text_hits(pdf_bytes: bytes, glyph: str, pages: list[int]) -> dict[int, list[dict]]:
     """Where the character `glyph` stands as a word of its own on each page — DISPLAY-frame boxes. PDFium's
-    text search under PDFIUM_LOCK."""
+    text search under PDFIUM_LOCK; a hit that is letters of a longer word (`_in_word`) is not one."""
     from extractor.pdf_vectors import _to_display
     from extractor.pdfium_guard import PDFIUM_LOCK
     import pypdfium2 as pdfium
@@ -363,6 +394,8 @@ def _text_hits(pdf_bytes: bytes, glyph: str, pages: list[int]) -> dict[int, list
                                     break
                                 idx, n = occ
                                 boxes = [tp.get_charbox(i) for i in range(idx, idx + n)]
+                                if _in_word(tp, idx, n, boxes):
+                                    continue
                                 left = min(b[0] for b in boxes)
                                 bottom = min(b[1] for b in boxes)
                                 right = max(b[2] for b in boxes)

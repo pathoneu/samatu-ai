@@ -271,8 +271,11 @@ def _has_twin(g: dict, pool: list[dict]) -> bool:
 def _row_anchors(pool: list[dict]) -> list[dict]:
     """The symbols of one legend row: the largest glyph is an anchor, everything within its radius is its
     parts, what is left starts the next symbol (objektas_d: two rings with petals side by side)."""
-    # a lone hairline (a table border beside the label) is never a symbol
-    pool = [g for g in pool if not (g["short"] < 0.3 and g["long"] > 30 and not _has_twin(g, pool))]
+    # a lone hairline (a table border beside the label, a dimension line round a material sample) is never a
+    # symbol: as an anchor it has no parts and every line of its colour on the sheet is an „instance" (B2-A:
+    # objektas_e p11, a box over the material column took the sample's red dimension lines → 124 on one sheet).
+    # A slot diffuser's double line has its twin and stays (objektas_b).
+    pool = [g for g in pool if not (g["short"] < 0.3 and g["thin"] and not _has_twin(g, pool))]
     pool.sort(key=lambda g: (-g["long"], -g["fill"]))
     anchors: list[dict] = []
     while pool:

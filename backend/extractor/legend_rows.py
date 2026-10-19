@@ -57,6 +57,9 @@ COUNTABLE_LONG_PT = 120.0     # …and this long
 LINE_SAMPLE_LONG_PT = 8.0     # ONE stroke at least this long (and 3 × its thickness) is a line sample, not a symbol
 _BULLETS = set("-–—•·*‒")
 _SYMBOL_CHAR = re.compile(r"^[^\w\s]$|^[A-ZĄČĘĖĮŠŲŪŽ]$")
+SYMBOL_GAP_EM = 0.1           # a symbol in front of a text stands at least this many line heights clear of it (B2-A)
+_NAME_START = re.compile(r"^[^\W\d_]{3,}")   # …and the text after it starts with a word: a name, not a value
+_ONE_LETTER_WORDS = {"Į"}      # a capital that is a Lithuanian word of its own („Į sieną įleistas") is no symbol
 
 NO_TEXT_LT = "Lape nėra teksto sluoksnio — legendos eilučių perskaityti negalima; pažymėkite ženklus rankiniu būdu."
 PICTURE_LT = ("Legenda įklijuota kaip paveikslėlis — joje nėra teksto, eilučių perskaityti negalima; "
@@ -472,11 +475,15 @@ def _split(pdf_bytes: bytes, page: int, bbox_pct: list[float]) -> dict:
             r["text"] += " " + ph["text"]
             r["tbox"] = (min(r["tbox"][0], ph["x0"]), r["tbox"][1], max(r["tbox"][2], ph["x1"]), max(r["tbox"][3], ph["bottom"]))
             continue
-        # a symbol character in front of the text („⊗ Šviestuvas", „T Termostatas")
-        if ph["n_words"] >= 2 and _SYMBOL_CHAR.match(ph["first"]) and ph["first"] not in _BULLETS:
+        # a symbol character in front of the text („⊗ Šviestuvas", „T Termostatas"): it stands clear of the text
+        # and a name follows. A capital the text layer split off its word touches the rest („U Ž SAKOVAS" in a
+        # title block — objektas_h, „B endras" — objektas_b: gap 0,0 pt, a real space is ≈ 0,3 line heights);
+        # a value after the letter is a label, not a legend row („H 0.3m" heights, „M 1:30" scales) (B2-A)
+        rest = ph["text"][len(ph["first"]):].strip()
+        if (ph["n_words"] >= 2 and _SYMBOL_CHAR.match(ph["first"]) and ph["first"] not in _BULLETS | _ONE_LETTER_WORDS
+                and (ph.get("first_gap") or 0.0) >= SYMBOL_GAP_EM * ph["h"] and _NAME_START.match(rest)):
             gw = ph["h"] * 0.9
             gbox = (ph["x0"], ph["top"], ph["x0"] + gw, ph["bottom"])
-            rest = ph["text"][len(ph["first"]):].strip()
             rows.append({"phrase": ph, "gbox": gbox, "kind": "tekstas", "colour": None, "glyph_text": ph["first"],
                          "text": rest, "tbox": (ph["x0"] + gw, ph["top"], ph["x1"], ph["bottom"]), "countable": True})
             continue

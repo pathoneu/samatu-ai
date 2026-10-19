@@ -179,13 +179,17 @@ def _phrase(words: list[dict]) -> dict:
     return {"text": text, "fold": fold(text), "n_words": len(words),
             "x0": min(w["x0"] for w in words), "x1": max(w["x1"] for w in words),
             "top": min(w["top"] for w in words), "bottom": max(w["bottom"] for w in words),
-            "h": max(min(w["bottom"] - w["top"] for w in words), 1.0), "first": words[0]["text"]}
+            "h": max(min(w["bottom"] - w["top"] for w in words), 1.0), "first": words[0]["text"],
+            # the gap after the first word (its own frame): a symbol in front of a text stands clear of it; a
+            # letter the character reader split off its word („U Ž SAKOVAS") touches the next one (B2-A)
+            "first_gap": (words[1]["x0"] - words[0]["x1"]) if len(words) > 1 else None}
 
 
 def read_phrases(pdf_bytes: bytes, page: int, frame: tuple[float, float] | None = None) -> tuple[list[dict], int, bool]:
     """(phrases in the DISPLAY frame, real character count, frame_ok) of a 1-based page, every text direction.
     Phrase: {text, fold, n_words, x0, top, x1, bottom (display points), h (glyph height in its own frame),
-    first (its first word), turn (the direction's quarter turns)}.
+    first (its first word), first_gap (points between the first word and the next, None for one word), turn (the
+    direction's quarter turns)}.
 
     `frame` is the page's true display size (`display_frame`). The character reader takes the same frame
     from the page (pdf_vectors.page_frames); until 2026-10-18 it guessed it from where the characters lay and
