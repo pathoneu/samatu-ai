@@ -22,6 +22,11 @@ const PriceLists = lazy(() => import('@/pages/PriceLists'));
 const Rinkiniai = lazy(() => import('@/pages/Rinkiniai'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Register = lazy(() => import('@/pages/Register'));
+// Emailed links (v3 M2): reset request, new password, email confirmation.
+const ForgotPassword = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.ResetPassword })));
+const VerifyEmail = lazy(() => import('@/pages/AuthEmailPages').then((m) => ({ default: m.VerifyEmail })));
+const Pagalba = lazy(() => import('@/pages/Pagalba'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const Cookies = lazy(() => import('@/pages/Cookies'));
 const Terms = lazy(() => import('@/pages/Terms'));
@@ -114,6 +119,9 @@ function App() {
               <Route path="/en" element={<Landing lang="en" />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/pamirsau-slaptazodi" element={<ForgotPassword />} />
+              <Route path="/slaptazodzio-keitimas" element={<ResetPassword />} />
+              <Route path="/el-pasto-patvirtinimas" element={<VerifyEmail />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/terms" element={<Terms />} />
@@ -150,6 +158,7 @@ function App() {
                 <Route path="/billing/success" element={<BillingResult variant="success" />} />
                 <Route path="/billing/cancel" element={<BillingResult variant="cancel" />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/pagalba" element={<Pagalba />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Route>
               <Route path="*" element={<PageNotFound />} />

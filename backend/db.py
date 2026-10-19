@@ -271,6 +271,88 @@ def bump_session_version(user_id: str) -> int:
     return int(row["session_version"]) if row else 1
 
 
+# ── Email verification + password reset tokens (v3 W7-A M2) ─────────────────
+# The raw token travels only in the emailed link; the table holds its SHA-256,
+# so a database copy (a backup) cannot be turned into a working link.
+
+EMAIL_TOKEN_PURPOSES = ("verify", "reset")
+
+
+def _token_hash(raw: str) -> str:
+    import hashlib
+    return hashlib.sha256(str(raw).encode("utf-8")).hexdigest()
+
+
+def _iso_in(seconds: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + seconds))
+
+
+def create_email_token(user_id: str, purpose: str, ttl_s: int) -> str:
+    """Mint a single-use token for `purpose`; returns the RAW token (for the link)."""
+    import secrets
+    if purpose not in EMAIL_TOKEN_PURPOSES:
+        raise ValueError(f"unknown email token purpose: {purpose!r}")
+    raw = secrets.token_urlsafe(32)
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO email_tokens (token_hash, user_id, purpose, created_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (_token_hash(raw), user_id, purpose, _now_iso(), _iso_in(ttl_s)))
+    return raw
+
+
+def count_recent_email_tokens(user_id: str, purpose: str, within_s: int) -> int:
+    """How many `purpose` links this user was sent in the last `within_s` seconds."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT COUNT(*) AS n FROM email_tokens WHERE user_id = ? AND purpose = ? "
+            "AND created_at >= ?", (user_id, purpose, _iso_in(-within_s))).fetchone()
+    return int(row["n"]) if row else 0
+
+
+def consume_email_token(raw: str, purpose: str) -> str | None:
+    """Spend a token: returns its user_id when it exists, matches `purpose`, has
+    not expired and was never used — and marks it used in the same statement,
+    so two clicks race to one winner. Anything else → None."""
+    if not raw or not isinstance(raw, str) or len(raw) > 200:
+        return None
+    h = _token_hash(raw)
+    now = _now_iso()
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE email_tokens SET used_at = ? WHERE token_hash = ? AND purpose = ? "
+            "AND used_at IS NULL AND expires_at > ?", (now, h, purpose, now))
+        if cur.rowcount != 1:
+            return None
+        row = c.execute("SELECT user_id FROM email_tokens WHERE token_hash = ?", (h,)).fetchone()
+    return row["user_id"] if row else None
+
+
+def spend_email_tokens(user_id: str, purpose: str) -> int:
+    """Mark every unused `purpose` token of this user used (a reset done, a new
+    link asked for). Returns how many were still open."""
+    with _conn() as c:
+        return c.execute(
+            "UPDATE email_tokens SET used_at = ? WHERE user_id = ? AND purpose = ? "
+            "AND used_at IS NULL", (_now_iso(), user_id, purpose)).rowcount
+
+
+def mark_email_verified(user_id: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) "
+                  "WHERE id = ?", (_now_iso(), user_id))
+
+
+def set_user_admin(user_id: str, is_admin: bool) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if is_admin else 0, user_id))
+
+
+def set_password_hash(user_id: str, password_hash: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+
+
 def list_users(admin_only: bool = False) -> list[dict]:
     """Admin endpoint — returns user summaries (no password_hash)."""
     with _conn() as c:
@@ -1458,6 +1540,25 @@ def _migrate_schema() -> None:
         # `delete_account`.
         if ucols and "deleted_at" not in ucols:
             c.execute("ALTER TABLE users ADD COLUMN deleted_at TEXT")
+        # Email verification (v3 W7-A M2, 2026-10-18): set = the person proved
+        # they read this inbox (a verification or reset link, or Google's
+        # email_verified). NULL on every row that predates it — the login gate
+        # (SAMATU_REQUIRE_EMAIL_VERIFIED=1) is off by default.
+        if ucols and "email_verified_at" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+        # One-time links (verification, password reset): only the SHA-256 of
+        # the token is stored; a row is spent by setting used_at.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS email_tokens (
+                token_hash TEXT PRIMARY KEY,
+                user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                purpose    TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used_at    TEXT
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_email_tokens_user "
+                  "ON email_tokens(user_id, purpose, created_at)")
         # consumed_trials: keyed by company code, SURVIVES user deletion —
         # anti-abuse gate for the 1-project free trial.
         c.execute("""
@@ -2015,7 +2116,7 @@ _DELETED_PASSWORD_HASH = "!deleted"
 # The account-level rows that go with the account. Literals only: they are
 # interpolated into the DELETE below.
 _ACCOUNT_TABLES = ("user_settings", "extraction_jobs", "price_lists",
-                   "samata_templates", "assemblies")
+                   "samata_templates", "assemblies", "email_tokens")
 # Older than this, a 'running' row is a record that never got its ending, not a
 # read in flight: runs take 15-35 min, and each boot marks every earlier one
 # interrupted. Bounded so a stuck row cannot block a deletion for good.

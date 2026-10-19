@@ -22,6 +22,7 @@ import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 import LanguageToggle from '@/components/LanguageToggle';
 import { returnPathFrom } from '@/lib/returnPath';
+import { emailStatus, resendVerification } from '@/lib/authEmailApi';
 
 // The Google callback bounces failures back to /login?oauth_error=<code>.
 // Codes come from backend main.py (api_google_callback) plus whatever Google
@@ -34,6 +35,8 @@ const OAUTH_ERROR_KEYS = {
   incomplete_userinfo: 'incompleteUserinfo',
   account_disabled: 'accountDisabled',
   access_denied: 'accessDenied',
+  email_unverified: 'emailUnverified',
+  link_needs_password: 'linkNeedsPassword',
 };
 
 export default function Login() {
@@ -49,6 +52,16 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // v3 M2: an unverified inbox (gate on) can ask for the link again; and the
+  // reset form replaces the write-to-us link once a link can reach the person.
+  const [unverified, setUnverified] = useState(false);
+  const [resent, setResent] = useState('');
+  const [resetAvailable, setResetAvailable] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    emailStatus().then((r) => { if (alive && r.ok) setResetAvailable(r.data?.links_can_be_sent === true); });
+    return () => { alive = false; };
+  }, []);
 
   // Surface a failed Google sign-in in the existing error banner. Before this
   // the redirect landed on a pristine login form and the user had no idea why.
@@ -61,12 +74,15 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setUnverified(false);
+    setResent('');
     setSubmitting(true);
     try {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message);
+      setUnverified(err.body?.detail?.error === 'email_not_verified');
     } finally {
       setSubmitting(false);
     }
@@ -97,7 +113,19 @@ export default function Login() {
           {error && (
             <div className="flex items-start gap-2 p-3 mb-5 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>{error}</div>
+              <div>
+                {error}
+                {unverified && !resent && (
+                  <button type="button" className="block mt-2 underline text-foreground"
+                    onClick={async () => {
+                      const r = await resendVerification(email);
+                      setResent(r.message || t('authEmail.genericError'));
+                    }}>
+                    {t('login.resendVerification')}
+                  </button>
+                )}
+                {resent && <p className="mt-2 text-foreground">{resent}</p>}
+              </div>
             </div>
           )}
 
@@ -130,13 +158,19 @@ export default function Login() {
             {t('login.noAccount')}{' '}
             <Link to="/register" className="text-primary font-medium hover:underline">{t('login.registerLink')}</Link>
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-2">
-            {/* Interim recovery path until email-based reset ships (2026-07-25):
-                no email infra exists, so a forgotten password would otherwise be
-                a permanent lockout. */}
-            <a href="mailto:solutions@pathon.eu?subject=Slapta%C5%BEod%C5%BEio%20atk%C5%ABrimas" className="hover:text-foreground underline">
-              {t('login.forgotPassword')}
-            </a>
+          <p className="text-center text-sm text-muted-foreground mt-2">
+            {/* v3 M2 (2026-10-18): the reset form once a link can reach the
+                person (SMTP set, or development); until then the write-to-us
+                link, so a forgotten password is never a permanent lockout. */}
+            {resetAvailable ? (
+              <Link to="/pamirsau-slaptazodi" className="hover:text-foreground underline">
+                {t('login.forgotPasswordLink')}
+              </Link>
+            ) : (
+              <a href="mailto:solutions@pathon.eu?subject=Slapta%C5%BEod%C5%BEio%20atk%C5%ABrimas" className="hover:text-foreground underline">
+                {t('login.forgotPassword')}
+              </a>
+            )}
           </p>
 
           <div className="mt-8 pt-6 border-t border-border text-xs text-muted-foreground text-center">

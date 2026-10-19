@@ -34,6 +34,8 @@ export default function Register() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [firstAdmin, setFirstAdmin] = useState(false);
+  // v3 M2: the email gate is on — say where the link went, start no session.
+  const [checkEmail, setCheckEmail] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +55,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       const r = await register({ email, password, name, company_name: companyName });
+      if (r.verificationRequired) { setCheckEmail(r.message); return; }
       setFirstAdmin(r.isFirstAdmin);
       // Brief celebration if first admin, then redirect
       setTimeout(() => navigate('/', { replace: true }), r.isFirstAdmin ? 1500 : 100);
@@ -62,6 +65,18 @@ export default function Register() {
       setSubmitting(false);
     }
   };
+
+  if (checkEmail) {
+    return (
+      <div className="pathon-landing min-h-screen flex items-center justify-center p-6">
+        <div className="relative text-center max-w-md" role="status">
+          <h1 className="font-display text-2xl font-semibold tracking-tight mb-2">{t('authEmail.registeredCheckEmail')}</h1>
+          <p className="text-muted-foreground">{checkEmail}</p>
+          <p className="mt-6 text-sm"><Link to="/login" className="text-primary hover:underline">{t('authEmail.toLogin')}</Link></p>
+        </div>
+      </div>
+    );
+  }
 
   if (firstAdmin) {
     return (

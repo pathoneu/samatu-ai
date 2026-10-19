@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { lt } from 'date-fns/locale';
+import { vatPercent } from '@/lib/vatMode';
 
 /**
  * ProjectCard — vertical card mirroring claude.ai/design prototype
@@ -44,7 +45,7 @@ export default function ProjectCard({ project }) {
     || (project.darbu_sarasas || []).reduce(
       (s, it) => s + (it.kiekis || 0) * (it.kaina || 0), 0,
     );
-  const grossDisplay = fmtSum(totalNet, project.vat_rate || 21);
+  const grossDisplay = fmtSum(totalNet, vatPercent(project));
   const dateStr = fmtDate(project.created_date || project.created_at || project.updated_at);
   const rowCount = project.darbu_sarasas?.length || project.total_rows || 0;
 

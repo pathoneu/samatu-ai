@@ -179,19 +179,24 @@ def render_pvm_invoice_pdf(fields: dict) -> bytes:
     total_style = ParagraphStyle("total", fontName=_FONT_BOLD, fontSize=11,
                                  leading=14, alignment=TA_RIGHT)
 
+    # Paragraph() parses its text as reportlab markup; buyer fields are typed by
+    # the user (audit backend-security-8: "<font …>" or a stray "&" broke or
+    # restyled the invoice). Every field is escaped before it is laid out.
+    from xml.sax.saxutils import escape as _x
+
     def _party_lines(party: dict, is_supplier: bool) -> list:
-        lines = [Paragraph(party.get("name", "") or "—", body)]
+        lines = [Paragraph(_x(str(party.get("name", "") or "—")), body)]
         code_key = "code" if is_supplier else "company_code"
         if party.get(code_key):
-            lines.append(Paragraph(f"Įmonės kodas: {party[code_key]}", body))
+            lines.append(Paragraph(f"Įmonės kodas: {_x(str(party[code_key]))}", body))
         if party.get("pvm_code"):
-            lines.append(Paragraph(f"PVM kodas: {party['pvm_code']}", body))
+            lines.append(Paragraph(f"PVM kodas: {_x(str(party['pvm_code']))}", body))
         if is_supplier and party.get("address"):
-            lines.append(Paragraph(party["address"], body))
+            lines.append(Paragraph(_x(str(party["address"])), body))
         if party.get("email"):
-            lines.append(Paragraph(party["email"], body))
+            lines.append(Paragraph(_x(str(party["email"])), body))
         if is_supplier and party.get("iban"):
-            lines.append(Paragraph(f"IBAN: {party['iban']}", body))
+            lines.append(Paragraph(f"IBAN: {_x(str(party['iban']))}", body))
         return lines
 
     buf = io.BytesIO()
@@ -222,7 +227,7 @@ def render_pvm_invoice_pdf(fields: dict) -> bytes:
     rows = [
         [Paragraph("Aprašymas", label), Paragraph("Kiekis", label),
          Paragraph("Vnt. kaina", label), Paragraph("Suma", label)],
-        [Paragraph(item.get("description", "") or "", body),
+        [Paragraph(_x(str(item.get("description", "") or "")), body),
          Paragraph(str(item.get("qty", "")), body_r),
          Paragraph(_eur(item.get("unit_price_eur", 0)), body_r),
          Paragraph(_eur(fields.get("sum_eur", 0)), body_r)],

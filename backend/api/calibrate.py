@@ -271,7 +271,8 @@ async def calibrate_project(
         "project_id": project_id,
         "factors": factors,
         "updated_at": record["updated_at"],
-        "stored_at": str(p),
+        # No `stored_at` (audit backend-security-21, 2026-10-18): it was the
+        # absolute server path of the file — nothing for the browser to know.
     }
 
 

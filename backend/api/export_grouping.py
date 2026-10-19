@@ -6,6 +6,8 @@ docs/superpowers/research/2026-10-16-togal-pipeline-analysis.md §8).
     seimos        the Kiekiai panel's tree: one group per line (its skyrius in the heading) → the rooms
     lapai         sheet → the shares of the rooms drawn on it, then „Be lapo"
     be_grupavimo  Togal's Full Export: one flat row per line × room, no headings, every attribute a column
+    aukstai       floor → the shares of its rooms, then „Aukštas nenurodytas", then „Nepriskirta patalpoms"
+    butai         apartment (a room's `butas`) → its rooms' shares, then „Butas nenurodytas", unassigned last
 
 Rules this module keeps (and tests/test_export_grouping.py asserts):
   * Nothing is recomputed. A line's quantity is the server's `kiekis`; the rooms' shares are the server's
@@ -20,21 +22,31 @@ Rules this module keeps (and tests/test_export_grouping.py asserts):
 """
 from __future__ import annotations
 
+import re
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable
 
 DEFAULT_GROUPING = "skyriai"
-GROUPINGS = ("skyriai", "patalpos", "seimos", "lapai", "be_grupavimo")
+GROUPINGS = ("skyriai", "patalpos", "seimos", "lapai", "be_grupavimo", "aukstai", "butai")
 GROUPING_LABELS = {
     "skyriai": "Skyrius",
     "patalpos": "Patalpas",
     "seimos": "Darbų šeimas",
     "lapai": "Lapus",
     "be_grupavimo": "Be grupavimo",
+    "aukstai": "Aukštus",
+    "butai": "Butus",
 }
 
 UNASSIGNED_ROOMS = "Nepriskirta patalpoms"
 UNASSIGNED_SHEET = "Be lapo"
+# aukstai / butai (v3 W7-A M5, 2026-10-18): a room is put on a floor only from
+# what the project says — its own `aukstas`, or a room number that names the
+# floor („2F-05", „II-12", „X.2"); a bare „05" names none, so it is not guessed.
+# A room's `butas` (apartment) is used as written; nothing reads it off a
+# drawing yet, so the dialog offers „Butus" only when some room carries one.
+UNKNOWN_FLOOR = "Aukštas nenurodytas"
+UNKNOWN_FLAT = "Butas nenurodytas"
 REMAINDER_LABEL = "kiekio dalis, nepriskirta patalpai"
 OVERSHOOT_LABEL = "patalpų dalių suma viršija eilutės kiekį — pataisa"
 
@@ -182,6 +194,43 @@ def _remainder_text(share: dict) -> str:
     return OVERSHOOT_LABEL if share["remainder"] == "over" else REMAINDER_LABEL
 
 
+_BARE_NUMBER = re.compile(r"^\d{1,4}[a-zA-Z]?$")
+
+
+def room_floor(room: dict | None) -> int | None:
+    """The floor a room is on, when the project says so; None otherwise."""
+    if not isinstance(room, dict):
+        return None
+    explicit = room.get("aukstas")
+    if explicit is not None and not isinstance(explicit, bool):
+        try:
+            return int(explicit)
+        except (TypeError, ValueError):
+            pass
+    nr = str(room.get("nr") or "").strip()
+    if not nr or _BARE_NUMBER.fullmatch(nr):
+        return None
+    from extractor.universal_rules import room_aukstas_from_nr  # read-only use of the engine's rule
+    return room_aukstas_from_nr(nr)
+
+
+def floor_label(floor: int | None) -> str:
+    if floor is None:
+        return UNKNOWN_FLOOR
+    return "Rūsys (0 aukštas)" if floor == 0 else f"{floor} aukštas"
+
+
+def room_flat(room: dict | None) -> str | None:
+    if not isinstance(room, dict):
+        return None
+    flat = str(room.get("butas") or "").strip()
+    return flat[:40] or None
+
+
+def has_flats(rooms: Iterable[dict] | None) -> bool:
+    return any(room_flat(r) for r in rooms or [])
+
+
 def group_export_lines(lines: Iterable[dict], grouping: str, *, rooms: Iterable[dict] | None = None,
                        sheets: Iterable[dict] | None = None) -> list[dict]:
     """The export rows in print order for `grouping` (see the module docstring).
@@ -207,9 +256,11 @@ def group_export_lines(lines: Iterable[dict], grouping: str, *, rooms: Iterable[
         return [{**{k: v for k, v in ln.items() if k != "dalys"}, "_kaip_gauta": kaip_gauta(ln)} for ln in lines]
 
     room_order = {}
+    room_by_nr: dict[str, dict] = {}
     for i, r in enumerate(rooms or []):
         if isinstance(r, dict):
             room_order.setdefault(str(r.get("nr") or "").strip(), i)
+            room_by_nr.setdefault(str(r.get("nr") or "").strip(), r)
 
     split_lines = []
     for ln in lines:
@@ -244,11 +295,34 @@ def group_export_lines(lines: Iterable[dict], grouping: str, *, rooms: Iterable[
                                 split=len(shares) > 1))
         return out
 
-    # patalpos / lapai: buckets in plan order, unassigned last
+    # patalpos / lapai / aukstai / butai: buckets in plan order, unassigned last
     buckets: dict[tuple, list[dict]] = {}
     for li, (ln, shares, money) in enumerate(split_lines):
         for sh, amount in zip(shares, money):
             assigned = not sh["remainder"]
+            if mode in ("aukstai", "butai"):
+                room = room_by_nr.get(sh["room_nr"]) if assigned else None
+                if mode == "aukstai":
+                    fl = room_floor(room) if assigned else None
+                    known = fl is not None
+                    key = (0, fl, "") if known else ((1, 0, "") if assigned else (2, 0, ""))
+                    group = floor_label(fl) if assigned else UNASSIGNED_ROOMS
+                else:
+                    flat = room_flat(room) if assigned else None
+                    known = flat is not None
+                    key = ((0, int(flat) if flat.isdigit() else 10**6, flat) if known
+                           else ((1, 0, "") if assigned else (2, 0, "")))
+                    group = f"Butas {flat}" if known else (UNKNOWN_FLAT if assigned else UNASSIGNED_ROOMS)
+                if sh["remainder"] in ("under", "over"):
+                    desc = f"{label(ln)} — {_remainder_text(sh)}"
+                elif assigned:
+                    desc = f"{label(ln)} — {_room_label(sh['room_nr'], sh['room_name'])}"
+                else:
+                    desc = label(ln)
+                buckets.setdefault(key, []).append(
+                    (li, _row(ln, sh, amount, group=group, description=desc, sheet_names=sheet_names,
+                              split=len(shares) > 1)))
+                continue
             if mode == "patalpos":
                 key = ((0, room_order.get(sh["room_nr"], len(room_order)), sh["room_nr"]) if assigned
                        else (1, 0, ""))
@@ -323,6 +397,8 @@ TITLE_SUFFIX = {
     "seimos": "pagal darbų šeimas",
     "lapai": "pagal lapus",
     "be_grupavimo": "visos eilutės be grupavimo",
+    "aukstai": "pagal aukštus",
+    "butai": "pagal butus",
 }
 
 

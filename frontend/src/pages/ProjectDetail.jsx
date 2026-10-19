@@ -24,6 +24,7 @@ import {
 } from '@/lib/applyPriceList';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { toast } from 'sonner';
+import { vatPercent } from '@/lib/vatMode';
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
@@ -412,7 +413,7 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <SummaryBar rows={localRows} vatRate={project.vat_rate || 21} />
+      <SummaryBar rows={localRows} vatRate={vatPercent(project)} />
 
       {selectedRow && (
         <RowDetailPanel row={selectedRow} onClose={() => setSelectedRow(null)} />
