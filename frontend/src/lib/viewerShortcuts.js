@@ -78,11 +78,17 @@ export const VIEWER_SHORTCUTS = [
   { id: 'roomEditOutline', group: 'room', bound: 'hotkeys', label: 'Taisyti kontūrą — tempti kampus, prilimpa prie sienų', combos: [{ keys: ['e', 'E'] }] },
   { id: 'roomMerge', group: 'room', bound: 'hotkeys', label: 'Sujungti su gretima patalpa', combos: [{ keys: ['m', 'M'] }] },
   { id: 'roomSubtract', group: 'room', bound: 'hotkeys', label: 'Atimti koloną, spintą ar šachtą iš patalpos', combos: [{ keys: ['x', 'X'] }] },
+  { id: 'roomDoubleClick', group: 'room', bound: 'mouse', label: 'Taisyti patalpos kontūrą (kaip E); ant matavimo — taisyti jo taškus', display: 'Dukart spustelėti patalpą ar matavimą' },
 
   // ── Kontūro taisymas
   { id: 'outlineDrag', group: 'outline', bound: 'mouse', label: 'Perkelti viršūnę (prilimpa prie sienų)', display: 'Tempti kampą' },
-  { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti vidurio tašką' },
+  { id: 'outlineInsert', group: 'outline', bound: 'mouse', label: 'Pridėti viršūnę', display: 'Spustelėti kraštinę ar jos vidurio tašką' },
   { id: 'outlineRemove', group: 'outline', bound: 'mouse', label: 'Pašalinti viršūnę', display: 'Dukart spustelėti kampą' },
+  { id: 'outlineEdgeDrag', group: 'outline', bound: 'mouse', label: 'Perkelti visą kraštinę (abu kampai prilimpa prie sienų)', display: 'Tempti kraštinę' },
+  { id: 'outlineVertexMenu', group: 'outline', bound: 'mouse', label: 'Kampo veiksmai: ištrinti, iškirpti angą', display: 'Spustelėti kampą arba dešinysis klavišas' },
+  { id: 'outlineBox', group: 'outline', bound: 'mouse', label: 'Pažymėti kelis kampus (su Ctrl — pridėti po vieną)', display: 'Tempti rėmelį tuščioje vietoje' },
+  { id: 'outlineDeleteSelected', group: 'outline', bound: 'outline', label: 'Ištrinti pažymėtus kampus', hint: 'ištrinti kampus', combos: [{ keys: ['Delete'] }, { keys: ['Backspace'] }] },
+  { id: 'outlineNudge', group: 'outline', bound: 'outline', label: 'Pastumti pažymėtus kampus (su Shift — 10 kartų toliau)', combos: [{ keys: ['ArrowLeft'] }, { keys: ['ArrowRight'] }, { keys: ['ArrowUp'] }, { keys: ['ArrowDown'] }] },
   { id: 'outlineUndo', group: 'outline', bound: 'outline', label: 'Atšaukti paskutinį viršūnės pakeitimą', hint: 'atgal', combos: [{ keys: ['z', 'Z'] }] },
   { id: 'outlineSave', group: 'outline', bound: 'outline', label: 'Išsaugoti kontūrą', hint: 'išsaugoti', combos: [{ keys: ['Enter'] }] },
   { id: 'outlineCancel', group: 'outline', bound: 'esc', label: 'Atšaukti redagavimą (niekas neišsaugoma)', hint: 'atšaukti', combos: [{ keys: ['Escape'] }] },
@@ -125,6 +131,7 @@ export function isMacPlatform(nav = (typeof navigator !== 'undefined' ? navigato
 
 const KEY_NAMES = {
   PageDown: 'PgDn', PageUp: 'PgUp', Escape: 'Esc', '-': '−', ' ': 'Tarpas',
+  ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
 };
 
 function keyName(k) {

@@ -73,7 +73,7 @@ export function cursorHintFor(state = {}) {
       if (symbolPhase === 'review') return 'Spustelėkite neteisingą žymę — pašalinti · naujas rėmelis — nauja paieška';
       return 'Tempdami apveskite vieną simbolį kuo glaudžiau';
     case 'outlineEdit':
-      return 'Tempkite kampą · vidurio taškas — pridėti · Enter — išsaugoti';
+      return 'Tempkite kampą ar kraštinę · spustelėkite kampą — veiksmai · Enter — išsaugoti';
     case 'split':
       if (!outlineTool?.a) return 'Spustelėkite, kur prasideda skirianti linija';
       if (!outlineTool?.b) return 'Spustelėkite, kur linija baigiasi';

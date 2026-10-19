@@ -37,14 +37,14 @@ export function modePillFor(state = {}) {
   if (outlineEdit) {
     return {
       id: 'outlineEdit',
-      name: `Kontūras · patalpa ${outlineEdit.nr}`,
+      name: outlineEdit.name || `Kontūras · patalpa ${outlineEdit.nr}`,
       detail: outlineEdit.invalid ? 'Kontūras kertasi pats su savimi — pataisykite viršūnes' : null,
       keys: hintText(['outlineUndo', 'outlineSave', 'outlineCancel'], { mac }),
       actions: [
         { id: 'outlineUndo', label: 'Atgal', disabled: !outlineEdit.canUndo, title: 'Atšaukti paskutinį viršūnės pakeitimą (Z)' },
         {
           id: 'outlineSave',
-          label: outlineEdit.saving ? 'Saugoma…' : 'Išsaugoti kontūrą',
+          label: outlineEdit.saving ? 'Saugoma…' : (outlineEdit.saveLabel || 'Išsaugoti kontūrą'),
           primary: true,
           disabled: !!(outlineEdit.saving || outlineEdit.invalid),
           title: outlineEdit.invalid

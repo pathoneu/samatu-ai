@@ -488,6 +488,38 @@ export default function InteriorWorkspace({
     return { undo: makeOutlineUndo(undoable || {}) };
   };
 
+  // A door or window changed on the drawing (Pathon v3 W5-A A2 / A9): `update(elementai) → elementai`, saved like
+  // the room sheet's opening edit (lib/roomSheet openingsPatch — `_angos_user_at` marks the openings as his) and
+  // recomputed on the usual path; „Atšaukti" puts the room's openings back as they were.
+  const handleRoomOpenings = async (roomNr, update) => {
+    await flushProjectSaves().catch(() => null);
+    const fresh = getProject(project.id) || project;
+    const before = (fresh.patalpos || []).find((r) => String(r?.nr) === String(roomNr));
+    if (!before) throw new Error(`Patalpa ${roomNr} nerasta`);
+    const elementai = update(Array.isArray(before.elementai) ? before.elementai : []);
+    if (!elementai) return null;
+    const restore = { elementai: before.elementai, _angos_user_at: before._angos_user_at };   // undefined = absent again (JSON drops it)
+    const recompute = (reason) => {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent('samatu:project-recompute', { detail: { projectId: project.id, reason, roomNr, quiet: true } }));
+    };
+    const ticket = ticketFor(undoRegistryRef.current, [String(roomNr)]);
+    const updated = updateProject(project.id, roomPatchFields(fresh, { [String(roomNr)]: { elementai, _angos_user_at: new Date().toISOString() } }));
+    if (updated) onProjectChange?.(updated);
+    recompute('openings-edited');
+    return {
+      undo: () => {
+        if (!isNewest(undoRegistryRef.current, ticket)) { toast.info(UNDO_SUPERSEDED); return; }
+        ticketFor(undoRegistryRef.current, [String(roomNr)]);
+        const now = getProject(project.id) || project;
+        const back = updateProject(project.id, roomPatchFields(now, { [String(roomNr)]: restore }));
+        if (back) onProjectChange?.(back);
+        recompute('openings-undone');
+        toast.success(`Atšaukta: patalpos ${roomNr} angos grąžintos`, { description: 'Kiekiai perskaičiuojami.' });
+      },
+    };
+  };
+
   // Persist measurements + per-page calibration scales from the viewer's local
   // state onto the project. New top-level keys (measurements / pageScalesDurable)
   // ride the existing project JSON — zero backend changes. The viewer debounces.
@@ -793,6 +825,7 @@ export default function InteriorWorkspace({
         onOutlineTool={handleOutlineTool}
         onRoomToolPreview={handleRoomToolPreview}
         onRoomToolCommit={handleRoomToolCommit}
+        onRoomOpenings={handleRoomOpenings}
         fillRequest={fillRequest}
         exportFileName={`${(project?.name || 'brezinys').trim().replace(/[\\/:*?"<>|]+/g, '-')}.pdf`}
         initialMeasurements={project?.measurements || []}

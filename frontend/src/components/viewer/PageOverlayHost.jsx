@@ -89,6 +89,12 @@ export default function PageOverlayHost({
   onOutlineToolChange = null,
   onRoomZoneClick,
   onPagePoint,
+  // Double-click on the sheet (Pathon v3 W5-A A1): ({measureId?, pageIndex, x, y, …}) — a measurement under it, or
+  // the point (unrotated PDF points, like a click) for the room under it.
+  onPageDoubleClick = null,
+  // The vertex editor's corner selection and pop-up (W5-A A2 / A3).
+  onOutlineSelect = null,
+  onOutlineMenu = null,
   // Measurement subsystem (Phase 3) — state lives in TakeoffViewer.
   measureTool = null,
   measurements = [],
@@ -183,8 +189,22 @@ export default function PageOverlayHost({
     onMeasureContextMenu({ id: id || null, clientX: e.clientX, clientY: e.clientY });
   } : undefined;
 
+  // A measurement being edited point by point is drawn by the vertex editor alone (W5-A A1).
+  const editingMeasureId = outlineEdit?.target === 'measure' ? outlineEdit.id : null;
+  const shownMeasurements = editingMeasureId ? (measurements || []).filter((m) => m.id !== editingMeasureId) : (measurements || []);
+  const handleDoubleClick = (onPageDoubleClick && adapter && !checkMode && !editingHere && !toolHere
+    && (measureTool == null || measureTool === 'select')) ? (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
+      const measureId = hitTestMeasurement(raw, (measurements || []).filter((m) => m.kind !== 'count'), layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
+      onPageDoubleClick({
+        measureId: measureId || null, pageIndex: layout.pageIndex, x: raw.x, y: raw.y, pageWidth: pageWidthPt, pageHeight: pageHeightPt,
+        pageRotation, renderedWidth: width, renderedHeight: height,
+      });
+    } : undefined;
+
   return (
-    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }} onContextMenu={handleContextMenu}>
+    <PagePointerProvider documentId={documentId} pageIndex={layout.pageIndex} data-page-number={layout.pageNumber} style={{ position: 'relative', width, height }} onContextMenu={handleContextMenu} onDoubleClick={handleDoubleClick}>
       {/* ── Rotated page content ─────────────────────────────────────────────
           EmbedPDF draws ALL page content in UNROTATED mediabox space:
           <RenderLayer>'s raster ignores /Rotate (PDFium matrix render path),
@@ -285,7 +305,7 @@ export default function PageOverlayHost({
             pageNr={layout.pageNumber}
             tool={measureTool || 'pan'}
             scale={measureScale || uncalibratedScale()}
-            measurements={measurements || []}
+            measurements={shownMeasurements}
             countTypes={countTypes}
             activeCountTypeId={activeCountTypeId}
             snapEnabled={snapEnabled}
@@ -343,6 +363,11 @@ export default function PageOverlayHost({
             pageRotation={pageRotation}
             tableAreaM2={outlineEdit.tableAreaM2 ?? null}
             holes={outlineEdit.holes || []}
+            closed={outlineEdit.closed !== false}
+            minPoints={outlineEdit.minPoints || 3}
+            selected={outlineEdit.selected || []}
+            onSelect={onOutlineSelect}
+            onMenu={onOutlineMenu}
           />
         </div>
       )}
