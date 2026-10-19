@@ -34,12 +34,13 @@ function Swatch({ row }) {
   );
 }
 
-export default function OverlayLegend({ layers = [], className = '', ...rest }) {
+// `vertical` (v3 W1-B): one row per line — a compact card the canvas chrome can move out of the way.
+export default function OverlayLegend({ layers = [], className = '', vertical = false, ...rest }) {
   const rows = layers.flatMap((layer) => LEGENDS[layer] || []);
   if (!rows.length) return null;
   return (
     <div
-      className={`rounded-panel border border-border bg-card/95 px-3 py-1.5 text-meta text-foreground shadow-md pointer-events-none flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}
+      className={`rounded-panel border border-border bg-card/95 px-3 py-1.5 text-meta text-foreground shadow-md pointer-events-none flex ${vertical ? 'flex-col items-start gap-1' : 'flex-wrap items-center gap-x-3 gap-y-1'} ${className}`}
       {...rest}
     >
       {rows.map((row) => (

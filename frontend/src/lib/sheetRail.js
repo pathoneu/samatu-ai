@@ -38,10 +38,17 @@ const PANEL_GAP = 8;
  * Where a panel floating at the drawing's top-left starts („Rasti panašius", the count types): right of the
  * open rail, never over it (2026-10-18 audit §4.6 item 4 — the review panel covered ~76 px of the sheet list).
  */
-export function floatingPanelLeft({ railOpen, sheetRail, strip = false }) {
+export function floatingPanelLeft({ railOpen, sheetRail, strip = false, toolRail = 0 }) {
+  // Pathon v3 click model (W1-B): the tool cards float at the drawing's left edge — panels start right of them too
+  const tools = toolRail > 0 ? toolRail + PANEL_GAP : 0;
+  return sheetRailWidth({ railOpen, sheetRail, strip }) + PANEL_GAP + tools;
+}
+
+/** How wide the sheet list on the drawing's left is: the full rail, the 56 px strip, the thumbnails, or 0. */
+export function sheetRailWidth({ railOpen, sheetRail, strip = false }) {
   // Pathon v3 frame (A4): with the full rail shut a sheet set still shows its 56 px strip
-  if (!railOpen) return sheetRail && strip ? SHEET_STRIP_WIDTH + PANEL_GAP : PANEL_GAP;
-  return (sheetRail ? SHEET_RAIL_WIDTH : THUMBNAIL_RAIL_WIDTH) + PANEL_GAP;
+  if (!railOpen) return sheetRail && strip ? SHEET_STRIP_WIDTH : 0;
+  return sheetRail ? SHEET_RAIL_WIDTH : THUMBNAIL_RAIL_WIDTH;
 }
 
 /** The type choices the rename editor offers: the classification's enum with its LT labels. */
