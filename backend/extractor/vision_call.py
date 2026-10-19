@@ -3690,6 +3690,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     lubos_share = (1 - walls_share) * _ceiling_keep if _dazymo_all > 0 else 0.5
     glaistas_total = _sum("glaistas_kg")
     dazai_total = round(sum(_room_dazai_l(r) for r in rooms), 2)
+    from . import waste_pattern as _waste
+    if _waste.enabled():  # v3 W5-E E7, default off: paint litres + the §3 paint waste
+        dazai_total = round(dazai_total * _waste.factor("paint", _waste.STRAIGHT), 2)
     gruntas_total = _sum("gruntas_l")
 
     # Wet rooms (vonia/wc/san) — voniose dažymas tik virš plytelių zonos
@@ -3792,6 +3795,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "m2", "kiekis": molio_total, "saltinis": SAL,
             "_assumption": "Plotas iš apdailos plano (molio/kalkinio tinko ar kitos dangos zona). Paruošimas įskaičiuotas į dekoravimo darbą — atskiros glaistymo eilutės šiam plotui nėra.",
         })
+
+    # v3 W5-E E2, flag SAMATU_WALLPAPER_ROLLS (default off → nothing): wallpaper rolls for the walls whose
+    # finish reads „tapetai" (extractor/wallpaper_flag.py)
+    from .wallpaper_flag import wallpaper_rows as _wallpaper_rows
+    pozicijos.extend(_wallpaper_rows(rooms, SK_GD, SAL))
 
     # The eksplikacija's own "Iš viso" is the ceiling quantity when we have a
     # trustworthy one — minus the rooms whose ceilings nobody paints. Falls back
@@ -4108,6 +4116,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
         ])
+        # v3 W5-E E3, flag SAMATU_NICHE_DEPTH (default off → nothing): with a typed niche depth for every
+        # niche room, the two finishing rows are billed in m² = Σ m × gylis × 3 (CLAUDE.md §1.5)
+        from . import niche_depth as _niche
+        if _niche.enabled():
+            _na = _niche.niche_area(rooms, parsed.get("_overrides"), lambda r: r.get("nisu_metrai"))
+            if _na:
+                for _p in pozicijos[-2:]:
+                    _p["vnt"], _p["kiekis"] = "m2", _na[0]
+                    _why = ("Nišų vidus (viršus ir du šonai): " + "; ".join(_na[1])
+                            + f" — iš viso {lt_num(_na[0])} m².")
+                    _p["_confidence_reason"] = " ".join(x for x in (_p.get("_confidence_reason"), _why) if x)
     # 2026-10-06: rooms where no niche length was read and the room-type estimate
     # waits for his answer — one blank row naming them with the estimate for each
     # (niche_inference.LED_ESTIMATE_OPT_IN). Emitted with or without read metres.
@@ -4225,6 +4244,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 else (lambda r: in_group(r) and _floor_rule_is_tile(r)))
         return contribs, _choice_excluded("plyteles", keep)
 
+    def _tile_waste(field: str | None, pasks: set | None) -> float:
+        """TILE_WASTE; under SAMATU_WASTE_BY_PATTERN=1 (v3 W5-E E7) the §1.7 factor of the pattern the
+        drawing writes for this location (floor-plan label for floor tiles, tile-spec excerpt)."""
+        if not _waste.enabled() or not field:
+            return TILE_WASTE
+        grp = [r for r in rooms if ((_pask(r) in pasks) if pasks is not None
+                                    else (_pask(r) not in WET and _pask(r) != "virtuve"))]
+        texts = [_waste.room_floor_text(r) for r in grp] if field == "plyteles_grindys_m2" else []
+        where = None if pasks is None else ({"virtuve"} if pasks == {"virtuve"} else {"vonia", "wc"})
+        texts += _waste.tile_spec_texts(parsed, where)
+        return _waste.factor("tiles", _waste.pattern_of_texts(texts))
+
     def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str,
                         field: str | None = None, pasks: set | None = None):
         """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos.
@@ -4253,8 +4284,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelės",
-            "vnt": "m2", "kiekis": round(kiekis * TILE_WASTE, 2), "saltinis": SAL,
+            "vnt": "m2", "kiekis": round(kiekis * _tile_waste(field, pasks), 2), "saltinis": SAL,
             "susijes_darbas": f"{vieta} plytelių klijavimas",
+            **({"_assumption": f"Plytelių atliekos {_waste.pct_label(_tile_waste(field, pasks))} % — brėžinyje "
+                               f"parašytas klojimo raštas."}
+               if abs(_tile_waste(field, pasks) - TILE_WASTE) > 1e-9 else {}),
             _IS_MATERIAL_LINE: True,
         })
         _fug = {
@@ -4660,6 +4694,15 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
             "medziagos_kiekis": round(pvc_billed * FLOOR_COVERING_WASTE, 2),
             "medziagos_vnt": "m2"}
+        if _waste.enabled():  # v3 W5-E E7, default off: §1.6 waste of the pattern the floor plan writes
+            _fw = _waste.factor("floor", _waste.pattern_of_texts(
+                _waste.room_floor_text(r) for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0))
+            # the material NAME stays stable (price-list assemblies match on it, api/assemblies_default.py);
+            # the read pattern and its factor go into the row's assumption text
+            _lam_row["medziagos_kiekis"] = round(pvc_billed * _fw, 2)
+            if abs(_fw - FLOOR_COVERING_WASTE) > 1e-9:
+                _lam_row["_assumption"] = (f"Grindų dangos atliekos {_waste.pct_label(_fw)} % — brėžinyje parašytas "
+                                           f"klojimo raštas ({_waste.PATTERN_LT[_waste.pattern_of_texts(_waste.room_floor_text(r) for r in rooms if float(r.get('pvc_grindys_m2') or 0) > 0)]}).")
         if _lam_meta["source"] == "anchor":
             _lam_row["_confidence_reason"] = _lam_meta["provenance"]
             _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,
@@ -4816,6 +4859,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             _emit_mixer_lines(pozicijos, SK_SAN, "vonia", n_vonios_sym or None,
                               san_concealed["vonia"], san_source["vonia"],
                               saltinis="simboliai_brezinyje", emitted=san_emitted)
+        # v3 W5-E E5, flag SAMATU_BATH_DRAIN_ROWS (default off → nothing): the bathtub itself from the tub-only
+        # count, floor drains from a legend count (extractor/fixture_rows_flag.py)
+        from .fixture_rows_flag import fixture_rows as _fixture_rows
+        pozicijos.extend(_fixture_rows(parsed, tubs_read=(n_vonios_sym if _tubs_read is not None else None),
+                                       tub_or_tray_glance=int(_sym.get("vonios") or 0), skyrius=SK_SAN))
         # Virtuvė / skalbykla — plautuvė + jos maišytuvas. Both consume
         # `n_plautuves`, so the sink and its mixer can never drift apart, and
         # neither is billed a second time inside the praustuvė lines above.

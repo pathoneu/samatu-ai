@@ -11,6 +11,7 @@ import { rulesWithScope } from '@/lib/scope';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
 import { estimatedLedRooms, ledEstimateBilled, ledEstimateText } from '@/lib/ledEstimate';
 import { createDebouncedRun, createRequestOrder } from '@/lib/debouncedRun';
+import { BAG_KEY, BAG_RANGE, BUCKET_KEY, BUCKET_RANGE, packagingSizes } from '@/lib/packaging';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
 // keystroke fired its own request and the answers raced (2026-07-27 audit).
@@ -254,6 +255,7 @@ export default function AssumptionsPanel({
   // showcase. Live editing/recompute stays fully functional on real projects.
   const isDemo = !!(rawData?.is_demo);
   const sienos_storis_m = safeAssumptions.sienos_storis_m;
+  const packSizes = packagingSizes(safeAssumptions);
   // A settings screen where NOTHING is selected tells the contractor his
   // sąmata was built with no putty level at all. Fall back to what the
   // extraction actually used, then to the LT default Q2 — the one the copy
@@ -710,6 +712,28 @@ export default function AssumptionsPanel({
                 min: ltDecimal('0.05'), max: ltDecimal('0.50'),
               })}
             />
+          </Row>
+
+          {/* Pakuotės (v3 W5-E): only the note beside the Medžiagos kg / l — nothing recomputes, the kg stay */}
+          <Row label={t('project.assumptions.packagingLabel')} note={t('project.assumptions.packagingNote')}>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="text-ui text-muted-foreground">{t('project.assumptions.packagingBag')}</span>
+              <NumberInput
+                value={packSizes.bagKg}
+                onChange={v => setField(BAG_KEY, v)}
+                min={BAG_RANGE[0]} max={BAG_RANGE[1]} step={1} unit="kg"
+                label={t('project.assumptions.packagingBag')}
+                errorMessage={t('project.assumptions.packagingRangeErr', { min: BAG_RANGE[0], max: BAG_RANGE[1] })}
+              />
+              <span className="text-ui text-muted-foreground">{t('project.assumptions.packagingBucket')}</span>
+              <NumberInput
+                value={packSizes.bucketL}
+                onChange={v => setField(BUCKET_KEY, v)}
+                min={BUCKET_RANGE[0]} max={BUCKET_RANGE[1]} step={0.5} unit="l"
+                label={t('project.assumptions.packagingBucket')}
+                errorMessage={t('project.assumptions.packagingRangeErr', { min: ltDecimal(BUCKET_RANGE[0]), max: BUCKET_RANGE[1] })}
+              />
+            </div>
           </Row>
 
           {/* ── Per-room settings ────────────────────────────────────────
