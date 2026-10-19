@@ -163,9 +163,12 @@ export function buildCreate({ rows, counts, review, removed = new Set(), countTy
     let type = countTypes.find((t) => t.legend_row_id === row.row_id) || null;
     if (type) {
       replaceTypeIds.push(type.id);
-      if (type.label !== name) type = { ...type, label: name };
+      if (type.label !== name || !type.eilute_id) type = { ...type, label: name, eilute_id: type.eilute_id || legendRowId(type.id), kaip: type.kaip || 'kiekis' };
     } else {
-      type = { ...makeCountType(name, existing), legend_row_id: row.row_id, legend_text: String(row.text || '') };
+      const made = makeCountType(name, existing);
+      // the link to its sąmata row rides on the type (lib/measuredRows honours a link on the object): the row's
+      // kiekis IS the marks, on every save and through /recompute-interior's rebuild
+      type = { ...made, legend_row_id: row.row_id, legend_text: String(row.text || ''), eilute_id: legendRowId(made.id), kaip: 'kiekis' };
       existing.push(type);
       types.push(type);
     }
@@ -300,6 +303,11 @@ export function matchSavedLegend(rows, saved, base = {}) {
 
 const LEGEND_ROW_PREFIX = 'rnk-legenda-';
 
+/** The id of a legend count type's sąmata row (`rnk-` — a recompute carries it like a hand-added row). */
+export function legendRowId(typeId) {
+  return `${LEGEND_ROW_PREFIX}${typeId}`;
+}
+
 /** The sentence a legend row's ledger shows. `manual` = marks he placed by hand on top. */
 export function legendLedgerText(text, pages, manual = 0) {
   const base = `suskaičiuota pagal legendą: eilutė „${String(text || '').trim()}“, ${perPageText(pages)}`;
@@ -307,11 +315,20 @@ export function legendLedgerText(text, pages, manual = 0) {
 }
 
 /**
- * The sąmata rows of the legend count types, brought in line with the marks: a type made from a legend row
- * has ONE row (`quantity_source: 'measurement_count'`, id `rnk-legenda-…` so a recompute carries it like a
- * hand-added row), its `kiekis` = the marks of that type, its `ledger_note_lt` the sentence above. A row
- * whose quantity he typed himself keeps his number (only the sentence follows). A row whose type is gone is
- * removed. Returns the SAME array when nothing changed (callers skip the save).
+ * The ledger line of a legend count type's row — lib/measuredRows uses it as the type's `tekstas`, so the row
+ * says „suskaičiuota pagal legendą: eilutė „…“, 3 ženklai lape 1" instead of a plain „matavimas".
+ */
+export function legendTypeText(type, measurements) {
+  const marks = (measurements || []).filter((m) => m?.kind === 'count' && m.typeId === type?.id);
+  return legendLedgerText(type?.legend_text || type?.label, perPage(marks), marks.filter((m) => m.source !== LEGEND_SOURCE).length);
+}
+
+/**
+ * The sąmata rows of the legend count types (B3): a type made from a legend row gets ONE row — id
+ * `rnk-legenda-<type>` (the type's `eilute_id`), `quantity_source: 'measurement_count'`, unit vnt. — created here
+ * the first time the type is saved; from then on its `kiekis` follows the marks through lib/measuredRows (the
+ * type carries `kaip: 'kiekis'`), on every save and through /recompute-interior. A legend row whose type is gone
+ * (Atšaukti) is removed. Returns the SAME array when nothing changed (callers skip the save).
  */
 export function syncLegendRows(rows, measurements, countTypes) {
   const list = Array.isArray(rows) ? rows : [];
@@ -325,43 +342,24 @@ export function syncLegendRows(rows, measurements, countTypes) {
     out.push(r);
   }
   for (const t of legendTypes) {
+    const id = t.eilute_id || legendRowId(t.id);
+    if (out.some((r) => String(r?.id) === String(id) || (r?.measure_type_id === t.id && r.quantity_source === 'measurement_count'))) continue;
     const marks = (measurements || []).filter((m) => m.kind === 'count' && m.typeId === t.id);
-    const pages = perPage(marks);
-    const manual = marks.filter((m) => m.source !== LEGEND_SOURCE).length;
-    const note = legendLedgerText(t.legend_text || t.label, pages, manual);
-    const idx = out.findIndex((r) => r?.measure_type_id === t.id && r.quantity_source === 'measurement_count');
-    if (idx >= 0) {
-      const cur = out[idx];
-      const own = cur.manual_override === true;
-      const next = {
-        ...cur,
-        ...(own ? {} : { kiekis: marks.length }),
-        ledger_note_lt: note,
-        legend_row_id: t.legend_row_id,
-        aprasymas: cur.aprasymas,
-      };
-      if (next.kiekis !== cur.kiekis || next.ledger_note_lt !== cur.ledger_note_lt || next.legend_row_id !== cur.legend_row_id) {
-        out[idx] = next;
-        changed = true;
-      }
-    } else {
-      out.push({
-        id: `${LEGEND_ROW_PREFIX}${t.id}`,
-        eil_nr: out.length + 1,
-        aprasymas: `${t.label} (pagal legendą)`,
-        mato_vnt: 'vnt.',
-        kiekis: marks.length,
-        kaina: 0,
-        skyrius: 'Matavimai',
-        confidence: 'medium',
-        saltinis: 'legenda',
-        quantity_source: 'measurement_count',
-        measure_type_id: t.id,
-        legend_row_id: t.legend_row_id,
-        ledger_note_lt: note,
-      });
-      changed = true;
-    }
+    out.push({
+      id,
+      eil_nr: out.reduce((m, d) => Math.max(m, Number(d?.eil_nr) || 0), 0) + 1,
+      aprasymas: `${t.label} (pagal legendą)`,
+      mato_vnt: 'vnt.',
+      kiekis: marks.length,
+      kaina: 0,
+      skyrius: 'Matavimai',
+      confidence: 'medium',
+      saltinis: 'legenda',
+      quantity_source: 'measurement_count',
+      measure_type_id: t.id,
+      legend_row_id: t.legend_row_id,
+    });
+    changed = true;
   }
   return changed ? out : list;
 }

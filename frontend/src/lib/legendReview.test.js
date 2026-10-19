@@ -141,33 +141,30 @@ test('an earlier legend fits only when most rows match; his names come with it',
   assert.equal(matchSavedLegend(rows, { rows: [] }), null);
 });
 
-test('sąmata rows follow the legend counts live', () => {
-  const t = { id: 'rozete', label: 'Rozetė', legend_row_id: 'p3-a', legend_text: 'Rozetė' };
-  const marks = [
-    { kind: 'count', typeId: 'rozete', page: 1, source: LEGEND_SOURCE },
-    { kind: 'count', typeId: 'rozete', page: 1, source: LEGEND_SOURCE },
-    { kind: 'count', typeId: 'rozete', page: 3, source: 'user' },
-  ];
+test('a legend type gets ONE sąmata row, linked by eilute_id; Atšaukti removes it; kiekis then follows via measuredRows', async () => {
+  const { syncMeasuredRows } = await import('./measuredRows.js');
+  const review = { 'p3-a': { keep: true, name: null } };
+  const plan = buildCreate({ rows: [rowA], counts, review, countTypes: [], pages });
+  const t = plan.types[0];
+  assert.equal(t.eilute_id, `rnk-legenda-${t.id}`);
+  assert.equal(t.kaip, 'kiekis');
   const base = [{ id: 'x', aprasymas: 'Dažymas', kiekis: 10 }];
-  const one = syncLegendRows(base, marks, [t]);
+  const one = syncLegendRows(base, plan.marks, [t]);
   assert.equal(one.length, 2);
-  const row = one[1];
-  assert.equal(row.id, 'rnk-legenda-rozete');
+  assert.equal(one[1].id, t.eilute_id);
+  assert.equal(one[1].kiekis, 3);
+  assert.equal(one[1].quantity_source, 'measurement_count');
+  // nothing more to create → the same array
+  assert.equal(syncLegendRows(one, plan.marks, [t]), one);
+  // the row follows the marks through lib/measuredRows, with the legend sentence as its ledger line
+  const marks = [...plan.marks.slice(0, 2), { kind: 'count', typeId: t.id, page: 3, source: 'user', id: 'h1' }];
+  const project = { darbu_sarasas: one, measurements: marks, countTypes: [t] };
+  const synced = syncMeasuredRows(project);
+  const row = synced.darbu_sarasas.find((r) => r.id === t.eilute_id);
   assert.equal(row.kiekis, 3);
-  assert.equal(row.quantity_source, 'measurement_count');
-  assert.equal(row.ledger_note_lt, 'suskaičiuota pagal legendą: eilutė „Rozetė“, 2 ženklai lape 1, 1 ženklas lape 3 (iš jų 1 pažymėta rankiniu būdu)');
-  // nothing changed → the same array (no save)
-  assert.equal(syncLegendRows(one, marks, [t]), one);
-  // a mark removed → kiekis follows
-  const two = syncLegendRows(one, marks.slice(0, 2), [t]);
-  assert.equal(two[1].kiekis, 2);
-  // his own quantity stays; the sentence follows
-  const typed = [base[0], { ...two[1], kiekis: 7, manual_override: true }];
-  const three = syncLegendRows(typed, marks, [t]);
-  assert.equal(three[1].kiekis, 7);
-  assert.match(three[1].ledger_note_lt, /lape 3/);
-  // the type gone (Undo) → the row goes
-  assert.deepEqual(syncLegendRows(two, [], []).map((r) => r.id), ['x']);
+  assert.equal(row.matavimai[0].tekstas, 'suskaičiuota pagal legendą: eilutė „Rozetė“, 3 ženklai lape 3 (iš jų 1 pažymėta rankiniu būdu)');
+  // the type gone (Atšaukti) → the row goes
+  assert.deepEqual(syncLegendRows(one, [], []).map((r) => r.id), ['x']);
   // count rows not made from a legend are not touched
   const plain = [{ id: 'y', quantity_source: 'measurement_count', measure_type_id: 'z', kiekis: 4 }];
   assert.equal(syncLegendRows(plain, [], []), plain);

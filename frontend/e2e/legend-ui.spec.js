@@ -107,7 +107,8 @@ test.describe('legend marking (W2-B)', () => {
     for (const r of lrows) {
       const count = marks.filter((m) => m.typeId === r.measure_type_id).length;
       expect(r.kiekis, r.aprasymas).toBe(count);
-      expect(r.ledger_note_lt).toMatch(/^suskaičiuota pagal legendą: eilutė „.+“, /);
+      // the row's ledger line (lib/measuredRows `matavimai`, the type linked with kaip „kiekis")
+      expect(r.matavimai?.[0]?.tekstas).toMatch(/^suskaičiuota pagal legendą: eilutė „.+“, \d+ ženkl/);
       expect(String(r.id)).toMatch(/^rnk-legenda-/);
     }
     note(`created: ${n} count types, ${marks.length} marks, ${lrows.length} sąmata rows`);

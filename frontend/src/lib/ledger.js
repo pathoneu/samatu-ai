@@ -249,6 +249,9 @@ export function sourceLabel(saltinis) {
 export function ledgerFallback(row) {
   // a count made from a legend row (v3 W2-B, lib/legendReview syncLegendRows) says how it was counted
   if (typeof row?.ledger_note_lt === 'string' && row.ledger_note_lt.trim()) return { kind: 'note', text: row.ledger_note_lt.trim() };
+  // a row whose quantity is measurements (lib/measuredRows `matavimai`, v3 W4-A / a legend count W2-B) lists them
+  const lines = Array.isArray(row?.matavimai) ? row.matavimai.map((l) => String(l?.tekstas || '').trim()).filter(Boolean) : [];
+  if (lines.length) return { kind: 'note', text: lines.join('; ') };
   if (isManualRow(row)) return { kind: 'manual' };
   return { kind: 'unwired', source: sourceLabel(row?.saltinis) };
 }
