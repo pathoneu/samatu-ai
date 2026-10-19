@@ -166,6 +166,31 @@ def sheet_types(projects: list[str]) -> None:
             print(f"    {h}")
 
 
+# ── D8 ───────────────────────────────────────────────────────────────────────
+
+def dimlen(projects: list[str]) -> None:
+    """Does a dimension string's evidence line (`span`, what `line_pct` is drawn from) include the stroke's caps?
+    Per codename: the median of span − drawn length (`ilgis_pt`), and the line measured at the page's own scale
+    against the written value — from the span and from the drawn length."""
+    import statistics
+    from extractor.plan_dimensions import read_dimension_strings
+    for code, pdf, _ in corpus(projects):
+        dims = [d for d in read_dimension_strings(pdf, pages=None)
+                if d.get("span_source") == "line" and d.get("span") and d.get("ilgis_pt") and d.get("orientation") in ("h", "v")]
+        if not dims:
+            print(f"== {code}: no line-backed strings")
+            continue
+        caps = [abs(d["span"][1] - d["span"][0]) - float(d["ilgis_pt"]) for d in dims]
+        by_span = [abs(d["span"][1] - d["span"][0]) * float(d["scale_m_per_pt"]) / d["value_m"] - 1 for d in dims]
+        by_drawn = [float(d["ilgis_pt"]) * float(d["scale_m_per_pt"]) / d["value_m"] - 1 for d in dims]
+        short = [r for d, r in zip(dims, by_span) if d["value_m"] <= 1.0]
+        pct = lambda v: f"{100 * v:+.1f} %"  # noqa: E731
+        print(f"== {code}: {len(dims)} strings on {len({d['page'] for d in dims})} sheets — span − drawn length: median "
+              f"{statistics.median(caps):.2f} pt (min {min(caps):.2f}, max {max(caps):.2f}); measured vs written: span "
+              f"{pct(statistics.median(by_span))} (strings ≤ 1 m: {pct(statistics.median(short)) if short else '—'}), "
+              f"drawn length {pct(statistics.median(by_drawn))}")
+
+
 def main() -> int:
     global NO_LABELS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -174,7 +199,7 @@ def main() -> int:
     ap.add_argument("--no-labels", action="store_true")
     args = ap.parse_args()
     NO_LABELS = args.no_labels
-    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types}.get(args.what)
+    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types, "dimlen": dimlen}.get(args.what)
     if fn is None:
         print(f"unknown report: {args.what}")
         return 2
