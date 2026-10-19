@@ -3,7 +3,7 @@
  * design §5 Count: „right-click — type menu"). Opens when the count tool is armed and on a right-click while it
  * is: the types (each with its shape AND colour, the running count), ↑ / ↓ and Enter to choose, and „Naujas tipas"
  * — a name, a shape (four buttons, the shape is the type's meaning beside its colour) and Enter. A click on the
- * drawing closes it and still places the mark (it never costs a click). Esc closes it alone.
+ * drawing closes it and still places the mark (it never costs a click). Esc closes it and leaves the tool.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
@@ -27,7 +27,9 @@ export default function CountTypePicker({ at, countTypes = [], activeId = null, 
   useEffect(() => {
     if (!at) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose?.(); return; }
+      // Esc closes the picker and goes on to the viewer's Esc step (design §5 Count: „Esc — exits"): one press
+      // leaves the count tool, the picker with it — it is a helper beside the pointer, not a dialog to dismiss first
+      if (e.key === 'Escape') { onClose?.(); return; }
       if (e.target === inputRef.current) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); setHi((i) => Math.min(countTypes.length - 1, i + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); setHi((i) => Math.max(0, i - 1)); }
@@ -49,7 +51,7 @@ export default function CountTypePicker({ at, countTypes = [], activeId = null, 
   return (
     <div
       ref={ref}
-      role="dialog"
+      role="group"
       aria-label="Kiekio tipas"
       data-testid="count-type-picker"
       className="fixed z-[60] w-72 rounded-panel border border-border bg-card shadow-lg p-1.5 flex flex-col gap-1"

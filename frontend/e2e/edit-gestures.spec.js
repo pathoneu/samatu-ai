@@ -421,7 +421,9 @@ test.describe('W5-A editing gestures', () => {
     await bringIntoView(page, fx, fy);
     const start = (await stored(page)).measurements.length;
     await page.keyboard.press('s');
-    await page.waitForTimeout(800);
+    // the sheet's wall solid has arrived (the walls layer draws it) before the click
+    await expect(page.locator('[data-drawing-geometry-layer] polygon').first()).toBeAttached({ timeout: 30_000 });
+    await page.waitForTimeout(300);
     await page.mouse.click(...Object.values(await at(page, fx, fy)));
     const made = toast(page, 'Sienos ilgis:');
     await expect(made).toBeVisible({ timeout: 20_000 });
