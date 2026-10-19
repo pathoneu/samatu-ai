@@ -439,6 +439,58 @@ def _text_count(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: bo
     return {"status": "ok", "detail": None, **_sheet_rules(pdf_bytes, row, per_page)}
 
 
+RING_HOW_LT = "pagal ženklo žiedą ir jo atšakas brėžinio linijose"
+
+
+def _ring_count(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: bool) -> dict | None:
+    """A black glyph that is ONE ring with arms (objektas_h's switches) counted from the paths — the ring's size,
+    the number of its arms and whether two stand opposite (vector_symbols `ring_arm_*`, B2-A (c)): the shape
+    search scores the four switch rows alike and cannot tell them apart. None when the glyph is no ring with
+    arms, or a sheet holds more objects than the reader takes — the shape search counts it then, as before.
+    Nothing in a legend, a table or the title block; on a sheet with a plan zone, nothing outside the plan
+    (objektas_h p3's switch-height detail draws a door handle: a ring with one arm)."""
+    from extractor.sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones, zone_at
+    from extractor.vector_symbols import ZONE_KINDS_WITHOUT_MARKS, ring_arm_instances, ring_arm_template
+    tpl = ring_arm_template(pdf_bytes, row["page"], row["glyph_bbox_pct"])
+    if not tpl:
+        return None
+    first, rest = _pages_for(pdf_bytes, row, wanted, other_sheets)
+    if not first:
+        first, rest = rest, []
+    per_page: dict[int, list[dict]] = {}
+    listed: list[dict] = []
+    own = [row["glyph_bbox_pct"]] + ([row["legend_bbox_pct"]] if row.get("legend_bbox_pct") else [])
+
+    def read(seq: list[int]) -> bool:
+        for p in seq:
+            found, complete = ring_arm_instances(pdf_bytes, p, tpl)
+            if not complete:
+                return False
+            zones = read_zones(pdf_bytes, p, table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
+            plans = [z["bbox_pct"] for z in zones if z.get("kind") == "planas"]
+            keep = []
+            for i in found:
+                x, y = i["x_pct"], i["y_pct"]
+                if p == row["page"] and any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in own):
+                    continue
+                z = zone_at(zones, x, y)
+                zona = (str(z.get("kind")) if z is not None and z.get("kind") in ZONE_KINDS_WITHOUT_MARKS
+                        else "kita" if plans and not any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in plans)
+                        else None)
+                if zona:
+                    listed.append({"page": p, "x_pct": x, "y_pct": y, "zona": zona})
+                    continue
+                keep.append(i)
+            per_page[p] = keep
+        return True
+    if not read(first):
+        return None
+    if rest and (other_sheets or not any(per_page.values())) and not read(rest):
+        return None
+    return {"status": "ok", "detail": None, "uz_zonu": listed[:200], "kaip_lt": RING_HOW_LT,
+            **_sheet_rules(pdf_bytes, row, per_page)}
+
+
 def _pages_word(pages: list[int]) -> str:
     return ("lape " if len(pages) == 1 else "lapuose ") + ", ".join(str(p) for p in pages)
 
@@ -458,6 +510,7 @@ def sentence_lt(row: dict, ans: dict) -> str:
     how = {"vektoriai": "pagal ženklo spalvą ir formą brėžinyje",
            "rastras": "pagal ženklo formą — peržiūrėkite kiekvieną vietą, forma gali sutapti ir su kitu ženklu",
            "tekstas": f"pagal ženklą „{(row.get('glyph_text') or '').strip()}“ tekste"}.get(ans.get("saltinis"), "")
+    how = ans.get("kaip_lt") or how
     if ans["count"]:
         s = f"„{name}“: rasta {ans['count']} vnt. ({'; '.join(parts)}) {how}."
     else:
@@ -543,6 +596,14 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
                           "kiti": [{**i, "score": None, "saltinis": "tekstas"} for i in got["kiti"]]}
             answers[k]["count"] = len(answers[k]["instances"])
             continue
+        if r["glyph_kind"] == "juodas":
+            ring = _ring_count(pdf_bytes, r, wanted, bool(body.other_sheets))
+            if ring is not None:                           # a ring with arms: counted from the paths (B2-A (c))
+                answers[k] = {**base, **ring, "saltinis": "vektoriai",
+                              "instances": [{**i, "score": None, "saltinis": "vektoriai"} for i in ring["instances"]],
+                              "kiti": [{**i, "score": None, "saltinis": "vektoriai"} for i in ring["kiti"]]}
+                answers[k]["count"] = len(answers[k]["instances"])
+                continue
         if remaining <= 0:
             answers[k] = {**base, "partial": True, "pages_not_read": wanted, "saltinis": "rastras"}
             continue

@@ -7,11 +7,14 @@ no model call.
     (a real space is ≈ 0,3 line heights; a split letter touches its word, 0,0 pt) and a NAME follows — a height
     label „H 0.3m" or a Lithuanian one-letter word „Į sieną" is not a legend row either.
 (b) A text-glyph row counted by its character must not count that character inside a word: PDFium's
-    whole-word search answers „Ž" inside the same split „UŽSAKOVAS" — every sheet's title block was a hit.
+    whole-word search answers „Ž" inside the same split „UŽSAKOVAS" — every sheet's title block was a hit; and a
+    coloured hairline (a material sample's dimension line) as the glyph made every line of its colour an instance.
+(c) Black switches drawn as ONE ring told apart by their arms (objektas_h p3): counted from the paths.
 """
 from __future__ import annotations
 
 import io
+import math
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -160,3 +163,94 @@ def test_a_double_line_glyph_still_counts_its_pairs():
     pdf = _dimension_sheet(twin=True)
     got = vs.count_glyph_instances(pdf, _row(pdf), zones=False)
     assert got["status"] == "ok" and got["count"] >= 8        # the pairs drawn 0,6–5 × the legend's length
+
+
+# ── (c) black switches: one ring, told apart by its arms ─────────────────────────────────────────────────────
+
+RING_D = 4.92                                              # objektas_h p3's ring (points)
+SWITCHES = [("Viengubas jungiklis", [312]), ("Viengubas perjungėjas", [133, 313]),
+            ("Dvigubas jungiklis", [226, 311]), ("Dvigubas perjungėjas", [49, 132, 227, 313])]
+
+
+def _switch(c, cx: float, cy: float, angles, turn: float = 0.0) -> None:
+    """A ring (display point centre) and its arms: a stalk out of the ring and a short bar across its end."""
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(0.4)
+    r = RING_D / 2
+    c.circle(cx, H - cy, r - 0.2, stroke=1, fill=0)
+    for a in angles:
+        t = math.radians(a + turn)
+        x0, y0 = cx + r * math.cos(t), cy + r * math.sin(t)
+        x1, y1 = cx + (r + 2.6) * math.cos(t), cy + (r + 2.6) * math.sin(t)
+        bx, by = 1.0 * math.cos(t + math.pi / 2), 1.0 * math.sin(t + math.pi / 2)
+        p = c.beginPath()
+        p.moveTo(x0, H - y0)
+        p.lineTo(x1, H - y1)
+        p.lineTo(x1 + bx, H - (y1 + by))
+        c.drawPath(p, stroke=1, fill=0)
+
+
+def _switch_sheet() -> tuple[bytes, dict[str, int]]:
+    """A legend of the four switch rows and a plan: each kind several times, turned, one pair stacked ring on
+    ring the way objektas_h stacks them, and plain rings (sockets) with no arm."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont(LT_FONT, 6)
+    c.drawString(60, H - 90, "SUTARTINIAI ŽYMĖJIMAI:")
+    for i, (text, angles) in enumerate(SWITCHES):
+        cy = 105.0 + 14 * i
+        _switch(c, 66, cy, angles)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(80, H - cy - 2, text)
+    plan = {"Viengubas jungiklis": [(300, 300, 0), (360, 320, 90), (420, 340, 200)],
+            "Viengubas perjungėjas": [(300, 420, 30), (380, 450, 270)],
+            "Dvigubas jungiklis": [(300, 520, 0), (300, 525.4, 180), (450, 560, 120), (480, 600, 300)],
+            "Dvigubas perjungėjas": [(420, 480, 15)]}
+    angles_of = dict(SWITCHES)
+    for text, places in plan.items():
+        for x, y, turn in places:
+            _switch(c, x, y, angles_of[text], turn)
+    for x, y in ((250, 650), (320, 660)):                  # sockets: a ring of the same size, no arm
+        _switch(c, x, y, [])
+    c.showPage()
+    c.save()
+    return buf.getvalue(), {k: len(v) for k, v in plan.items()}
+
+
+def test_switch_rows_are_told_apart_by_their_arms():
+    from api.legend_count import _ring_count
+    from extractor import vector_symbols as vs
+    pdf, truth = _switch_sheet()
+    res = lr.split_legend_rows(pdf, 1, [0.08, 0.09, 0.45, 0.2])
+    rows = {r["text"]: r for r in res["rows"]}
+    assert set(rows) == set(truth) and all(r["glyph_kind"] == "juodas" for r in rows.values())
+    sigs = {t: vs.ring_arm_template(pdf, 1, r["glyph_bbox_pct"])["signature"] for t, r in rows.items()}
+    assert sigs == {"Viengubas jungiklis": (1, None), "Viengubas perjungėjas": (2, True),
+                    "Dvigubas jungiklis": (2, False), "Dvigubas perjungėjas": (4, None)}
+    for text, r in rows.items():
+        got = _ring_count(pdf, {**r, "legend_bbox_pct": None}, [1], False)
+        assert got is not None and len(got["instances"]) == truth[text], text
+
+
+def test_a_black_glyph_that_is_no_ring_with_arms_keeps_the_shape_search():
+    from api.legend_count import _ring_count
+    from extractor import vector_symbols as vs
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFont(LT_FONT, 6)
+    c.drawString(60, H - 90, "SUTARTINIAI ŽYMĖJIMAI:")
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(0.4)
+    c.line(62, H - 103, 70, H - 111)                      # a black cross
+    c.line(62, H - 111, 70, H - 103)
+    c.drawString(80, H - 109, "Kryžius")
+    c.circle(66, H - 121, 2.3, stroke=1, fill=0)           # a ring with no arm (a socket)
+    c.drawString(80, H - 123, "Rozetė")
+    c.showPage()
+    c.save()
+    pdf = buf.getvalue()
+    res = lr.split_legend_rows(pdf, 1, [0.08, 0.09, 0.45, 0.17])
+    assert {r["text"] for r in res["rows"]} == {"Kryžius", "Rozetė"}
+    for r in res["rows"]:
+        assert vs.ring_arm_template(pdf, 1, r["glyph_bbox_pct"]) is None
+        assert _ring_count(pdf, {**r, "legend_bbox_pct": None}, [1], False) is None
