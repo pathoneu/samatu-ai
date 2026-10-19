@@ -4116,6 +4116,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
         ])
+        # v3 W5-E E3, flag SAMATU_NICHE_DEPTH (default off → nothing): with a typed niche depth for every
+        # niche room, the two finishing rows are billed in m² = Σ m × gylis × 3 (CLAUDE.md §1.5)
+        from . import niche_depth as _niche
+        if _niche.enabled():
+            _na = _niche.niche_area(rooms, parsed.get("_overrides"), lambda r: r.get("nisu_metrai"))
+            if _na:
+                for _p in pozicijos[-2:]:
+                    _p["vnt"], _p["kiekis"] = "m2", _na[0]
+                    _why = ("Nišų vidus (viršus ir du šonai): " + "; ".join(_na[1])
+                            + f" — iš viso {lt_num(_na[0])} m².")
+                    _p["_confidence_reason"] = " ".join(x for x in (_p.get("_confidence_reason"), _why) if x)
     # 2026-10-06: rooms where no niche length was read and the room-type estimate
     # waits for his answer — one blank row naming them with the estimate for each
     # (niche_inference.LED_ESTIMATE_OPT_IN). Emitted with or without read metres.
