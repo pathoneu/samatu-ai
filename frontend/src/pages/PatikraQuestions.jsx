@@ -22,12 +22,13 @@ import { useNavigate, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check, CircleHelp, Loader2, MinusCircle, PenLine } from 'lucide-react';
 
-import { getProject, logCorrection, refreshProjectFromBackend } from '@/lib/projectStore';
+import { toast } from 'sonner';
+import { flushProjectSaves, getProject, logCorrection, refreshProjectFromBackend, updateProject } from '@/lib/projectStore';
 import { questionCorrection, questionVerdict } from '@/lib/learningEvents';
 import { useProjectFixes } from '@/lib/useProjectFixes';
 import {
   answerSummary, doorsAnswer, floorAnswer, heightAnswer, nextOpenQuestion, numbersAnswer, openingsAnswer, progressOf,
-  questionAfterAnswer, wallsAnswer,
+  questionAfterAnswer, tableDecisionAnswer, wallsAnswer,
 } from '@/lib/questions';
 import { fetchQuestions } from '@/lib/questionsApi';
 import { fetchRoomFacts, saveAssumptionEdit, saveRoomEdit } from '@/lib/roomSheetApi';
@@ -47,13 +48,13 @@ import RemindersNotice from '@/components/project/RemindersNotice';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
 import {
-  ChoicesBody, NumberAllBody, NumbersBody, OpeningsBody, OutlineBody, Q_PLAIN, Q_PRIMARY,
+  ChoicesBody, InfoBody, NumberAllBody, NumbersBody, OpeningsBody, OutlineBody, Q_PLAIN, Q_PRIMARY, ReconcileBody,
 } from '@/components/questions/QuestionBodies';
 
 // which of the room's facts a question is about — what the drawing lights up
 const FACT_OF = {
   aukstis: 'aukstis', konturas: 'perimetras', erdve: 'perimetras', perimetras: 'perimetras', plotas: 'plotas',
-  angos: 'angos', grindys: 'grindys', apdaila: 'apdaila',
+  angos: 'angos', grindys: 'grindys', apdaila: 'apdaila', lentele_apdaila: 'grindys',
 };
 const WITH_DRAWING = new Set(['outline', 'split', 'numbers', 'choices', 'openings']);
 // questions whose evidence is on ANOTHER sheet than the room's outline (the floor plan, the area label): the
@@ -233,9 +234,43 @@ export default function PatikraQuestions() {
     answer(current, built && { ...built, typed: true, value: Number(value) }, (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { how: 'own' } });
   }, [current, outlineItem, project, answer]);
 
+  // A schedule question (v3 W3-A kinds; bodies since W2-B): his record in `_lenteliu_sprendimai`, the estimate is not
+  // changed by it — saved on the project, the list asked for again, „Atšaukti" in the toast puts the old record back.
+  const saveTableDecision = (question, built, payload) => run(async () => {
+    if (!built) return;
+    pilot('question_answer', { kind: 'question', id: question.kind });
+    standAfter.current = { id: question.id, index: Math.max(0, questions.findIndex((q) => q.id === question.id)) };
+    const updated = updateProject(id, { _lenteliu_sprendimai: built.decisions });
+    if (updated) setProject(updated);
+    await flushProjectSaves();
+    remember(question, payload, question.answer === 'info' || built.value === question.proposed ? 'accepted' : 'own', []);
+    setAnswered((n) => n + 1);
+    toast.success(answerSummary(question, built, t), {
+      duration: 10_000,
+      action: {
+        label: 'Atšaukti',
+        onClick: async () => {
+          const back = updateProject(id, { _lenteliu_sprendimai: built.previous });
+          if (back) setProject(back);
+          await flushProjectSaves();
+          setAnswered((n) => Math.max(0, n - 1));
+          standAfter.current = { id: question.id, index: 0 };
+          toast(t('project.questions.tableUndone'));
+          loadQuestions();
+        },
+      },
+    });
+    await loadQuestions();
+  });
+  const showTable = host?.onRevealEvidence ? (where) => host.onRevealEvidence(where) : null;
+
   const onBodyAnswer = (payload) => {
     const q = current;
     if (!q) return;
+    if (q.answer === 'reconcile' || q.answer === 'info') {
+      saveTableDecision(q, tableDecisionAnswer(project, q, q.answer === 'info' ? 'matyta' : (payload.value ?? q.proposed)), payload);
+      return;
+    }
     if (q.answer === 'number_all') {
       answer(q, heightAnswer(project, q.items, payload.value, payload.perRoom),
         (a) => saveAssumptionEdit(project, 'lubu_auksciai', a.table), { learn: { payload } });
@@ -574,7 +609,9 @@ export default function PatikraQuestions() {
                 <div className="mt-4">
                   {current.answer === 'number_all' && <NumberAllBody question={current} busy={busy} onAnswer={onBodyAnswer} />}
                   {current.answer === 'numbers' && <NumbersBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} />}
-                  {current.answer === 'choices' && <ChoicesBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} />}
+                  {current.answer === 'choices' && <ChoicesBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
+                  {current.answer === 'reconcile' && <ReconcileBody question={current} busy={busy} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
+                  {current.answer === 'info' && <InfoBody question={current} busy={busy} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
                   {current.answer === 'openings' && <OpeningsBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onOpenRoom={openRoom} />}
 
                   {current.answer === 'outline' && !join && (
