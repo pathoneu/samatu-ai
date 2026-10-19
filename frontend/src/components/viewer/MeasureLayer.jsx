@@ -11,7 +11,8 @@ import {
   pointInPolygon,
   polygonCentroid,
 } from '@/lib/polygonGeometry.js';
-import { pickSnap } from '@/lib/drawingSnap.js';
+import { alignGuide, pickSnap } from '@/lib/drawingSnap.js';
+import { cursorForMode } from '@/lib/cursors.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
 import { boxMode, marksInBox } from '@/lib/editGestures.js';
 import { flashCursorHint } from '@/lib/cursorHints.js';
@@ -33,6 +34,10 @@ const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
 
 // Pixel tolerance (screen px) for vertex/edge snap, poly-close, and select hit-testing.
 const SNAP_TOL_PX = 8;
+// Ctrl (⌘) held: the pointer jumps to the nearest snap target this far away (W5-A A6 [#106]).
+const JUMP_TOL_PX = 48;
+// An alignment guide catches within this many screen px of a vertex's x or y (A6 [#56]).
+const ALIGN_TOL_PX = 5;
 
 const EMPTY_DRAFT = { points: [], committed: false };
 
@@ -80,6 +85,8 @@ export default function MeasureLayer({
   // „Žymėti" box selection (W5-A A5): ({ids, a, b, mode, add}) — a, b the box corners in PDF points, mode
   // 'window' (dragged left→right: whole shapes) or 'crossing' (right→left: touched ones).
   onBoxSelect = null,
+  // The snap under the pointer changed (A6): (kind | null) — the status line names it.
+  onSnapChange = null,
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -93,7 +100,8 @@ export default function MeasureLayer({
   const setCalibA = onCalibAChange || setLocalCalibA;
   const [cursor, setCursor] = useState(null);   // snapped PDF point under the pointer
   const [snapPt, setSnapPt] = useState(null);    // PDF point where a snap fired (for the indicator dot)
-  const [snapKind, setSnapKind] = useState(null); // drawing-vertex | drawing-edge | measure-vertex | measure-edge
+  const [snapKind, setSnapKind] = useState(null); // a key of drawingSnap.SNAP_KIND_TEXT
+  const [guides, setGuides] = useState([]);        // alignment guides [{from, axis}] (A6)
   const [lasso, setLasso] = useState(null);       // {px: [{x, y}], add} while a lasso is being drawn
   const [box, setBox] = useState(null);           // {from, to (px), add} while a „Žymėti" box is dragged (A5)
   // Right-click while drawing (v3 W1-B B5, Kreo „Create / Reset"): „Baigti" / „Atšaukti" at the pointer.
@@ -102,6 +110,12 @@ export default function MeasureLayer({
     () => new Set(Array.isArray(selectedIds) ? selectedIds : (selectedId != null ? [selectedId] : [])),
     [selectedIds, selectedId],
   );
+
+  // The status line names the snap (A6): told when it changes, and cleared when this layer stops snapping.
+  const onSnapChangeRef = useRef(onSnapChange);
+  onSnapChangeRef.current = onSnapChange;
+  useEffect(() => { onSnapChangeRef.current?.(snapKind); }, [snapKind]);
+  useEffect(() => () => onSnapChangeRef.current?.(null), []);
 
   // Reset the draft whenever the active tool changes. In controlled mode the
   // OWNER resets (this component re-mounts on every scroll-back, and resetting
@@ -138,10 +152,12 @@ export default function MeasureLayer({
   // Order (lib/drawingSnap.pickSnap): a wall corner of the drawing, a measurement vertex, a wall face,
   // a measurement edge — the drawing wins because it is what the person is measuring.
   const applySnap = useCallback((raw, e) => {
-    const tol = SNAP_TOL_PX / (adapter?.scale || 1);
+    const jump = !!(e && (e.ctrlKey || e.metaKey));
+    const tol = (jump ? JUMP_TOL_PX : SNAP_TOL_PX) / (adapter?.scale || 1);
     let point = raw;
     let snapped = false;
     let snapKind = null;
+    let guideList = [];
 
     if (snapEnabled && (drawingSnapPolygons.length || snapPolygons.length)) {
       const hit = pickSnap(raw, { drawing: drawingSnapPolygons, measurements: snapPolygons }, tol);
@@ -150,6 +166,12 @@ export default function MeasureLayer({
         snapped = true;
         snapKind = hit.kind;
       }
+    }
+    // Nothing to snap to: line up with a point already placed (this drawing's corners, his measurements' points).
+    if (!snapped && snapEnabled && (POLY_TOOLS.has(tool) || tool === 'calibrate')) {
+      const vertices = [...draft.points, ...snapPolygons.flatMap((p) => p.points)];
+      const g = alignGuide(raw, vertices, ALIGN_TOL_PX / (adapter?.scale || 1));
+      if (g) { point = g.point; snapped = true; snapKind = 'align'; guideList = g.guides; }
     }
 
     const shiftHeld = !!(e && e.shiftKey);
@@ -161,7 +183,7 @@ export default function MeasureLayer({
       // sub-point rounding is well below drawing precision.
       point = orthoSnap(prev, point, { orthoEnabled: orthoEnabled || shiftHeld, shiftHeld, altHeld });
     }
-    return { point, snapped, snapKind };
+    return { point, snapped, snapKind, guides: guideList };
   }, [adapter?.scale, snapEnabled, snapPolygons, drawingSnapPolygons, orthoEnabled, tool, draft.points]);
 
   // ---- pointer handlers ---------------------------------------------------
@@ -202,10 +224,11 @@ export default function MeasureLayer({
       setCursor(null);
       return;
     }
-    const { point, snapped, snapKind: kind } = applySnap(eventToPdf(e), e);
+    const { point, snapped, snapKind: kind, guides: g } = applySnap(eventToPdf(e), e);
     setCursor(point);
     setSnapPt(snapped ? point : null);
     setSnapKind(snapped ? kind : null);
+    setGuides(g || []);
   }, [tool, applySnap, eventToPdf, lasso, box, localPx]);
 
   const handlePointerDown = useCallback((e) => {
@@ -413,13 +436,13 @@ export default function MeasureLayer({
         position: 'absolute',
         inset: 0,
         pointerEvents: tool === 'pan' ? 'none' : 'auto',
-        cursor: tool === 'select' ? 'default' : 'crosshair',
+        cursor: cursorForMode(tool),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={() => { setLasso(null); setBox(null); }}
-      onPointerLeave={() => setCursor(null)}
+      onPointerLeave={() => { setCursor(null); setSnapPt(null); setSnapKind(null); setGuides([]); }}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
@@ -470,6 +493,10 @@ export default function MeasureLayer({
           </g>
         );
       })()}
+      {cursor && guides.map((g, i) => {
+        const a = adapter.toViewport(g.from); const b = adapter.toViewport(cursor);
+        return <line key={`guide${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={paint({ stroke: EDITING })} strokeWidth={1} strokeDasharray={DASH} pointerEvents="none" data-align-guide={g.axis} />;
+      })}
       {lasso && lasso.px.length > 1 && (
         <polygon
           points={lasso.px.map((p) => `${p.x},${p.y}`).join(' ')}
@@ -751,19 +778,29 @@ function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) 
 
 function SnapDot({ p, kind = null }) {
   // One colour for every snap mark (the tool-at-work orange) — the SHAPE says what the click will land
-  // on: a wall corner of the DRAWING is a square, a wall face a diamond, his own measurement a circle.
+  // on: a wall corner of the DRAWING is a square, a wall face a diamond, his own measurement a circle,
+  // a middle a triangle, where two lines cross an ×, a point in line with another a small plus (W5-A A6).
+  if (kind === 'drawing-midpoint' || kind === 'measure-midpoint') {
+    return <path d={`M ${p.x} ${p.y - 6} L ${p.x + 6} ${p.y + 5} L ${p.x - 6} ${p.y + 5} Z`} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
+  if (kind === 'intersection') {
+    return <path d={`M ${p.x - 5} ${p.y - 5} L ${p.x + 5} ${p.y + 5} M ${p.x + 5} ${p.y - 5} L ${p.x - 5} ${p.y + 5}`} style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
+  if (kind === 'align') {
+    return <path d={`M ${p.x - 4} ${p.y} L ${p.x + 4} ${p.y} M ${p.x} ${p.y - 4} L ${p.x} ${p.y + 4}`} style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind} />;
+  }
   if (kind === 'drawing-vertex' || kind === 'drawing-edge') {
     const r = kind === 'drawing-vertex' ? 6 : 5;
     return (
       <rect
         x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
-        fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none"
+        fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind}
         transform={kind === 'drawing-edge' ? `rotate(45 ${p.x} ${p.y})` : undefined}
       />
     );
   }
   return (
-    <circle cx={p.x} cy={p.y} r={5} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" />
+    <circle cx={p.x} cy={p.y} r={5} fill="none" style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX} pointerEvents="none" data-snap={kind || 'measure'} />
   );
 }
 

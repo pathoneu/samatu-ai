@@ -37,6 +37,7 @@ import { scaleCheckReadout } from '@/lib/scaleCheck';
 import { visiblePageOf } from '@/lib/visiblePage';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { centreDelta } from '@/lib/checkOverlay';
+import { SNAP_KIND_TEXT } from '@/lib/drawingSnap';
 import { selfIntersects } from '@/lib/polygonGeometry';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { roomAtPoint, nextRoomSelection } from '@/lib/roomHitTest';
@@ -264,7 +265,7 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false, snapKind = null }) {
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -285,7 +286,10 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
   const { status: geometryStatus } = usePageGeometry(projectId, cur, snapsHere);
   // One place per instruction (v3 W1-C): the armed tool's sentence is the pill on the drawing — the status
   // bar no longer repeats it; it keeps the scale sentence and what this sheet snaps to.
-  const snapNote = snapsHere && !symbolHint && !outlineEdit ? (SNAP_NOTE[geometryStatus] || '') : '';
+  // the snap under the pointer is named (W5-A A6); otherwise what this sheet snaps to
+  const snapNote = snapsHere && !symbolHint && !outlineEdit
+    ? (snapKind && SNAP_KIND_TEXT[snapKind] ? `Prilimpa: ${SNAP_KIND_TEXT[snapKind]} · laikykite Ctrl — peršokti iki artimiausio` : (SNAP_NOTE[geometryStatus] || ''))
+    : '';
   return (
     <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
@@ -957,6 +961,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [guideOpen, setGuideOpen] = useState(false);
   // Right-click on a committed mark: { id, clientX, clientY } | null (MeasureContextMenu).
   const [measureMenu, setMeasureMenu] = useState(null);
+  // What the pointer snaps to right now (W5-A A6) — the status line names it.
+  const [snapKind, setSnapKind] = useState(null);
   const menuMeasurement = measureMenu ? measurements.find((m) => m.id === measureMenu.id) || null : null;
   const renameMeasurement = (id, name) => setMeasurements((prev) => prev.map((m) => {
     if (m.id !== id) return m;
@@ -1853,6 +1859,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       }))}
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureBoxSelect={handleBoxSelect}
+                      onMeasureSnapChange={setSnapKind}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}
@@ -2089,6 +2096,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             outlineEdit={outlineEdit}
             projectId={projectId}
             symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
+            snapKind={snapKind}
           />
           <CalibrateDialog
             request={calibRequest}

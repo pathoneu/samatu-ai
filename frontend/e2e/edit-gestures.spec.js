@@ -223,6 +223,29 @@ test.describe('W5-A editing gestures', () => {
     await expect(bar).toContainText('06 + 09');
   });
 
+  test('A6: Ctrl held jumps to the nearest snap; the status line names what the click will land on', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, ...ROOM_06);
+    const seen = new Set();
+    page.on('response', (r) => { const m = /\/pages\/(\d+)\/geometry/.exec(r.url()); if (m && r.ok()) seen.add(Number(m[1])); });
+    await page.keyboard.press('2');
+    await expect.poll(() => seen.has(1), { timeout: 30_000 }).toBe(true);
+    await page.waitForTimeout(500);
+    // a spot in open floor, ~20 px from the nearest wall line at this zoom: no snap without Ctrl
+    const s = await sheet(page);
+    const free = { x: s.x + 0.705 * s.w, y: s.y + 0.405 * s.h };
+    await page.mouse.move(free.x, free.y, { steps: 3 });
+    await page.mouse.move(free.x + 1, free.y + 1);
+    await expect(page.locator('[data-snap^="drawing"]')).toHaveCount(0);
+    await page.keyboard.down('Control');
+    await page.mouse.move(free.x + 2, free.y + 2);
+    await expect(page.locator('[data-snap]')).toHaveCount(1);
+    await expect(page.getByText(/^Prilimpa: /)).toBeVisible();
+    await shot(page, 'w5a-a6-ctrl-jump');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Escape');
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);

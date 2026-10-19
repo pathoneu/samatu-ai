@@ -115,6 +115,8 @@ export default function PageOverlayHost({
   onMeasureSelect = null,
   // „Žymėti" box selection (W5-A A5) → TakeoffViewer.handleBoxSelect.
   onMeasureBoxSelect = null,
+  // The snap under the pointer (W5-A A6) → the status line.
+  onMeasureSnapChange = null,
   onMeasureDelete = null,
   // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
   onMeasureContextMenu = null,
@@ -322,6 +324,7 @@ export default function PageOverlayHost({
             onCalibrate={onMeasureCalibrate}
             onSelect={onMeasureSelect}
             onBoxSelect={onMeasureBoxSelect}
+            onSnapChange={onMeasureSnapChange}
             onDelete={onMeasureDelete}
             selectedIds={selectedMeasureIds}
             draft={measureDraft}
