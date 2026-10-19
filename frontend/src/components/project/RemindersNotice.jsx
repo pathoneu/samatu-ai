@@ -7,12 +7,15 @@
  * row, nothing is added to the estimate. A reminder read from the drawing (a fire rating in the text, a long
  * wall, two outlines over each other) has „Rodyti brėžinyje", which frames that place on the drawing.
  * Nothing is hover-only. The list is read once per project; the server saves nothing.
+ *
+ * B1-D (`folded`, the Sąmata page): ONE line „Priminimai · 6 ▸" that opens in place with every reminder listed.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, MapPin, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import Notice from '@/components/ui/Notice';
+import FoldLine from './FoldLine';
 import { cleanUserText } from '@/lib/userText';
 import { VISIBLE_FIRST, blankRowOf, evidenceTarget, hasBlankRow, remindersFor, remindersWord } from '@/lib/reminders';
 import { fetchReminders } from '@/lib/remindersApi';
@@ -20,6 +23,7 @@ import { useWorkspaceHost } from './workspaceHost';
 
 export default function RemindersNotice({
   projectId, where, onJumpToPage = null, reloadKey = 0, className = '', rows = null, onAddRow = null,
+  folded = false,
 }) {
   const { t } = useTranslation();
   const host = useWorkspaceHost();
@@ -46,9 +50,67 @@ export default function RemindersNotice({
     else onJumpToPage?.(target.page);
   };
   const canReveal = Boolean(host?.onRevealEvidence || onJumpToPage);
-  const shown = expanded ? items : items.slice(0, VISIBLE_FIRST);
+  // folded: opening the line shows them all — no second „Rodyti visus" inside it
+  const shown = expanded || folded ? items : items.slice(0, VISIBLE_FIRST);
   const rest = items.length - VISIBLE_FIRST;
   const tone = items.some((r) => r.tone === 'warning') ? 'warning' : 'info';
+
+  const listNode = (
+    <ul className="space-y-1.5">
+      {shown.map((r) => {
+        const target = canReveal ? evidenceTarget(r) : null;
+        return (
+          <li key={r.id} className="flex items-start gap-2" data-reminder={r.kind}>
+            <span className="shrink-0 text-muted-foreground" aria-hidden="true">·</span>
+            <div className="min-w-0 flex-1">
+              <span className="text-foreground">{cleanUserText(r.sentence)}</span>
+              {onAddRow && blankRowOf(r) && (
+                <button
+                  type="button"
+                  onClick={() => onAddRow(blankRowOf(r))}
+                  className="ml-2 inline-flex items-center gap-1 underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  style={{ color: 'hsl(var(--accent-2))' }}
+                  data-testid="reminder-add-row"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('project.reminders.addBlankRow')}
+                </button>
+              )}
+              {target && (
+                <button
+                  type="button"
+                  onClick={() => reveal(target)}
+                  className="ml-2 inline-flex items-center gap-1 underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  style={{ color: 'hsl(var(--accent-2))' }}
+                >
+                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('project.reminders.reveal', { page: target.page })}
+                </button>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  if (folded) {
+    return (
+      <FoldLine
+        title={t('project.reminders.foldTitle')}
+        summary={String(items.length)}
+        className={className}
+        open={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+        data-testid={`reminders-${where}`}
+      >
+        <div className="space-y-1.5 text-ui">
+          <p className="text-muted-foreground">{t('project.reminders.sub')}</p>
+          {listNode}
+        </div>
+      </FoldLine>
+    );
+  }
 
   return (
     <Notice
@@ -70,42 +132,7 @@ export default function RemindersNotice({
       ) : null}
     >
       <p className="text-muted-foreground">{t('project.reminders.sub')}</p>
-      <ul className="space-y-1.5">
-        {shown.map((r) => {
-          const target = canReveal ? evidenceTarget(r) : null;
-          return (
-            <li key={r.id} className="flex items-start gap-2" data-reminder={r.kind}>
-              <span className="shrink-0 text-muted-foreground" aria-hidden="true">·</span>
-              <div className="min-w-0 flex-1">
-                <span className="text-foreground">{cleanUserText(r.sentence)}</span>
-                {onAddRow && blankRowOf(r) && (
-                  <button
-                    type="button"
-                    onClick={() => onAddRow(blankRowOf(r))}
-                    className="ml-2 inline-flex items-center gap-1 underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{ color: 'hsl(var(--accent-2))' }}
-                    data-testid="reminder-add-row"
-                  >
-                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('project.reminders.addBlankRow')}
-                  </button>
-                )}
-                {target && (
-                  <button
-                    type="button"
-                    onClick={() => reveal(target)}
-                    className="ml-2 inline-flex items-center gap-1 underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{ color: 'hsl(var(--accent-2))' }}
-                  >
-                    <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('project.reminders.reveal', { page: target.page })}
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {listNode}
     </Notice>
   );
 }

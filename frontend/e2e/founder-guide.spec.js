@@ -364,7 +364,7 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await shot(page, '05-room-tools');
   // W1-F F1: „Patalpų suvestinė" (Sąmata) adds the rooms the same way — 05 inside 04, once
   await page.getByTestId('step-samata').click();
-  await page.getByTestId('samata-expand').click();
+  // B1-D: Sąmata opens across the width — the summary line is there without „Išskleisti"
   await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
   note('Sąmata „Patalpų suvestinė": 11 patalpų · 143,27 m²');
 });
@@ -617,7 +617,7 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   const sanity = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '');
   expect(sanity.filter((m) => falseChecks.test(m)), 'no false floor-ratio check after the merge').toEqual([]);
   await page.getByTestId('step-samata').click();
-  await page.getByTestId('samata-expand').click();
+  // B1-D: Sąmata opens across the width — the summary line is there without „Išskleisti"
   await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
   await expect(page.getByText(/Lubų plotas 0,80×|Dažomas sienų plotas 1,72×/)).toHaveCount(0);
   note('after 04 + 05: „Patalpos 11 143,27 m²" · „Patalpų suvestinė" 143,27 m² · no 0,80× / 1,72× check');

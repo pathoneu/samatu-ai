@@ -409,6 +409,9 @@
     "bodyCookiesLink": "Slapukų politikoje",
     "bodyAnd": "ir",
     "bodyPrivacyLink": "Privatumo politikoje",
+    "bodyDocked": "Būtinieji slapukai — kad paslauga veiktų; analitiniai ir rinkodaros — tik jums sutikus.",
+    "dockedCookiesLink": "Slapukų politika",
+    "dockedPrivacyLink": "Privatumo politika",
     "catNecessaryTitle": "Būtinieji",
     "catNecessaryBadge": "Visada",
     "catNecessaryDesc": "Prisijungimas, sesija, saugumas ir jūsų slapukų pasirinkimas. Be jų paslauga neveiktų.",
@@ -722,6 +725,7 @@
       "sub": "Tai ne sąmatos eilutės — tik tai, ką verta patikrinti prieš siunčiant.",
       "showAll": "Rodyti visus ({{count}})",
       "collapse": "Suskleisti",
+      "foldTitle": "Priminimai",
       "reveal": "Rodyti brėžinyje ({{page}} lapas)",
       "addBlankRow": "Pridėti tuščią eilutę",
       "rowAdded": "Pridėta eilutė „{{name}}“ — įrašykite kiekį."
@@ -779,7 +783,10 @@
       "planoUzrasasLabel": "užrašyta plane",
       "planoUzrasasTitle": "Plotas užrašytas brėžinyje prie pačios patalpos ir perskaitytas iš PDF teksto. Spauskite → matysite užrašą.",
       "dimensionLabel": "iš dimensijos",
-      "dimensionTitle": "Skaičius iš brėžinio dimensijos."
+      "dimensionTitle": "Skaičius iš brėžinio dimensijos.",
+      "listHeaderHint": "spustelėkite plotą — matysite, iš kur jis",
+      "areaButtonTitle": "Iš kur šis plotas — spustelėkite",
+      "listHeader": {"eksplikacija": "Plotai iš eksplikacijos", "plano_uzrasas": "Plotai užrašyti plane", "manual_polygon": "Plotai iš jūsų kontūrų", "vision": "Plotai perskaityti iš brėžinio", "dimension": "Plotai iš matmenų"}
     },
     "interior": {
       "confHigh": "Nuskaityta tiesiai iš brėžinio",
@@ -1213,6 +1220,7 @@
       "rowMenu": "Daugiau veiksmų su eilute",
       "priceFromKainynasSimilarTitle": "Kainą įrašė kainynas pagal PANAŠIĄ, ne tapačią eilutę — patikrinkite prieš siųsdami užsakovui.",
       "worksAreLabourOnly": "Darbų kainos — be medžiagų; medžiagos kainuojamos atskirai skyriuje „Medžiagos“.",
+      "worksHintLine": "Kainos — be medžiagų (jos skyriuje „Medžiagos“). Spustelėkite kiekį ar kainą ir įrašykite: Enter — kita eilutė, Esc — atsisakyti.",
       "orphanBadge": "senesnė eilutė",
       "orphanTitle": "Senesnė eilutė — perskaičiavimas jos nebeišveda. Kiekis liko senas: peržiūrėkite arba pašalinkite.",
       "orphanRemove": "Šalinti",
@@ -1241,6 +1249,8 @@
       "openLedgerTitle": "Spustelėkite — pamatysite, kaip šis skaičius suskaičiuotas",
       "pricesTitle": "Kainos",
       "pricesNote": "Kiekiai jau paskaičiuoti. Liko įrašyti savo įkainius — arba užpildyti iš kainyno.",
+      "pricesFoldNone": "dar neįrašytos — užpildykite iš kainyno arba įrašykite eilutėse",
+      "pricesFoldSome": "su kaina {{priced}} iš {{count}}",
       "pricesManual": "arba įveskite pats: spustelėkite kainos langelį lentelėje, įrašykite ir spauskite Enter — atsidarys kitos eilutės kaina.",
       "rowSummary_one": "Iš brėžinio — {{count}} eilutė · patikrinta {{verified}}",
       "rowSummary_few": "Iš brėžinio — {{count}} eilutės · patikrinta {{verified}}",

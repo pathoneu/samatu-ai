@@ -409,6 +409,9 @@
     "bodyCookiesLink": "in the Cookie Policy",
     "bodyAnd": "and",
     "bodyPrivacyLink": "in the Privacy Policy",
+    "bodyDocked": "Necessary cookies keep the service working; analytics and marketing only with your consent.",
+    "dockedCookiesLink": "Cookie policy",
+    "dockedPrivacyLink": "Privacy policy",
     "catNecessaryTitle": "Essential",
     "catNecessaryBadge": "Always",
     "catNecessaryDesc": "Login, session, security and your cookie choice. The service wouldn't work without them.",
@@ -685,6 +688,7 @@
       "sub": "These are not estimate rows — only what is worth checking before sending.",
       "showAll": "Show all ({{count}})",
       "collapse": "Collapse",
+      "foldTitle": "Reminders",
       "reveal": "Show on the drawing (sheet {{page}})",
       "addBlankRow": "Add an empty row",
       "rowAdded": "Row “{{name}}” added — enter the quantity."
@@ -741,7 +745,10 @@
       "planoUzrasasLabel": "labelled on plan",
       "planoUzrasasTitle": "The area is written on the drawing next to the room itself and was read from the PDF text. Click → see the label.",
       "dimensionLabel": "from dimension",
-      "dimensionTitle": "The number is from a drawing dimension."
+      "dimensionTitle": "The number is from a drawing dimension.",
+      "listHeaderHint": "click an area to see where it comes from",
+      "areaButtonTitle": "Where this area comes from — click",
+      "listHeader": {"eksplikacija": "Areas from the room schedule", "plano_uzrasas": "Areas written on the plan", "manual_polygon": "Areas from your outlines", "vision": "Areas read from the drawing", "dimension": "Areas from dimensions"}
     },
     "interior": {
       "confHigh": "Read directly from the drawing",
@@ -1161,6 +1168,7 @@
       "priceFromKainynasSimilar": "similar row",
       "priceFromKainynasSimilarTitle": "Filled in from your price list on a SIMILAR, not identical row — check it before sending the quote.",
       "worksAreLabourOnly": "Work prices are labour only; materials are priced separately in the “Medžiagos” section.",
+      "worksHintLine": "Prices are labour only (materials in “Medžiagos”). Click a quantity or price and type: Enter — next row, Esc — cancel.",
       "orphanBadge": "older row",
       "orphanTitle": "An older row — the recalculation no longer produces it. Its quantity is the old one: review it or remove it.",
       "orphanRemove": "Remove",
@@ -1189,6 +1197,8 @@
       "openLedgerTitle": "Click to see how this number was calculated",
       "pricesTitle": "Prices",
       "pricesNote": "The quantities are done. What is left is your rates — typed in, or filled from a price list.",
+      "pricesFoldNone": "not entered yet — fill from a price list or type them in the rows",
+      "pricesFoldSome": "priced {{priced}} of {{count}}",
       "pricesManual": "or type them yourself: click a price cell in the table, type, and press Enter — the next row's price opens.",
       "rowSummary_one": "From the drawing — {{count}} row · {{verified}} checked",
       "rowSummary_other": "From the drawing — {{count}} rows · {{verified}} checked",
