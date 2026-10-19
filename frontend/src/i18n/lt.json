@@ -480,6 +480,34 @@
       "last30dSub": "naujų projektų",
       "last30dSubEmpty": "nėra naujų"
     },
+    "row": {
+      "head": {
+        "name": "Projektas",
+        "state": "Būsena",
+        "lastChange": "Paskutinis pakeitimas",
+        "totals": "Suma ir kiekiai"
+      },
+      "state": {
+        "processing": "Skaičiuojama — projektas atsiras pats",
+        "error": "Brėžinio perskaityti nepavyko",
+        "check_one": "Liko patikrinti {{count}} kambarį",
+        "check_few": "Liko patikrinti {{count}} kambarius",
+        "check_other": "Liko patikrinti {{count}} kambarių",
+        "prices_one": "Liko įrašyti {{count}} eilutės kainą",
+        "prices_few": "Liko įrašyti {{count}} eilučių kainas",
+        "prices_other": "Liko įrašyti {{count}} eilučių kainas",
+        "ready": "Sąmata paruošta siųsti"
+      },
+      "next": {
+        "check": "Tęsti patikrą",
+        "prices": "Įrašyti kainas",
+        "send": "Siųsti",
+        "newUpload": "Įkelti iš naujo"
+      },
+      "gross": "{{sum}} € su PVM",
+      "counts": "{{rooms}} pat. · {{rows}} eil.",
+      "lastChangeTitle": "Kada projektas paskutinį kartą pakeistas"
+    },
     "card": {
       "untitled": "Be pavadinimo",
       "statusReady": "Paruošta",
