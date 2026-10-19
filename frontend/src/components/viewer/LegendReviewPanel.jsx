@@ -18,7 +18,7 @@ import { BLANK_REASON, createLabel, keptInstances, perPage, perPageText, rowName
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border px-2.5 text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 const PLAIN = `${BTN} border-border bg-card hover:bg-muted`;
-const ON = `${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-[hsl(var(--accent-2))]`;
+const ON = `${BTN} border-accent-2 bg-accent-2/10 text-accent-2`;
 
 const crop = (url) => (url ? `${API_BASE}${url}` : null);
 
@@ -65,7 +65,7 @@ function Row({ row, count, review, removed, projectId, legend, onPage, onMeasure
               {kept.length} vnt. · {perPageText(perPage(kept))}
             </p>
           )}
-          <p className="mt-1 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{count?.sentence_lt || row.reason_lt || ''}</p>
+          <p className="mt-1 text-[14px] leading-snug text-ink-2">{count?.sentence_lt || row.reason_lt || ''}</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ function Row({ row, count, review, removed, projectId, legend, onPage, onMeasure
       )}
 
       {keep && !sample && kept.length === 0 && (
-        <p className="mt-2 rounded-[2px] border border-[hsl(var(--conf-med)/0.5)] bg-[hsl(var(--conf-med)/0.08)] px-2 py-1.5 text-[14px] leading-snug" data-testid="legend-row-blank">
+        <p className="mt-2 rounded-[2px] border border-conf-med/50 bg-conf-med/[0.08] px-2 py-1.5 text-[14px] leading-snug" data-testid="legend-row-blank">
           Sąmatoje bus tuščia eilutė: {BLANK_REASON}.
         </p>
       )}
@@ -188,13 +188,13 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {legend.phase === 'proposed' && (
-          <p className="px-3 py-3 text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+          <p className="px-3 py-3 text-[14px] leading-snug text-ink-2">
             Brėžinyje brūkšniniu rėmeliu pažymėjau, kur, mano manymu, yra legenda. Jei tai ji — spauskite „Taip“ apačioje
             arba spustelėkite rėmelį; jei ne — tempdami apveskite tikrąją.
           </p>
         )}
         {legend.phase === 'box' && (
-          <p className="px-3 py-3 text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+          <p className="px-3 py-3 text-[14px] leading-snug text-ink-2">
             {legend.notice ? `${legend.notice}. ` : ''}Tempdami apveskite legendą brėžinyje — ženklus kartu su jų pavadinimais.
           </p>
         )}
@@ -225,12 +225,12 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           </Notice>
         )}
         {legend.phase === 'review' && legend.reuse?.applied && (
-          <p className="mx-3 mt-3 text-[14px] text-[hsl(var(--ink-2))]">Pritaikyta ankstesnė legenda — patikrinkite eilutes.</p>
+          <p className="mx-3 mt-3 text-[14px] text-ink-2">Pritaikyta ankstesnė legenda — patikrinkite eilutes.</p>
         )}
 
         {/* nothing read in the box: what to do next (C9, #133) */}
         {legend.phase === 'review' && (legend.rows || []).length === 0 && (
-          <p className="px-3 py-3 text-[14px] leading-snug text-[hsl(var(--ink-2))]" data-testid="legend-empty">
+          <p className="px-3 py-3 text-[14px] leading-snug text-ink-2" data-testid="legend-empty">
             Šiame rėmelyje legendos eilučių neradau. Apveskite kitą vietą — ženklus kartu su jų pavadinimais — arba
             skaičiuokite patys įrankiu „Kiekis“ kairėje.
           </p>
@@ -276,7 +276,7 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
             type="button"
             disabled={!(n || blanks) || legend.phase === 'creating'}
             onClick={legend.create}
-            className={`${BTN} min-h-[44px] w-full justify-center border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-[15px] font-semibold text-white hover:opacity-95`}
+            className={`${BTN} min-h-[44px] w-full justify-center border-accent-2 bg-accent-2 text-[15px] font-semibold text-white hover:opacity-95`}
             data-testid="legend-create"
           >
             {legend.phase === 'creating' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}

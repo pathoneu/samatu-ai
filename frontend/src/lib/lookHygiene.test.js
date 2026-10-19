@@ -15,7 +15,6 @@ const PENDING = new Set([
   'components/viewer/TakeoffViewer.jsx',
   'components/viewer/CountLegendPanel.jsx',
   'components/viewer/SymbolReviewPanel.jsx',
-  'components/viewer/LegendReviewPanel.jsx',
 ]);
 
 function walk(dir, acc = []) {
