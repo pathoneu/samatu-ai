@@ -71,8 +71,9 @@ import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
 import VertexPopover from './VertexPopover';
 import CountTypePicker from './CountTypePicker';
+import OpeningPopover from './OpeningPopover';
 import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms } from '@/lib/editGestures';
-import { openingForEdge, addEdgeOpening, openingText } from '@/lib/openingEdit';
+import { openingForEdge, addEdgeOpening, openingText, openingAt, openingState, applyOpeningEdit } from '@/lib/openingEdit';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
 import { historyReducer, initHistory, describeChange } from '@/lib/measureHistory';
 import SymbolReviewPanel, { useSymbolSearch, SYMBOL_HINTS } from './SymbolReviewPanel';
@@ -764,6 +765,20 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       minPoints: minPointsOf(m.kind),
     });
   };
+  // An opening being edited on the drawing (A9): {o, nr, state, x, y} | null.
+  const [openingEdit, setOpeningEdit] = useState(null);
+  const saveOpeningEdit = async ({ kind, plotisMm }) => {
+    const ed = openingEdit;
+    setOpeningEdit(null);
+    if (!ed || !onRoomOpenings) return;
+    try {
+      const saved = await onRoomOpenings(ed.nr, (el) => applyOpeningEdit(el, ed.o, { kind, plotisMm }));
+      if (!saved) { toast.info('Anga nepasikeitė'); return; }
+      toast.success(`Patalpa ${ed.nr}: ${openingText(kind, plotisMm).toLowerCase()}`, { description: 'Kiekiai perskaičiuojami.', ...undoAction(saved) });
+    } catch (e) {
+      toast.error(e?.message || 'Angos išsaugoti nepavyko');
+    }
+  };
   // The corner / edge pop-up (A2): {kind, index, t?, x, y} | null.
   const [vertexMenu, setVertexMenu] = useState(null);
   // Undo: every drag / insert / delete snapshots the ring first (OutlineEditLayer.onGestureStart);
@@ -1345,6 +1360,16 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         } else {
           const tol = MEASURE_HIT_TOL_PX / (Number(pt.scale) > 0 ? Number(pt.scale) : 1);
           const onMark = measureTool === 'select' && hitTestMeasurement({ x: pt.x, y: pt.y }, measurements, pt.pageIndex + 1, tol);
+          // an opening on the walls layer (W5-A A9): its pop-up, not a room click
+          const where = !onMark && wallsLayerVisible && onRoomOpenings ? displayPointOf(pt) : null;
+          const opening = where ? openingAt(rooms, where.page, [where.x_pct, where.y_pct], {
+            w: pt.renderedWidth, h: pt.renderedHeight, preferNr: focusedRoomNr,
+          }) : null;
+          if (opening) {
+            const room = (rooms || []).find((r) => String(r?.nr) === opening.nr);
+            setOpeningEdit({ o: opening, nr: opening.nr, state: openingState(room, opening), x: pt.clientX ?? 400, y: pt.clientY ?? 300 });
+            return;
+          }
           if (!onMark) selectRoomAt(pt);
         }
         if (measureTool == null) onPagePoint?.(pt);
@@ -2154,6 +2179,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onClose={() => setCalibRequest(null)}
           />
           <ShortcutsGuide open={guideOpen} onOpenChange={setGuideOpen} />
+          <OpeningPopover key={openingEdit ? `${openingEdit.nr}-${openingEdit.o.k}` : 'none'} target={openingEdit} onSave={saveOpeningEdit} onClose={() => setOpeningEdit(null)} />
           <CountTypePicker
             at={measureTool === 'count' ? countPicker : null}
             countTypes={countTypes}

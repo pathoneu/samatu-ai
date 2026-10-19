@@ -48,6 +48,8 @@ function PageClicks({ documentId, pageIndex, pageWidth, pageHeight, pageRotation
     onClick: (pos, evt) => onPagePoint?.({
       pageIndex, x: pos.x, y: pos.y, pageWidth, pageHeight, pageRotation,
       shiftKey: !!evt?.shiftKey, scale, renderedWidth, renderedHeight,
+      // where on screen (W5-A A9: a pop-up opens beside the click)
+      clientX: evt?.clientX ?? null, clientY: evt?.clientY ?? null,
     }),
   }), [register, pageIndex, pageWidth, pageHeight, pageRotation, onPagePoint, scale, renderedWidth, renderedHeight]);
   return null;

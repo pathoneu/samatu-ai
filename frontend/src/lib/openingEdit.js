@@ -30,7 +30,8 @@ export function openingsOnPage(rooms, page) {
     if (!a || Number(a.page) !== Number(page) || !Array.isArray(a.angos)) continue;
     a.angos.forEach((g, k) => {
       if (!Array.isArray(g?.line_pct) || g.line_pct.length !== 2) return;
-      out.push({ nr: String(r.nr), k, i: g.i != null ? String(g.i) : null, line: g.line_pct, plotisM: Number(g.plotis_m) || null, nupiesta: g.nupiesta || null });
+      out.push({ nr: String(r.nr), k, i: g.i != null ? String(g.i) : null, line: g.line_pct, plotisM: Number(g.plotis_m) || null, nupiesta: g.nupiesta || null,
+        linked: linkedEntry(r.elementai, k) >= 0 });
     });
   }
   return out;
@@ -53,11 +54,13 @@ export function openingAt(rooms, page, pt, { tolPx = 8, w = 1000, h = 1000, pref
     if (nr != null && o.nr !== String(nr)) continue;
     const d = segDist(pt, o.line, w, h);
     if (d > tolPx) continue;
-    const score = d - (preferNr != null && o.nr === String(preferNr) ? 0.5 : 0);
+    // one door read from both rooms draws two marks on one line: the focused room's wins, then the side whose
+    // doors list it (the other side counts nothing there — mark_shared_doors)
+    const score = d - (preferNr != null && o.nr === String(preferNr) ? 0.5 : 0) - (o.linked ? 0.25 : 0);
     if (!best || score < best.score) best = { ...o, score };
   }
   if (!best) return null;
-  const { score: _s, ...o } = best;
+  const { score: _s, linked: _l, ...o } = best;
   return o;
 }
 

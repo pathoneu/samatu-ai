@@ -324,6 +324,42 @@ test.describe('W5-A editing gestures', () => {
     }
   });
 
+  test('A9: walls layer on, click an opening → width and kind → saved for the room, Atšaukti puts it back', async ({ page }) => {
+    await openProject(page);
+    const { rooms } = await stored(page);
+    // the first room whose wall opening has a door standing in it (an `elementai` entry listing its index)
+    let pick = null;
+    for (const r of Object.values(rooms)) {
+      const angos = r._angos_sienose?.page === 1 ? r._angos_sienose.angos || [] : [];
+      angos.forEach((g, k) => {
+        if (pick || !Array.isArray(g.line_pct)) return;
+        const el = (r.elementai || []).find((e) => Array.isArray(e._anga_ks) && e._anga_ks.length === 1 && Number(e._anga_ks[0]) === k && e.tipas === 'duris');
+        if (el) pick = { nr: String(r.nr), k, g, el };
+      });
+    }
+    expect(pick).toBeTruthy();
+    const [[ax, ay], [bx, by]] = pick.g.line_pct;
+    const mx = (ax + bx) / 2; const my = (ay + by) / 2;
+    await bringIntoView(page, mx, my);
+    await page.keyboard.press('s');
+    await page.waitForTimeout(400);
+    await page.mouse.click(...Object.values(await at(page, mx, my)));
+    const pop = page.getByTestId('opening-popover');
+    await expect(pop).toBeVisible();
+    await expect(page.getByTestId('opening-kind-durys')).toBeChecked();
+    await shot(page, 'w5a-a9-opening-popover');
+    await page.getByTestId('opening-width').fill('1,10');
+    await page.getByTestId('opening-width').press('Enter');
+    const saved = toast(page, 'durys 1,10 m');
+    await expect(saved).toBeVisible({ timeout: 20_000 });
+    const entry = async () => ((await stored(page)).rooms[pick.nr].elementai || [])
+      .find((e) => Array.isArray(e._anga_ks) && e._anga_ks.map(Number).includes(pick.k));
+    await expect.poll(async () => (await entry())?.plotis_mm).toBe(1100);
+    expect((await stored(page)).rooms[pick.nr]._angos_user_at).toBeTruthy();
+    await saved.getByRole('button', { name: 'Atšaukti' }).click();
+    await expect.poll(async () => (await entry())?.plotis_mm).toBe(pick.el.plotis_mm);
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);
