@@ -65,7 +65,7 @@ def corpus(wanted: list[str]):
 
 def _pages(pdf: bytes) -> int:
     import pypdfium2 as pdfium
-    from extractor.pdf_vectors import PDFIUM_LOCK
+    from extractor.pdfium_guard import PDFIUM_LOCK
     with PDFIUM_LOCK:
         doc = pdfium.PdfDocument(pdf)
         n = len(doc)
@@ -114,7 +114,7 @@ def legend_zones(projects: list[str]) -> None:
         rows = []
         for p in range(1, n + 1):
             for leg in lr.suggest_legend_rows(pdf, p)["legends"]:
-                rows.extend(r for r in leg["rows"] if r.get("countable"))
+                rows.extend(r for r in leg["rows"] if r.get("countable") and r.get("glyph_kind") == "spalvotas")
         res = vs.count_glyph_instances_many(pdf, rows, time_budget_s=120.0) if rows else []
         listed = sum(len(a.get("uz_zonu") or []) for a in res)
         print(f"== {code}: {len(rows)} countable rows, {sum(a['count'] for a in res)} instances, "
@@ -125,6 +125,28 @@ def legend_zones(projects: list[str]) -> None:
                 print(f"    p{r['page']} {a['count']:>4} kept, outside the plan: {dict(kinds)}  {_txt(r['text'])}")
 
 
+# ── (c) legend rows per codename ─────────────────────────────────────────────
+
+def columns(projects: list[str]) -> None:
+    """Legend rows per sheet, with the rows whose glyph holds a letter (W5-D (c)) listed."""
+    from extractor import legend_rows as lr
+    for code, pdf, _ in corpus(projects):
+        n = _pages(pdf)
+        total = 0
+        per = []
+        for p in range(1, n + 1):
+            k = 0
+            for leg in lr.suggest_legend_rows(pdf, p)["legends"]:
+                k += len(leg["rows"])
+                for r in leg["rows"]:
+                    if r["glyph_kind"] == "tekstas":
+                        print(f"    p{p} tekstas „{r['glyph_text']}“  {_txt(r['text'])}")
+            if k:
+                per.append(f"p{p}:{k}")
+            total += k
+        print(f"== {code}: {total} legend rows ({', '.join(per)})")
+
+
 def main() -> int:
     global NO_LABELS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -133,7 +155,7 @@ def main() -> int:
     ap.add_argument("--no-labels", action="store_true")
     args = ap.parse_args()
     NO_LABELS = args.no_labels
-    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones}.get(args.what)
+    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns}.get(args.what)
     if fn is None:
         print(f"unknown report: {args.what}")
         return 2
