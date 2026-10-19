@@ -31,7 +31,7 @@ function Swatch({ token, children }) {
   );
 }
 
-export default function RevisionCompareControl({ project, currentPage, overlay, onOverlayChange, onProjectSaved }) {
+export default function RevisionCompareControl({ project, currentPage, overlay, onOverlayChange, onProjectSaved, compact = false }) {
   const confirm = useConfirm();
   const projectId = project?.id;
   const [open, setOpen] = useState(false);
@@ -117,7 +117,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
           data-testid="revision-compare-button"
         >
           <GitCompare className="h-3.5 w-3.5" aria-hidden />
-          <span className="hidden xl:inline">Palyginti leidimus</span>
+          <span className={compact ? "sr-only" : "hidden xl:inline"}>Palyginti leidimus</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-96 rounded-[2px] p-3 space-y-3" data-testid="revision-compare-panel">

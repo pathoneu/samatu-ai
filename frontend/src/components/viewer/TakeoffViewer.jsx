@@ -51,6 +51,7 @@ import ScaleCheckCard from './ScaleCheckCard';
 import ScaleChip from './ScaleChip';
 import CountLegendPanel from './CountLegendPanel';
 import ShortcutsGuide from './ShortcutsGuide';
+import useChromeCompact from './useChromeCompact';
 import HistoryPanel from './HistoryPanel';
 import ViewerCoachMarks from './ViewerCoachMarks';
 import MeasureContextMenu, { RenameDialog } from './MeasureContextMenu';
@@ -198,7 +199,7 @@ function SearchBox({ documentId, onClose }) {
 // The canvas chrome's cards (v3 W1-B B6, W5-B): the sheet header (SheetHeaderBadge) and the reading / editions
 // buttons with the search at the top right, the zoom column (ZoomCluster) at the bottom right.
 const chromeBtn = 'h-8 min-w-8 px-1.5 inline-flex items-center justify-center rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const chromeCard = 'pointer-events-auto rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
+const chromeCard = 'pointer-events-auto shrink-0 rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
 
 /** Top right: „Perskaityti iš naujo" and „Palyginti leidimus" (renderToolbarAddon), then the text search. */
 function CanvasHeader({ documentId, totalPages, addon = null, addonContext = null, searchOpen, onToggleSearch, onCloseSearch }) {
@@ -1013,6 +1014,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [historyOpen, setHistoryOpen] = useState(false);
   const tvRootRef = useRef(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  // the top-right buttons go icon-only when they no longer fit beside the sheet pill (B2-B item 4)
+  const [chromeTopRef, chromeCompact] = useChromeCompact();
   // Right-click on a committed mark: { id, clientX, clientY } | null (MeasureContextMenu).
   const [measureMenu, setMeasureMenu] = useState(null);
   // How Plotas / Perimetras draw (W5-A A11): 'free' | 'rect' | 'arc' — chosen in the pill.
@@ -2120,13 +2123,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               )}
               {/* Top right, one row: the sheet (badge, name, „← 1 iš N →", W5-B B1), then the reading / editions
                   buttons and the search. Zoom is the column at the bottom right (ZoomCluster). */}
-              <div className="absolute top-2 right-2 flex flex-wrap items-start justify-end gap-2" style={{ left: check ? 8 : RAIL_WIDTH + 16 }} data-chrome-top>
+              <div className="absolute top-2 right-2 flex flex-nowrap items-start justify-end gap-2" style={{ left: check ? 8 : RAIL_WIDTH + 16 }} data-chrome-top data-compact={chromeCompact ? "" : undefined} ref={chromeTopRef}>
                 <SheetHeaderBadge documentId={activeDocumentId} totalPages={totalPages} sheets={sheetRail?.sheets || null} />
                 <CanvasHeader
                   documentId={activeDocumentId}
                   totalPages={totalPages}
                   addon={check ? null : renderToolbarAddon}
-                  addonContext={project ? (page) => ({ scaleGate: sheetNotNeeded(page) ? { ok: true, state: 'nereikia', reason: null } : scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
+                  addonContext={project ? (page) => ({ compact: chromeCompact, scaleGate: sheetNotNeeded(page) ? { ok: true, state: 'nereikia', reason: null } : scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
                   searchOpen={searchOpen}
                   onToggleSearch={() => setSearchOpen((v) => !v)}
                   onCloseSearch={() => setSearchOpen(false)}

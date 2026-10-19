@@ -5,10 +5,16 @@
  */
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download } from 'lucide-react';
+import { Download, GitCompare, ScanLine, Search } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { isMacPlatform, shortcutGuideRows } from '@/lib/viewerShortcuts';
 import { downloadShortcutSheet } from '@/lib/shortcutsPdf';
+
+const TOP_BUTTONS = [
+  { id: 'reread', Icon: ScanLine, label: 'Perskaityti lapą (iš naujo) — nemokamai, iš brėžinio' },
+  { id: 'compare', Icon: GitCompare, label: 'Palyginti leidimus — naujas brėžinio leidimas ant dabartinio' },
+  { id: 'search', Icon: Search, label: 'Paieška brėžinio tekste' },
+];
 
 export default function ShortcutsGuide({ open, onOpenChange }) {
   const mac = useMemo(() => isMacPlatform(), []);
@@ -47,6 +53,18 @@ export default function ShortcutsGuide({ open, onOpenChange }) {
           </button>
         </SheetHeader>
         <div className="px-5 py-4 space-y-5">
+          {/* B2-B item 4: on a narrow drawing the top-right buttons show only their icons — what each one is */}
+          <section data-testid="shortcuts-guide-buttons">
+            <h3 className="text-meta font-semibold text-primary mb-1.5">Mygtukai virš brėžinio dešinėje</h3>
+            <ul className="divide-y divide-border/60 border-t border-border">
+              {TOP_BUTTONS.map(({ id, Icon, label }) => (
+                <li key={id} className="flex items-start gap-3 py-1.5 text-ui" data-guide-button={id}>
+                  <span className="w-[42%] shrink-0"><Icon className="w-4 h-4 text-foreground" aria-hidden="true" /></span>
+                  <span className="flex-1 text-foreground leading-snug">{label}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
           {rows.map((g) => (
             <section key={g.group}>
               <h3 className="text-meta font-semibold text-primary mb-1.5">{g.title}</h3>
