@@ -10,8 +10,11 @@
  * 2026-06-17 door/fixture loss; the 2026-09-02 un-anchored Lubų row). One
  * helper, two callers, nothing to drift.
  */
+import { measuredContributions } from './measuredRows.js';
+
 export function buildRecomputeContext(rawData) {
   const d = rawData || {};
+  const matavimai = measuredContributions(d);
   return {
     _door_types: d._door_types,
     detected_symbols_summary: d.detected_symbols_summary,
@@ -36,6 +39,9 @@ export function buildRecomputeContext(rawData) {
     // the first edit (measured: the „Pridėti kaip patalpą" list vanished).
     _meta: d._meta,
     _autoriaus_kiekiai: d._autoriaus_kiekiai,
+    // Pathon v3 W4-A: what he measured on rows (lib/measuredRows.js) — the rebuilt rows come back carrying their
+    // „matavimas" lines (backend api/measured_rows.py). Absent when nothing is linked: the request is unchanged.
+    matavimai: matavimai.length ? matavimai : undefined,
   };
 }
 
@@ -43,4 +49,5 @@ export function buildRecomputeContext(rawData) {
 export const RECOMPUTE_CONTEXT_KEYS = Object.freeze([
   '_door_types', 'detected_symbols_summary', '_plyteliu_specs', '_symbol_legend', '_duru_ziniarastis',
   '_vector_symbols', 'bendras_plotas_m2', 'v9_meta', '_overrides', '_ceiling_anchor', '_walls_anchor', '_floor_anchors', '_meta', '_autoriaus_kiekiai',
+  'matavimai',
 ]);

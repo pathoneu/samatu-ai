@@ -179,6 +179,18 @@ export function totalsByUnit(families) {
 }
 
 /**
+ * What the footer adds up (#220, Pathon v3 W1-F F3). With no filter the list is every kind of work, and one
+ * „Σ 1 559,67 m²" over walls, ceilings, tiles and floors means nothing — so the Σ is per unit WITHIN each work
+ * family (the skyrius the lines sit in), never across them: `{mode: 'sections', sections: [{label, units,
+ * missing}]}`. A filter is his choice of lines; their Σ per unit stands: `{mode: 'units', units, missing}`.
+ */
+export function footerTotals(tree, filter = '') {
+  if (foldText(filter)) return { mode: 'units', ...(tree?.totals || totalsByUnit([])) };
+  const sections = (tree?.sections || []).map((s) => ({ key: s.key, label: s.label, ...totalsByUnit(s.families) }));
+  return { mode: 'sections', sections };
+}
+
+/**
  * @param {Array<object>} rows   project.darbu_sarasas
  * @param {Array<object>} rooms  project.v8_rooms || project.patalpos (plan order)
  * @param {{filter?: string, sort?: string, hiddenRoomNrs?: Iterable}} options

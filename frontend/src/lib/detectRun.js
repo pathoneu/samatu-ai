@@ -13,7 +13,7 @@
 
 import { ltCount } from './ltPlural.js';
 
-export const STAGE_IDS = Object.freeze(['mastelis', 'tekstas', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
+export const STAGE_IDS = Object.freeze(['mastelis', 'tekstas', 'lenteles', 'planas', 'konturai', 'angos', 'sienos', 'grindys', 'kiekiai']);
 export const FEATURES = Object.freeze(['plotai', 'konturai', 'sienos', 'angos', 'grindys']);
 
 /**
@@ -42,7 +42,7 @@ export const FEATURE_HINTS = Object.freeze({
 
 // Shown before the server's first answer, and when a snapshot lacks its stage list.
 const FALLBACK_LABELS = Object.freeze({
-  mastelis: 'Mastelis', tekstas: 'Tekstas', planas: 'Planas', konturai: 'Kontūrai',
+  mastelis: 'Mastelis', tekstas: 'Tekstas', lenteles: 'Lentelės', planas: 'Planas', konturai: 'Kontūrai',
   angos: 'Angos', sienos: 'Sienos', grindys: 'Grindys', kiekiai: 'Kiekiai',
 });
 

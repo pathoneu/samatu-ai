@@ -1,0 +1,198 @@
+{
+  "about": "Measurements on sąmata rows (Pathon v3 W4-A M1): one rule, browser (lib/measuredRows.js) and server (backend/api/measured_rows.py) alike. Each case applies `contributions` to `rows`; `want` lists, per row id, only the fields it checks; `absent` lists keys the row must not carry.",
+  "cases": [
+    {
+      "name": "a measured length added to a computed line",
+      "rows": [
+        { "id": "a", "aprasymas": "Grindjuosčių montavimas", "mato_vnt": "m", "kiekis": 40, "kaina": 3.5, "suma": 140,
+          "contributions": [{ "room_nr": "01", "value": 25, "unit": "m" }, { "room_nr": "02", "value": 15, "unit": "m" }],
+          "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 }], "contributions_sum_to_total": true },
+        { "id": "b", "aprasymas": "Lubų dažymas", "mato_vnt": "m²", "kiekis": 60 }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "a", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 44.2, "kiekis_programos": 40, "suma": 154.7,
+          "lines": ["+ matavimas 4,20 m (lapas 1)"], "taikoma": [true],
+          "roll_up_ops": ["sum", "matavimas"], "roll_up_last": 44.2, "roll_up_notes": [null, "+4,20 m"], "sum_flag": false },
+        { "id": "b", "kiekis": 60, "untouched": true }
+      ]
+    },
+    {
+      "name": "a measured length taken away",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 40, "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 }] }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "a", "kaip": "atimti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 35.8, "kiekis_programos": 40, "lines": ["− matavimas 4,20 m (lapas 1)"],
+          "roll_up_ops": ["sum", "matavimas"], "roll_up_last": 35.8, "roll_up_notes": [null, "−4,20 m"] }
+      ]
+    },
+    {
+      "name": "a measurement instead of the program's quantity",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 40, "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 }] }
+      ],
+      "contributions": [
+        { "key": "m:x2", "eilute_id": "a", "kaip": "kiekis", "value": 12.5, "unit": "m", "pages": [2] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 12.5, "kiekis_programos": 40, "lines": ["matavimas 12,50 m (lapas 2)"],
+          "roll_up_ops": ["sum", "matavimas"], "roll_up_last": 12.5, "roll_up_notes": [null, "vietoj programos kiekio 40,00 m"] }
+      ]
+    },
+    {
+      "name": "applying twice is applying once",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 44.2, "kiekis_programos": 40, "kaina": 3.5, "suma": 154.7,
+          "contributions": [{ "value": 25 }, { "value": 15 }],
+          "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 },
+                      { "op": "matavimas", "label": "+ matavimas 4,20 m (lapas 1)", "value": 44.2, "note": "+4,20 m" }],
+          "contributions_sum_to_total": false,
+          "matavimai": [{ "key": "m:x1", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1],
+                          "tekstas": "+ matavimas 4,20 m (lapas 1)", "taikoma": true }] }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "a", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 44.2, "kiekis_programos": 40, "suma": 154.7, "roll_up_ops": ["sum", "matavimas"], "roll_up_last": 44.2, "untouched": true }
+      ]
+    },
+    {
+      "name": "the program's number moved under the measurement — the measurement rides on the new number",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 50, "kiekis_programos": 40,
+          "roll_up": [{ "op": "sum", "label": "Σ 3 patalpų", "value": 50 }],
+          "matavimai": [{ "key": "m:x1", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1],
+                          "tekstas": "+ matavimas 4,20 m (lapas 1)", "taikoma": true }] }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "a", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 54.2, "kiekis_programos": 50, "roll_up_ops": ["sum", "matavimas"], "roll_up_last": 54.2 }
+      ]
+    },
+    {
+      "name": "a measurement taken off the line — the program's number comes back",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 44.2, "kiekis_programos": 40, "kaina": 3.5, "suma": 154.7,
+          "contributions": [{ "value": 25 }, { "value": 15 }],
+          "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 },
+                      { "op": "matavimas", "label": "+ matavimas 4,20 m (lapas 1)", "value": 44.2, "note": "+4,20 m" }],
+          "contributions_sum_to_total": false,
+          "matavimai": [{ "key": "m:x1", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1],
+                          "tekstas": "+ matavimas 4,20 m (lapas 1)", "taikoma": true }] }
+      ],
+      "contributions": [],
+      "want": [
+        { "id": "a", "kiekis": 40, "suma": 140, "roll_up_ops": ["sum"], "roll_up_last": 40, "sum_flag": true,
+          "absent": ["kiekis_programos", "matavimai"] }
+      ]
+    },
+    {
+      "name": "a quantity he typed wins — the measurement is shown, not counted",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 30, "manual_override": true, "quantity_source": "manual_override", "ai_kiekis_original": 40,
+          "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 }] }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "a", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 30, "lines": ["+ matavimas 4,20 m (lapas 1)"], "taikoma": [false],
+          "priezastys": ["Kiekį įrašėte ranka — matavimas į jį neįtrauktas."],
+          "roll_up_ops": ["sum"], "absent": ["kiekis_programos"] }
+      ]
+    },
+    {
+      "name": "a sheet without a scale — the length is shown, not counted",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 40, "roll_up": [{ "op": "sum", "label": "Σ 2 patalpų", "value": 40 }] }
+      ],
+      "contributions": [
+        { "key": "m:x3", "eilute_id": "a", "kaip": "pridėti", "value": null, "unit": "m", "pages": [3] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 40, "kiekis_programos": 40, "lines": ["+ matavimas be mastelio (lapas 3)"], "taikoma": [false],
+          "priezastys": ["3 lape nenustatytas mastelis — nustatykite jį, ir matavimas bus įtrauktas."],
+          "roll_up_ops": ["sum"], "roll_up_last": 40 }
+      ]
+    },
+    {
+      "name": "a length on a line counted in m² — not counted, and said why",
+      "rows": [
+        { "id": "b", "mato_vnt": "m²", "kiekis": 60, "roll_up": [{ "op": "sum", "label": "Σ 4 patalpų", "value": 60 }] }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "b", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "b", "kiekis": 60, "taikoma": [false],
+          "priezastys": ["Eilutė skaičiuojama m², o matavimas — m: į kiekį neįtrauktas."], "roll_up_ops": ["sum"] }
+      ]
+    },
+    {
+      "name": "a count type on a hand-added line without a ledger",
+      "rows": [
+        { "id": "rnk-1", "aprasymas": "Rozetės (suskaičiuota brėžinyje)", "mato_vnt": "vnt.", "kiekis": 3, "kaina": 0, "skyrius": "Matavimai" }
+      ],
+      "contributions": [
+        { "key": "type:rozetes", "eilute_id": "rnk-1", "kaip": "kiekis", "value": 5, "unit": "vnt.", "pages": [1, 3], "pavadinimas": "Rozetės" }
+      ],
+      "want": [
+        { "id": "rnk-1", "kiekis": 5, "kiekis_programos": 3, "suma": 0, "lines": ["matavimas „Rozetės“ 5 vnt. (lapai 1, 3)"], "taikoma": [true],
+          "absent": ["roll_up"] }
+      ]
+    },
+    {
+      "name": "several on one line: instead, then added, then taken away — never below zero",
+      "rows": [
+        { "id": "a", "mato_vnt": "m²", "kiekis": 20, "roll_up": [{ "op": "sum", "label": "Σ 1 patalpos", "value": 20 }] }
+      ],
+      "contributions": [
+        { "key": "m:s", "eilute_id": "a", "kaip": "atimti", "value": 15, "unit": "m²", "pages": [1], "pavadinimas": "Niša" },
+        { "key": "m:k", "eilute_id": "a", "kaip": "kiekis", "value": 10, "unit": "m²", "pages": [1] },
+        { "key": "m:p", "eilute_id": "a", "kaip": "pridėti", "value": 2, "unit": "m2", "pages": [2] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 0, "kiekis_programos": 20,
+          "lines": ["matavimas 10,00 m² (lapas 1)", "+ matavimas 2,00 m² (lapas 2)", "− matavimas „Niša“ 15,00 m² (lapas 1)"],
+          "roll_up_ops": ["sum", "matavimas", "matavimas", "matavimas"], "roll_up_last": 0 }
+      ]
+    },
+    {
+      "name": "a long measurement keeps the thousands apart; the producer's own words are used as given",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 0 },
+        { "id": "c", "mato_vnt": "vnt.", "kiekis": 1 }
+      ],
+      "contributions": [
+        { "key": "m:long", "eilute_id": "a", "kaip": "kiekis", "value": 1234.5, "unit": "m", "pages": [] },
+        { "key": "type:difuzoriai", "eilute_id": "c", "kaip": "kiekis", "value": 9, "unit": "vnt", "pages": [2],
+          "tekstas": "suskaičiuota pagal legendą: 9 ženklai 2 lape" }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 1234.5, "lines": ["matavimas 1\u00a0234,50 m"] },
+        { "id": "c", "kiekis": 9, "lines": ["suskaičiuota pagal legendą: 9 ženklai 2 lape"] }
+      ]
+    },
+    {
+      "name": "a measurement on a line that is no longer in the sąmata changes nothing",
+      "rows": [
+        { "id": "a", "mato_vnt": "m", "kiekis": 40 }
+      ],
+      "contributions": [
+        { "key": "m:x1", "eilute_id": "gone", "kaip": "pridėti", "value": 4.2, "unit": "m", "pages": [1] }
+      ],
+      "want": [
+        { "id": "a", "kiekis": 40, "untouched": true }
+      ]
+    }
+  ]
+}

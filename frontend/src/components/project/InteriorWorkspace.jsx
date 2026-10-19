@@ -928,6 +928,8 @@ export default function InteriorWorkspace({
           setChatAddRequest({ ...what, nonce: Date.now() });
           setRightTab('pokalbis');
         }}
+        onProjectChange={onProjectChange}
+        onJumpToPage={(pageNr) => { setLocalFocusedPage(pageNr); onJumpToPage?.(pageNr); }}
       />
     ),
     pokalbis: (
