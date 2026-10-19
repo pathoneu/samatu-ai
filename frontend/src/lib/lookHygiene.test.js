@@ -10,12 +10,8 @@ import { rewrite, opacitySuffix } from '../../scripts/look-hygiene-codemod.mjs';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Files another track still edits; the codemod runs over them once that track has merged.
-const PENDING = new Set([
-  'components/viewer/TakeoffViewer.jsx',
-  'components/viewer/CountLegendPanel.jsx',
-  'components/viewer/SymbolReviewPanel.jsx',
-]);
+// Every file is rewritten (pass 2 ran after W5-A merged); a new file joins here only while another track edits it.
+const PENDING = new Set([]);
 
 function walk(dir, acc = []) {
   for (const e of readdirSync(dir)) {

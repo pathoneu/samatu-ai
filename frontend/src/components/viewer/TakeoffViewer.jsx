@@ -156,7 +156,7 @@ function SearchBox({ documentId, onClose }) {
   const hasQuery = committed !== '' && committed === query.trim();
   // Raster honesty: only after OUR typed query finished searching with 0 hits.
   const noHits = hasQuery && !search?.loading && total === 0;
-  const btn = 'p-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] disabled:opacity-40 disabled:hover:bg-transparent';
+  const btn = 'p-1 rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover disabled:opacity-40 disabled:hover:bg-transparent';
   return (
     <span className="relative inline-flex items-center gap-1">
       <input
@@ -176,17 +176,17 @@ function SearchBox({ documentId, onClose }) {
         placeholder="Ieškoti brėžinyje…"
         aria-label="Paieška dokumente"
         title="Ieško teksto brėžinyje (patalpų pavadinimų, žymėjimų). Skenuotuose PDF teksto nėra — nerasta nieko."
-        className="w-44 h-6 px-2 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] text-meta text-[hsl(var(--viewer-chrome-foreground))] placeholder:text-[hsl(var(--viewer-chrome-foreground)/0.45)] focus:outline-none focus:border-[hsl(var(--viewer-chrome-active))]"
+        className="w-44 h-6 px-2 rounded border border-viewer-chrome-border bg-viewer-chrome-muted text-meta text-viewer-chrome-foreground placeholder:text-viewer-chrome-foreground/45 focus:outline-none focus:border-viewer-chrome-active"
       />
       {hasQuery && (
-        <span className="mono tabular text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap px-0.5">
+        <span className="mono tabular text-meta text-viewer-chrome-foreground/65 whitespace-nowrap px-0.5">
           {total > 0 ? `${(search.activeResultIndex ?? 0) + 1} / ${total}` : '0 / 0'}
         </span>
       )}
       <button className={btn} title="Ankstesnis rezultatas (Shift+Enter)" disabled={total === 0} onClick={() => searchApi?.previousResult()}><ChevronUp className="w-4 h-4" /></button>
       <button className={btn} title="Kitas rezultatas (Enter)" disabled={total === 0} onClick={() => searchApi?.nextResult()}><ChevronDown className="w-4 h-4" /></button>
       {noHits && (
-        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] whitespace-nowrap shadow-sm">
+        <span className="absolute left-0 top-full mt-2 z-40 px-2 py-1 rounded border border-viewer-chrome-border bg-viewer-chrome text-meta text-viewer-chrome-foreground/65 whitespace-nowrap shadow-sm">
           Rezultatų nėra — šis PDF greičiausiai skenuotas (be teksto)
         </span>
       )}
@@ -269,11 +269,11 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
     ? (snapKind && SNAP_KIND_TEXT[snapKind] ? `Prilimpa: ${SNAP_KIND_TEXT[snapKind]} · laikykite Ctrl — peršokti iki artimiausio` : (SNAP_NOTE[geometryStatus] || ''))
     : '';
   return (
-    <div className="h-6 shrink-0 bg-[hsl(var(--viewer-chrome))] border-t border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground)/0.65)] px-3 flex items-center gap-3">
+    <div className="h-6 shrink-0 bg-viewer-chrome border-t border-viewer-chrome-border text-meta text-viewer-chrome-foreground/65 px-3 flex items-center gap-3">
       <span className="mono tabular whitespace-nowrap">psl. {cur} / {totalPages || 1} · {pct}%</span>
       {sheet && <span className="mono tabular whitespace-nowrap">{sheet}</span>}
       {fillFor != null ? (
-        <span className="ml-auto whitespace-nowrap text-[hsl(var(--viewer-chrome-active))]">
+        <span className="ml-auto whitespace-nowrap text-viewer-chrome-active">
           {fillBusy ? `Ieškoma patalpos ${fillFor} kontūro…` : `Spustelėkite patalpos ${fillFor} viduje`}
         </span>
       ) : (
@@ -299,7 +299,7 @@ function ThumbnailRail({ documentId }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
   return (
-    <aside className="w-[148px] shrink-0 bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]">
+    <aside className="w-[148px] shrink-0 bg-viewer-chrome border-r border-viewer-chrome-border">
       <ThumbnailsPane documentId={documentId} style={{ height: '100%' }}>
         {(m) => {
           const pageNumber = m.pageIndex + 1;
@@ -317,11 +317,11 @@ function ThumbnailRail({ documentId }) {
                 documentId={documentId}
                 meta={m}
                 style={{ width: m.width, height: m.height }}
-                className={`bg-white rounded-[2px] ${isCurrent ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))] group-hover:ring-[hsl(var(--viewer-chrome-foreground)/0.35)]'}`}
+                className={`bg-white rounded-[2px] ${isCurrent ? 'ring-2 ring-viewer-chrome-active' : 'ring-1 ring-viewer-chrome-border group-hover:ring-viewer-chrome-foreground/35'}`}
               />
               <span
                 style={{ height: m.labelHeight, lineHeight: `${m.labelHeight}px` }}
-                className={`mono tabular text-meta ${isCurrent ? 'text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.65)]'}`}
+                className={`mono tabular text-meta ${isCurrent ? 'text-viewer-chrome-active' : 'text-viewer-chrome-foreground/65'}`}
               >
                 {pageNumber}
               </span>
