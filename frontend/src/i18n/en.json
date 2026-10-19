@@ -746,7 +746,8 @@
       "planoUzrasasTitle": "The area is written on the drawing next to the room itself and was read from the PDF text. Click → see the label.",
       "dimensionLabel": "from dimension",
       "dimensionTitle": "The number is from a drawing dimension.",
-      "listHeaderHint": "click an area to see where it comes from",
+      "listHeaderHint": "Click a room's area to see which table row or plan note it comes from.",
+      "listHeaderHelp": "Where the areas come from",
       "areaButtonTitle": "Where this area comes from — click",
       "listHeader": {"eksplikacija": "Areas from the room schedule", "plano_uzrasas": "Areas written on the plan", "manual_polygon": "Areas from your outlines", "vision": "Areas read from the drawing", "dimension": "Areas from dimensions"}
     },
@@ -1007,9 +1008,9 @@
     "freeReread": {
       "title": "This drawing can be read more precisely — for free",
       "body": "Since this project was extracted the program has learned to take wall lengths from the drawing itself (it adds the dimensions written on the plan), exact room outlines and floor coverings. No new extraction is needed and it costs nothing. Your corrections, prices and verified rooms stay as they are.",
-      "titleShort": "Can be read more precisely — for free",
-      "bodyShort": "corrections and prices stay",
-      "cta": "Read for free",
+      "titleLine": "More precise, free",
+      "ctaShort": "Read",
+      "ctaTitle": "Read the drawing again — free; your corrections, prices and checked rooms stay",
       "running": "Reading the drawing…",
       "later": "Not now",
       "done_one": "Drawing read. Of {{count}} room: {{parts}}. What changed in each room is written on its sheet.",

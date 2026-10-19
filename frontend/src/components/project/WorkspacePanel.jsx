@@ -12,8 +12,9 @@ import { useTranslation } from '@/i18n/react';
 import { toast } from 'sonner';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff, Ruler,
-  AlertCircle,
+  AlertCircle, HelpCircle,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { loadTakeoff, removePolygon, saveTakeoff, subscribeTakeoff } from '@/lib/takeoffStore';
 import { measurementValue, DEFAULT_COUNT_TYPES } from '@/lib/measurements';
 import { effectivePageScales, pageScaleIn } from '@/lib/pageScales';
@@ -692,12 +693,27 @@ export default function WorkspacePanel({
             own word; on the others the area itself opens the same evidence (the table row, the plan's note). */}
         {!collapsed.rooms && roomsSource && (
           <div
-            className="px-3 py-1.5 text-ui text-muted-foreground"
+            className="px-3 py-1 text-ui text-muted-foreground flex items-center gap-1.5 whitespace-nowrap"
             style={{ borderBottom: '1px solid hsl(var(--border) / 0.5)' }}
             data-testid="rooms-source-line"
           >
             <span className="text-foreground">{t(`project.provenance.listHeader.${roomsSource}`)}</span>
-            {' · '}{t('project.provenance.listHeaderHint')}
+            {/* B2-B: the hint opens on a click (never hover-only) so the line stays one line in the 340 px panel */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t('project.provenance.listHeaderHelp')}
+                  data-testid="rooms-source-help"
+                >
+                  <HelpCircle className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 rounded-[2px] p-2.5 text-ui leading-snug" data-testid="rooms-source-hint">
+                {t('project.provenance.listHeaderHint')}
+              </PopoverContent>
+            </Popover>
           </div>
         )}
         {!collapsed.rooms && filteredRooms.map((r, i) => {

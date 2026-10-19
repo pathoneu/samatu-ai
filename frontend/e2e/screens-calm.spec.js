@@ -111,6 +111,37 @@ test.describe('screens calmed — one step, its own panel, the sąmata as the pa
       await expect(page.getByTestId('samata-rooms-summary').locator('tbody tr')).toHaveCount(0);
     });
 
+    test(`one line each: the free re-read offer and the room-list source in the 340 px panel, ${w}×${h}`, async ({ page }) => {
+      // B2-B item 5 — the offer wrapped to 2–3 lines (93 px), the source header to 2 (53 px)
+      await page.setViewportSize({ width: w, height: h });
+      await openProject(page);
+      await waitForDrawing(page);
+      const offer = page.locator('[data-testid="free-reread-banner"]:visible');
+      if (await offer.count()) {
+        await expect(offer.first().getByRole('button', { name: 'Perskaityti' })).toBeVisible();
+        expect((await offer.first().boundingBox()).height, 'offer height').toBeLessThanOrEqual(52);
+      }
+      const src = page.getByTestId('rooms-source-line');
+      expect((await src.boundingBox()).height, 'source line height').toBeLessThanOrEqual(40);
+      await page.getByTestId('rooms-source-help').click();
+      await expect(page.getByTestId('rooms-source-hint')).toContainText('Spustelėkite patalpos plotą');
+    });
+
+    test(`the drawing's top-right buttons never wrap over the sheet title, Sąmata with the drawing, ${w}×${h}`, async ({ page }) => {
+      // B2-B item 4 — at 1280 they wrapped under the sheet pill and covered the title
+      await page.setViewportSize({ width: w, height: h });
+      await openProject(page, `/project/${PROJECT}?step=samata`);
+      await waitForDrawing(page);
+      await page.getByRole('button', { name: /Rodyti brėžinį/ }).first().click();
+      const row = page.locator('[data-chrome-top]');
+      await expect.poll(async () => (await row.boundingBox())?.height ?? 999).toBeLessThanOrEqual(44);
+      await expect(page.getByTestId('detect-run-button')).toBeVisible();
+      await expect(page.getByTestId('revision-compare-button')).toBeVisible();
+      const pill = await page.getByTestId('sheet-name').boundingBox();
+      const btn = await page.getByTestId('detect-run-button').boundingBox();
+      expect(btn.x, 'buttons sit right of the sheet name').toBeGreaterThanOrEqual(pill.x + pill.width);
+    });
+
     test(`at most one notice line above the panel on every step, ${w}×${h}`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
       await openProject(page);
@@ -139,6 +170,14 @@ test.describe('screens calmed — one step, its own panel, the sąmata as the pa
       const canvas = await page.locator('[data-testid="viewer-canvas"]').boundingBox();
       expect(b.y, 'cookie bar top vs the drawing bottom').toBeGreaterThanOrEqual(canvas.y + canvas.height);
       expect(b.y + b.height).toBeLessThanOrEqual(h + 1);
+      // B2-B: „Tvarkyti" puts the categories in the bar's own row — the bar does not grow over the drawing
+      await bar.getByRole('button', { name: 'Tvarkyti' }).click();
+      await expect(bar.getByRole('switch')).toHaveCount(3);
+      const m = await bar.boundingBox();
+      expect(m.y, 'categories open: bar top vs the drawing bottom').toBeGreaterThanOrEqual(canvas.y + canvas.height);
+      expect(m.height).toBeLessThanOrEqual(b.height + 1);
+      await bar.getByRole('switch', { name: 'Analitiniai' }).click();
+      await expect(bar.getByRole('switch', { name: 'Analitiniai' })).toHaveAttribute('aria-checked', 'true');
       await bar.getByRole('button', { name: 'Tik būtinieji' }).click();
       await expect(bar).toHaveCount(0);
     });
