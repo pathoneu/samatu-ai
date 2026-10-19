@@ -32,7 +32,7 @@ export default function RoomPicker({ items, index, total, onPick, className = ''
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[70vh] w-80 overflow-y-auto rounded-panel" data-testid="room-picker-list">
         <DropdownMenuLabel className="text-[14px] font-normal text-muted-foreground">
-          {t('project.roomPicker.counts', { open: counts.open, checked: counts.checked })}
+          {t(counts.merged ? 'project.roomPicker.countsMerged' : 'project.roomPicker.counts', { open: counts.open, checked: counts.checked, merged: counts.merged })}
         </DropdownMenuLabel>
         {items.map((it) => {
           const Icon = ICON[it.state] || Circle;
