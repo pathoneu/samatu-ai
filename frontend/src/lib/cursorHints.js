@@ -14,6 +14,9 @@ export const CURSOR_HINT_MODES = [
   'room', 'findSimilar', 'legend', 'outlineEdit', 'split', 'merge', 'subtract', 'fill',
 ];
 
+/** What Shift does while a length, area or perimeter is being drawn (MeasureLayer: orthoSnap). */
+export const ORTHO = 'tik tiesiai arba 45°';
+
 /** The window event a layer fires to say, for a moment, why its click did nothing. */
 export const CURSOR_HINT_EVENT = 'samatu:cursor-hint';
 export const CURSOR_HINT_FLASH_MS = 2600;
@@ -49,15 +52,17 @@ export function cursorHintFor(state = {}) {
       // the second plain click ends a distance; Shift + click keeps the chain going (v3 W1-B B5)
       if (points === 0) return 'Spustelėkite pradžią';
       if (shift) return 'Spustelėkite kitą tašką — atstumas tęsiamas';
-      return 'Spustelėkite pabaigą — atstumas įsirašys · su Shift — tęsti';
+      return `Spustelėkite pabaigą — atstumas įsirašys · su Shift — tęsti, ${ORTHO}`;
+    // once the first point is down, Shift matters — said here, beside the pointer (W5-A follow-up: never only in a
+    // tooltip or the „?" guide)
     case 'area':
       if (points === 0) return 'Spustelėkite pirmą kampą';
-      if (points < 3) return 'Spustelėkite kitą kampą';
-      return 'Kitas kampas · dukart arba Enter — baigti';
+      if (points < 3) return `Spustelėkite kitą kampą · Shift — ${ORTHO}`;
+      return `Kitas kampas · dukart arba Enter — baigti · Shift — ${ORTHO}`;
     case 'perimeter':
       if (points === 0) return 'Spustelėkite pirmą tašką';
-      if (points < 2) return 'Spustelėkite kitą tašką';
-      return 'Kitas taškas · dukart arba Enter — baigti';
+      if (points < 2) return `Spustelėkite kitą tašką · Shift — ${ORTHO}`;
+      return `Kitas taškas · dukart arba Enter — baigti · Shift — ${ORTHO}`;
     case 'count':
       if (!countType) return 'Pirmiausia pasirinkite arba sukurkite tipą kairėje';
       return `${countType.label}: spustelėkite elementą (pažymėta ${countType.n}) · ant žymės — pašalinti`;
