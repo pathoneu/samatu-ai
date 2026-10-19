@@ -455,6 +455,29 @@ def draw_sheet(c, sheet: dict, project: dict, layers: Layers, scale: dict | None
         if shown:
             legend.append(("line", (0.16, 0.44, 0.71), f"Jūsų matavimai — ilgis arba plotas pagal lapo mastelį ({shown})",
                            "solid"))
+        # „Pastaba" pins (Pathon v3 W5-C, C11): a small square with the note's number and its text beside it —
+        # P1, P2 … per sheet, the numbers the viewer and the Matavimai list show
+        notes = 0
+        for m in measurements:
+            if m.get("kind") != "note":
+                continue
+            pts = disp(m.get("points"))
+            text = " ".join(str(m.get("text") or "").split())
+            if not pts or not text:
+                continue
+            notes += 1
+            x, y = P(*pts[0])
+            rr = 3.0 * unit
+            c.saveState()
+            c.setFillColorRGB(1, 1, 1)
+            c.setStrokeColorRGB(*INK)
+            c.setLineWidth(0.8 * unit)
+            c.rect(x - rr, y - rr, 2 * rr, 2 * rr, stroke=1, fill=1)
+            c.restoreState()
+            short = text if len(text) <= 70 else text[:69] + "…"
+            label(f"P{notes} {short}", x + rr + 2 * unit, y - 2 * unit, size=6.5, colour=INK, anchor="start")
+        if notes:
+            legend.append(("dot", INK, f"Pastabos — jūsų užrašai brėžinyje ({notes})", ""))
 
     if layers.counts:
         types = _count_types(project)

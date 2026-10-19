@@ -26,7 +26,7 @@ import { isReverseVat, vatPercent } from '@/lib/vatMode';
 import { toast } from 'sonner';
 import {
   Home, ChevronDown, ChevronUp, Eye, Plus, FileText,
-  Edit2, Check, X, Trash2, AlertCircle, Search, Sliders, Star, Sigma,
+  Edit2, Check, X, Trash2, AlertCircle, Search, Sliders, Star, Sigma, MoreHorizontal,
 } from 'lucide-react';
 import { getPriceLists, pullPriceListsFromBackend } from '@/lib/projectStore';
 import { applyPriceListToPositions, manualPricePatch, describeAmbiguous, describeMaterialPrices } from '@/lib/applyPriceList';
@@ -43,6 +43,9 @@ const invalidAmountKey = (n) =>
     ? 'project.mainView.toastTooLarge'
     : 'project.mainView.toastInvalidNumber';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import ExportDropdown from './ExportDropdown';
 import RowDetailPanel from './RowDetailPanel';
@@ -477,30 +480,21 @@ function WorkRow({
             {priceSplitTitle(item) && (
               <span className="sr-only">{priceSplitTitle(item)}</span>
             )}
-            {/* WHERE the price came from. `kaina_source` has been written since
-                the kainynas shipped and nothing read it — so a price the
-                matcher guessed at from a merely SIMILAR row looked exactly like
-                one the contractor typed. Amber says "check this one".
-                (2026-09-02) */}
-            {kainynasPriced && (
-              <span
-                aria-hidden="true"
-                title={approxMatch
-                  ? t('project.mainView.priceFromKainynasSimilarTitle')
-                  : t('project.mainView.priceFromKainynasTitle')}
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  approxMatch ? 'bg-amber-500' : 'bg-primary/50'}`}
-              />
-            )}
-            {kainynasPriced && (
-              <span className="sr-only">
-                {approxMatch
-                  ? `${t('project.mainView.priceFromKainynas')} — ${t('project.mainView.priceFromKainynasSimilar')}`
-                  : t('project.mainView.priceFromKainynas')}
-              </span>
-            )}
           </span>
-        ) : (
+        ) : null}
+        {/* the price's source in WORDS (C8, #213) — the coloured dot said it to nobody who did not know the code */}
+        {!editingPrice && item.kaina && kainynasPriced ? (
+          <span
+            className={`block text-ui leading-tight ${approxMatch ? 'text-foreground' : 'text-muted-foreground'}`}
+            title={approxMatch
+              ? t('project.mainView.priceFromKainynasSimilarTitle')
+              : t('project.mainView.priceFromKainynasTitle')}
+            data-testid="price-source"
+          >
+            {approxMatch ? t('project.mainView.priceWordSimilar') : t('project.mainView.priceWord')}
+          </span>
+        ) : null}
+        {editingPrice || item.kaina ? null : (
           <span className="text-muted-foreground italic underline decoration-dotted underline-offset-2">
             {t('project.mainView.enterPrice')}
           </span>
@@ -533,14 +527,31 @@ function WorkRow({
           <Edit2 className="w-3.5 h-3.5" />
         </button>
         {onRemove && (
-          /* The delete is recoverable for 6 s via the toast — say so on the
-             control itself, otherwise a one-click delete of a priced position
-             reads as permanent. (2026-07-28 explainability pass.) */
-          <button onClick={() => onRemove(item)}
-            className="p-1 hover:bg-red-50 text-red-600 rounded ml-1"
-            title={t('project.mainView.removeTitle')} aria-label={t('project.mainView.removeTitle')}>
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          /* Delete lives in the row's ⋯ menu (C8, #213): one stray click on a red bin no longer removes a priced
+             line. Still recoverable for 6 s via the toast, and the item says so. */
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-1 ml-1 hover:bg-muted rounded text-muted-foreground"
+                title={t('project.mainView.rowMenu')}
+                aria-label={t('project.mainView.rowMenu')}
+                data-testid="row-menu"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72 rounded-panel">
+              <DropdownMenuItem onSelect={() => setEditing(true)} className="text-ui">
+                <Edit2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('project.mainView.edit')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onRemove(item)} className="text-ui" data-testid="row-menu-delete">
+                <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('project.mainView.removeTitle')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </td>
     </tr>

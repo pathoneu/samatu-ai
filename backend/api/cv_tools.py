@@ -304,6 +304,18 @@ def find_symbol(
              find_symbol_by_shape(page, template, min_score=body.min_score,
                                   max_results=body.max_results, dpi=dpi))
     rh, rw = page.shape[:2]
+    # „neieškoti tokių" (Pathon v3 W5-C, C10): symbols he rated 👎 are negative examples — a candidate that
+    # looks at least as much like one of them as like his boxed example is dropped (api/feedback.py)
+    from api.feedback import apply_negatives, negatives_for
+    negatives = negatives_for(body.project_id)
+    dropped = 0
+    if negatives and found["candidates"]:
+        for c in found["candidates"]:
+            c["is_source"] = body.page_idx == t_idx and _px_iou(c["bbox"], (bx, by, bw, bh)) > 0.3
+        kept, dropped = apply_negatives(found["candidates"], page, body.page_idx, negatives,
+                                        lambda i, d: render_page(pdf, i, d), find_symbol_by_shape,
+                                        body.min_score, dpi)
+        found = {**found, "candidates": kept}
     candidates = []
     for c in found["candidates"]:
         box = px_box_to_pt(c["bbox"], pw, ph, prot, rw, rh)
@@ -338,7 +350,20 @@ def find_symbol(
         "warning_lt": ("Lapas rastrinis arba tamsus — panašumų paieška nepatikima, šiame lape neieškota"
                        if raster else None),
         "elapsed_s": round(time.monotonic() - started, 2),
+        # how many candidates his „neieškoti tokių" examples took out, and the sentence that says so
+        "neieskota": dropped,
+        "neieskota_lt": (f"Nerodoma {dropped} — panašūs į ženklus, kurių prašėte neieškoti" if dropped else None),
     }
+
+
+def _px_iou(a, b) -> float:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    ix = max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0.0, min(ay + ah, by + bh) - max(ay, by))
+    inter = ix * iy
+    union = aw * ah + bw * bh - inter
+    return inter / union if union > 0 else 0.0
 
 
 @router.post("/magic-wand")

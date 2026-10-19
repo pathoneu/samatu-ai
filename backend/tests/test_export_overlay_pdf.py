@@ -231,3 +231,16 @@ def test_a_strangers_malformed_body_gets_the_same_404(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     r = TestClient(app).post("/api/projects/nera/export-overlay-pdf", json={"dpi": "daug", "pages": "kai kurie"})
     assert r.status_code == 404
+
+
+def test_note_pins_print_with_their_number_and_text(tmp_path, monkeypatch):
+    """A „Pastaba" pin (Pathon v3 W5-C C11) prints as P1 with its text and a legend line — never as a length."""
+    _isolate(tmp_path, monkeypatch)
+    _store(_sheet_pdf(0), {"measurements": [
+        {"kind": "note", "page": 1, "points": [{"x": 60, "y": 60}], "text": "Patikrinti lubų aukštį", "source": "user"}]})
+    r = TestClient(app).post("/api/projects/p1/export-overlay-pdf", json={})
+    assert r.status_code == 200, r.text
+    text = _text(r.content)
+    assert "P1 Patikrinti lubų aukštį" in text
+    assert "Pastabos — jūsų užrašai brėžinyje (1)" in text
+    assert "Jūsų matavimai" not in text
