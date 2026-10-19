@@ -18,9 +18,9 @@ import { Button } from '@/components/ui/button';
 import { verdictKey } from '@/lib/preflight';
 
 const TONE = {
-  ok:      { icon: CheckCircle2,  border: 'border-border',              accent: 'text-[hsl(var(--conf-high))]' },
+  ok:      { icon: CheckCircle2,  border: 'border-border',              accent: 'text-conf-high' },
   neutral: { icon: FileSearch,    border: 'border-border',              accent: 'text-muted-foreground' },
-  caution: { icon: AlertTriangle, border: 'border-[hsl(var(--conf-med))]/45', accent: 'text-[hsl(var(--conf-med))]' },
+  caution: { icon: AlertTriangle, border: 'border-conf-med/45', accent: 'text-conf-med' },
   blocked: { icon: Ban,           border: 'border-destructive/40',      accent: 'text-destructive' },
 };
 

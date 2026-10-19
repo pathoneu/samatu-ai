@@ -30,7 +30,7 @@ export default function RunTeaching({ phase, progress, elapsed, started = false,
   useEffect(() => { markReadScopeSeen(storage()); }, []);
   const v = runTeachingFor({ phase, progress, elapsed, started, estMinutes });
   const row = 'flex items-start gap-3';
-  const icon = 'mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--ink-2))]';
+  const icon = 'mt-0.5 h-5 w-5 shrink-0 text-ink-2';
   return (
     <section
       className={`w-full rounded-panel border border-border bg-card p-4 text-ui text-foreground ${className}`}
@@ -97,7 +97,7 @@ export function ReadScopeCard({ className = '' }) {
       <ul className="mt-2 space-y-2">
         {items.map(({ key, Icon, word, text }) => (
           <li key={key} className="flex items-start gap-2" data-scope={key}>
-            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--ink-2))]" aria-hidden="true" />
+            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-2" aria-hidden="true" />
             {/* the word says it, not the icon's colour */}
             <p><span className="font-semibold">{word}</span> {text}</p>
           </li>

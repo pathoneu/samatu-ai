@@ -24,7 +24,7 @@ export default function RoomSheetStrip({
 
   // sticky (C7): which room this is, and the way to any other, stay in sight while the facts scroll
   return (
-    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-2 bg-[hsl(var(--primary))] px-4 py-2.5 text-white" data-testid="room-sheet-strip">
+    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-2 bg-primary px-4 py-2.5 text-white" data-testid="room-sheet-strip">
       {/* Patikra opens on the question list (2026-09-21); this sheet is the look into one room — the way back */}
       {onQuestions && (
         <button type="button" onClick={onQuestions} className={NAV} data-testid="back-to-questions">
@@ -51,7 +51,7 @@ export default function RoomSheetStrip({
           })}
         >
           <span
-            className="block h-full bg-[hsl(var(--accent-2))]"
+            className="block h-full bg-accent-2"
             style={{ width: `${progress.percent}%` }}
           />
         </span>

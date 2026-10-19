@@ -208,7 +208,7 @@ export default function RoomDrawingPane({
           {pick && !hidePickButtons && (
             <button
               type="button"
-              className={`${BTN} ${pick.active && pick.mode !== 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
+              className={`${BTN} ${pick.active && pick.mode !== 'split' ? 'border-accent-2 bg-accent-2/[0.08]' : ''}`}
               aria-pressed={pick.active && pick.mode !== 'split'}
               disabled={pick.busy}
               onClick={() => (pick.active && pick.mode !== 'split' ? pick.onCancel?.() : pick.onStart?.('outline'))}
@@ -222,7 +222,7 @@ export default function RoomDrawingPane({
           {pick && space && !hidePickButtons && (
             <button
               type="button"
-              className={`${BTN} ${pick.active && pick.mode === 'split' ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : ''}`}
+              className={`${BTN} ${pick.active && pick.mode === 'split' ? 'border-accent-2 bg-accent-2/[0.08]' : ''}`}
               aria-pressed={pick.active && pick.mode === 'split'}
               disabled={pick.busy}
               onClick={() => (pick.active && pick.mode === 'split' ? pick.onCancel?.() : pick.onStart?.('split'))}
@@ -240,7 +240,7 @@ export default function RoomDrawingPane({
           pale line of small text.) */}
       {pick?.active && (
         <div
-          className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] bg-[hsl(var(--accent-2))] px-4 py-3 text-white shadow-sm"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] bg-accent-2 px-4 py-3 text-white shadow-sm"
           role="status"
           data-testid="outline-pick-banner"
         >
@@ -249,7 +249,7 @@ export default function RoomDrawingPane({
               ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
               : pick.mode === 'split'
                 ? (
-                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-ui font-bold text-[hsl(var(--accent-2))]">
+                  <span className="mt-0.5 inline-flex h-6 shrink-0 items-center rounded-[2px] bg-white px-2 font-mono text-ui font-bold text-accent-2">
                     {pick.first ? '2 / 2' : '1 / 2'}
                   </span>
                 )
@@ -269,7 +269,7 @@ export default function RoomDrawingPane({
               )}
               {/* why the last click did not work — said HERE, at the drawing he is looking at, not in a corner toast */}
               {!pick.busy && pick.notice && (
-                <p className="mt-1.5 rounded-[2px] bg-white px-2 py-1 text-[14px] font-semibold leading-snug text-[hsl(var(--conf-low))]" role="alert" data-testid="pick-notice">
+                <p className="mt-1.5 rounded-[2px] bg-white px-2 py-1 text-[14px] font-semibold leading-snug text-conf-low" role="alert" data-testid="pick-notice">
                   {pick.notice}
                 </p>
               )}
@@ -290,7 +290,7 @@ export default function RoomDrawingPane({
       {!hosted && (
       <div
         className={`h-[68vh] min-h-[460px] overflow-hidden rounded-[2px] border bg-card
-          ${pick?.active ? 'border-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : 'border-border'}`}
+          ${pick?.active ? 'border-accent-2 [&_*]:!cursor-crosshair' : 'border-border'}`}
       >
         {pdfState === 'ready' && pdfUrl ? (
           <ViewerBoundary onFail={() => setPdfState('failed')}>
@@ -311,12 +311,12 @@ export default function RoomDrawingPane({
       )}
 
       {space && (
-        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-ink-2">
           {t('project.roomSheet.drawOpenSpace', { rooms: others.join(', ') })}
         </p>
       )}
       {noOutline && (
-        <p className="text-ui leading-snug text-[hsl(var(--ink-2))]">
+        <p className="text-ui leading-snug text-ink-2">
           {reason
             ? t('project.roomSheet.drawNoOutline', { reason: reason.replace(/\.$/, '') })
             : t('project.roomSheet.drawNoOutlinePlain')}

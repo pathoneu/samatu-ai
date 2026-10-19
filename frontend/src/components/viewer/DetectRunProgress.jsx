@@ -18,8 +18,8 @@ import Notice from '@/components/ui/Notice';
 import { headline, statusMark } from '@/lib/detectRun';
 
 const MARK_CLASS = {
-  done: 'text-[hsl(var(--accent-2))]',
-  running: 'text-[hsl(var(--accent-2))] animate-pulse',
+  done: 'text-accent-2',
+  running: 'text-accent-2 animate-pulse',
   skipped: 'text-muted-foreground',
   failed: 'text-destructive',
   pending: 'text-muted-foreground',
@@ -64,7 +64,7 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
             <p className="leading-snug text-muted-foreground" data-testid="detect-run-scope">{run.snapshot.skaitoma_lt}</p>
           )}
           {!terminal && current?.about && (
-            <p className="pt-1 leading-snug text-[hsl(var(--ink-2))]" data-testid="detect-run-about">{current.about}</p>
+            <p className="pt-1 leading-snug text-ink-2" data-testid="detect-run-about">{current.about}</p>
           )}
           <ol className="mt-1.5 space-y-0.5" data-testid="detect-run-stages">
             {stages.map((s) => (
@@ -104,7 +104,7 @@ export default function DetectRunProgress({ run, view, groups = null, onDismiss,
             {headline(view, run.pages, run.snapshot?.result?._meta?.geometrija?.grupes || groups)}
           </span>
           <span className="mt-1 block h-[3px] bg-muted" aria-hidden="true">
-            <span className={`block h-full transition-[width] duration-300 ${failed ? 'bg-destructive' : 'bg-[hsl(var(--accent-2))]'}`} style={{ width: `${Math.round(progress * 100)}%` }} />
+            <span className={`block h-full transition-[width] duration-300 ${failed ? 'bg-destructive' : 'bg-accent-2'}`} style={{ width: `${Math.round(progress * 100)}%` }} />
           </span>
         </span>
         <button

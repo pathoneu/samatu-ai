@@ -42,10 +42,10 @@ export default function RoomNameChips({ projectId, room, busy = false, onAnswer 
   return (
     <div className="border-t border-border px-4 py-3" data-testid="room-name-chips">
       <p className="flex items-start gap-2 text-[15px] font-semibold">
-        <Tag className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--ink-2))]" aria-hidden="true" />
+        <Tag className="mt-0.5 h-4 w-4 shrink-0 text-ink-2" aria-hidden="true" />
         {t('project.roomNames.question', { name: first.pavadinimas.toLocaleLowerCase('lt-LT') })}
       </p>
-      <p className="mt-0.5 pl-6 text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+      <p className="mt-0.5 pl-6 text-[14px] leading-snug text-ink-2">
         {t('project.roomNames.evidence', { word: first.zodis })}
       </p>
       <div className="mt-2 flex flex-wrap gap-2 pl-6">
@@ -53,7 +53,7 @@ export default function RoomNameChips({ projectId, room, busy = false, onAnswer 
           type="button"
           disabled={busy}
           onClick={() => onAnswer?.(first)}
-          className={`${CHIP} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white`}
+          className={`${CHIP} border-accent-2 bg-accent-2 text-white`}
           data-testid="room-name-yes"
         >
           <Check className="h-4 w-4" aria-hidden="true" />
@@ -101,7 +101,7 @@ export default function RoomNameChips({ projectId, room, busy = false, onAnswer 
             className="mt-2 flex flex-wrap items-center gap-2"
             onSubmit={(e) => { e.preventDefault(); if (own.trim()) onAnswer?.({ pavadinimas: own.trim() }); }}
           >
-            <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`room-name-own-${nr}`}>{t('project.roomNames.ownLabel')}</label>
+            <label className="text-[14px] text-ink-2" htmlFor={`room-name-own-${nr}`}>{t('project.roomNames.ownLabel')}</label>
             <input
               id={`room-name-own-${nr}`}
               value={own}

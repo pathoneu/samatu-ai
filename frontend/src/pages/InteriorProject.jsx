@@ -651,7 +651,7 @@ function DarbuSarasas({ items }) {
                               onClick={() => markFeedback(it.kategorija, 'ok')}
                               className={`p-1 rounded border text-xs transition-colors ${
                                 fb === 'ok'
-                                  ? 'bg-green-500/20 border-green-500 text-green-600 dark:text-green-400'
+                                  ? 'bg-green-500/20 border-green-500 text-green-600'
                                   : 'border-border text-muted-foreground hover:border-green-500/50 hover:text-green-600'
                               }`}
                               title={t('project.interior.feedbackOk')}
@@ -662,7 +662,7 @@ function DarbuSarasas({ items }) {
                               onClick={() => markFeedback(it.kategorija, 'bad')}
                               className={`p-1 rounded border text-xs transition-colors ${
                                 fb === 'bad'
-                                  ? 'bg-red-500/20 border-red-500 text-red-600 dark:text-red-400'
+                                  ? 'bg-red-500/20 border-red-500 text-red-600'
                                   : 'border-border text-muted-foreground hover:border-red-500/50 hover:text-red-600'
                               }`}
                               title={t('project.interior.feedbackBad')}
@@ -1553,7 +1553,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               </span>
             </div>
             {(!project.v8_rooms || project.v8_rooms.length === 0) && (
-              <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
                 {t('project.interior.noRooms')}
               </div>
             )}
@@ -1762,10 +1762,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
           {/* ── Task 6: Forgotten items warnings ───────────────────────────── */}
           {perspejimani.filter(w => !dismissedWarnings.has(w.id)).length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-xl p-4">
+            <div className="border border-amber-200 bg-amber-50 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t('project.interior.checkReminder')}</span>
+                <span className="text-sm font-semibold text-amber-800">{t('project.interior.checkReminder')}</span>
               </div>
               <div className="space-y-2">
                 {perspejimani
@@ -1778,9 +1778,9 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                           w.kategorija === 'techninė' ? 'bg-blue-500' : 'bg-amber-500'
                         }`} />
                         <div>
-                          <p className="text-xs text-amber-800 dark:text-amber-300">{w.tekstas}</p>
+                          <p className="text-xs text-amber-800">{w.tekstas}</p>
                           {(w.patalpos || []).length > 0 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                            <p className="text-xs text-amber-600 mt-0.5">
                               {w.patalpos.join(', ')}
                             </p>
                           )}
@@ -1788,7 +1788,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                       </div>
                       <button
                         onClick={() => setDismissedWarnings(prev => new Set([...prev, w.id]))}
-                        className="shrink-0 text-amber-400 hover:text-amber-600 dark:hover:text-amber-200"
+                        className="shrink-0 text-amber-400 hover:text-amber-600"
                         title={t('project.interior.close')}
                       >
                         <X className="w-3.5 h-3.5" />

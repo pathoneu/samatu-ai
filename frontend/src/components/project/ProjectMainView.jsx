@@ -418,7 +418,7 @@ function WorkRow({
               <span>{fmt(item.kiekis)}</span>
               {isManualQty && (
                 <span
-                  className="text-meta font-semibold text-[hsl(var(--accent-2))]"
+                  className="text-meta font-semibold text-accent-2"
                   title={t('project.mainView.manualShortTitle')}
                 >
                   {t('project.mainView.manualShort')}

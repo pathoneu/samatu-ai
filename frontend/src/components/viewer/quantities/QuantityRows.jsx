@@ -12,9 +12,9 @@ import { cleanUserText } from '@/lib/userText';
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 
 const SOURCE_CLASS = {
-  user: 'text-foreground border-[hsl(var(--ov-read))]',
-  walls: 'text-foreground border-[hsl(var(--ov-read))]',
-  approx: 'text-foreground border-dashed border-[hsl(var(--ov-estimated))]',
+  user: 'text-foreground border-ov-read',
+  walls: 'text-foreground border-ov-read',
+  approx: 'text-foreground border-dashed border-ov-estimated',
   marker: 'text-muted-foreground border-border',
   none: 'text-muted-foreground border-border',
 };

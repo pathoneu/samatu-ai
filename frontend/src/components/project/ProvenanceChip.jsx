@@ -27,7 +27,7 @@ import AiBadge from './AiBadge';
 const SOURCE_META = {
   eksplikacija: {
     labelKey: 'project.provenance.eksplikacijaLabel',
-    cls: 'text-[hsl(var(--accent-2))]',
+    cls: 'text-accent-2',
     titleKey: 'project.provenance.eksplikacijaTitle',
   },
   manual_polygon: {
@@ -37,19 +37,19 @@ const SOURCE_META = {
   },
   vision: {
     labelKey: 'project.provenance.visionLabel',
-    cls: 'text-[hsl(var(--ov-estimated))]',
+    cls: 'text-ov-estimated',
     titleKey: 'project.provenance.visionTitle',
   },
   // 2026-09-06: the designer's own room area written on the plan („37.86 m²"
   // inside the room), read from the PDF text layer — deterministic, exact.
   plano_uzrasas: {
     labelKey: 'project.provenance.planoUzrasasLabel',
-    cls: 'text-[hsl(var(--accent-2))]',
+    cls: 'text-accent-2',
     titleKey: 'project.provenance.planoUzrasasTitle',
   },
   dimension: {
     labelKey: 'project.provenance.dimensionLabel',
-    cls: 'text-[hsl(var(--accent-2))]',
+    cls: 'text-accent-2',
     titleKey: 'project.provenance.dimensionTitle',
   },
 };

@@ -89,7 +89,7 @@ export default function ScaleCalibrationModal({
             {sanityHint && (
               <p className={`text-xs mt-1.5 ${
                 sanityHint.type === 'warn'
-                  ? 'text-amber-600 dark:text-amber-400'
+                  ? 'text-amber-600'
                   : 'text-muted-foreground'
               }`}>
                 {sanityHint.text}

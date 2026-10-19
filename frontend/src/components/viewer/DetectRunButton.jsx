@@ -47,7 +47,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
         <button
           type="button"
           disabled={busy}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-2.5 py-1 text-meta font-semibold text-white hover:opacity-95 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-[2px] bg-accent-2 px-2.5 py-1 text-meta font-semibold text-white hover:opacity-95 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={busy
             ? 'Brėžinys skaitomas — eiga rodoma kortelėje virš brėžinio; galite toliau dirbti'
             : 'Perskaityti šį lapą iš brėžinio: mastelis, patalpos, kontūrai, angos, sienų ilgiai, grindys. Nemokama, skaičiuoja iš brėžinio.'}
@@ -73,7 +73,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
               <label className={`flex items-start gap-2 text-ui ${f === 'plotai' ? 'text-muted-foreground' : 'text-foreground cursor-pointer'}`} title={FEATURE_HINTS[f]}>
                 <input
                   type="checkbox"
-                  className="mt-0.5 h-4 w-4 accent-[hsl(var(--accent-2))]"
+                  className="mt-0.5 h-4 w-4 accent-accent-2"
                   checked={Boolean(features[f])}
                   disabled={f === 'plotai'}
                   onChange={(e) => setFeatures((s) => toggleFeature(s, f, e.target.checked))}
@@ -92,7 +92,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
             type="button"
             disabled={!canStart(features)}
             onClick={() => go([currentPage])}
-            className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[2px] bg-[hsl(var(--accent-2))] px-3 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-50"
+            className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[2px] bg-accent-2 px-3 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-50"
             data-testid="detect-run-start-page"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />

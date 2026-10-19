@@ -26,7 +26,7 @@ export default function FixConsequence({ consequence, busy = false, onUndo }) {
 
   return (
     <div
-      className="mx-4 mb-3 rounded-[2px] border border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.06)] px-3 py-2 text-[14px]"
+      className="mx-4 mb-3 rounded-[2px] border border-accent-2/35 bg-accent-2/[0.06] px-3 py-2 text-[14px]"
       data-testid="fix-consequence"
       role="status"
     >
@@ -49,7 +49,7 @@ export default function FixConsequence({ consequence, busy = false, onUndo }) {
       {lines.length > 0 && (
         <ul className="mt-1 space-y-0.5">
           {lines.map((l) => (
-            <li key={`${l.label}-${l.unit}`} className="leading-snug text-[hsl(var(--ink-2))]">
+            <li key={`${l.label}-${l.unit}`} className="leading-snug text-ink-2">
               {cleanUserText(l.label)}:{' '}
               <span className="font-mono text-muted-foreground">{qty(l.before, l.unit)}</span>
               {' → '}

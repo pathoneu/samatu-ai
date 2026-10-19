@@ -11,7 +11,7 @@ import { ThumbsDown, ThumbsUp, Undo2 } from 'lucide-react';
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border px-3 text-[14px] font-medium '
   + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 const PLAIN = `${BTN} border-border bg-card text-foreground hover:bg-muted`;
-const ON = `${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-foreground`;
+const ON = `${BTN} border-accent-2 bg-accent-2/10 text-foreground`;
 
 export default function FeedbackThumbs({
   question, upLabel = 'Tinka', downLabel = 'Netinka', downNote = null, linePlaceholder = 'Pastaba (nebūtina)',

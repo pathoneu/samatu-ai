@@ -30,7 +30,7 @@ import { API_BASE } from '@/lib/apiBase';
 export const Q_BTN = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[2px] border px-4 '
   + 'text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 '
   + 'focus-visible:ring-ring disabled:opacity-50';
-export const Q_PRIMARY = `${Q_BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white hover:opacity-95`;
+export const Q_PRIMARY = `${Q_BTN} border-accent-2 bg-accent-2 text-white hover:opacity-95`;
 export const Q_PLAIN = `${Q_BTN} border-border bg-card hover:bg-muted`;
 
 const INPUT = 'h-11 w-28 rounded-[2px] border border-border bg-card px-2 text-right font-mono text-[16px] '
@@ -90,7 +90,7 @@ export function ReconcileBody({ question, busy, onAnswer, onShowTable = null, pr
             key={String(c.value)} type="button" aria-pressed={current === c.value}
             onClick={() => setPicked(c.value)}
             className={`inline-flex min-h-[44px] items-center rounded-[2px] border px-3 text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-              ${current === c.value ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-[hsl(var(--accent-2))]' : 'border-border bg-card hover:bg-muted'}`}
+              ${current === c.value ? 'border-accent-2 bg-accent-2/10 text-accent-2' : 'border-border bg-card hover:bg-muted'}`}
             data-testid={`reconcile-${c.value}`}
           >
             {c.label}
@@ -102,12 +102,12 @@ export function ReconcileBody({ question, busy, onAnswer, onShowTable = null, pr
           {question.items.map((item) => (
             <li key={item.room_nr} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-border px-3 py-2 first:border-t-0 text-[14px]">
               <span className="font-semibold"><span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}</span>
-              <span className="text-[hsl(var(--ink-2))]">{cleanUserText(item.sentence || '')}</span>
+              <span className="text-ink-2">{cleanUserText(item.sentence || '')}</span>
             </li>
           ))}
         </ul>
       )}
-      {question.lentele?.sentence && <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(question.lentele.sentence)}</p>}
+      {question.lentele?.sentence && <p className="text-[14px] leading-snug text-ink-2">{cleanUserText(question.lentele.sentence)}</p>}
       <div className="flex flex-wrap items-start gap-2">
         <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={() => onAnswer({ value: current })}>
           <Check className="h-4 w-4" aria-hidden="true" />
@@ -128,9 +128,9 @@ export function InfoBody({ question, busy, onAnswer, onShowTable = null, project
     <div className="flex flex-col gap-3" data-testid="question-info">
       {item.lentele != null && item.musu != null && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-[2px] border border-border px-3 py-2 text-[15px]">
-          <dt className="text-[hsl(var(--ink-2))]">{item.room_name || 'Lentelėje'}</dt>
+          <dt className="text-ink-2">{item.room_name || 'Lentelėje'}</dt>
           <dd className="font-mono tabular-nums">{lt(item.lentele)} {unit}</dd>
-          <dt className="text-[hsl(var(--ink-2))]">Patalpų suma</dt>
+          <dt className="text-ink-2">Patalpų suma</dt>
           <dd className="font-mono tabular-nums">{lt(item.musu)} {unit}</dd>
         </dl>
       )}
@@ -148,7 +148,7 @@ export function InfoBody({ question, busy, onAnswer, onShowTable = null, project
 function Row({ item, focused, onFocus, children, note, stacked = false }) {
   return (
     <li
-      className={`border-t border-border first:border-t-0 ${focused ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
+      className={`border-t border-border first:border-t-0 ${focused ? 'bg-accent-2/[0.06]' : ''}`}
       data-testid={`question-item-${item.room_nr}`}
     >
       {/* `stacked`: a row of wide choice buttons goes UNDER the room's name — beside it the name broke into three lines */}
@@ -163,7 +163,7 @@ function Row({ item, focused, onFocus, children, note, stacked = false }) {
         </button>
         <div className="flex items-center gap-2">{children}</div>
       </div>
-      {focused && note && <p className="px-3 pb-2 text-[13px] leading-snug text-[hsl(var(--ink-2))]">{note}</p>}
+      {focused && note && <p className="px-3 pb-2 text-[13px] leading-snug text-ink-2">{note}</p>}
     </li>
   );
 }
@@ -177,7 +177,7 @@ export function OutlineBody({ question, item, busy, onAccept, onTypeLength }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(() => lt(item?.perimetras_dabar));
   useEffect(() => { setDraft(lt(item?.perimetras_dabar)); }, [item?.room_nr, item?.perimetras_dabar]);
-  if (!item) return <p className="text-[15px] text-[hsl(var(--ink-2))]">{t('project.questions.outlineAllSkipped')}</p>;
+  if (!item) return <p className="text-[15px] text-ink-2">{t('project.questions.outlineAllSkipped')}</p>;
   const value = parseLtNumber(draft);
   const valid = isValidAmount(value);
   const proposal = item.proposed_outline;
@@ -190,7 +190,7 @@ export function OutlineBody({ question, item, busy, onAccept, onTypeLength }) {
       </p>
       {proposal ? (
         <>
-          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]" data-testid="outline-proposal-sentence">
+          <p className="text-[14px] leading-snug text-ink-2" data-testid="outline-proposal-sentence">
             {cleanUserText(item.sentence || '')}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -198,21 +198,21 @@ export function OutlineBody({ question, item, busy, onAccept, onTypeLength }) {
               <Check className="h-4 w-4" aria-hidden="true" />
               {t('project.questions.outlineAccept', { area: ltNumber(Number(proposal.plotas_m2), 2) })}
             </button>
-            <span className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineElsewhere')}</span>
+            <span className="text-[14px] leading-snug text-ink-2">{t('project.questions.outlineElsewhere')}</span>
           </div>
         </>
       ) : (
         <>
-          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+          <p className="text-[14px] leading-snug text-ink-2">
             {t('project.questions.outlineReason', { reason: cleanUserText(item.reason || '').replace(/\.$/, '') })}
           </p>
-          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineHow')}</p>
+          <p className="text-[14px] leading-snug text-ink-2">{t('project.questions.outlineHow')}</p>
         </>
       )}
       <div className="border-t border-border pt-3">
-        <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.outlineTypeLength')}</p>
+        <p className="text-[14px] leading-snug text-ink-2">{t('project.questions.outlineTypeLength')}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <label className="text-[15px] text-[hsl(var(--ink-2))]" htmlFor="q-outline-length">{t('project.questions.outlineLengthLabel')}</label>
+          <label className="text-[15px] text-ink-2" htmlFor="q-outline-length">{t('project.questions.outlineLengthLabel')}</label>
           <input
             id="q-outline-length" value={draft} inputMode="decimal" className={INPUT}
             onFocus={(e) => e.target.select()}
@@ -223,7 +223,7 @@ export function OutlineBody({ question, item, busy, onAccept, onTypeLength }) {
             {t('project.questions.save')}
           </button>
         </div>
-        {!valid && draft !== '' && <p className="mt-1 text-[13px] text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+        {!valid && draft !== '' && <p className="mt-1 text-[13px] text-conf-low">{t('project.questions.needNumber')}</p>}
       </div>
     </div>
   );
@@ -255,7 +255,7 @@ export function NumberAllBody({ question, busy, onAnswer }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[15px] text-[hsl(var(--ink-2))]" htmlFor="q-number-all">{t('project.questions.heightLabel')}</label>
+        <label className="text-[15px] text-ink-2" htmlFor="q-number-all">{t('project.questions.heightLabel')}</label>
         <input
           id="q-number-all" value={draft} inputMode="decimal" className={INPUT}
           onFocus={(e) => e.target.select()}
@@ -269,7 +269,7 @@ export function NumberAllBody({ question, busy, onAnswer }) {
               : t('project.questions.acceptAllRooms', { count: n })}
         </button>
       </div>
-      {!valid && draft !== '' && <p className="text-[13px] text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+      {!valid && draft !== '' && <p className="text-[13px] text-conf-low">{t('project.questions.needNumber')}</p>}
 
       <div>
         <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">{t('project.questions.roomsAsked')}</p>
@@ -296,7 +296,7 @@ export function NumberAllBody({ question, busy, onAnswer }) {
         {n > 1 && (
           <button
             type="button"
-            className="mt-2 text-[14px] font-semibold text-[hsl(var(--accent-2))] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 text-[14px] font-semibold text-accent-2 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => setSeparately((v) => !v)}
           >
             {separately ? t('project.questions.elsewhereHide') : t('project.questions.elsewhere')}
@@ -341,7 +341,7 @@ export function NumbersBody({ question, busy, focusNr, onFocus, onAnswer }) {
           </Row>
         ))}
       </ul>
-      {bad && <p className="text-[13px] text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+      {bad && <p className="text-[13px] text-conf-low">{t('project.questions.needNumber')}</p>}
       <div>
         <button
           type="button" className={Q_PRIMARY} disabled={busy || bad || !answerable} data-testid="question-accept"
@@ -376,7 +376,7 @@ export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer, onShow
                     key={String(c.value)} type="button" aria-pressed={current === c.value}
                     onClick={() => { onFocus?.(item.room_nr); setPicked((cur) => ({ ...cur, [item.room_nr]: c.value })); }}
                     className={`inline-flex min-h-[36px] items-center rounded-[2px] border px-2.5 text-[14px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                      ${current === c.value ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-[hsl(var(--accent-2))]' : 'border-border bg-card hover:bg-muted'}`}
+                      ${current === c.value ? 'border-accent-2 bg-accent-2/10 text-accent-2' : 'border-border bg-card hover:bg-muted'}`}
                   >
                     {c.label}
                   </button>
@@ -443,12 +443,12 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
               return (
                 <li
                   key={`${item.room_nr}-${item.i}-${item.plotis_mm}-${i}`}
-                  className={`border-t border-border first:border-t-0 ${focusNr === item.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
+                  className={`border-t border-border first:border-t-0 ${focusNr === item.room_nr ? 'bg-accent-2/[0.06]' : ''}`}
                   data-testid={`opening-item-${item.room_nr}-${i}`}
                 >
                   <div className="flex items-start gap-3 px-3 py-2.5">
                     <input
-                      type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--accent-2))]" checked={!off.has(i)}
+                      type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-accent-2" checked={!off.has(i)}
                       aria-label={`${roomLabel(item)} — ${t('project.questions.openingTicked')}`}
                       onChange={() => toggle(i, item)}
                     />
@@ -458,11 +458,11 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
                         className="text-left text-[15px] font-semibold leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}
-                        {leads && <span className="font-normal text-[hsl(var(--ink-2))]"> — {leads}</span>}
+                        {leads && <span className="font-normal text-ink-2"> — {leads}</span>}
                       </button>
                       {/* the width the walls show and the standard height — both his to correct, and the kind
                           (2026-09-23: „durys 1,40 pločio nebus tikrai … turi būti galimybė pataisyti") */}
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-[hsl(var(--ink-2))]">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2">
                         <select
                           value={d.tipas} className={SELECT} aria-label={`${roomLabel(item)} — ${t('project.questions.openingKind')}`}
                           onChange={(e) => setEdit(i, { tipas: e.target.value })}
@@ -484,11 +484,11 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
                         <span>m</span>
                       </div>
                       {odd && !off.has(i) && (
-                        <p className="mt-1 text-[13px] leading-snug text-[hsl(var(--conf-low))]" data-testid="opening-width-odd">
+                        <p className="mt-1 text-[13px] leading-snug text-conf-low" data-testid="opening-width-odd">
                           {t('project.questions.openingWidthOdd', { width: d.plotis })}
                         </p>
                       )}
-                      {badNumber && <p className="mt-1 text-[13px] leading-snug text-[hsl(var(--conf-low))]">{t('project.questions.needNumber')}</p>}
+                      {badNumber && <p className="mt-1 text-[13px] leading-snug text-conf-low">{t('project.questions.needNumber')}</p>}
                     </div>
                   </div>
                 </li>
@@ -519,7 +519,7 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
             {question.manual.map((m) => (
               <li
                 key={m.room_nr}
-                className={`border-t border-border px-3 py-2.5 first:border-t-0 ${focusNr === m.room_nr ? 'bg-[hsl(var(--accent-2)/0.06)]' : ''}`}
+                className={`border-t border-border px-3 py-2.5 first:border-t-0 ${focusNr === m.room_nr ? 'bg-accent-2/[0.06]' : ''}`}
                 data-testid={`opening-manual-${m.room_nr}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -538,7 +538,7 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
                     one click away — secondary, never the first thing he has to read */}
                 <p className="mt-1 text-[15px] leading-snug text-foreground">{cleanUserText(m.sentence || '')}</p>
                 {m.details && (
-                  <details className="mt-1.5 text-[13px] leading-snug text-[hsl(var(--ink-2))]">
+                  <details className="mt-1.5 text-[13px] leading-snug text-ink-2">
                     <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {t('project.questions.manualDetails')}
                     </summary>

@@ -110,8 +110,8 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
         <button
           type="button"
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-[2px] px-2 py-1 text-meta font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${overlay
-            ? 'bg-[hsl(var(--accent-2))] text-white'
-            : 'text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--muted))]'}`}
+            ? 'bg-accent-2 text-white'
+            : 'text-viewer-chrome-foreground hover:bg-muted'}`}
           title="Uždėti naują projektuotojo atsiųstą brėžinio leidimą ant dabartinio ir pamatyti, kas pasikeitė"
           aria-pressed={!!overlay}
           data-testid="revision-compare-button"
@@ -136,7 +136,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
             <div key={r.id} className="flex items-center gap-2">
               <label className="flex flex-1 min-w-0 items-center gap-2 text-ui cursor-pointer">
                 <input
-                  type="radio" name="revision" className="accent-[hsl(var(--accent-2))]"
+                  type="radio" name="revision" className="accent-accent-2"
                   checked={overlay?.rid === r.id} onChange={() => show(r)}
                 />
                 <span className="truncate" title={editionLabel(r)}>{editionLabel(r)}</span>
@@ -172,7 +172,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
                   key={m} type="button" role="radio" aria-checked={overlay.mode === m}
                   onClick={() => show(active, { mode: m })}
                   className={`${chip} ${overlay.mode === m
-                    ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+                    ? 'border-accent-2 bg-accent-2 text-white'
                     : 'border-border-strong bg-card text-foreground/85 hover:bg-muted/50'}`}
                 >
                   {MODE_LABELS[m]}
@@ -200,7 +200,7 @@ export default function RevisionCompareControl({ project, currentPage, overlay, 
               />
             </label>
             {info && (
-              <p className={`text-meta leading-snug ${info.matched && info.byWalls ? 'text-foreground/85' : 'text-[hsl(var(--conf-med))]'}`}>
+              <p className={`text-meta leading-snug ${info.matched && info.byWalls ? 'text-foreground/85' : 'text-conf-med'}`}>
                 {info.text}
               </p>
             )}
