@@ -216,9 +216,9 @@ Kiekvienas: kontekstas vienu sakiniu · galimybės · ką siūlo vadovas (jei si
 
 4. **F klavišas.** Dabar F = „Rasti panašius", o parodyti pažymėtą — Shift+F arba „.". Togal F reiškia „parodyti". Perjungti — viena eilutė kode. Palikti ar sukeisti?
 5. **12 px žodžiai įrankių kortelėse.** 14 px reikia apie 550 px stulpelio, o prie 1280×720 brėžiniui lieka 534 px; patarimai, juosta ir užuominos — 14 px. Ar 12 px kortelėse tinka?
-6. **Kambarių pavadinimai 340 px skydelyje** (6 iš 11 nukirpti). A — dvi eilutės; B — šaltinis vieną kartą antraštėje. Nuotraukos: `…/scratchpad/w6a/shots/g3-now-*.png`, `g3-A-*.png`, `g3-B-*.png` (1440×900 ir 1280×720).
-7. **Išvaizda.** 1 — kaip dabar; 2 — tamsus rėmas aplink šviesų brėžinį (gintarinė juosta ant jo blogiau matosi). Nuotraukos: `…/scratchpad/w6a/shots/g4-look-1-today-*.png`, `g4-look-2-dark-frame-*.png`. Kol nenuspręsite — nieko nekeičiame.
-   *Kelias:* `/private/tmp/claude-501/-Users-ignasgaldikas-samatu-ai/17639f50-ffef-49b5-8063-bb81f19b2420/scratchpad/w6a/shots/` — tai laikinas vadovo aplankas; prieš jums žiūrint vadovas turi perkelti nuotraukas į `docs/superpowers/research/` (patikrinti, kad lape nesimatytų užsakovo duomenų).
+6. **Kambarių pavadinimai 340 px skydelyje** (6 iš 11 nukirpti). A — dvi eilutės; B — šaltinis vieną kartą antraštėje. Nuotraukos: `docs/superpowers/research/2026-10-19-w6a-shots/g3-now-*.png`, `g3-A-*.png`, `g3-B-*.png` (1440×900 ir 1280×720).
+7. **Išvaizda.** 1 — kaip dabar; 2 — tamsus rėmas aplink šviesų brėžinį (gintarinė juosta ant jo blogiau matosi). Nuotraukos: `docs/superpowers/research/2026-10-19-w6a-shots/g4-look-1-today-*.png`, `g4-look-2-dark-frame-*.png`. Kol nenuspręsite — nieko nekeičiame.
+   *Kelias:* nuotraukos jau perkeltos į `docs/superpowers/research/2026-10-19-w6a-shots/` (patikrinta: demo projektas, užsakovo duomenų nėra).
 8. **Du „Kiekiai".** Siūloma: dešiniojo skydelio skirtukas → „Kiekių suvestinė", skyrius „Patalpos ir eilutės" viduje → „Sąmatos eilutės". Lietuviškus žodžius patvirtinate jūs.
 9. **Paskyros puslapio pavadinimas** — jis irgi vadinasi „Nustatymai" (prielaidų mygtukas lieka „Nustatymai"). Pvz., „Paskyra"?
 10. **Profesionalų sluoksnis** (#140): „Rodinys" kortelėje paruoštas, bet išjungtas jungiklis — kontūrų skaidrumas ir linijos storis. Su juo susiję: vienos eilutės išskyrimas, skydelio klaviatūra ir keli pažymėjimai, trijų būsenų ikonos, klavišų lapas, kuris rodo spaudžiamą klavišą, du lapai greta. Įjungti, kam ir kada?
