@@ -1668,6 +1668,16 @@
       "colTotal": "Suma, €",
       "totalNoVat": "Iš viso be PVM"
     },
+    "roomPicker": {
+      "open": "Rinktis kambarį iš sąrašo",
+      "counts": "Liko patikrinti: {{open}} · patikrinta: {{checked}}",
+      "state": {
+        "checked": "patikrinta",
+        "open": "liko patikrinti",
+        "excluded": "neskaičiuojama",
+        "merged": "sujungta su {{nr}}"
+      }
+    },
     "roomNames": {
       "question": "Ar tai {{name}}?",
       "evidence": "Plane šioje patalpoje užrašyta: „{{word}}“.",
