@@ -18,9 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { displayPointOf, outlineFailureKey } from '@/lib/roomOutline';
-import {
-  roomForToolClick, pickCandidates, retryNrFor, noWallSentence, proposalLines, rasterProposalLines, commitBody, insideProposal,
-} from '@/lib/roomTool';
+import { roomForToolClick, pickCandidates, commitBody, insideProposal, readOutlineProposal } from '@/lib/roomTool';
 import { fetchSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
 
 const IDLE = { phase: 'idle', proposal: null, reading: null, picking: null };
@@ -35,8 +33,12 @@ export default function useRoomTool({
   useEffect(() => { stateRef.current = state; });
   const roomsRef = useRef(rooms);
   useEffect(() => { roomsRef.current = rooms; });
+  // Every read takes a number; leaving the tool or dropping what it shows moves the number on, so an answer
+  // still on its way when he left lands nowhere (it used to come back as a proposal the next R showed — and
+  // the next click saved).
+  const readRef = useRef(0);
   // Disarmed (another tool, Esc, the check view): whatever was proposed is dropped — it was never saved.
-  useEffect(() => { if (!active) setState(IDLE); }, [active]);
+  useEffect(() => { if (!active) { readRef.current += 1; setState(IDLE); } }, [active]);
 
   const roomByNr = (nr) => (roomsRef.current || []).find((r) => String(r?.nr) === String(nr)) || null;
 
@@ -51,44 +53,17 @@ export default function useRoomTool({
    * inside the room's own outline and the walls still give the place to a neighbour, no wall separates them.
    */
   const propose = useCallback(async (nr, where, how = 'number') => {
+    const read = ++readRef.current;
+    const stale = () => read !== readRef.current;
     setState({ ...IDLE, phase: 'reading', reading: where });
     try {
-      let tried = nr;
-      let answer = await onPreview(tried, where);
-      const again = how === 'number' ? retryNrFor(answer, tried) : null;
-      if (again && roomByNr(again)) {
-        tried = again;
-        answer = await onPreview(tried, where);
-      }
-      const noWall = noWallSentence(tried, answer);
-      if (noWall && (how === 'outline' || tried !== nr)) {
-        toast.error(noWall);
-        setState(IDLE);
-        return;
-      }
-      if (answer?.status === 'ok' && Array.isArray(answer.room?.polygon_pct)) {
-        const room = roomByNr(tried);
-        setState({
-          ...IDLE,
-          phase: 'proposed',
-          proposal: { kind: 'vector', nr: String(tried), page: where.page, ring: answer.room.polygon_pct, answer, lines: proposalLines(room, answer) },
-        });
-        return;
-      }
-      if (answer?.status === 'no_walls' && onRasterPreview) {
-        const raster = await onRasterPreview(tried, where).catch(() => null);
-        if (raster?.ring) {
-          setState({
-            ...IDLE,
-            phase: 'proposed',
-            proposal: { kind: 'raster', nr: String(tried), page: where.page, ring: raster.ring, data: raster.data, lines: rasterProposalLines(roomByNr(tried), raster.ring) },
-          });
-          return;
-        }
-      }
-      toast.error(failure(answer));
+      const out = await readOutlineProposal({ nr, where, how, onPreview, onRasterPreview, roomByNr, stale });
+      if (!out) return;
+      if (out.proposal) { setState({ ...IDLE, phase: 'proposed', proposal: out.proposal }); return; }
+      toast.error(out.error || failure(out.failure));
       setState(IDLE);
     } catch (e) {
+      if (stale()) return;
       toast.error(e?.userMessage || e?.message || 'Nepavyko perskaityti kontūro');
       setState(IDLE);
     }
@@ -156,7 +131,7 @@ export default function useRoomTool({
   /** Esc: drop the proposal (or the question) first; with nothing pending the tool exits (→ false). */
   const escape = useCallback(() => {
     const cur = stateRef.current;
-    if (cur.phase === 'proposed' || cur.phase === 'picking') { setState(IDLE); return true; }
+    if (cur.phase === 'proposed' || cur.phase === 'picking') { readRef.current += 1; setState(IDLE); return true; }
     return false;
   }, []);
 

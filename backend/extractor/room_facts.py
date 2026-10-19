@@ -1881,6 +1881,78 @@ def _fact_pertvaros(project: dict, room: dict, region: list[float] | None) -> di
     return _fact("pertvaros", value, "vnt.", "assumed", "prielaida", page, rect, sentence, editable)
 
 
+def _zone_phrase(z: dict) -> str:
+    if z.get("plotis_m") and z.get("aukstis_m"):
+        n = int(z.get("kiekis") or 1)
+        size = f"{lt_num(z['plotis_m'])} × {lt_num(z['aukstis_m'])} m"
+        return (f"{n} × " if n > 1 else "") + size + f" = {_m2(z['m2'])}"
+    if z.get("dalis"):
+        return f"{lt_num(z['dalis'] * 100, 0)} % sienų = {_m2(z['m2'])}"
+    return _m2(z["m2"])
+
+
+def _fact_zonos(project: dict, room: dict, region: list[float] | None) -> list[dict]:
+    """v3 W5-E E1: „Baldų zonos" / „Plokščių zonos" — wall area behind built-in furniture or panels
+    (extractor/wall_zones.py). On the sheet only where something was read or typed, and — while the engine flag
+    is off — only once he typed a total, so the sheet stays as it is until the manager turns the deduction on.
+    The sentence says whether the area is taken off the painted walls."""
+    from . import wall_zones as wz
+    t = wz.zone_totals(room)
+    on = wz.enabled()
+    page = room.get("puslapio_nr")
+    out = []
+    loose = wz.wardrobes_without_height(room)
+    if on and t["_baldu_zonos_m2"] <= 0 and loose and room.get(wz.TYPED_FURNITURE_M2) is None:
+        lengths = " ir ".join(f"{lt_num(x)} m" for x in loose)
+        out.append(_fact("baldu_zonos", None, "m²", "missing", "planas", page, region_on_page(room, page, region),
+                         f"Plane įmontuota spinta ({lengths} ilgio), bet jos aukščio brėžinyje neradau — jei už jos "
+                         f"siena nedažoma, įrašykite spintos plotą (ilgis × aukštis).",
+                         {"field": wz.TYPED_FURNITURE_M2, "kind": "number"}))
+    for key, zones, total, field, what, src_lt in (
+            ("baldu_zonos", t["baldu_zonos"], t["_baldu_zonos_m2"], wz.TYPED_FURNITURE_M2,
+             "Įmontuoti baldai prie sienų", {"brezinys": "plane", "ivesta": "įrašėte patys"}),
+            ("plokstes_zonos", t["plokstes_zonos"], t["_plokstes_zonos_m2"], wz.TYPED_PANEL_M2,
+             "Sienų plokštės", {"apdailos_lentele": "apdailų lentelėje", "ivesta": "įrašėte patys"})):
+        if total <= 0 or not (on or room.get(field) is not None):
+            continue       # flag off and nothing typed: today's sheet, unchanged
+        parts = "; ".join(f"{_zone_phrase(z)} ({src_lt.get(z['saltinis'], '')})" for z in zones)
+        if key == "plokstes_zonos":   # never deducted: walls under panels are skimmed and billed
+            tail = "Sienos po plokštėmis glaistomos, todėl šis plotas lieka dažomame sienų plote."
+        else:
+            tail = ("Šis plotas atimtas iš dažomo sienų ploto." if on else
+                    "Kol kas šis plotas į dažomą sienų plotą įskaičiuotas — patikrinkite, ar už jų siena dažoma.")
+        own = next((z for z in zones if z.get("rect_pct") and z.get("page")), None)
+        z_page = own["page"] if own else page
+        rect = own["rect_pct"] if own else region_on_page(room, page, region)
+        kind = "planas" if any(z["saltinis"] != "ivesta" for z in zones) else "prielaida"
+        out.append(_fact(key, round(total, 2), "m²", "read", kind, z_page, rect,
+                         f"{what}: {parts}. {tail}", {"field": field, "kind": "number"}))
+    return out
+
+
+def _fact_nisos_gylis(project: dict, room: dict, region: list[float] | None) -> dict | None:
+    """v3 W5-E E3: „Nišos gylis" — only for a room with niche metres, and only once it can matter (typed, or the
+    engine flag that bills the niche inside in m² is on). No depth is ever assumed."""
+    from . import niche_depth as nd
+    if (_f(room.get("nisu_metrai")) or 0) <= 0:
+        return None
+    overrides = project.get("_overrides") if isinstance(project.get("_overrides"), dict) else {}
+    d = nd.room_depth(room, overrides)
+    if d is None and not nd.enabled():
+        return None
+    page = room.get("puslapio_nr")
+    rect = region_on_page(room, page, region)
+    editable = {"field": nd.KEY, "kind": "number"}
+    if d is None:
+        return _fact("nisos_gylis", None, "m", "missing", "nera", page, rect,
+                     "Nišos gylio brėžinyje neradau — įrašykite jį, ir nišos vidus (viršus ir du šonai) bus "
+                     "skaičiuojamas kvadratiniais metrais.", editable)
+    how = ("Nišos vidus skaičiuojamas kvadratiniais metrais (ilgis × gylis × 3)." if nd.enabled()
+           else "Kol kas nišų glaistymas ir dažymas skaičiuojami metrais.")
+    return _fact("nisos_gylis", d, "m", "read", "prielaida", page, rect, f"Nišos gylį įrašėte patys: {lt_num(d)} m. {how}",
+                 editable)
+
+
 _HIS_SOURCES = ("user_override", "manual")
 
 
@@ -1913,6 +1985,12 @@ def _is_yours(project: dict, room: dict, key: str) -> bool:
         return src(room.get("grindu_danga_saltinis")) == "user_override" and bool(room.get("grindu_danga"))
     if key == "pertvaros":
         return src(room.get("n_partition_walls_saltinis")) in _HIS_SOURCES
+    if key == "baldu_zonos":
+        return room.get("baldu_zonos_ivesta_m2") is not None
+    if key == "plokstes_zonos":
+        return room.get("plokstes_zonos_ivesta_m2") is not None
+    if key == "nisos_gylis":
+        return room.get("nisos_gylis_m") is not None
     return False
 
 
@@ -1933,6 +2011,10 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
     pertvaros = _fact_pertvaros(project, room, region)
     if pertvaros is not None:
         facts.append(pertvaros)
+    facts.extend(_fact_zonos(project, room, region))
+    nisa = _fact_nisos_gylis(project, room, region)
+    if nisa is not None:
+        facts.append(nisa)
     for fact in facts:
         fact["yours"] = _is_yours(project, room, fact["key"])
     try:

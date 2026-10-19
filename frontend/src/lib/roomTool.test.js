@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  roomForToolClick, pickCandidates, retryNrFor, noWallSentence, proposalLines, rasterProposalLines, holesKept, commitBody, insideProposal,
+  roomForToolClick, pickCandidates, retryNrFor, noWallSentence, proposalLines, rasterProposalLines, holesKept, commitBody, insideProposal, readOutlineProposal,
 } from './roomTool.js';
 import { noRoomZoneAt, NO_ROOM_ZONES } from './sheetZonesApi.js';
 
@@ -109,4 +109,79 @@ test('a click in the title block, a legend or a table is never a room (sheet zon
   assert.equal(noRoomZoneAt(zones, 0.8, 0.5), null);
   assert.equal(noRoomZoneAt({ status: 'no_text', zones: [] }, 0.8, 0.8), null);
   assert.equal(noRoomZoneAt(null, 0.8, 0.8), null);
+});
+
+// ── readOutlineProposal: what one click proposes (useRoomTool's reading, proposal first) ─────────────────
+const WHERE = { page: 1, x_pct: 0.6, y_pct: 0.7 };
+const byNr = (nr) => ROOMS.find((r) => String(r.nr) === String(nr)) || null;
+const RING = square(0.5, 0.6, 0.7, 0.8);
+
+test('readOutlineProposal: vector walls → a vector proposal with the consequence lines, the raster never asked', async () => {
+  const asked = [];
+  const out = await readOutlineProposal({
+    nr: '06', where: WHERE, onPreview: async (nr) => { asked.push(nr); return { status: 'ok', room: { polygon_pct: RING, _konturas: { plotas_m2: 15.2 } } }; },
+    onRasterPreview: async () => { throw new Error('raster must not be asked'); }, roomByNr: byNr,
+  });
+  assert.deepEqual(asked, ['06']);
+  assert.equal(out.proposal.kind, 'vector');
+  assert.equal(out.proposal.nr, '06');
+  assert.deepEqual(out.proposal.ring, RING);
+  assert.match(out.proposal.lines.title, /^06 Vaiko · kontūras 15,2/);
+});
+
+test('readOutlineProposal: no vector walls → the raster fill is PROPOSED (not saved), its lines say it is an estimate', async () => {
+  const raster = [];
+  const out = await readOutlineProposal({
+    nr: '06', where: WHERE, onPreview: async () => ({ status: 'no_walls' }),
+    onRasterPreview: async (nr, where) => { raster.push([nr, where]); return { ring: RING, data: { polygon_pdf: [[1, 2]] } }; },
+    roomByNr: byNr,
+  });
+  assert.deepEqual(raster, [['06', WHERE]]);
+  assert.equal(out.proposal.kind, 'raster');
+  assert.deepEqual(out.proposal.ring, RING);
+  assert.deepEqual(out.proposal.data, { polygon_pdf: [[1, 2]] });   // what the commit later saves
+  assert.equal(out.proposal.page, 1);
+  assert.equal(out.proposal.lines.title, '06 Vaiko · kontūras pagal brėžinio vaizdą');
+  assert.match(out.proposal.lines.sub, /apytikslis/);
+});
+
+test('readOutlineProposal: the raster fallback finds nothing or fails → the no_walls answer is the failure to word', async () => {
+  for (const onRasterPreview of [async () => null, async () => { throw new Error('click-to-fill 500'); }, async () => ({ ring: null })]) {
+    const out = await readOutlineProposal({ nr: '06', where: WHERE, onPreview: async () => ({ status: 'no_walls' }), onRasterPreview, roomByNr: byNr });
+    assert.deepEqual(out, { failure: { status: 'no_walls' } });
+  }
+  // no raster fallback wired at all → the same failure
+  const none = await readOutlineProposal({ nr: '06', where: WHERE, onPreview: async () => ({ status: 'no_walls' }), roomByNr: byNr });
+  assert.deepEqual(none, { failure: { status: 'no_walls' } });
+});
+
+test('readOutlineProposal: a guessed room the walls give to a neighbour is asked once more for that one; the raster follows the retried room', async () => {
+  const asked = [];
+  const out = await readOutlineProposal({
+    nr: '05', where: WHERE, how: 'number',
+    onPreview: async (nr) => { asked.push(nr); return nr === '05' ? { status: 'open', su: ['06'] } : { status: 'no_walls' }; },
+    onRasterPreview: async (nr) => (nr === '06' ? { ring: RING, data: {} } : null), roomByNr: byNr,
+  });
+  assert.deepEqual(asked, ['05', '06']);
+  assert.equal(out.proposal.kind, 'raster');
+  assert.equal(out.proposal.nr, '06');
+});
+
+test('readOutlineProposal: no wall between the clicked outline and a neighbour → one sentence, nothing proposed', async () => {
+  const out = await readOutlineProposal({ nr: '04', where: WHERE, how: 'outline', onPreview: async () => ({ status: 'taken', nr: '05' }), roomByNr: byNr });
+  assert.match(out.error, /^Patalpos 04 nuo patalpos 05 sienos neatskiria/);
+});
+
+test('readOutlineProposal: he left the tool while it read (stale) → null after the outline answer and after the raster answer', async () => {
+  let left = false;
+  const afterOutline = await readOutlineProposal({
+    nr: '06', where: WHERE, onPreview: async () => { left = true; return { status: 'ok', room: { polygon_pct: RING } }; }, roomByNr: byNr, stale: () => left,
+  });
+  assert.equal(afterOutline, null);
+  left = false;
+  const afterRaster = await readOutlineProposal({
+    nr: '06', where: WHERE, onPreview: async () => ({ status: 'no_walls' }),
+    onRasterPreview: async () => { left = true; return { ring: RING, data: {} }; }, roomByNr: byNr, stale: () => left,
+  });
+  assert.equal(afterRaster, null);
 });

@@ -100,6 +100,10 @@ UNIVERSAL_RULES = {
         "laminate_straight": 0.10,
         "laminate_diagonal": 0.13,
         "parquet_herringbone": 0.16,  # CLAUDE.md §1.6 +12-16% range
+        # v3 W5-E E7: read only under SAMATU_WASTE_BY_PATTERN=1 (extractor/waste_pattern.py)
+        "tiles_hexagonal": 0.16,      # CLAUDE.md §1.7 +16%, §3 15-17%
+        "laminate_hexagonal": 0.16,   # CLAUDE.md §1.6 hexagonal +16%
+        "wallpaper": 0.10,            # CLAUDE.md §3 10-15% — read only under SAMATU_WALLPAPER_ROLLS=1 (E2)
     },
 
     # Wallpaper
@@ -2924,6 +2928,14 @@ def calc_room_quantities(room: dict,
     # extraction once that ships.
     walls_paintable = walls_paintable + extra_walls_m2 + extra_walls_virs_3m_m2
 
+    # v3 W5-E E1, flag SAMATU_FURNITURE_ZONES (default off → nothing): CLAUDE.md §1.1 takes the furniture and
+    # panel zones off the paintable walls (extractor/wall_zones.py reads them; never below 0)
+    zones_deducted_m2 = None
+    from . import wall_zones as _wall_zones
+    if _wall_zones.enabled() and walls_paintable > 0:
+        zones_deducted_m2 = min(walls_paintable, _wall_zones.deduction_m2(room, walls_gross, doors_deduction))
+        walls_paintable = walls_paintable - zones_deducted_m2
+
     # WHICH predicate left this room out of the paint lines (2026-09-02).
     # Named HERE, where it was decided, from the branch's own state — the
     # contribution ledger used to say „Šios patalpos sienos nedažomos", which
@@ -3401,6 +3413,7 @@ def calc_room_quantities(room: dict,
         "ceiling_type": ceiling_type,
         "walls_gross_m2": round(walls_gross, 2),
         "walls_paintable_m2": round(walls_paintable, 2),
+        **({"_zonos_atimta_m2": round(zones_deducted_m2, 2)} if zones_deducted_m2 else {}),
         # ── Wall-finish provenance (2026-07-28) ──────────────────────────
         # Which evidence decided the paint/tile split, whether it was a READ
         # or an ASSUMPTION, and the LT text explaining it. Surfaced by
