@@ -216,3 +216,31 @@ def test_status_a_project_read_at_lane_version_12_is_offered_the_reader_frame_re
     body = TestClient(app).get("/api/projects/p1/free-reread").json()
     assert gl.LANE_VERSION == 13
     assert body["needed"] is True and body["projekto_versija"] == 12
+
+
+
+# ── Pathon v3 W5-D D6: figures + heights behind SAMATU_REREAD_FIGURES ──────────────────────────────────
+
+def test_figures_and_heights_are_off_by_default_and_read_with_the_flag(monkeypatch):
+    from extractor import plan_area_annotations as pa
+    calls = []
+
+    def fake_scan(pdf, pages=None):
+        calls.append(pages)
+        return {"figures": [{"page": 2, "label": "Sienų dažai", "value": 120, "unit": "m2", "family": "sienu_dazymas"}],
+                "heights": [], "annotations": []}
+    monkeypatch.setattr(pa, "scan_text_layer", fake_scan)
+    parsed = {"patalpos": [{"nr": "1"}], "puslapiai": []}
+    monkeypatch.delenv(fr.FIGURES_FLAG, raising=False)
+    assert fr.read_figures_and_heights(parsed, b"%PDF", "p") == {} and calls == []
+    monkeypatch.setenv(fr.FIGURES_FLAG, "1")
+    out = fr.read_figures_and_heights(parsed, b"%PDF", "p")
+    assert out["_autoriaus_kiekiai"][0]["value"] == 120
+    assert parsed["_meta"]["plan_height_statement"]["status"] == "none"
+
+
+def test_figures_never_fail_the_read(monkeypatch):
+    from extractor import plan_area_annotations as pa
+    monkeypatch.setenv(fr.FIGURES_FLAG, "1")
+    monkeypatch.setattr(pa, "scan_text_layer", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert fr.read_figures_and_heights({"patalpos": []}, b"%PDF", "p") == {}

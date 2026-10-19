@@ -301,6 +301,8 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
                     asked.append({"nr": nr, "polygon": polygon, "point": point})
             got = read_floor_coverings(pdf_bytes, fp, asked, m_per_pt=scale.get(fp))
             read.update(got["rooms"])
+            # the sheet's key (Pathon v3 W5-D, D1): kept as evidence — `_meta.grindu_legenda`
+            meta["grindu_dangos"].setdefault("legenda", []).extend(got.get("legenda") or [])
             for nr, texts in got["dvi_dangos"].items():
                 two.setdefault(nr, {"page": fp, "tekstai": list(texts)})
     for r in rooms:
@@ -715,6 +717,11 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         meta["error"] = repr(exc)
         print(f"[extractor] geometry lane failed: {exc!r}")
     meta["seconds"] = round(time.time() - t0, 2)
+    legend = meta["grindu_dangos"].pop("legenda", None)
     if isinstance(parsed, dict):
         parsed.setdefault("_meta", {})["geometrija"] = meta
+        if legend is not None:
+            # the floor sheet's key lines (text, colour, sheet, box) — evidence beside the floor fact, never a
+            # room key (LANE_VERSION unchanged); a read that found no floor sheet leaves the stored key alone
+            parsed["_meta"]["grindu_legenda"] = legend
     return {"status": status, **meta}

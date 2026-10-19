@@ -395,7 +395,7 @@ def read_floor_coverings(pdf_bytes: bytes, page: int, rooms: Sequence[dict],
     """What the floor sheet `page` draws in each of `rooms`
     ([{nr, polygon: [[x, y] …] | None, point: (x, y) | None}] in that page's
     display points). Returns {"rooms": {nr: {danga, irodymas, tekstas,
-    plotas_m2, rect_pct, page}}, "legenda": [{tekstas, klase, spalva}],
+    plotas_m2, rect_pct, page}}, "legenda": [{tekstas, klase, spalva, page, rect_pct}],
     "dvi_dangos": {nr: [tekstas, …]}, "page"}. A room that is not in "rooms"
     was not read — it is never guessed here; "dvi_dangos" names the rooms where
     the sheet WRITES two kinds of covering, with what it writes."""
@@ -500,5 +500,14 @@ def read_floor_coverings(pdf_bytes: bytes, page: int, rooms: Sequence[dict],
             out["rooms"][nr] = {"danga": hatch_kind, "irodymas": "rastas", "tekstas": blk["tekstas"],
                                 "plotas_m2": None, "rect_pct": _pct(s["shape"].bounds, W, H, 0.01),
                                 "page": int(page)}
-    out["legenda"] = [{"tekstas": b["tekstas"], "klase": b["klase"], "spalva": list(b["colour"])} for b in legend]
+    out["legenda"] = [{"tekstas": b["tekstas"], "klase": b["klase"], "spalva": list(b["colour"]),
+                       "page": int(page), "rect_pct": _legend_rect_pct(b["bbox"], W, H)} for b in legend]
     return out
+
+
+def _legend_rect_pct(bbox, W: float, H: float) -> list[float]:
+    """A legend line's box widened to the LEFT by a few text heights, where a key draws its colour swatch —
+    the crop beside the floor fact shows the swatch and the words together (Pathon v3 W5-D, D1)."""
+    x0, top, x1, bottom = bbox
+    h = max(bottom - top, 1.0)
+    return _pct((max(0.0, x0 - 6.0 * h), top - 0.6 * h, x1 + 0.6 * h, bottom + 0.6 * h), W, H, 0.0)

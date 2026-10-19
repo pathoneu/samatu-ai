@@ -102,6 +102,11 @@ def test_a_hatch_in_the_colour_of_its_legend_line():
         "05": ("minksta", "rastas"), "07": ("plyteles", "rastas"), "01": ("plyteles", "rastas")}
     assert out["rooms"]["05"]["tekstas"].startswith("Grindys - ąžuolas")
     assert [l["klase"] for l in out["legenda"]] == ["minksta", "plyteles", "plyteles"]
+    # each key line carries its sheet and a box that reaches left over the swatch (W5-D D1)
+    for line in out["legenda"]:
+        assert line["page"] == out["page"] and len(line["rect_pct"]) == 4
+        x0, y0, x1, y1 = line["rect_pct"]
+        assert 0.0 <= x0 < x1 <= 1.0 and 0.0 <= y0 < y1 <= 1.0
     # where to look: the room on the floor sheet
     x0, y0, x1, y1 = out["rooms"]["07"]["rect_pct"]
     assert x0 < (room_pt(BATH)[0][0] + 10) / 1190.55 < x1

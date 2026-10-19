@@ -237,3 +237,21 @@ test('sheet zones merge sheet by sheet — a sheet the read did not look at keep
   // no zones in the read: the stored ones stay as they were
   assert.deepEqual(mergeFreeReread(stored, result(), 'T').project._meta.zonos, stored._meta.zonos);
 });
+
+test('the floor sheet key lines land whole, and a read without them keeps the stored ones (W5-D D1)', () => {
+  const key = [{ tekstas: 'Plyteles 60x60', klase: 'plyteles', spalva: [0.1, 0.3, 0.9], page: 4, rect_pct: [0.7, 0.1, 0.9, 0.12] }];
+  const read = { ...result(), _meta: { ...result()._meta, grindu_legenda: key } };
+  assert.deepEqual(mergeFreeReread(base(), read, 'T').project._meta.grindu_legenda, key);
+  const stored = { ...base(), _meta: { ...base()._meta, grindu_legenda: key } };
+  assert.deepEqual(mergeFreeReread(stored, result(), 'T').project._meta.grindu_legenda, key);
+});
+
+test('the designer figures and anchors (sent only with the server flag on) land, the figures list included (W5-D D6)', () => {
+  const figures = [{ page: 6, label: 'Sienų dažai', value: 320, unit: 'm2' }];
+  const read = { ...result(), _autoriaus_kiekiai: figures, _walls_anchor: { total_area_m2: 320 } };
+  const { project } = mergeFreeReread(base(), read, 'T');
+  assert.deepEqual(project._autoriaus_kiekiai, figures);
+  assert.equal(project._walls_anchor.total_area_m2, 320);
+  const kept = mergeFreeReread({ ...base(), _autoriaus_kiekiai: figures }, result(), 'T').project;
+  assert.deepEqual(kept._autoriaus_kiekiai, figures, 'never overwritten by their absence');
+});

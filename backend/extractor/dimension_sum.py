@@ -53,6 +53,7 @@ import math
 from typing import Sequence
 
 from shapely.geometry import Point, Polygon
+import os
 
 from .sheet_alignment import base_page, to_base
 from .vector_rooms import SOURCE as VECTOR_SOURCE
@@ -162,6 +163,27 @@ def _edge_frame(edge) -> tuple[bool | None, float, float, float]:
     return False, min(ay, by), max(ay, by), (ax + bx) / 2
 
 
+# Pathon v3 W5-D D8 — behind SAMATU_DIM_LINE_TICKS (default off). A string's `span` is the hairline's PDFium bounds,
+# which include the stroke's caps: on objektas_h p1 every span is its drawn length (`ilgis_pt`) + 1,00 pt, so a
+# 0,50 m string's evidence line measured 0,54 m at the page's own scale (+8 %, +2 % at 2,00 m — a constant
+# 0,04 m, not a proportion). With the flag the evidence line (`line_pct`, the check sheet and the viewer draw it)
+# ends where the drawn line ends. `s0`/`s1`, which match strings to walls, are NOT changed: no length the
+# perimeter adds up moves.
+LINE_TICKS_FLAG = "SAMATU_DIM_LINE_TICKS"
+
+
+def _drawn_ends(a0: float, a1: float, ilgis_pt) -> tuple[float, float]:
+    """The span's ends pulled in to the drawn length (half the cap at each end) — with the flag on only."""
+    if os.environ.get(LINE_TICKS_FLAG) != "1" or ilgis_pt is None:
+        return a0, a1
+    lo, hi = min(a0, a1), max(a0, a1)
+    cap = (hi - lo) - float(ilgis_pt)
+    if not (0.0 < cap < 0.5 * (hi - lo)):
+        return a0, a1
+    lo, hi = lo + cap / 2, hi - cap / 2
+    return (lo, hi) if a0 <= a1 else (hi, lo)
+
+
 def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[dict]]:
     """Line-backed strings, mapped onto their plan group's base page."""
     by_base: dict[int, list[dict]] = {}
@@ -181,7 +203,8 @@ def _strings_on_base(dims: Sequence[dict], alignment: dict) -> dict[int, list[di
         lp = float(d["line_pos"])
         line_pct = None
         if W > 0 and H > 0:
-            ends = [(a0, lp), (a1, lp)] if horiz else [(lp, a0), (lp, a1)]
+            e0, e1 = _drawn_ends(a0, a1, d.get("ilgis_pt"))
+            ends = [(e0, lp), (e1, lp)] if horiz else [(lp, e0), (lp, e1)]
             line_pct = [[round(x / W, 5), round(y / H, 5)] for x, y in ends]
         by_base.setdefault(b, []).append({"page": p, "text": str(d["text"]), "value_m": float(d["value_m"]), "horiz": horiz,
                                           "s0": min(s0, s1), "s1": max(s0, s1), "pos": t["k"] * lp + across,

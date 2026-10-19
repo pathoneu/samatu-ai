@@ -12,12 +12,15 @@ import { cn } from '@/lib/utils';
  *   drop it while the zone kept showing the old filename.
  */
 export default function UploadZone({
-  onFileSelect, accept = '.pdf,.xlsx,.xls', label, resetToken = 0,
+  onFileSelect, accept = '.pdf,.xlsx,.xls', label, resetToken = 0, onFilesSelect = null,
 }) {
+  // `onFilesSelect` (Pathon v3 W5-D, D14): several files at once — called with every accepted File in the
+  // order chosen; the zone then shows the first name and how many more.
   const { t } = useTranslation();
   const resolvedLabel = label ?? t('upload.zone.defaultLabel');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [moreFiles, setMoreFiles] = useState(0);
   const [fileError, setFileError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -55,8 +58,20 @@ export default function UploadZone({
     if (err) { setFileError(err); return; }
     setFileError(null);
     setSelectedFile(file);
+    setMoreFiles(0);
     onFileSelect(file);
   }, [validateFile, onFileSelect]);
+
+  const acceptFiles = useCallback((list) => {
+    const files = Array.from(list || []);
+    if (!onFilesSelect || files.length < 2) { if (files[0]) acceptFile(files[0]); return; }
+    const err = files.map(validateFile).find(Boolean);
+    if (err) { setFileError(err); return; }
+    setFileError(null);
+    setSelectedFile(files[0]);
+    setMoreFiles(files.length - 1);
+    onFilesSelect(files);
+  }, [validateFile, onFilesSelect, acceptFile]);
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -80,15 +95,16 @@ export default function UploadZone({
     e.stopPropagation();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    if (files && files.length > 0) acceptFile(files[0]);
-  }, [acceptFile]);
+    if (files && files.length > 0) acceptFiles(files);
+  }, [acceptFiles]);
 
   const handleChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) acceptFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) acceptFiles(e.target.files);
   };
 
   const clearFile = () => {
     setSelectedFile(null);
+    setMoreFiles(0);
     onFileSelect(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -115,7 +131,7 @@ export default function UploadZone({
               <FileText className="w-5 h-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>{selectedFile.name}</p>
+              <p className="text-sm font-medium text-foreground truncate" title={selectedFile.name}>{selectedFile.name}{moreFiles > 0 ? ` ir dar ${moreFiles}` : ''}</p>
               <p className="text-xs text-muted-foreground">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
@@ -157,6 +173,7 @@ export default function UploadZone({
         ref={fileInputRef}
         type="file"
         accept={accept}
+        multiple={!!onFilesSelect}
         onChange={handleChange}
         className="sr-only"
         id="file-upload"

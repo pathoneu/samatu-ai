@@ -29,6 +29,7 @@ import { newRunEnding } from '@/lib/runEndNotice';
 import { useQueryClient } from '@tanstack/react-query';
 import { loadPrefs } from '@/components/project/SetupWizard';
 import { API_BASE as API } from '@/lib/apiBase';
+import { INTAKE_ACCEPT, combineUploads, needsCombine } from '@/lib/intakeApi';
 import { useBilling } from '@/hooks/useBilling';
 import UpgradeDialog from '@/components/billing/UpgradeDialog';
 import { detectPaywall } from '@/lib/paywall';
@@ -325,7 +326,34 @@ export default function NewProject() {
     setPreflightBusy(false);
   };
 
+  // Pathon v3 W5-D D14: several drawings (or a picture) are made into ONE PDF first — free, nothing saved —
+  // and the sheets keep their files' names (`sheet_overrides`, renamed like any other in the sheet rail).
+  const sheetNamesRef = useRef(null);
+  const [combining, setCombining] = useState(false);
+  const handleFilesSelect = async (files) => {
+    sheetNamesRef.current = null;
+    if (!needsCombine(files)) { handleFileSelect(files?.[0] || null); return; }
+    const run = ++preflightRunRef.current;
+    setFile(null);
+    setPreflight(null);
+    setError(null);
+    setCombining(true);
+    try {
+      const { file: combined, overrides } = await combineUploads(files);
+      if (run !== preflightRunRef.current) return;
+      sheetNamesRef.current = Object.keys(overrides).length ? overrides : null;
+      await handleFileSelect(combined);
+    } catch (e) {
+      if (run !== preflightRunRef.current) return;
+      setError(e?.message || 'Failų sujungti nepavyko — bandykite įkelti juos po vieną.');
+      setUploadResetToken((n) => n + 1);
+    } finally {
+      if (run === preflightRunRef.current) setCombining(false);
+    }
+  };
+
   const clearChosenFile = () => {
+    sheetNamesRef.current = null;
     preflightRunRef.current++;
     setFile(null);
     setPreflight(null);
@@ -635,6 +663,11 @@ export default function NewProject() {
           ...(json.warnings?.length ? { warnings: json.warnings } : {}),
         }, t));
         (json.warnings || []).forEach((w) => toast.warning(w.message, { duration: 12000 }));
+      }
+
+      // v3 W5-D D14: the sheets of a combined upload carry their files' names
+      if (project && sheetNamesRef.current) {
+        project = updateProject(project.id, { sheet_overrides: sheetNamesRef.current }) || project;
       }
 
       // Saugom PDF: greitas IndexedDB kešas + durabli kopija backende, kad
@@ -961,11 +994,15 @@ export default function NewProject() {
         <div>
           <Label className="text-sm text-muted-foreground mb-1.5 block">{t('newProject.pdfLabel')}</Label>
           <UploadZone
-            onFileSelect={handleFileSelect}
-            accept=".pdf"
+            onFileSelect={(f) => { sheetNamesRef.current = null; handleFileSelect(f); }}
+            onFilesSelect={handleFilesSelect}
+            accept={INTAKE_ACCEPT}
             label={t('newProject.uploadLabel')}
             resetToken={uploadResetToken}
           />
+          {combining && (
+            <p className="mt-2 text-[14px] text-muted-foreground" role="status">Sujungiami failai į vieną brėžinį…</p>
+          )}
           {/* Five seconds of looking, before twenty-five minutes of paying. */}
           <PreflightCard
             card={card}

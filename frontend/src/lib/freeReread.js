@@ -24,7 +24,10 @@ import { mergeReextractRooms } from './mergeReextract.js';
  * Project-level reads the free re-read returns beside the rooms (api/free_reread.py): the door schedule, the
  * symbols counted from the paths, and the window and finish schedules of the „lentelės" stage (Pathon v3 W3-A).
  */
-export const PROJECT_READ_KEYS = Object.freeze(['_duru_ziniarastis', '_vector_symbols', '_langu_ziniarastis', '_apdailos_lentele']);
+export const PROJECT_READ_KEYS = Object.freeze(['_duru_ziniarastis', '_vector_symbols', '_langu_ziniarastis', '_apdailos_lentele',
+  // Pathon v3 W5-D D6 — sent only with the server's SAMATU_REREAD_FIGURES on: the designer's figures and the anchors
+  // billed from them
+  '_autoriaus_kiekiai', '_walls_anchor', '_floor_anchors']);
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -59,6 +62,10 @@ export function mergeReadMeta(storedMeta, readMeta) {
   const out = { ...base };
   if (readMeta.geometrija !== undefined) out.geometrija = readMeta.geometrija;
   if (isObj(readMeta.lenteles)) out.lenteles = readMeta.lenteles;
+  // the floor sheet's key lines (Pathon v3 W5-D, D1) — a record of the floor sheet, taken whole
+  if (Array.isArray(readMeta.grindu_legenda)) out.grindu_legenda = readMeta.grindu_legenda;
+  // the wall / partition types the legends name (W5-D D9) — a record of the drawing, taken whole
+  if (isObj(readMeta.sienu_tipai)) out.sienu_tipai = readMeta.sienu_tipai;
   const zonos = mergeZones(base.zonos, readMeta.zonos);
   if (zonos !== undefined) out.zonos = zonos;
   return out;
@@ -87,7 +94,7 @@ export function mergeFreeReread(base, result, now = new Date().toISOString()) {
   // the paths): a project read before they existed gets them with the same click — never overwritten by
   // their absence
   for (const key of PROJECT_READ_KEYS) {
-    if (isObj(result[key])) project[key] = result[key];
+    if (isObj(result[key]) || Array.isArray(result[key])) project[key] = result[key];
   }
   return { project, diff };
 }

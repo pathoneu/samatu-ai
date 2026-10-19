@@ -6,7 +6,7 @@
 
 import {
   FileText, Layers, Square, Building2, BookOpen, Zap, Droplets,
-  HelpCircle, ChevronRight, Map, DoorOpen, Brush, Frame, EyeOff,
+  HelpCircle, ChevronRight, Map, DoorOpen, Brush, Frame, EyeOff, ListChecks,
 } from 'lucide-react';
 
 // LT user-facing labels per enum value.
@@ -25,6 +25,7 @@ export const PAGE_TYPE_LABELS = {
   plumbing:             'Santechnikos planas',
   specification:        'Specifikacija',
   title_page:           'Tituliniai',
+  legend:               'Legenda',
   unknown:              'Nežinomas',
   non_relevant:         'Nereikalingas',
 };
@@ -46,6 +47,7 @@ export const PAGE_TYPE_COLOR = {
   plumbing:             '#0891b2', // ciano
   specification:        '#4f46e5', // indigo
   title_page:           '#78716c', // pilkstvo
+  legend:               '#0f766e', // tamsiai žalsva
   unknown:              '#a8a29e',
   non_relevant:         '#525252',
 };
@@ -65,6 +67,7 @@ export const PAGE_TYPE_ICON = {
   plumbing:             Droplets,
   specification:        BookOpen,
   title_page:           FileText,
+  legend:               ListChecks,
   unknown:              HelpCircle,
   non_relevant:         EyeOff,
 };
