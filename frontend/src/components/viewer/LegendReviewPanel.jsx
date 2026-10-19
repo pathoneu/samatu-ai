@@ -8,13 +8,13 @@
  * ONE „Sukurti kiekius (N)" at the bottom — nothing exists before it.
  */
 import { useState } from 'react';
-import { Check, Loader2, PenLine, Ruler, Trash2, Undo2, X } from 'lucide-react';
+import { Check, Loader2, PenLine, RotateCcw, Ruler, Trash2, Undo2, X } from 'lucide-react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { API_BASE } from '@/lib/apiBase';
 import Notice from '@/components/ui/Notice';
 import FeedbackThumbs from '@/components/ui/FeedbackThumbs';
 import { feedbackBody, sendFeedback, validBoxPct } from '@/lib/feedback';
-import { BLANK_REASON, createLabel, keptInstances, perPage, perPageText, rowName } from '@/lib/legendReview';
+import { BLANK_REASON, countingText, createLabel, keptInstances, legendGotoPage, perPage, perPageText, rowName } from '@/lib/legendReview';
 
 const BTN = 'inline-flex min-h-[36px] items-center gap-1.5 rounded-[2px] border px-2.5 text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
 const PLAIN = `${BTN} border-border bg-card hover:bg-muted`;
@@ -169,9 +169,32 @@ function Row({ row, count, review, removed, projectId, legend, onPage, onMeasure
   );
 }
 
+const OUTCOME_TONE = { ok: 'info', empty: 'warning', warn: 'warning', error: 'error' };
+
+/** How the tool ended, in one sentence (B1-B) — and „Bandyti dar kartą" when trying again can help. */
+function Outcome({ outcome, onRetry }) {
+  return (
+    <Notice
+      className="mx-3 mt-3"
+      tone={OUTCOME_TONE[outcome.tone] || 'info'}
+      data-testid="legend-outcome"
+      data-tone={outcome.tone}
+      action={outcome.retry ? (
+        <button type="button" className={PLAIN} onClick={onRetry} data-testid="legend-retry">
+          <RotateCcw className="h-4 w-4" aria-hidden="true" /> Bandyti dar kartą
+        </button>
+      ) : null}
+    >
+      {outcome.text}
+    </Notice>
+  );
+}
+
 export default function LegendReviewPanel({ documentId, projectId, legend, onMeasure }) {
-  const { provides: scrollApi } = useScroll(documentId);
+  const { provides: scrollApi, state: scrollState } = useScroll(documentId);
   const toPage = (page) => scrollApi?.scrollToPage({ pageNumber: page, behavior: 'smooth' });
+  const pages = scrollState?.totalPages || null;
+  const gotoPage = legendGotoPage(legend);
   const busy = legend.phase === 'suggesting' || legend.phase === 'reading' || legend.phase === 'counting' || legend.phase === 'creating';
   const marks = legend.toCreate.reduce((n, r) => n + keptInstances(legend.counts[r.row_id], legend.removed).length, 0);
   const n = legend.toCreate.length;
@@ -194,19 +217,57 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           </p>
         )}
         {legend.phase === 'box' && (
-          <p className="px-3 py-3 text-[14px] leading-snug text-ink-2">
-            {legend.notice ? `${legend.notice}. ` : ''}Tempdami apveskite legendą brėžinyje — ženklus kartu su jų pavadinimais.
-          </p>
+          <>
+            {legend.outcome ? (
+              <Outcome outcome={legend.outcome} onRetry={legend.retry} />
+            ) : legend.notice ? (
+              <p className="px-3 pt-3 text-[14px] font-medium leading-snug text-foreground" role="status" data-testid="legend-outcome" data-tone="empty">
+                {legend.notice}.
+              </p>
+            ) : null}
+            {gotoPage && (
+              <div className="px-3 pt-2">
+                <button type="button" className={ON} onClick={() => toPage(gotoPage)} data-testid="legend-goto">
+                  Eiti į {gotoPage} lapą
+                </button>
+              </div>
+            )}
+            <p className="px-3 py-3 text-[14px] leading-snug text-ink-2">
+              Tempdami apveskite legendą brėžinyje — ženklus kartu su jų pavadinimais.
+            </p>
+          </>
         )}
         {busy && (
-          <p className="flex items-center gap-2 px-3 py-3 text-[14px] text-muted-foreground" data-testid="legend-busy">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {legend.phase === 'suggesting' ? 'Ieškoma legendos šiame lape…'
-              : legend.phase === 'reading' ? 'Skaitomos legendos eilutės…'
-                : legend.phase === 'counting' ? 'Skaičiuojami ženklai visuose lapuose — gali užtrukti iki minutės…'
-                  : 'Kuriami kiekiai…'}
-          </p>
+          <div className="px-3 py-3" data-testid="legend-busy" role="status" aria-live="polite">
+            <p className="flex items-center gap-2 text-[14px] font-medium text-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {legend.phase === 'suggesting' ? `Ieškau legendos šiame lape… ${legend.elapsed || 0} s`
+                : legend.phase === 'reading' ? `Skaitau rėmelį… ${legend.elapsed || 0} s`
+                  : legend.phase === 'counting' ? countingText(legend.elapsed)
+                    : 'Kuriami kiekiai…'}
+            </p>
+            {legend.phase === 'counting' && (
+              <p className="mt-1 text-[14px] leading-snug text-ink-2">
+                Ieškau kiekvienos eilutės ženklų visuose {pages || ''} lapuose. Kai baigsiu, prie eilučių bus skaičiai — nieko spausti nereikia.
+              </p>
+            )}
+          </div>
         )}
+        {/* the rows while they are counted: he sees what was read at once, the numbers follow */}
+        {legend.phase === 'counting' && (legend.rows || []).length > 0 && (
+          <ul data-testid="legend-rows-pending" aria-busy="true">
+            {legend.rows.map((row) => (
+              <li key={row.row_id} className="flex items-center gap-3 border-t border-border px-3 py-2.5 first:border-t-0">
+                {crop(row.glyph_crop_url) && (
+                  <img src={crop(row.glyph_crop_url)} alt={`Ženklas: ${row.text || ''}`} className="h-10 w-10 shrink-0 rounded-[2px] border border-border bg-white object-cover" />
+                )}
+                <span className="min-w-0 flex-1 text-[14px] leading-snug text-foreground">{row.text || 'Ženklas'}</span>
+                <span className="shrink-0 text-[14px] text-muted-foreground">{row.countable === false ? 'pavyzdys' : 'skaičiuojama…'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {legend.phase === 'review' && legend.outcome && <Outcome outcome={legend.outcome} onRetry={legend.retry} />}
 
         {legend.phase === 'review' && legend.reuse && !legend.reuse.applied && (
           <Notice
@@ -228,13 +289,6 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           <p className="mx-3 mt-3 text-[14px] text-ink-2">Pritaikyta ankstesnė legenda — patikrinkite eilutes.</p>
         )}
 
-        {/* nothing read in the box: what to do next (C9, #133) */}
-        {legend.phase === 'review' && (legend.rows || []).length === 0 && (
-          <p className="px-3 py-3 text-[14px] leading-snug text-ink-2" data-testid="legend-empty">
-            Šiame rėmelyje legendos eilučių neradau. Apveskite kitą vietą — ženklus kartu su jų pavadinimais — arba
-            skaičiuokite patys įrankiu „Kiekis“ kairėje.
-          </p>
-        )}
         {(legend.phase === 'review' || legend.phase === 'creating') && (
           <>
             <ul className="mt-2" data-testid="legend-rows">
@@ -285,7 +339,9 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground">
             {n || blanks
               ? `${n ? `${n} kiek. ir ${marks} žym. brėžinyje — sąmatos eilutės skaičiuosis pačios.` : ''}${blanks ? ` ${blanks} eil. be ženklų — sąmatoje tuščios, su klausimu.` : ''} Po to galėsite atšaukti.`.trim()
-              : 'Pažymėkite bent vieną eilutę „Tinka“.'}
+              : (legend.rows || []).some((r) => r.countable !== false)
+                ? 'Pažymėkite bent vieną eilutę „Tinka“.'
+                : 'Vienetais skaičiuoti nėra ką — matuokite plotu ar ilgiu.'}
           </p>
         </footer>
       )}
