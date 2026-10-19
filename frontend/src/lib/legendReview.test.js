@@ -4,7 +4,7 @@ import {
   applyCreate, boxFromPctDrag, buildCreate, createLabel, decisionsFor, displayBoxToMediaBox, displayPctToMediaPt,
   initialReview, journalRows, keptInstances, legendCursorHint, legendLedgerText, legendPill, legendRowsToSave,
   LEGEND_PHASES, LEGEND_SOURCE, marksWord, matchSavedLegend, MAX_ACCEPTS_PER_ROW, perPage, perPageText, proposalsFrom,
-  rowName, rowsOf, rowsToCreate, syncLegendRows,
+  rowName, rowsOf, rowsToCreate, syncLegendRows, blankRows, blankSamataRow, BLANK_REASON,
 } from './legendReview.js';
 
 const A3 = { size: { width: 1000, height: 500 }, rotation: 0 };
@@ -53,7 +53,7 @@ test('the review starts from a proposal: found rows ✔, empty / sample rows �
   assert.equal(review['p3-b'].keep, false);
   assert.equal(review['p3-s'].keep, false);
   // a sample row is never created even if kept
-  assert.deepEqual(rowsToCreate([rowA, rowS], { 'p3-a': { keep: true }, 'p3-s': { keep: true } }).map((r) => r.row_id), ['p3-a']);
+  assert.deepEqual(rowsToCreate([rowA, rowS], { 'p3-a': { keep: true }, 'p3-s': { keep: true } }, counts).map((r) => r.row_id), ['p3-a']);
   assert.equal(createLabel(2), 'Sukurti kiekius (2)');
 });
 
@@ -72,11 +72,13 @@ test('his name wins over the legend text', () => {
   assert.equal(rowName({ text: '' }, null), 'Ženklas');
 });
 
-test('create: a new type per kept row with legend_row_id, marks at the instance centres, removed ones left out', () => {
+test('create: a new type per kept row with marks, with legend_row_id, marks at the instance centres, removed ones left out', () => {
   const review = { 'p3-a': { keep: true, name: null }, 'p3-b': { keep: true, name: 'Jungikliai' }, 'p3-s': { keep: true } };
   const plan = buildCreate({ rows: [rowA, rowB, rowS], counts, review, removed: new Set(['p3-a#1']), countTypes: [], pages });
-  assert.equal(plan.types.length, 2);
-  assert.deepEqual(plan.types.map((t) => [t.label, t.legend_row_id]), [['Rozetė', 'p3-a'], ['Jungikliai', 'p3-b']]);
+  // p3-b found no mark: a blank row, not a count type
+  assert.equal(plan.types.length, 1);
+  assert.deepEqual(plan.types.map((t) => [t.label, t.legend_row_id]), [['Rozetė', 'p3-a']]);
+  assert.deepEqual(plan.blanks.map((b) => [b.aprasymas, b.kiekis]), [['Jungikliai (pagal legendą)', null]]);
   assert.equal(plan.marks.length, 2);
   assert.ok(plan.marks.every((m) => m.kind === 'count' && m.source === LEGEND_SOURCE && m.typeId === plan.types[0].id));
   assert.deepEqual(plan.marks[0].points, [{ x: 500, y: 250 }]);
@@ -187,4 +189,31 @@ test('hints and pill per phase, always a way out', () => {
   const review = legendPill({ phase: 'review', toCreate: 0 });
   assert.equal(review.actions[0].disabled, true);
   assert.equal(legendPill({ phase: 'review', toCreate: 3 }).actions[0].label, 'Sukurti kiekius (3)');
+});
+
+
+test('a kept row with no mark is never counted: it becomes a blank sąmata row with the question', () => {
+  const review = { 'p3-a': { keep: true }, 'p3-b': { keep: true, name: 'Jungikliai' } };
+  // p3-b found nothing; p3-a loses all three marks by hand → both blank
+  assert.deepEqual(rowsToCreate([rowA, rowB], review, counts).map((r) => r.row_id), ['p3-a']);
+  assert.deepEqual(blankRows([rowA, rowB], review, counts).map((r) => r.row_id), ['p3-b']);
+  const gone = new Set(['p3-a#0', 'p3-a#1', 'p3-a#2']);
+  assert.deepEqual(rowsToCreate([rowA, rowB], review, counts, gone), []);
+  const plan = buildCreate({ rows: [rowA, rowB], counts, review, removed: gone, countTypes: [], pages });
+  assert.deepEqual(plan.types, []);
+  assert.deepEqual(plan.marks, []);
+  assert.deepEqual(plan.blanks.map((b) => b.legend_row_id), ['p3-a', 'p3-b']);
+  const blank = blankSamataRow(rowB, review['p3-b']);
+  assert.equal(blank.kiekis, null);
+  assert.equal(blank.aprasymas, 'Jungikliai (pagal legendą)');
+  assert.equal(blank.ledger_note_lt, BLANK_REASON);
+  assert.match(blank._confidence_reason, /^Legendoje yra, brėžinyje ženklų nerasta — suskaičiuokite „Kiekis“ įrankiu$/);
+  assert.ok(!/ženkl(ai|as) lape/.test(blank.ledger_note_lt), 'no ledger line claims a count');
+  // blank rows are not count rows: the legend sync never touches them
+  const rows = [blank];
+  assert.equal(syncLegendRows(rows, [], []), rows);
+  // the pill lets him create blanks alone, the label still counts only the rows with marks
+  const pill = legendPill({ phase: 'review', toCreate: 0, blanks: 2 });
+  assert.equal(pill.actions[0].label, 'Sukurti kiekius (0)');
+  assert.equal(pill.actions[0].disabled, false);
 });

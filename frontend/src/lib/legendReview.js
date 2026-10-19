@@ -136,9 +136,42 @@ export function rowName(row, review) {
   return own || String(row?.text || '').trim() || 'Ženklas';
 }
 
-/** What „Sukurti kiekius (N)" will create: the rows he kept that can be counted. */
-export function rowsToCreate(rows, review) {
+/** The rows he kept („Tinka") that can be counted — with marks or without. */
+export function keptRows(rows, review) {
   return (rows || []).filter((r) => r.countable !== false && review?.[r.row_id]?.keep);
+}
+
+/**
+ * What „Sukurti kiekius (N)" counts: the kept rows with at least one kept mark. A count is never claimed
+ * for a row the drawing shows no mark of (`blankRows`).
+ */
+export function rowsToCreate(rows, review, counts = {}, removed = new Set()) {
+  return keptRows(rows, review).filter((r) => keptInstances(counts?.[r.row_id], removed).length > 0);
+}
+
+/** The kept rows with no mark left: each becomes a BLANK sąmata row with the question, never a count. */
+export function blankRows(rows, review, counts = {}, removed = new Set()) {
+  return keptRows(rows, review).filter((r) => keptInstances(counts?.[r.row_id], removed).length === 0);
+}
+
+/** Why a kept legend row stands blank in the sąmata — said beside the row before the click, and on the row. */
+export const BLANK_REASON = 'legendoje yra, brėžinyje ženklų nerasta — suskaičiuokite „Kiekis“ įrankiu';
+
+/** The blank sąmata row of a kept legend row with no marks: kiekis empty, the reason, no ledger count. */
+export function blankSamataRow(row, review) {
+  return {
+    id: `${LEGEND_ROW_PREFIX}be-zenklu-${row.row_id}`,
+    aprasymas: `${rowName(row, review)} (pagal legendą)`,
+    mato_vnt: 'vnt.',
+    kiekis: null,
+    kaina: 0,
+    skyrius: 'Matavimai',
+    confidence: 'low',
+    saltinis: 'legenda',
+    legend_row_id: row.row_id,
+    _confidence_reason: BLANK_REASON[0].toUpperCase() + BLANK_REASON.slice(1),
+    ledger_note_lt: BLANK_REASON,
+  };
 }
 
 /** The button's label. */
@@ -158,7 +191,7 @@ export function buildCreate({ rows, counts, review, removed = new Set(), countTy
   const marks = [];
   const replaceTypeIds = [];
   const made = [];
-  for (const row of rowsToCreate(rows, review)) {
+  for (const row of rowsToCreate(rows, review, counts, removed)) {
     const name = rowName(row, review[row.row_id]);
     let type = countTypes.find((t) => t.legend_row_id === row.row_id) || null;
     if (type) {
@@ -191,7 +224,8 @@ export function buildCreate({ rows, counts, review, removed = new Set(), countTy
     marks.push(...rowMarks);
     made.push({ row, type, marks: rowMarks });
   }
-  return { types, marks, replaceTypeIds, made, renamed: made.map((m) => m.type).filter((t) => replaceTypeIds.includes(t.id)) };
+  const blanks = blankRows(rows, review, counts, removed).map((r) => blankSamataRow(r, review[r.row_id]));
+  return { types, marks, replaceTypeIds, made, blanks, renamed: made.map((m) => m.type).filter((t) => replaceTypeIds.includes(t.id)) };
 }
 
 /**
@@ -263,7 +297,7 @@ export function journalRows({ rows, counts, review, removed = new Set() }) {
 
 /** The legend as api/legends.py stores it (ProjectLegend.rows): the kept rows with his names. */
 export function legendRowsToSave(rows, review) {
-  return rowsToCreate(rows, review).map((r) => ({
+  return keptRows(rows, review).map((r) => ({
     row_id: r.row_id, page: r.page, glyph_bbox_pct: r.glyph_bbox_pct, glyph_box_pt: r.glyph_box_pt ?? null,
     glyph_kind: r.glyph_kind ?? null, colour: r.colour ?? null, glyph_text: r.glyph_text ?? null,
     text: String(r.text || ''), text_bbox_pct: r.text_bbox_pct ?? null, legend_bbox_pct: r.legend_bbox_pct ?? null,
@@ -384,7 +418,7 @@ export function legendCursorHint(phase) {
  * The bottom pill for the legend tool. state = {phase, proposals (n), toCreate (n), notice} →
  * {id, name, detail, keys, actions}
  */
-export function legendPill({ phase, proposals = 0, toCreate = 0, notice = null } = {}) {
+export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, notice = null } = {}) {
   const name = 'Pažymėti legendą';
   const exit = { id: 'legendExit', label: 'Išeiti', title: 'Išeiti iš legendos įrankio (Esc) — niekas nesukuriama' };
   if (phase === 'proposed') {
@@ -407,9 +441,9 @@ export function legendPill({ phase, proposals = 0, toCreate = 0, notice = null }
   if (phase === 'review' || phase === 'creating') {
     return {
       id: 'legend', name, detail: phase === 'creating' ? 'Kuriama…' : 'Peržiūrėkite eilutes dešinėje',
-      keys: toCreate ? 'Enter — sukurti' : null,
+      keys: toCreate || blanks ? 'Enter — sukurti' : null,
       actions: [
-        { id: 'legendCreate', label: createLabel(toCreate), primary: true, disabled: !toCreate || phase === 'creating', title: toCreate ? 'Sukurti pažymėtų eilučių kiekius ir žymes brėžinyje (Enter) — po to galėsite atšaukti' : 'Pažymėkite bent vieną eilutę ✔' },
+        { id: 'legendCreate', label: createLabel(toCreate), primary: true, disabled: !(toCreate || blanks) || phase === 'creating', title: toCreate || blanks ? 'Sukurti pažymėtų eilučių kiekius ir žymes brėžinyje (Enter) — eilutės be ženklų sąmatoje liks tuščios; po to galėsite atšaukti' : 'Pažymėkite bent vieną eilutę „Tinka“' },
         { id: 'legendRedraw', label: 'Kita legenda', title: 'Apvesti kitą legendą — ši peržiūra išmetama' },
         exit,
       ],

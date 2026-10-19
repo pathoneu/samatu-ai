@@ -525,6 +525,24 @@ export default function InteriorWorkspace({
     if (updated) onProjectChange?.(updated);
   };
 
+  // v3 W2-B: a legend row he kept whose marks the drawing does not show → a BLANK sąmata row with the question
+  // (lib/legendReview blankSamataRow); the returned function takes them away again (the create's „Atšaukti").
+  const handleLegendBlankRows = (blanks) => {
+    const cur = getProject(project.id)?.darbu_sarasas || project.darbu_sarasas || [];
+    const have = new Set(cur.map((r) => String(r?.id)));
+    let nr = cur.reduce((m, d) => Math.max(m, Number(d?.eil_nr) || 0), 0);
+    const add = (blanks || []).filter((b) => !have.has(String(b.id))).map((b) => ({ ...b, eil_nr: ++nr }));
+    if (!add.length) return null;
+    const updated = updateProject(project.id, { darbu_sarasas: [...cur, ...add] });
+    if (updated) onProjectChange?.(updated);
+    const ids = new Set(add.map((b) => String(b.id)));
+    return () => {
+      const now = getProject(project.id)?.darbu_sarasas || [];
+      const back = updateProject(project.id, { darbu_sarasas: now.filter((r) => !ids.has(String(r?.id))) });
+      if (back) onProjectChange?.(back);
+    };
+  };
+
   // Sheet names / types / groups the user set in the viewer's sheet rail (Togal-v2 W7) — a frontend
   // key on the project blob like `measurements`. The links between sheets are read server side from
   // the SAVED blob, so they are asked for again (version bump) once this save has landed.
@@ -820,6 +838,7 @@ export default function InteriorWorkspace({
         onMeasureDataChange={handleMeasureDataChange}
         legendPanelSlot={legendSlot}
         onLegendPanelChange={setLegendOpen}
+        onLegendBlankRows={handleLegendBlankRows}
         sheetPages={sheetPages}
         sheetOverrides={project?.sheet_overrides || null}
         onSheetOverridesChange={handleSheetOverridesChange}
