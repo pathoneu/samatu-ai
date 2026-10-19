@@ -31,3 +31,10 @@ test('JSON round-trips', () => {
 test('fromJSON rejects garbage', () => {
   assert.throws(() => fromJSON('{"nope":1}'));
 });
+test('CSV: a „Pastaba" pin is its own row with its text — never a length (W5-C C11)', () => {
+  const csv = toMeasurementsCSV({ ...doc, measurements: [{ id: 'n', kind: 'note', page: 2, points: [{ x: 1, y: 1 }], text: 'Patikrinti aukštį', source: 'user' }] });
+  const lines = csv.split('\r\n');
+  assert.equal(lines.length, 2);
+  assert.ok(lines[1].startsWith('2;Pastaba;Patikrinti aukštį;'));
+  assert.ok(!/Atstumas/.test(csv));
+});

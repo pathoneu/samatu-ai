@@ -27,6 +27,10 @@ export function toMeasurementsCSV(doc) {
   const rows = [['Lapas', 'Tipas', 'Klasifikacija', 'Kiekis', 'Vnt.', 'Antrinis', 'Antrinis vnt.', 'Patikimumas', 'Šaltinis']];
   for (const m of measurements) {
     if (m.kind === 'count') continue;
+    if (m.kind === 'note') {
+      rows.push([String(m.page), 'Pastaba', m.text || '', '', '', '', '', '', m.source || '']);
+      continue;
+    }
     const scale = measureScales[m.page] || uncal;
     const { value, secondary } = measurementValue(m, scale);
     const isArea = m.kind === 'area';

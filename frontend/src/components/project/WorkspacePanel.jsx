@@ -41,6 +41,7 @@ import {
 import { measureDragProps, useMeasureRows } from './measure/useMeasureRows';
 import MeasureRowPicker from './measure/MeasureRowPicker';
 import MeasuredChip from './measure/MeasuredChip';
+import NotesList from './measure/NotesList';
 import { floorAreaTotal } from '@/lib/floorArea';
 import { roomAreaText } from '@/lib/roomZones';
 import { cleanUserText } from '@/lib/userText';
@@ -828,6 +829,9 @@ export default function WorkspacePanel({
             })}
           </>
         )}
+
+        {/* „Pastaba" pins listed with the measurements (C11) */}
+        <NotesList project={project} onJumpToPage={onJumpToPage} />
 
         {/* KIEKIAI section */}
         <SectionHeader
