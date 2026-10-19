@@ -427,6 +427,7 @@ from api.export_overlay_pdf import router as export_overlay_pdf_router
 from api.project_questions import router as project_questions_router
 from api.reminders import router as reminders_router
 from api.table_export import router as table_export_router
+from api.intake import router as intake_router
 from api.project_versions import router as project_versions_router
 from api.pdf_revisions import router as pdf_revisions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
@@ -788,6 +789,7 @@ app.include_router(legend_count_router)
 app.include_router(sheet_links_router)
 app.include_router(export_overlay_pdf_router)
 app.include_router(table_export_router)          # „Eksportuoti lentelę" (v3 W5-D D10)
+app.include_router(intake_router)                # several PDFs / pictures → one project PDF (v3 W5-D D14)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
 # What an estimator commonly forgets, as notices for Patikra and the Sąmata (v3 W5-E) — read-only.
