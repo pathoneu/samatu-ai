@@ -1718,6 +1718,7 @@
       "splitNoProposal": "Ribos pasiūlyti nepavyko — nubrėžkite ją patys: du paspaudimai brėžinyje, nuo sienos iki sienos.",
       "skip": "Praleisti",
       "skipNote": "Praleidus skaičiuoju su savo siūlymu. Grįžti galite bet kada.",
+      "keysHint": "Enter — tinka, kitas klausimas · Esc — atgal į sąrašą",
       "doneTitle": "Klausimų nebeliko",
       "doneBody": "Viskas, ko brėžinys nepasakė, atsakyta. Galite eiti į sąmatą — arba peržiūrėti patalpas po vieną, jei norite pamatyti, ką ir iš kur perskaičiau.",
       "doneSkipped": "Praleistų klausimų: {{count}} — juos skaičiuoju su savo siūlymu. Grįžti prie jų galite bet kada kairėje.",

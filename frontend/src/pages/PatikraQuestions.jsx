@@ -37,6 +37,8 @@ import { orderFacts, roomsInDrawingOrder } from '@/lib/roomSheet';
 import { ltNumber } from '@/lib/ledger';
 import { ltPlural } from '@/lib/ltPlural';
 import { cleanUserText } from '@/lib/userText';
+import { patikraKeyAction } from '@/lib/patikraKeys';
+import { openLayerInDocument } from '@/lib/escOrder';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
 import { StepBar } from '@/components/project/StepRail';
 import { PANEL_TWO_COLUMNS_MIN, useWorkspaceHost } from '@/components/project/workspaceHost';
@@ -361,6 +363,48 @@ export default function PatikraQuestions() {
     setCurrentId(nextOpenQuestion(questions, next, current.id)?.id ?? null);
   }, [current, skipped, questions, pilot]);
 
+  // ── Enter = „Tinka" and the next question; Esc = back to the list (C4) ───────────────────────────────
+  // The card's own accept button is pressed, so each kind of question answers exactly as its button does.
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Enter' && e.key !== 'Escape') return;
+      const root = topRef.current;
+      if (!root) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const accept = root.querySelector('[data-testid="question-accept"]');
+      const ctx = {
+        targetTag: target?.tagName,
+        targetEditable: Boolean(target?.closest?.('[contenteditable="true"]')),
+        // the current question in the list (where Esc put him) is not a button for Enter: it answers that
+        // question; any other list entry is picked by its own Enter
+        targetIsButton: Boolean(target?.closest?.('button, a, [role="button"]'))
+          && !target?.closest?.('[data-question-rail] [aria-current="step"]'),
+        insideQueue: Boolean(target && root.contains(target)),
+        onBody: !target || target === document.body || target === document.documentElement,
+        layerOpen: openLayerInDocument(),
+        busy: busyRef.current,
+        canAccept: Boolean(accept && !accept.disabled),
+      };
+      const action = patikraKeyAction(e, ctx);
+      if (action === 'list') {
+        const rail = root.querySelector('[data-question-rail] [aria-current="step"]') || root.querySelector('[data-question-rail] button');
+        if (rail) { rail.focus(); rail.scrollIntoView?.({ block: 'nearest' }); }
+        return;
+      }
+      if (action !== 'accept') return;
+      // another surface (the drawing finishing a line) may take the same Enter after us: look once it has run
+      setTimeout(() => {
+        if (e.defaultPrevented) return;
+        const button = topRef.current?.querySelector('[data-testid="question-accept"]');
+        if (button && !button.disabled && !busyRef.current) button.click();
+      }, 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const firstRoomNr = useMemo(() => {
     const rooms = roomsInDrawingOrder(project);
     return rooms[0]?.nr != null ? String(rooms[0].nr) : null;
@@ -441,7 +485,7 @@ export default function PatikraQuestions() {
 
       <div className={`flex flex-1 gap-4 p-4 ${embedded ? (twoColumns ? 'flex-row items-start' : 'flex-col') : 'flex-col lg:flex-row lg:items-start'}`}>
         {/* the questions, top to bottom in the order that lets one answer settle the next */}
-        <nav className={`shrink-0 ${embedded ? (twoColumns ? 'w-[260px]' : 'w-full') : 'w-full lg:w-[300px]'}`} aria-label={t('project.questions.title')}>
+        <nav data-question-rail className={`shrink-0 ${embedded ? (twoColumns ? 'w-[260px]' : 'w-full') : 'w-full lg:w-[300px]'}`} aria-label={t('project.questions.title')}>
           <ol className="flex flex-col gap-1.5">
             {questions.map((q, i) => {
               const isCurrent = q.id === currentId;
@@ -616,7 +660,8 @@ export default function PatikraQuestions() {
                   <button type="button" className={`${Q_PLAIN} min-h-[36px] px-3 text-[14px]`} disabled={busy} onClick={skip} data-testid="question-skip">
                     {t('project.questions.skip')}
                   </button>
-                  <span className="ml-2 text-[13px] text-muted-foreground">{t('project.questions.skipNote')}</span>
+                  <span className="ml-2 text-[14px] text-muted-foreground">{t('project.questions.skipNote')}</span>
+                  <p className="mt-2 text-[14px] text-muted-foreground" data-testid="question-keys">{t('project.questions.keysHint')}</p>
                 </div>
               </section>
 
