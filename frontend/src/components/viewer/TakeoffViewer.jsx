@@ -600,7 +600,8 @@ function FocusZoomer({ documentId, focus, pages }) {
 function LegendPageWatcher({ documentId, pageRef, onPage }) {
   const { state: scroll } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
-  useEffect(() => { pageRef.current = cur; onPage?.(cur); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
+  // W5-B B10: the sheet on screen is also told to the Matavimai list's „Šis lapas“ filter (MeasureGroups)
+  useEffect(() => { pageRef.current = cur; onPage?.(cur); window.__pathonViewerPage = cur; window.dispatchEvent(new CustomEvent('samatu:viewer-page', { detail: { page: cur } })); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
