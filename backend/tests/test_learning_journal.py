@@ -101,3 +101,14 @@ def test_the_list_route_serves_the_sentence(tmp_path, monkeypatch):
         out = tc.get("/api/projects/p1/corrections").json()["corrections"]
     assert [c["sentence"] for c in out] == ["Eilutė „Sienų dažymas“: kiekį pakeitėte 143,2 → 150,0 m²"]
     assert out[0]["source"] == "eilute_kiekis" and out[0]["new_value"] == 150.0
+
+
+def test_legend_rows_read_as_sentences():
+    """„Pažymėti legendą" (Pathon v3 W2-B): one journal row per reviewed legend row, source „legenda"."""
+    kept = {"source": "legenda", "field_path": "legenda.3.p3-abc",
+            "old_value": {"eilute": "Rozetė", "rasta": 9},
+            "new_value": {"sprendimas": "accept", "pavadinimas": "Rozetės dvivietės", "kiekis": 8, "pasalinta": 1}}
+    assert sentence_for(kept) == "Lapas 3: legendos eilutę „Rozetės dvivietės“ patvirtinote — 8 vnt., 1 rastų pašalinote"
+    dropped = {"source": "legenda", "field_path": "legenda.3.p3-def",
+               "old_value": {"eilute": "LED juosta", "rasta": 0}, "new_value": {"sprendimas": "reject"}}
+    assert sentence_for(dropped) == "Lapas 3: legendos eilutę „LED juosta“ atmetėte"

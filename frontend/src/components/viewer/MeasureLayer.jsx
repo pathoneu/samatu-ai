@@ -14,6 +14,7 @@ import {
 import { pickSnap } from '@/lib/drawingSnap.js';
 import { lassoSelect } from '@/lib/outlineTools.js';
 import { flashCursorHint } from '@/lib/cursorHints.js';
+import { isAiMark } from '@/lib/symbolSearch.js';
 import {
   DASH, LABEL_FONT_PX, LABEL_STYLE, SELECTED_STROKE_PX, STROKE_PX, labelWidth, ov, paint,
 } from '@/lib/overlayTokens.js';
@@ -584,7 +585,7 @@ function CountMarker({ m, adapter, countTypes, selected }) {
   const stroke = selected ? INK : color;
   // „Rasti panašius" marks are found by shape, not checked: same type colour, drawn
   // hollow (white fill, thick outline) so they never pass for hand-placed ones.
-  if (m.source === 'symbol_search') {
+  if (isAiMark(m)) {
     const w = selected ? 2.5 : 2;
     const hollow = shape === 'square'
       ? <rect x={x - r} y={y - r} width={r * 2} height={r * 2} style={paint({ fill: ov('label-bg'), stroke })} fillOpacity={0.85} strokeWidth={w} />

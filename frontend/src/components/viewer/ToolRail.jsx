@@ -13,7 +13,7 @@
  * false) is drawn disabled with the reason in its tooltip — never silently missing.
  */
 import {
-  MousePointer2, Lasso, Hand, Ruler, Pentagon, Spline, Hash, SquareDashedMousePointer, ScanSearch, Scaling,
+  MousePointer2, Lasso, Hand, Ruler, Pentagon, Spline, Hash, SquareDashedMousePointer, ScanSearch, Scaling, ListTree,
   Layers, BrickWall, MoreHorizontal,
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -33,13 +33,14 @@ const ICONS = {
   count: Hash,
   room: SquareDashedMousePointer,
   findSimilar: ScanSearch,
+  legend: ListTree,
   calibrate: Scaling,
   zones: Layers,
   walls: BrickWall,
 };
 
 // Test ids the smoke suite and the coach marks already know (kept from the old toolbar).
-const TEST_IDS = { findSimilar: 'viewer-symbol-search', walls: 'viewer-walls-layer' };
+const TEST_IDS = { findSimilar: 'viewer-symbol-search', walls: 'viewer-walls-layer', legend: 'viewer-legend-tool' };
 
 // Tile and card geometry — RAIL_HEIGHT is what the labelled rail needs; below it the rail goes compact.
 export const RAIL_WIDTH = 72;            // card (64 px tiles + padding + border)
