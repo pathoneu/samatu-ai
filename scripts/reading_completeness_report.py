@@ -232,6 +232,39 @@ def figures(projects: list[str]) -> None:
         assert all(k not in runs["0"] for k in ("_autoriaus_kiekiai", "_walls_anchor", "_floor_anchors"))
 
 
+# ── D7 ───────────────────────────────────────────────────────────────────────
+
+def zone_scales(projects: list[str]) -> None:
+    """Sheets with two or more plan zones: per zone, how many dimension strings the page's ONE scale backs with a
+    line, how many it leaves unbacked, and — for the unbacked — the scale their nearest hairline would give.
+    A zone whose strings stay unbacked at one consistent other scale is a second viewport (D7's case)."""
+    import statistics
+    from extractor import sheet_zones as sz
+    from extractor.plan_dimensions import read_dimension_strings
+    for code, pdf, _ in corpus(projects):
+        dims = read_dimension_strings(pdf, pages=None)
+        by_page: dict[int, list[dict]] = collections.defaultdict(list)
+        for d in dims:
+            by_page[int(d["page"])].append(d)
+        found = 0
+        for page, ds in sorted(by_page.items()):
+            zones = [z for z in sz.read_zones(pdf, page).get("zones") or [] if z.get("kind") == "planas"]
+            if len(zones) < 2:
+                continue
+            found += 1
+            W = float(ds[0].get("page_width") or 1)
+            H = float(ds[0].get("page_height") or 1)
+            parts = []
+            for i, z in enumerate(zones):
+                inside = [d for d in ds if sz.zone_at([z], ((d["bbox"][0] + d["bbox"][2]) / 2) / W, ((d["bbox"][1] + d["bbox"][3]) / 2) / H)]
+                backed = [d for d in inside if d.get("span_source") == "line"]
+                sc = [d["value_m"] / float(d["ilgis_pt"]) for d in backed if d.get("ilgis_pt")]
+                parts.append(f"zone {i + 1}: {len(inside)} strings, {len(backed)} backed"
+                             + (f" at 1:{round(statistics.median(sc) / (25.4 / 72 / 1000))}" if sc else ""))
+            print(f"   {code} p{page}: " + "; ".join(parts))
+        print(f"== {code}: {found} sheets with two or more plan zones")
+
+
 def main() -> int:
     global NO_LABELS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -240,7 +273,7 @@ def main() -> int:
     ap.add_argument("--no-labels", action="store_true")
     args = ap.parse_args()
     NO_LABELS = args.no_labels
-    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types, "dimlen": dimlen, "figures": figures}.get(args.what)
+    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types, "dimlen": dimlen, "figures": figures, "zone-scales": zone_scales}.get(args.what)
     if fn is None:
         print(f"unknown report: {args.what}")
         return 2
