@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2, Map as MapIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import ExportFilterModal from './ExportFilterModal';

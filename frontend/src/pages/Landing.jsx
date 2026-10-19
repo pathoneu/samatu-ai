@@ -22,7 +22,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { changeAppLanguage } from '@/i18n';
 import { PathonMark } from '@/components/layout/Logo';
 import { openCookieSettings } from '@/components/CookieBanner';

@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ChevronDown, ChevronRight, MapPin, Settings2, Sigma } from 'lucide-react';
 import {
   anchorNote, contributionsOf, excludedOf, hasAnchorStep, hasLedger,

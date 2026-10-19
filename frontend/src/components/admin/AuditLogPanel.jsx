@@ -9,7 +9,7 @@
  * self-refreshes (like UsersTable, it owns its fetch rather than taking props).
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { RefreshCw } from 'lucide-react';
 import { SectionHead, Panel, EmptyLine, ErrorLine } from './adminPrimitives';
 import { fetchAdmin, fmtDateTime } from './adminUtils';

@@ -32,7 +32,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp, X, Eye, RefreshCw, Sliders } from 'lucide-react';
 
 import { revalidateProject } from '../../lib/revalidateApi';

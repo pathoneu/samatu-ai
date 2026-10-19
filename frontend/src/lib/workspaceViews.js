@@ -186,6 +186,8 @@ export function clampPanelWidth(width, mode = 'full') {
   return Math.round(Math.min(lim.max, Math.max(lim.min, n)));
 }
 
+export { browserStorage } from './browserStorage.js';
+
 /** The stored width for a panel mode, clamped; null when nothing (valid) is stored. */
 export function readPanelWidth(storage, mode = 'full') {
   const lim = PANEL_LIMITS[mode] || PANEL_LIMITS.full;

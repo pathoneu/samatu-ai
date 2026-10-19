@@ -37,7 +37,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { RefreshCw, Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPdfBlob } from '@/lib/pdfStore';

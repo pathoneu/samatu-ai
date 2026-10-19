@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { PathonMark } from '@/components/layout/Logo';
 
 // Room names — self-contained bilingual map (the landing i18n `heroRooms` is an

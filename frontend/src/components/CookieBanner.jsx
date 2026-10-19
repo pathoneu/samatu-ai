@@ -30,7 +30,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import '@/pages/landing/landing.css'; // paper-palette tokens + pl-btn-* (scoped under #plr)
 
 export const STORAGE_KEY = 'pathon_cookie_consent';

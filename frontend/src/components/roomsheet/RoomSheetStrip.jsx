@@ -7,7 +7,7 @@
  * a tilde for that reason — it is the founder's time model, not a measurement.
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ChevronLeft, ChevronRight, ListChecks } from 'lucide-react';
 
 import RoomPicker from '@/components/roomsheet/RoomPicker';

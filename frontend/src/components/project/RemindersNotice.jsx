@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, MapPin, Plus } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 import Notice from '@/components/ui/Notice';
 import FoldLine from './FoldLine';

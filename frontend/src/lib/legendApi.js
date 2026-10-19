@@ -13,6 +13,7 @@
  */
 import { API_BASE } from './apiBase.js';
 import { recordDecision } from './cvToolsApi.js';
+import { browserStorage } from './browserStorage.js';
 
 const DECISION_GAP_MS = 2_100;
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
@@ -143,7 +144,7 @@ export async function sendLegendLearning(projectId, { decisions = [], journal = 
 // legend. Per browser — the legends themselves live on the server.
 const ARCHITECTS_KEY = 'samatu_legend_architects';
 
-export function readArchitects(storage = (typeof window !== 'undefined' ? window.localStorage : null)) {
+export function readArchitects(storage = browserStorage()) {
   try {
     const raw = JSON.parse(storage?.getItem(ARCHITECTS_KEY) || '{}');
     return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -151,7 +152,7 @@ export function readArchitects(storage = (typeof window !== 'undefined' ? window
 }
 
 /** Remember that `projectId` carries `architect` → the names and their projects, newest last. */
-export function rememberArchitect(architect, projectId, storage = (typeof window !== 'undefined' ? window.localStorage : null)) {
+export function rememberArchitect(architect, projectId, storage = browserStorage()) {
   const name = String(architect || '').trim();
   if (!name || !projectId) return readArchitects(storage);
   const all = readArchitects(storage);

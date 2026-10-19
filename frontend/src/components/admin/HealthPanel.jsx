@@ -10,7 +10,7 @@
  * persisted log — error_log_tail is always []; we show the note instead).
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Database, DatabaseBackup, Info, Activity } from 'lucide-react';
 import { SectionHead, Panel, EmptyLine, ErrorLine, BlockSkeleton } from './adminPrimitives';
 import { fmtInt, fmtBytes, fmtRelative, fmtDateTime } from './adminUtils';

@@ -11,7 +11,7 @@
  *
  * Spec §5.6 AI tab.
  */
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 export function AiPanel({ onRunAi, isRunning = false, recentRuns = [] }) {
   const { t } = useTranslation();

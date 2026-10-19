@@ -8,7 +8,7 @@
  */
 
 import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { toast } from 'sonner';
 import {
   Search, ChevronDown, ChevronRight, Home, FileText, Eye, EyeOff, Ruler,

@@ -128,6 +128,9 @@ let _storageNoticeShown = false;
 export function _hasStorageNotice() {
   return _storageNoticeShown;
 }
+export function _resetStorageNotice() {   // test hook
+  _storageNoticeShown = false;
+}
 
 function _persist(key, value) {
   try {
@@ -145,6 +148,84 @@ function _persist(key, value) {
     }
     return false;
   }
+}
+
+// ── The project cache under a small quota (2026-10-19, Safari walk) ───────────
+// Safari / WebKit give an origin about 5 MB of localStorage and count it in UTF-16, so ~2.5 M characters.
+// Fourteen cached projects are ~3.3 M — every write threw, so on Safari the cache NEVER changed after the
+// first refusal: the old copy stayed in localStorage and, after a reload, was what the pages read until the
+// server answered; and the founder got „atmintis pilna" on every page. Now a refused write:
+//   1. removes the cached copy first — a write that did not land can never leave a stale copy behind;
+//   2. caches as many projects as fit, newest first (the ones with an unsent edit before anything else);
+//   3. warns only when not even one project fits. The backend PUT carries every edit regardless — the
+//      cache is a convenience, the server is the record.
+// Projects left out of the cache load from the server when opened (refreshProjectFromBackend adds them).
+
+function _isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22);
+}
+
+function _cachePriority(projects) {
+  const pending = new Set([..._dirtyIds, ..._queued.keys()]);
+  return projects
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      const pa = pending.has(a.p?.id) ? 1 : 0;
+      const pb = pending.has(b.p?.id) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      return String(b.p?.updated_at || b.p?.created_date || '').localeCompare(String(a.p?.updated_at || a.p?.created_date || ''));
+    });
+}
+
+/** Write the project list to the cache; true when it (or the part that fits) is stored. */
+function _persistProjects(projects) {
+  const list = Array.isArray(projects) ? projects : [];
+  const full = JSON.stringify(list);
+  let firstError;
+  try {
+    localStorage.setItem(PROJECTS_KEY, full);
+    return true;
+  } catch (e) {
+    firstError = e;
+  }
+  // Never keep the copy the refused write was meant to replace.
+  try { localStorage.removeItem(PROJECTS_KEY); } catch { /* storage blocked entirely */ }
+  if (_isQuotaError(firstError) && list.length > 0) {
+    const ranked = _cachePriority(list).map(({ p, i }) => ({ i, json: JSON.stringify(p) }));
+    let budget = Math.floor(full.length / 2);
+    while (budget > 0) {
+      const chosen = [];
+      let size = 2;
+      for (const r of ranked) {
+        if (size + r.json.length + 1 > budget) continue;
+        chosen.push(r);
+        size += r.json.length + 1;
+      }
+      if (chosen.length === 0) break;
+      chosen.sort((a, b) => a.i - b.i);   // keep the list's own order
+      try {
+        localStorage.setItem(PROJECTS_KEY, `[${chosen.map((r) => r.json).join(',')}]`);
+        console.info(`[projectStore] browser cache holds ${chosen.length} of ${list.length} projects (storage quota)`);
+        return true;
+      } catch (e) {
+        if (!_isQuotaError(e)) break;
+        budget = Math.floor(size / 2);
+      }
+    }
+  }
+  return _persistFailed(firstError);
+}
+
+function _persistFailed(e) {
+  console.warn('[projectStore] localStorage write failed:', e);
+  if (!_storageNoticeShown) {
+    _storageNoticeShown = true;
+    toast.error(
+      'Naršyklės atmintis pilna — projektai saugomi serveryje, bet šioje naršyklėje jų kopijos nėra.',
+      { id: 'projectstore-quota' },
+    );
+  }
+  return false;
 }
 
 // ── Backend sync helpers (fire-and-forget) ────────────────────────────────────
@@ -373,7 +454,7 @@ function _doFlush() {
     // the backend PUT below still carries the full, correct blob.
     // Keep the dirty flag set when the write was refused so a later flush
     // retries it (e.g. after the user frees space by deleting a project).
-    _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(_memProjects));
+    _lsDirty = !_persistProjects(_memProjects);
   }
   if (_dirtyIds.size === 0) return [];
   const ids = Array.from(_dirtyIds);
@@ -424,7 +505,7 @@ function _replaceAll(projects) {
   _pendingOpts.clear();
   _memProjects = projects;
   _lsDirty = false;
-  _persist(PROJECTS_KEY, JSON.stringify(projects));
+  _persistProjects(projects);
 }
 
 // Test hook — lets a unit test start from a clean slate. Shares the production
@@ -672,7 +753,7 @@ export async function refreshProjectFromBackend(id) {
   const next = cached ? projects.map(p => (p?.id === id ? fresh : p)) : [fresh, ...projects];
   _memProjects = next;
   // a refused localStorage write leaves the flag set, so the next flush retries it
-  _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(next));
+  _lsDirty = !_persistProjects(next);
   // What he sees changed under him: the workspace says „Atnaujinta iš serverio" once. Its own save whose
   // answer never came back (a tab closed with the PUT on the wire) holds the same content — nothing to say.
   if (moved && !_sameContent(cached, fresh)) {
@@ -823,7 +904,7 @@ export function adoptServerProject(project) {
     ? projects.map((p) => (p?.id === id ? project : p))
     : [project, ...projects];
   _memProjects = next;
-  _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(next));
+  _lsDirty = !_persistProjects(next);
   return getProject(id);
 }
 

@@ -4,7 +4,7 @@
  * The state is a word, never only a mark: „patikrinta", „liko patikrinti", „neskaičiuojama", „sujungta su 04".
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Check, ChevronDown, Circle, Minus } from 'lucide-react';
 
 import {

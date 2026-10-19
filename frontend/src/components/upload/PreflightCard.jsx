@@ -12,7 +12,7 @@
  * fact, not a guess.
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { FileSearch, AlertTriangle, Ban, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { verdictKey } from '@/lib/preflight';

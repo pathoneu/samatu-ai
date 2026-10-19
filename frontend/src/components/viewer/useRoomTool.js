@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { flashCursorHint } from '@/lib/cursorHints';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { displayPointOf, outlineFailureKey } from '@/lib/roomOutline';
 import { roomForToolClick, pickCandidates, commitBody, insideProposal, readOutlineProposal } from '@/lib/roomTool';
 import { fetchSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';

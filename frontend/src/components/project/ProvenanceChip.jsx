@@ -15,7 +15,7 @@
  *
  * No "bbox" or "polygon" jargon in any visible string.
  */
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 // v3 W1-C: a quiet 12 px text link in sentence case — it was a 9 px uppercase pill, blue-300 on
 // blue-500/15 (a dark-theme leftover: 1,47:1 on parchment, 11 times per screen). The words say where

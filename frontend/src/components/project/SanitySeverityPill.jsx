@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 import { summarizeSanity, warningKey } from '../../lib/sanitySeverity';

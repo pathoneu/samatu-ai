@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Loader2, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 

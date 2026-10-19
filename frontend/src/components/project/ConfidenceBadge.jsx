@@ -11,7 +11,7 @@
  *   🔴 neaišku — sources disagree, OR weak Vision-only
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { computeAreaConfidence } from '@/lib/areaConfidence';
 import { markRoomVerified } from '@/lib/projectStore';
 import { Check } from 'lucide-react';
