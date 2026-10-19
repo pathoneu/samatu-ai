@@ -25,6 +25,7 @@ import {
 } from '@/lib/symbolOverlay';
 import { getPlanSymbolTypes } from '@/lib/planSymbolTypes';
 import { API_BASE } from '@/lib/apiBase';
+import { browserStorage } from '@/lib/browserStorage';
 import RoomZoneLayer from './RoomZoneLayer';
 
 if (typeof pdfjs.version === 'string' && pdfjs.version !== '4.8.69') {
@@ -747,8 +748,7 @@ export default function PlanViewer({
           {/* Experimental Ženklai panel — stays gated behind localStorage
               flag (no dev auto-show) since 2026-05-11. CV V2 buttons were
               unwired; the panel still exposes the working V1 flows. */}
-          {(typeof window !== 'undefined' &&
-            window.localStorage?.getItem('samatu_experimental_tools') === '1') && (
+          {(browserStorage()?.getItem('samatu_experimental_tools') === '1') && (
             <button
               type="button"
               onClick={() => setSymbolToolsOpen(v => !v)}
