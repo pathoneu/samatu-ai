@@ -170,6 +170,19 @@ def sentence_for(c: dict, rows: dict[str, dict] | None = None) -> str:
                 tail += f", {int(gone)} rastų pašalinote"
             return f"{where}: {what} patvirtinote{tail}"
         return f"{where}: {what} atmetėte"
+    if source == "ivertinimas":
+        # 👍 / 👎 (Pathon v3 W5-C, api/feedback.py): the paid read as a whole, or one found symbol
+        v = new if isinstance(new, dict) else {}
+        verdict = v.get("ivertinimas")
+        parts = _path(c)
+        if len(parts) >= 2 and parts[1] == "simbolis":
+            where = f"Lapas {v.get('lapas')}" if v.get("lapas") else "Brėžinys"
+            if verdict == "atsaukta":
+                return f"{where}: „neieškoti tokių“ atšaukėte"
+            return f"{where}: rastas ženklas tiko" if verdict == "taip" else f"{where}: rastą ženklą pažymėjote — neieškoti tokių"
+        if verdict == "atsaukta":
+            return "Brėžinio perskaitymo įvertinimą atšaukėte"
+        return "Brėžinio perskaitymą įvertinote: tiko" if verdict == "taip" else "Brėžinio perskaitymą įvertinote: netiko"
     if source in ("pokalbis_taip", "pokalbis_ne"):
         return "Pokalbis: atsakymas tiko" if source == "pokalbis_taip" else "Pokalbis: atsakymas netiko"
     # Prielaidos and anything older: the setting, the room, before → after when both are numbers

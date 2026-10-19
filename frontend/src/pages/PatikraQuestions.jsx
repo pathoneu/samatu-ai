@@ -44,6 +44,7 @@ import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry'
 import { StepBar } from '@/components/project/StepRail';
 import { PANEL_TWO_COLUMNS_MIN, useWorkspaceHost } from '@/components/project/workspaceHost';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
+import ReadRating from '@/components/project/ReadRating';
 import RemindersNotice from '@/components/project/RemindersNotice';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
@@ -510,6 +511,8 @@ export default function PatikraQuestions() {
       </div>
 
       <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
+      {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
+      <ReadRating project={project} className="mx-4 mt-3" />
       {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
       <RemindersNotice projectId={id} where="patikra" reloadKey={project?.updated_at || 0} className="mx-4 mt-3" />
 
