@@ -193,6 +193,13 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
           <p className="mx-3 mt-3 text-[14px] text-[hsl(var(--ink-2))]">Pritaikyta ankstesnė legenda — patikrinkite eilutes.</p>
         )}
 
+        {/* nothing read in the box: what to do next (C9, #133) */}
+        {legend.phase === 'review' && (legend.rows || []).length === 0 && (
+          <p className="px-3 py-3 text-[14px] leading-snug text-[hsl(var(--ink-2))]" data-testid="legend-empty">
+            Šiame rėmelyje legendos eilučių neradau. Apveskite kitą vietą — ženklus kartu su jų pavadinimais — arba
+            skaičiuokite patys įrankiu „Kiekis“ kairėje.
+          </p>
+        )}
         {(legend.phase === 'review' || legend.phase === 'creating') && (
           <>
             <ul className="mt-2" data-testid="legend-rows">

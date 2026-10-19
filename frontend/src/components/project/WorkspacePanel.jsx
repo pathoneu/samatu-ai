@@ -699,9 +699,20 @@ export default function WorkspacePanel({
           );
         })}
         {!collapsed.rooms && filteredRooms.length === 0 && (
-          <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-            {filter ? `Patalpų nerasta pagal „${filter}“` : 'Patalpų dar nėra.'}
+          <div className="px-3 py-3 text-ui text-muted-foreground" data-testid="empty-rooms">
+            {/* an empty state says what to do next (C9, #133) */}
+            {filter
+              ? `Patalpų nerasta pagal „${filter}“ — išvalykite paiešką viršuje.`
+              : 'Patalpų dar nėra. Paspauskite „Perskaityti iš naujo“ virš brėžinio — programa nemokamai perskaitys patalpas iš plano ir lentelių.'}
           </div>
+        )}
+
+        {/* no measurements yet: what to do to make one (C9, #133) */}
+        {measCountRows.length === 0 && measGeomRows.length === 0 && (
+          <p className="flex items-start gap-2 border-t border-border/60 px-3 py-3 text-ui text-muted-foreground" data-testid="empty-measurements">
+            <Ruler className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>Matavimų dar nėra. Kairėje pasirinkite „Atstumas“, „Plotas“ arba „Kiekis“ ir spustelėkite brėžinyje — matavimas atsiras čia.</span>
+          </p>
         )}
 
         {/* MATAVIMAI — viewer measurements (counts + lengths/areas) */}
