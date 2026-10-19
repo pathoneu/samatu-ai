@@ -605,7 +605,7 @@ function LegendPageWatcher({ documentId, pageRef, onPage }) {
   return null;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null, onLegendBlankRows = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -964,15 +964,18 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const oldTypes = new Map(beforeT.map((t) => [t.id, t]));
     setCountTypes(next.countTypes);
     dispatchMeasureHist({ type: 'apply', update: next.measurements, label, at: Date.now() });
+    // kept rows the drawing shows no mark of: blank sąmata rows with the question (the host writes them)
+    const undoBlanks = plan.blanks?.length && onLegendBlankRows ? onLegendBlankRows(plan.blanks) : null;
     if (plan.made[0]?.type?.id) setActiveCountTypeId(plan.made[0].type.id);
     const undo = () => {
       setMeasurements((prev) => [...prev.filter((m) => !added.has(m.id)), ...gone]);
       setCountTypes((prev) => prev.filter((t) => !newTypeIds.has(t.id)).map((t) => oldTypes.get(t.id) || t));
       undoLegend?.();
+      if (typeof undoBlanks === 'function') undoBlanks();
       toast('Atšaukta: kiekiai pagal legendą pašalinti');
     };
     toast.success(`Sukurta pagal legendą: ${plan.made.length} kiek., ${plan.marks.length} žym. brėžinyje`, {
-      description: 'Žymės tuščiavidurės — rastos automatiškai. Sąmatos eilutės skaičiuojasi pačios (skyrius „Matavimai").',
+      description: `Žymės tuščiavidurės — rastos automatiškai. Sąmatos eilutės skaičiuojasi pačios (skyrius „Matavimai").${plan.blanks?.length ? ` ${plan.blanks.length} eil. be ženklų sąmatoje tuščios — suskaičiuokite „Kiekis“ įrankiu.` : ''}`,
       duration: 10_000,
       action: { label: 'Atšaukti', onClick: undo },
     });
@@ -992,7 +995,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       if (e.key !== 'Enter' || e.target?.closest?.('input, textarea, select, [contenteditable], button')) return;
       const l = legendKeyRef.current;
       if (l.phase === 'proposed') { e.preventDefault(); l.accept(); }
-      else if (l.phase === 'review' && l.toCreate.length) { e.preventDefault(); l.create(); }
+      else if (l.phase === 'review' && (l.toCreate.length || l.blanks.length)) { e.preventDefault(); l.create(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1367,7 +1370,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     selectionCount: selectedMeasureIds.length,
     countType: activeCountType ? { label: activeCountType.label, n: countTallies[activeCountType.id] || 0 } : null,
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
-    legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, notice: legend.notice } : null,
+    legend: legend.active ? { phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, blanks: legend.blanks.length, notice: legend.notice } : null,
     mac,
   });
   // The sentence beside the pointer (W1-B B3): the mode in front wins — outline edit, an outline tool, the
@@ -2064,6 +2067,8 @@ export default function TakeoffViewer({
   // host when the tool is on (so it can show that node). Absent → the review floats beside the drawing.
   legendPanelSlot = null,
   onLegendPanelChange = null,
+  // (rows) => undo — blank sąmata rows for kept legend rows with no marks (the host writes `darbu_sarasas`)
+  onLegendBlankRows = null,
   // „Neskaityti šio lapo" (W5-B B9): `project.neskaitomi_lapai` and its setter. Absent → no button.
   skippedPages = null,
   onSkippedPagesChange = null,
@@ -2113,6 +2118,7 @@ export default function TakeoffViewer({
           active={active}
           legendPanelSlot={legendPanelSlot}
           onLegendPanelChange={onLegendPanelChange}
+          onLegendBlankRows={onLegendBlankRows}
           skippedPages={skippedPages}
           onSkippedPagesChange={onSkippedPagesChange}
         />
