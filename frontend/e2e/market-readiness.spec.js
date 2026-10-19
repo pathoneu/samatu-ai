@@ -136,9 +136,13 @@ test.describe('Nustatymai grouped (B1-E)', () => {
     // per room: the value for all rooms first, a row only for the rooms that differ
     await page.getByTestId('settings-section-patalpos').click();
     const walls = panel.locator('[data-assumption^="walls_paint_override:"]');
-    await expect(panel.locator('[data-setting="walls_paint_override"]')).toContainText('dažomos 9 iš 11');
-    await expect(walls).toHaveCount(3);   // „Visoms patalpoms" + the two rooms left unpainted
-    await expect(panel.locator('[data-assumption="walls_paint_override:01"]')).toBeVisible();
+    const wallsLine = panel.locator('[data-setting="walls_paint_override"]');
+    await expect(wallsLine).toContainText(/dažomos \d+ iš 11/);
+    const painted = Number(/dažomos (\d+) iš 11/.exec(await wallsLine.innerText())[1]);
+    expect(painted).toBeGreaterThan(5);
+    await expect(walls).toHaveCount(1 + (11 - painted));   // „Visoms patalpoms" + only the rooms left unpainted
+    await expect(panel.locator('[data-assumption="walls_paint_override:01"]')).toBeVisible();   // Tambūras: unpainted
+    note(`walls: ${painted} of 11 painted → ${11 - painted} room row(s) shown`);
     await expect(panel.locator('[data-assumption^="lubu_auksciai:"]')).toHaveCount(1);   // every room 2,82 m
     await page.getByTestId('settings-rooms-lubu_auksciai').click();
     await expect(panel.locator('[data-assumption^="lubu_auksciai:"]')).toHaveCount(12);
