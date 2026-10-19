@@ -202,6 +202,46 @@ def _sheet_rules(pdf_bytes: bytes, row: dict, per_page: dict[int, list[dict]]) -
             "fallback": fallback}
 
 
+def _one_symbol_one_row(answers: dict[int, dict]) -> None:
+    """A shape-search hit claimed by two rows of one count is ONE symbol: it stays with the row whose template
+    it resembles most and leaves the others (Pathon v3 W5-D, D2 follow-up). objektas_h p3: the four switch rows
+    („Viengubas / Dvigubas jungiklis / perjungėjas") all found the same marks at 0,92–0,94 — 107 proposals
+    for one sheet. Only `rastras` instances move; the counts, pages and statuses follow."""
+    hits = [(k, i, inst) for k, a in answers.items() if a.get("saltinis") == "rastras"
+            for i, inst in enumerate(a.get("instances") or [])]
+    if len({k for k, _, _ in hits}) < 2:
+        return
+    drop: set[tuple[int, int]] = set()
+    for k, i, inst in hits:
+        b = inst["box_pct"]
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        for k2, i2, other in hits:
+            if k2 == k or other["page"] != inst["page"]:
+                continue
+            ob = other["box_pct"]
+            if not (ob[0] <= cx <= ob[2] and ob[1] <= cy <= ob[3]):
+                continue
+            mine, theirs = float(inst.get("score") or 0.0), float(other.get("score") or 0.0)
+            if theirs > mine or (theirs == mine and k2 < k):
+                drop.add((k, i))
+                break
+    if not drop:
+        return
+    for k, a in answers.items():
+        if a.get("saltinis") != "rastras":
+            continue
+        kept = [inst for i, inst in enumerate(a.get("instances") or []) if (k, i) not in drop]
+        if len(kept) == len(a.get("instances") or []):
+            continue
+        a["instances"] = kept
+        a["count"] = len(kept)
+        per: dict[int, int] = {}
+        for inst in kept:
+            per[inst["page"]] = per.get(inst["page"], 0) + 1
+        a["per_page"] = [{**pp, "count": per.get(pp["page"], 0)} for pp in a.get("per_page") or []
+                         if not pp.get("legenda_lape") or per.get(pp["page"], 0) > 0 or pp.get("kartojasi")]
+
+
 def _pages_for(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: bool) -> tuple[list[int], list[int]]:
     """(sheets to search first, sheets left for later) for the shape / text counts: the row's legend sheets
     first — a heavy sheet costs seconds to search."""
@@ -437,7 +477,9 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
                       "instances": [{**i, "saltinis": "rastras"} for i in got["instances"]],
                       "kiti": [{**i, "saltinis": "rastras"} for i in got["kiti"]],
                       "count": len(got["instances"]), "partial": res["partial"], "pages_not_read": res["pages_not_read"],
+                      "uz_zonu": [{"page": e["page"], **x} for e in res["pages"] for x in e.get("uz_zonu") or []],
                       "score_floor": res["score_floor"], "raster_pages": got["raster_pages"], "detail": res["detail"]}
+    _one_symbol_one_row(answers)
     out_rows = []
     for k, r in enumerate(rows):
         a = answers[k]
@@ -451,6 +493,8 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
                      for i in a.get("kiti") or []],
             "partial": bool(a.get("partial")), "pages_not_read": a.get("pages_not_read") or [],
             "score_floor": a.get("score_floor"),
+            # matches left out because they stand in a legend, a table, the title block or on letters (W5-D D2)
+            "uz_zonu": [{"page": x["page"], "zona": x["zona"]} for x in (a.get("uz_zonu") or [])][:200],
             "sentence_lt": sentence_lt(r, a),
         })
     return {"rows": out_rows, "pages": wanted, "partial": any(r["partial"] for r in out_rows),

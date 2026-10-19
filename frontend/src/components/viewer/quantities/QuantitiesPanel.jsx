@@ -36,6 +36,30 @@ import { useMeasureRows } from '@/components/project/measure/useMeasureRows';
 import MeasureRowPicker from '@/components/project/measure/MeasureRowPicker';
 import MeasuredChip from '@/components/project/measure/MeasuredChip';
 import MeasureTray from '@/components/project/measure/MeasureTray';
+import { openingsBySize } from '@/lib/openingsBySize';
+
+/** „Angos pagal dydį" (Pathon v3 W5-D, D11 #76): the rooms' doors and windows by kind and size — a count. */
+function OpeningsBySize({ project }) {
+  const groups = useMemo(() => openingsBySize(project), [project]);
+  if (!groups.length) return null;
+  return (
+    <details className="border-t border-border px-3 py-2" data-testid="openings-by-size">
+      <summary className="cursor-pointer text-[14px] font-semibold">Angos pagal dydį</summary>
+      <ul className="mt-1 list-none p-0">
+        {groups.map((g) => (
+          <li key={`${g.kind}|${g.size}`} className="flex items-baseline justify-between gap-3 py-0.5 text-[14px]">
+            <span>
+              {g.label} <span className="font-mono">{g.size}</span>
+              <span className="text-muted-foreground"> · {g.rooms.length === 1 ? 'patalpa' : 'patalpos'} {g.rooms.join(', ')}</span>
+            </span>
+            <span className="font-mono tabular-nums">{g.n} vnt.</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[13px] text-muted-foreground">Durys tarp dviejų patalpų skaičiuojamos vieną kartą.</p>
+    </details>
+  );
+}
 
 const SORT_LABELS = {
   [SORT_ORDER]: 'Kaip sąmatoje',
@@ -433,6 +457,7 @@ export default function QuantitiesPanel({
         </ContextMenuContent>
       </ContextMenu>
 
+      <OpeningsBySize project={project} />
       {rowCount > 0 && <TotalsFooter footer={footerTotals(tree, filter)} shown={tree.families.length} all={tree.familyCount} />}
       {canWrite && (
         <MeasureRowPicker

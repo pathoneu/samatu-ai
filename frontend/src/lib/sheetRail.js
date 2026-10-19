@@ -139,6 +139,42 @@ export function buildSheetRail({ puslapiai = [], overrides = null, pageCount = n
   return { sheets, groups };
 }
 
+// Types a read zone may replace: none, or one the paid reading did not commit to.
+const OPEN_TYPES = new Set(['', 'unknown', 'non_relevant']);
+
+/**
+ * The €0 sheet type the zones alone give (Pathon v3 W5-D, D12; the twin of backend
+ * sheet_zones.sheet_type_from_zones): „legend" for a sheet whose only content zone is a legend — a legend
+ * zone, no plan, no table. Null otherwise.
+ */
+export function sheetTypeFromZones(zones) {
+  const kinds = (Array.isArray(zones) ? zones : []).map((z) => String(z?.kind || ''));
+  return kinds.includes('legenda') && !kinds.includes('planas') && !kinds.includes('lentele') ? 'legend' : null;
+}
+
+/**
+ * `puslapiai[]` with the zones' type on the sheets the paid reading left without one (`_meta.zonos`,
+ * {page: [zone]}). A type the reading gave and his own choice (sheet overrides, applied later) always win;
+ * a sheet that gets its type here says so (`saltinis: 'zonos'`). Returns the SAME array when nothing changes.
+ */
+export function withZoneSheetTypes(puslapiai, zonos) {
+  const list = Array.isArray(puslapiai) ? puslapiai : [];
+  if (!zonos || typeof zonos !== 'object') return list;
+  const byPage = new Map(list.map((p, i) => [Number(p?.nr ?? p?.page), i]));
+  let out = list;
+  for (const [key, zones] of Object.entries(zonos)) {
+    const page = Number(key);
+    if (!Number.isInteger(page) || page < 1 || sheetTypeFromZones(zones) !== 'legend') continue;
+    const i = byPage.get(page);
+    const cur = i == null ? null : list[i];
+    if (cur && !OPEN_TYPES.has(String(cur.tipas || cur.type || ''))) continue;
+    if (out === list) out = [...list];
+    if (cur) out[i] = { ...cur, tipas: 'legend', saltinis: 'zonos' };
+    else out.push({ nr: page, tipas: 'legend', pavadinimas: '', saltinis: 'zonos' });
+  }
+  return out;
+}
+
 /**
  * A new overrides map with `patch` stored for `page`. A field equal to the automatic value is not
  * stored (renaming back to the automatic name is not an override), an empty patch removes the entry.

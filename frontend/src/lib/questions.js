@@ -199,7 +199,7 @@ const SUMMARY_KEY = {
   aukstis: 'answeredHeight', konturas: 'answeredOutline', erdve: 'answeredSplit', perimetras: 'answeredNumbers',
   plotas: 'answeredNumbers', angos: 'answeredOpenings', durys: 'answeredDoors', grindys: 'answeredChoices',
   apdaila: 'answeredChoices',
-  lentele_durys: 'answeredTable', lentele_langai: 'answeredTable', lentele_apdaila: 'answeredChoices', lentele_suma: 'answeredInfo',
+  lentele_durys: 'answeredTable', lentele_langai: 'answeredTable', lentele_zymos: 'answeredTable', lentele_apdaila: 'answeredChoices', lentele_suma: 'answeredInfo',
 };
 
 /** What was just answered, in one plain sentence for the strip above the next question. */
