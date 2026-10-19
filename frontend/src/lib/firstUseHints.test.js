@@ -7,6 +7,7 @@ import {
   FIRST_USE_IDS, FIRST_USE_KEY, FIRST_USE_PANELS, FIRST_USE_TOOLS, firstUseSeen, firstUseToolFor, markFirstUseSeen, resetFirstUse,
 } from './firstUseHints.js';
 import { CURSOR_HINT_MODES } from './cursorHints.js';
+import { legendCursorHint, reviewOutcome } from './legendReview.js';
 import { wordCount, COACH_MAX_WORDS } from './viewerCoachMarks.js';
 import { isBannedText } from './userText.js';
 
@@ -56,6 +57,16 @@ test('broken or garbage storage never nags', () => {
   const garbage = memStore();
   garbage.setItem(FIRST_USE_KEY, '{not json');
   assert.equal(firstUseSeen('room', garbage), true);
+});
+
+test('G: the first-use line points at the outcome, never repeats the legend tool\'s own sentences (B1-B)', () => {
+  const g = lt.project.firstUse.legend;
+  for (const phase of ['suggesting', 'proposed', 'box', 'reading', 'counting', 'review', 'creating']) {
+    assert.notEqual(legendCursorHint(phase), g, phase);
+  }
+  const outcomes = [reviewOutcome({ rows: [] }), reviewOutcome({ countError: 'x' })];
+  for (const o of outcomes) assert.ok(!o.text.includes(g) && o.short !== g);
+  assert.match(g, /ženklų skaičiumi/);
 });
 
 test('only the four tools have a cursor first-use line', () => {

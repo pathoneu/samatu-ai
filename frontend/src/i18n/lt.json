@@ -1272,7 +1272,7 @@
       "siusti": { "title": "Siųsti", "body": "Atsisiųskite Excel ar PDF arba nusiųskite nuorodą klientui." }
     },
     "firstUse": {
-      "legend": "Programa suskaičiuos legendos ženklus — jūs juos peržiūrėsite.",
+      "legend": "Baigus — eilutės su ženklų skaičiumi; patikrinkite ir sukurkite kiekius.",
       "room": "Kontūras nubrėžiamas pagal sienas — patikrinkite ir išsaugokite.",
       "subtract": "Kolona ar spinta išimama iš patalpos ploto.",
       "count": "Kiekvienas spustelėjimas prideda vieną vienetą.",

@@ -1217,7 +1217,7 @@
       "siusti": { "title": "Send", "body": "Download Excel or PDF, or send the client a link." }
     },
     "firstUse": {
-      "legend": "The program counts the legend's symbols — you review them.",
+      "legend": "At the end — rows with symbol counts; check them and create quantities.",
       "room": "The outline follows the walls — check it and save.",
       "subtract": "A column or a cupboard is taken out of the room's area.",
       "count": "Every click adds one item.",
