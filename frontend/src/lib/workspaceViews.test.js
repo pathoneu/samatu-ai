@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   VIEWS, PANEL_TABS, PANEL_LIMITS, MIN_SPLIT_CANVAS,
-  panelForView, canvasModeForView, selectTab, tabForView,
+  panelForView, canvasModeForView, selectTab, tabForView, panelTabsFor, STEP_TABS, SAMATA_EXPANDED_DEFAULT,
   viewFromLocation, locationForView, patikraSubview,
   clampPanelWidth, readPanelWidth, writePanelWidth, panelWidthFor, revealTarget,
 } from './workspaceViews.js';
@@ -27,6 +27,33 @@ test('each view opens its own panel; Siųsti has none', () => {
 test('the panel tabs are the five the design names, Lithuanian labels', () => {
   assert.deepEqual(PANEL_TABS.map((t) => t.id), ['patalpos', 'kiekiai', 'patikra', 'samata', 'pokalbis']);
   assert.deepEqual(PANEL_TABS.map((t) => t.label), ['Patalpos ir eilutės', 'Kiekiai', 'Patikra', 'Sąmata', 'Pokalbis']);
+});
+
+test('each step shows only its own tabs; the rest wait under „Daugiau"', () => {
+  const ids = (list) => list.map((t) => t.id);
+  assert.deepEqual(ids(panelTabsFor('brezinys', 'patalpos').primary), ['patalpos', 'kiekiai']);
+  assert.deepEqual(ids(panelTabsFor('brezinys', 'patalpos').more), ['patikra', 'samata', 'pokalbis']);
+  assert.deepEqual(ids(panelTabsFor('patikra', 'patikra').primary), ['patikra']);
+  assert.deepEqual(ids(panelTabsFor('patikra', 'patikra').more), ['patalpos', 'kiekiai', 'samata', 'pokalbis']);
+  assert.deepEqual(ids(panelTabsFor('samata', 'samata').primary), ['samata']);
+  assert.deepEqual(ids(panelTabsFor('siusti', null).primary), []);
+  assert.deepEqual(Object.keys(STEP_TABS), VIEWS);
+});
+
+test('the tab on screen is always in the strip, never hidden in „Daugiau"', () => {
+  const { primary, more } = panelTabsFor('brezinys', 'pokalbis');
+  assert.deepEqual(primary.map((t) => t.id), ['patalpos', 'kiekiai', 'pokalbis']);
+  assert.deepEqual(more.map((t) => t.id), ['patikra', 'samata']);
+  // every tab is reachable from every step: strip + menu = all five, none twice
+  for (const v of VIEWS) {
+    const all = panelTabsFor(v, tabForView(v));
+    assert.equal(all.primary.length + all.more.length, PANEL_TABS.length, v);
+  }
+});
+
+test('on Sąmata the rows take the width unless he brings the drawing back', () => {
+  assert.equal(SAMATA_EXPANDED_DEFAULT, true);
+  assert.equal(canvasModeForView('samata', { expanded: SAMATA_EXPANDED_DEFAULT }), 'strip');
 });
 
 test('the drawing gets the width on Brėžinys, half on Patikra and Sąmata, a strip on Siųsti', () => {

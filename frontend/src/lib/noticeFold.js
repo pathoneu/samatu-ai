@@ -13,6 +13,9 @@ export const NOTICE_NAMES = {
   'free-reread-done': 'perskaityta iš naujo',
   'read-rating': 'skaitymo įvertinimas',
   'reminders-patikra': 'priminimai',
+  // above the right panel on Brėžinys / Sąmata and on Siųsti (B1-D)
+  'server-refresh-notice': 'atnaujinta iš serverio',
+  'reread-diff-banner': 'kas pasikeitė',
 };
 
 export const FOLD_MIN = 2;

@@ -5,7 +5,8 @@
  *  - the drawing is mounted ONCE and kept across all four views (same DOM element, still connected);
  *  - today's URLs land on the right view;
  *  - the right panel is 340 px, resizable 300–480, remembered in localStorage `samatu_panel_width`;
- *  - Sąmata „Išskleisti" collapses the drawing to a 56 px strip without unmounting it;
+ *  - Sąmata opens with the rows across the width and the drawing as a 56 px strip (B1-D); „Rodyti brėžinį"
+ *    brings it back beside the rows and „Išskleisti" collapses it again, never unmounting it;
  *  - the sheet list opens as a 56 px strip (name on click/focus, „Lapai"/T for the full rail);
  *  - the drawing's canvas takes ≥ 48 % of a 1440×900 window on Brėžinys;
  *  - every view's main button is on screen (1440×900 and 1280×720), the page never scrolls, the top bar
@@ -216,18 +217,22 @@ test.describe('workspace frame — one workspace, four views', () => {
     await expect(page.locator('[data-picking="1"]')).toHaveCount(0);
   });
 
-  test('Sąmata „Išskleisti" gives the rows the width and keeps the drawing mounted behind a strip', async ({ page }) => {
-    await openProject(page, `/project/${PROJECT}?step=samata`);
+  test('Sąmata opens across the width; the drawing comes back beside the rows and stays mounted behind the strip', async ({ page }) => {
+    await openProject(page);
     await waitForDrawing(page);
     await page.evaluate(() => { window.__w1aViewer = document.querySelector('[data-takeoff-viewer]'); });
+    await goToStep(page, 'Sąmata');
     const mode = () => page.locator('[data-testid="workspace"]').getAttribute('data-canvas-mode');
-    expect(await mode()).toBe('split');
-    await page.locator('[data-testid="samata-expand"]').click();
-    expect(await mode()).toBe('strip');
+    // B1-D: the sąmata IS the page on its step — the drawing waits as the strip
+    await expect.poll(mode).toBe('strip');
     const strip = await page.locator('[data-testid="viewer-root"]').boundingBox();
     expect(Math.round(strip.width)).toBe(56);
+    await expect(page.locator('[data-testid="samata-expand"]')).toHaveText('Rodyti brėžinį');
     await page.locator('[data-testid="canvas-strip"]').click();
     expect(await mode()).toBe('split');
+    await expect(page.locator('[data-testid="viewer-canvas"]')).toBeVisible();
+    await page.locator('[data-testid="samata-expand"]').click();
+    expect(await mode()).toBe('strip');
     expect(await page.evaluate(() => window.__w1aViewer === document.querySelector('[data-takeoff-viewer]'))).toBe(true);
   });
 });

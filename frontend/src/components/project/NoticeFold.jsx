@@ -1,5 +1,6 @@
 /**
- * NoticeFold — Patikra's notices behind one „Pranešimai (N)" line (Pathon v3 W6-A; why: lib/noticeFold.js).
+ * NoticeFold — stacked notices behind one „Pranešimai (N)" line (Pathon v3 W6-A for Patikra; B1-D also above the
+ * right panel on Brėžinys and Sąmata and on Siųsti — why: lib/noticeFold.js).
  *
  * The notices stay mounted (each decides for itself whether it shows, and keeps its state); the fold only
  * counts the ones that rendered and hides them until the line is opened. One notice shows as it is. The line
@@ -9,7 +10,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { foldLabel, shouldFold } from '@/lib/noticeFold';
 
-const presentIds = (el) => (el ? [...el.children].map((c) => c.getAttribute('data-testid') || '') : []);
+// A notice may sit in a spacing wrapper (ServerRefreshNotice, RereadDiffBanner's chip): its name is the first
+// test id inside it.
+const noticeId = (c) => c.getAttribute('data-testid') || c.querySelector('[data-testid]')?.getAttribute('data-testid') || '';
+const presentIds = (el) => (el ? [...el.children].map(noticeId) : []);
 
 export default function NoticeFold({ children, className = '' }) {
   const box = useRef(null);
