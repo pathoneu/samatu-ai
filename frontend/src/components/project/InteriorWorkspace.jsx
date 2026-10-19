@@ -42,7 +42,7 @@ import { isNewest, newerSaves, restorePatch, ticketFor, undoneRooms, undoneSente
 import { roomsWithOutline } from '@/lib/roomOutline';
 import { saveOutlineTool } from '@/lib/outlineToolSave';
 import {
-  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth,
+  MIN_SPLIT_CANVAS, PANEL_LIMITS, PANEL_TABS, STRIP_WIDTH, canvasModeForView, panelWidthFor, readPanelWidth, browserStorage,
   revealTarget, selectTab, tabForView, writePanelWidth,
 } from '@/lib/workspaceViews';
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
@@ -775,8 +775,8 @@ export default function InteriorWorkspace({
   // The panel's width, as he dragged it: one for the drawing view (300–480 px, `samatu_panel_width`), one
   // for the wide Patikra / Sąmata panel. Remembered per browser when a drag ends.
   const [storedWidths, setStoredWidths] = useState(() => ({
-    full: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'full') : null,
-    split: typeof window !== 'undefined' ? readPanelWidth(window.localStorage, 'split') : null,
+    full: readPanelWidth(browserStorage(), 'full'),
+    split: readPanelWidth(browserStorage(), 'split'),
   }));
   const panelWidth = panelWidthFor(canvasMode, {
     workspaceWidth,
@@ -789,7 +789,7 @@ export default function InteriorWorkspace({
     : PANEL_LIMITS[widthMode].max;
   const handlePanelWidth = useCallback((width, { final } = {}) => {
     setStoredWidths((prev) => ({ ...prev, [widthMode]: width }));
-    if (final && typeof window !== 'undefined') writePanelWidth(window.localStorage, widthMode, width);
+    if (final) writePanelWidth(browserStorage(), widthMode, width);
   }, [widthMode]);
   const hiddenViewerWidth = canvasWidth || Math.max(480, (workspaceWidth || 1200) - (panelWidthFor('full', { workspaceWidth }) || 340));
 
