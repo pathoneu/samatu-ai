@@ -104,13 +104,36 @@ async function learnedCount(page) {
 test('1 coach marks + shortcuts guide', async ({ page }) => {
   await openProject(page, { coach: true, cookie: true });
   await page.getByRole('button', { name: 'Tik būtinieji' }).click();
-  const steps = [['Mastelis', 'Toliau'], ['Atstumas', 'Toliau'], ['Taisyti kontūrą', 'Supratau']];
-  for (const [i, [title, next]] of steps.entries()) {
+  // B1-E (founder 2026-10-19: more cards, less writing in each): ten short cards, one at a time, each at
+  // the element it explains, one sentence of at most 12 words.
+  const steps = [
+    ['Lapai', '[data-testid="sheet-rail"]'], ['Įrankiai', '[data-tool-rail]'], ['Patalpa', null],
+    ['Patalpos kontūras', '[data-coach="room"]'], ['Mastelis', '[data-testid="scale-chip"]'],
+    ['Atstumas', '[data-coach="distance"]'], ['Legenda', '[data-coach="legend"]'],
+    ['Patikra', '[data-testid="step-patikra"]'], ['Sąmata', '[data-testid="step-samata"]'], ['Siųsti', '[data-testid="step-siusti"]'],
+  ];
+  for (const [i, [title, anchor]] of steps.entries()) {
     const card = page.getByRole('dialog', { name: `Įvadas: ${title}` });
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card).toContainText(`Žingsnis ${i + 1} iš 3`);
-    await expect(card.getByTestId('viewer-coach-next')).toHaveText(next);
-    await card.getByTestId('viewer-coach-next').click();
+    await expect(card.getByTestId('viewer-coach-progress')).toHaveText(`${i + 1} iš 10`);
+    const words = (await card.getByTestId('viewer-coach-body').innerText()).split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+    expect(words.length, `${title}: one short sentence`).toBeLessThanOrEqual(12);
+    if (anchor) {
+      // the card stands at its element: their boxes touch or overlap within a few pixels
+      const a = await page.locator(anchor).first().boundingBox();
+      const c = await card.boundingBox();
+      const gapX = Math.max(0, a.x - (c.x + c.width), c.x - (a.x + a.width));
+      const gapY = Math.max(0, a.y - (c.y + c.height), c.y - (a.y + a.height));
+      expect(Math.max(gapX, gapY), `${title} card beside its element`).toBeLessThan(24);
+    }
+    await expect(card.getByTestId('viewer-coach-next')).toHaveText(i === steps.length - 1 ? 'Baigti' : 'Toliau');
+    if (i === 3) {
+      // resumable: a reload comes back on the same card
+      await page.reload();
+      await viewerReady(page);
+      await expect(page.getByRole('dialog', { name: `Įvadas: ${title}` })).toBeVisible({ timeout: 15_000 });
+    }
+    await page.getByRole('dialog', { name: `Įvadas: ${title}` }).getByTestId('viewer-coach-next').click();
   }
   await expect(page.getByTestId('viewer-coach-mark')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('samatu_viewer_onboarded'))).toBe('1');
@@ -119,7 +142,7 @@ test('1 coach marks + shortcuts guide', async ({ page }) => {
   await viewerReady(page);
   await page.waitForTimeout(1500);
   await expect(page.getByRole('dialog', { name: /^Įvadas:/ })).toHaveCount(0);
-  note('coach 3 steps, once per browser');
+  note('coach 10 short cards, resumable, once per browser');
 
   await moreItem(page, 'viewer-shortcuts-open');
   const guide = page.getByTestId('shortcuts-guide');
