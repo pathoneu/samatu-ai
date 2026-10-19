@@ -8,6 +8,7 @@ Per user directive: warnings only, NOT value mutations.
 """
 from __future__ import annotations
 
+from .scope import is_absorbed
 from .universal_rules import lt_num, paskirtis_label
 
 
@@ -424,8 +425,9 @@ def apply_lt_sanity(parsed: dict) -> dict:
             ),
         })
 
-    # Total area sanity
-    total_area = sum(float(r.get("plotas_m2") or 0) for r in rooms)
+    # Total area sanity. A room merged into another („Sujungti", `scope.is_absorbed`) is skipped: the kept
+    # room already carries its area, so adding it would count it twice (as `sanity_checks._counted`).
+    total_area = sum(float(r.get("plotas_m2") or 0) for r in rooms if not is_absorbed(r))
     if total_area > 800:
         warnings.append({
             "level": "WARN",
