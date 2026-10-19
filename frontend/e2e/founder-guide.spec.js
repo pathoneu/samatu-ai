@@ -609,6 +609,17 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await loadGeometry(page, 1);
   await mergeRooms(page, await getProject());
   await subtractColumn(page, await getProject());
+  // W1-F F5 (merge-then-totals): after „Sujungti" the room list's header and the Sąmata „Patalpų suvestinė"
+  // equal the billed lubos — 05's 35,50 m² once, inside 04 — and neither false floor-ratio check fires.
+  await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
+  const falseChecks = /^(Lubų plotas 0,80×|Dažomas sienų plotas 1,72×) grindų ploto$/;
+  const sanity = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '');
+  expect(sanity.filter((m) => falseChecks.test(m)), 'no false floor-ratio check after the merge').toEqual([]);
+  await page.getByTestId('step-samata').click();
+  await page.getByTestId('samata-expand').click();
+  await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
+  await expect(page.getByText(/Lubų plotas 0,80×|Dažomas sienų plotas 1,72×/)).toHaveCount(0);
+  note('after 04 + 05: „Patalpos 11 143,27 m²" · „Patalpų suvestinė" 143,27 m² · no 0,80× / 1,72× check');
   await page.goto(`/project/${PROJECT}/patikra?kambarys=04`);
   await expect(page.getByRole('heading', { level: 1, name: /^04 / })).toBeVisible({ timeout: 60_000 });
   // W1-F F2: the merged 04 still says what the floor plan draws in it — not „dvi dangos", not a question
