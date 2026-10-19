@@ -338,7 +338,11 @@
     "brandHeadlineB": ", not days.",
     "brandSub": "Interior finishing quantities from the project PDF — walls, ceilings, floors, openings.",
     "forgotPassword": "Forgot your password? Contact us",
+    "forgotPasswordLink": "Forgot your password?",
+    "resendVerification": "Send the confirmation link again",
     "oauthErr": {
+      "emailUnverified": "Google has not confirmed this email address. Sign in with your email and password, or confirm the address in your Google account.",
+      "linkNeedsPassword": "An account with a password already uses this email address. Sign in with the password and confirm your email (or reset the password via „Forgot your password?“) — then Google sign-in will work too.",
       "invalidState": "The sign-in session has expired. Start the Google sign-in again.",
       "missingCode": "Google did not return an authorisation code. Please try again.",
       "tokenExchangeFailed": "Could not reach Google. Try again in a few minutes, or sign in with your email.",
@@ -347,6 +351,27 @@
       "accessDenied": "Google sign-in was cancelled.",
       "generic": "Google sign-in failed. Please try again."
     }
+  },
+  "authEmail": {
+    "forgotTitle": "Reset your password",
+    "forgotSub": "Enter your account email — we will send a link to set a new password.",
+    "forgotSubmit": "Send the link",
+    "forgotUnavailable": "Email sending is not switched on yet. Write to us and we will reset the password by hand:",
+    "backToLogin": "Back to sign-in",
+    "resetTitle": "New password",
+    "resetSub": "Set a new password. Your other devices will be signed out.",
+    "newPassword": "New password",
+    "newPassword2": "Repeat the password",
+    "resetSubmit": "Save the password",
+    "errMismatch": "The passwords do not match.",
+    "errShort": "The password must be at least 8 characters.",
+    "noToken": "The link has no code. Open the whole link from the email, or ask for a new one.",
+    "askNewLink": "Ask for a new link",
+    "verifyTitle": "Email confirmation",
+    "verifying": "Checking the link…",
+    "toLogin": "Sign in",
+    "registeredCheckEmail": "Check your email",
+    "genericError": "That did not work. Check your connection and try again."
   },
   "register": {
     "backHome": "Home",
@@ -412,6 +437,7 @@
       "noActiveProject": "No active project — open a project first",
       "signedInAs": "Signed in as {{email}}",
       "nustatymai": "Settings",
+      "pagalba": "Help",
       "atsijungti": "Log out"
     }
   },
@@ -496,6 +522,7 @@
       "representativeHint": "Shown under the company name on the bid.",
       "vatRate": "VAT rate",
       "vatRateTitle": "Default VAT for new projects. Standard is 21%; renovation uses reverse VAT.",
+      "vatRateHint": "Applies to new projects. Pick an existing project’s rate when you export it.",
       "removeLogoTitle": "Remove the logo — it will no longer appear on exported PDFs",
       "logo": "Logo",
       "logoAlt": "Logo",
@@ -1501,8 +1528,9 @@
     },
     "vatChoice": {
       "title": "VAT on the document",
-      "standard": "Add 21 % VAT",
-      "standardDesc": "A 21 % VAT line is added to the total — the usual case.",
+      "standard": "Add {{rate}} % VAT",
+      "rateTitle": "Rate:",
+      "standardDesc": "A {{rate}} % VAT line is added to the total — the usual case. The rate is saved for this project.",
       "reverse": "Reverse-charge VAT",
       "reverseDesc": "The customer is VAT-registered and accounts for VAT themselves (Law on VAT, Art. 96). No VAT line is printed.",
       "fromLabel": "Reverse-charge VAT was picked by the app because the project was recognised as a renovation. Please check and choose yourself."
@@ -1525,7 +1553,7 @@
     },
     "exportInternal": {
       "label": "Internal copy with notes",
-      "desc": "Adds a sheet with the app's notes for you and, when prices are split, labour and material price columns. Send your client the file without them."
+      "desc": "Adds a sheet with the app's notes for you, a „Change log“ sheet (what you changed and when) and, when prices are split, labour and material price columns. Send your client the file without them."
     },
     "samataTemplate": {
       "layoutLabel": "Layout",

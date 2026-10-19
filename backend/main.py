@@ -119,6 +119,7 @@ def _validate_pdf_upload(pdf_bytes: bytes, filename: str = "") -> dict:
 # dev/staging from abusive clients (eg. accidental script loops).
 _RATE_BUCKET: dict[str, deque] = defaultdict(deque)
 _RATE_LIMIT_PER_MIN = 30  # generous; one estimator might do 5-10/hour normally
+RECOMPUTE_INTERIOR_PER_MIN = 120  # v3 M7: every room edit recomputes; see recompute_interior
 _RATE_BUCKET_LAST_GC = [0.0]  # mutable cell so we can update from inside func
 
 # M5 (2026-05-06): per-user daily Vision spend cap. Default disabled; set
@@ -172,11 +173,11 @@ def _check_user_quota(user_id: str | None) -> None:
     from billing.entitlements import quota_exceeded
     user = db.get_user_by_id(user_id)
     if user and quota_exceeded(user):
+        from billing.entitlements import quota_message
         raise HTTPException(
             status_code=402,
             detail={"error": "quota_exceeded", "plan": user.get("plan"),
-                    "message": "Išnaudotas mėnesio projektų limitas. "
-                               "Atnaujinkite planą."},
+                    "message": quota_message(user)},
         )
 
 
@@ -219,8 +220,9 @@ def _check_trial_gate(user_id: str | None) -> None:
         raise HTTPException(
             status_code=402,
             detail={"error": "trial_used",
-                    "message": "Nemokamas bandymas jau panaudotas šiai "
-                               "įmonei. Įsigykite planą."},
+                    "message": "Nemokamas bandymas šiai įmonei (pagal įmonės "
+                               "kodą) jau panaudotas. Kitą projektą galėsite "
+                               "skaityti pasirinkę planą nustatymuose."},
         )
 
 
@@ -259,8 +261,9 @@ def _client_key(request: "Request") -> str:
 _RATE_LOCK = _threading.Lock()
 
 
-def _check_rate_limit(client_ip: str, endpoint: str) -> None:
-    """Sliding-window rate limit. Raises 429 on overflow.
+def _check_rate_limit(client_ip: str, endpoint: str, limit: int | None = None) -> None:
+    """Sliding-window rate limit. Raises 429 on overflow. `limit` = calls per
+    minute for this bucket (default _RATE_LIMIT_PER_MIN).
 
     Sprint §AUDIT (2026-04-29): periodic janitor evicts empty buckets so the
     dict doesn't grow unbounded over weeks of unique IPs. Runs at most every
@@ -272,7 +275,7 @@ def _check_rate_limit(client_ip: str, endpoint: str) -> None:
         # Drop entries older than 60s
         while bucket and now - bucket[0] > 60:
             bucket.popleft()
-        over = len(bucket) >= _RATE_LIMIT_PER_MIN
+        over = len(bucket) >= (limit or _RATE_LIMIT_PER_MIN)
         if not over:
             bucket.append(now)
         # Janitor: evict stale entries every 10 minutes. Cheap because most
@@ -422,6 +425,7 @@ from api.project_questions import router as project_questions_router
 from api.project_versions import router as project_versions_router
 from api.pdf_revisions import router as pdf_revisions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
+from api.auth_email import router as auth_email_router  # verification + password reset (v3 M2)
 
 load_dotenv()
 
@@ -780,6 +784,7 @@ app.include_router(project_questions_router)
 app.include_router(project_versions_router)
 app.include_router(pdf_revisions_router)
 app.include_router(account_router)
+app.include_router(auth_email_router)
 
 
 # ── /api/log-error — frontend error reporting ─────────────────────────────────
@@ -920,18 +925,21 @@ def _admin_allowlist() -> set[str]:
     return {e.strip().lower() for e in raw.split(",") if e.strip()}
 
 
-def _is_admin_email(email: str) -> bool:
+def _is_admin_email(email: str, verified: bool = False) -> bool:
     """Decide admin status for a NEWLY-created user (register + OAuth create).
 
     If SAMATU_ADMIN_EMAIL is set (non-empty) → ONLY listed emails become admin
     (opt-in allowlist). This stops the first stranger to register on a fresh
-    production DB from self-bootstrapping to global admin.
+    production DB from self-bootstrapping to global admin. Audit
+    backend-security-6 (fixed 2026-10-18): a typed address proves nothing, so
+    the allowlist applies only to a VERIFIED inbox — Google's email_verified at
+    sign-in, or later our own link (api/auth_email.on_email_verified).
     If unset/empty → preserve the legacy "first-ever user is admin" dev
     convenience EXACTLY (must not break local/dev bootstrap).
     """
     allow = _admin_allowlist()
     if allow:
-        return email.lower() in allow
+        return verified and email.lower() in allow
     return len(db.list_users()) == 0
 
 
@@ -955,11 +963,19 @@ def api_register(payload: RegisterPayload, request: Request):
         name=payload.name, company_name=payload.company_name,
         is_admin=is_admin,
     )
-    request.session["user_id"] = user["id"]
-    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
+    # v3 M2: a verification link goes out (console backend until SMTP_* is set).
+    # With SAMATU_REQUIRE_EMAIL_VERIFIED=1 no session starts until it is opened.
+    from api import auth_email as _auth_email
+    _auth_email.send_verification(user)
     log.info("registered user: id=%s email=%s admin=%s", user["id"], email, is_admin)
     user.pop("password_hash", None)
-    return {"user": user, "is_first_admin": is_admin}
+    if _auth_email.verification_required():
+        return {"user": None, "is_first_admin": is_admin, "verification_required": True,
+                "message": "Išsiuntėme nuorodą į " + email + ". Atidarykite ją, kad "
+                           "patvirtintumėte el. paštą, tada prisijunkite."}
+    request.session["user_id"] = user["id"]
+    request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
+    return {"user": _auth.public_user(user), "is_first_admin": is_admin}
 
 
 @app.post("/api/auth/login")
@@ -983,11 +999,17 @@ def api_login(payload: LoginPayload, request: Request):
         log.warning("failed login: email=%s ip=%s", email,
                     request.client.host if request.client else "?")
         raise HTTPException(status_code=401, detail="Neteisingas el. paštas arba slaptažodis")
+    # v3 M2 (audit -9 follow-through): with the gate on, an unverified inbox
+    # gets no session. Only after the password matched, so it is no oracle.
+    from api import auth_email as _auth_email
+    if _auth_email.verification_required() and not user.get("email_verified_at"):
+        raise HTTPException(status_code=403, detail={
+            "error": "email_not_verified", "message": _auth_email.NOT_VERIFIED})
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     user.pop("password_hash", None)
-    return {"user": user}
+    return {"user": _auth.public_user(user)}
 
 
 @app.post("/api/auth/logout")
@@ -1012,7 +1034,7 @@ async def api_me(request: Request):
     user = _auth.get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Nesate prisijungę")
-    return {"user": user}
+    return {"user": _auth.public_user(user)}
 
 
 class PasswordChangePayload(BaseModel):
@@ -1101,7 +1123,7 @@ async def api_update_profile(payload: ProfileUpdatePayload, request: Request):
     for _k in ("password_hash", "google_sub", "stripe_customer_id",
                "session_version"):
         _u.pop(_k, None)
-    return {"user": _u}
+    return {"user": _auth.public_user(_u)}
 
 
 # ── M4: Google OAuth (2026-05-06) ──────────────────────────────────────
@@ -1202,13 +1224,27 @@ async def api_google_login(request: Request):
     return RedirectResponse(url=url, status_code=302)
 
 
+def _oauth_redirect(path: str) -> RedirectResponse:
+    """Where the Google callback sends the browser: `path` on the APP's origin.
+
+    The callback is served by the API (api.pathon.eu in production) while the
+    pages live on the app's origin (app.pathon.eu), so a bare "/login?…" landed
+    on the API and showed a 404 (audit backend-security-9, second half).
+    PATHON_APP_URL set → absolute URL on the app; unset (dev, tests) → the
+    relative path, exactly as before. `path` is always a same-site path here
+    (fixed strings or _safe_next_path output)."""
+    base = (os.environ.get("PATHON_APP_URL") or "").rstrip("/")
+    return RedirectResponse(url=f"{base}{path}" if base else path, status_code=302)
+
+
 @app.get("/api/auth/google/callback")
 async def api_google_callback(request: Request, code: str | None = None,
                               state: str | None = None, error: str | None = None):
     """Google OAuth redirect target. Exchanges code → token → user info,
     then creates/links the local user and starts a session."""
     if error:
-        return RedirectResponse(url=f"/login?oauth_error={error}", status_code=302)
+        from urllib.parse import quote as _q
+        return _oauth_redirect(f"/login?oauth_error={_q(str(error)[:64], safe='')}")
     if not GOOGLE_OAUTH_ENABLED:
         raise HTTPException(status_code=503, detail="Google OAuth not configured")
     expected_state = request.session.pop("google_oauth_state", None)
@@ -1219,11 +1255,9 @@ async def api_google_callback(request: Request, code: str | None = None,
     # exactly like the `error` and `account_disabled` paths already do.
     # (audit 2026-07-27)
     if not state or state != expected_state:
-        return RedirectResponse(url="/login?oauth_error=invalid_state",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=invalid_state")
     if not code:
-        return RedirectResponse(url="/login?oauth_error=missing_code",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=missing_code")
 
     import httpx  # lazy import — only loaded when OAuth is used
     async with httpx.AsyncClient(timeout=10) as client:
@@ -1239,21 +1273,18 @@ async def api_google_callback(request: Request, code: str | None = None,
         )
         if token_resp.status_code != 200:
             log.error("Google token exchange failed: %s", token_resp.text[:300])
-            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=token_exchange_failed")
         access_token = token_resp.json().get("access_token")
         if not access_token:
             log.error("Google token exchange returned no access_token")
-            return RedirectResponse(url="/login?oauth_error=token_exchange_failed",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=token_exchange_failed")
         userinfo = await client.get(
             "https://openidconnect.googleapis.com/v1/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if userinfo.status_code != 200:
             log.error("Google userinfo fetch failed: HTTP %s", userinfo.status_code)
-            return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
-                                    status_code=302)
+            return _oauth_redirect("/login?oauth_error=incomplete_userinfo")
         info = userinfo.json()
 
     google_sub = info.get("sub")
@@ -1262,37 +1293,52 @@ async def api_google_callback(request: Request, code: str | None = None,
     avatar = info.get("picture")
     if not google_sub or not email:
         log.error("Google userinfo missing sub/email")
-        return RedirectResponse(url="/login?oauth_error=incomplete_userinfo",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=incomplete_userinfo")
+    # Audit backend-security-9 (fixed 2026-10-18): Google vouches for the
+    # address only when it says so. Without that, linking by email would hand
+    # an existing account to whoever controls a Google login for that string.
+    if info.get("email_verified") is not True:
+        log.warning("Google sign-in refused: email not verified by Google")
+        return _oauth_redirect("/login?oauth_error=email_unverified")
 
+    from api import auth_email as _auth_email
     # Match priority: existing google_sub → existing email → create new user.
     user = db.get_user_by_google_sub(google_sub)
     if user is None:
         existing = db.get_user_by_email(email)
         if existing:
+            # Pre-account-takeover guard: a password account whose inbox was
+            # never proven may have been registered by someone else with this
+            # address. Do not merge Google into it; the owner signs in with
+            # the password (or resets it, which proves the inbox) first.
+            has_password = (existing.get("password_hash") or "") not in ("", "!oauth")
+            if has_password and not existing.get("email_verified_at"):
+                return _oauth_redirect("/login?oauth_error=link_needs_password")
             db.link_google_to_user(existing["id"], google_sub, avatar)
+            _auth_email.on_email_verified(existing["id"])
             user = db.get_user_by_id(existing["id"])
         else:
-            # Admin via SAMATU_ADMIN_EMAIL allowlist, else legacy first-user
-            # (matches /api/auth/register policy).
-            is_admin = _is_admin_email(email)
+            # Admin via SAMATU_ADMIN_EMAIL allowlist (a Google-verified inbox),
+            # else legacy first-user (matches /api/auth/register policy).
+            is_admin = _is_admin_email(email, verified=True)
             user = db.create_user_oauth(
                 email=email, google_sub=google_sub, name=name,
                 avatar_url=avatar, is_admin=is_admin,
             )
+            db.mark_email_verified(user["id"])
+            user = db.get_user_by_id(user["id"])
     # Admin-disable enforcement (2026-07-05): a deactivated account must not be
     # able to mint a session via OAuth either. The password /api/auth/login path
     # already rejects `is_active=0`, and get_current_user re-checks it on every
     # request — but refuse here too so a disabled user is bounced at the login
     # boundary (defense in depth) rather than getting a live-but-useless cookie.
     if not user.get("is_active"):
-        return RedirectResponse(url="/login?oauth_error=account_disabled",
-                                status_code=302)
+        return _oauth_redirect("/login?oauth_error=account_disabled")
     request.session["user_id"] = user["id"]
     request.session["sv"] = user.get("session_version", 1)  # F2 session nonce
     db.update_user_login(user["id"])
     # Re-sanitize on use (defense in depth) before redirecting.
-    return RedirectResponse(url=_safe_next_path(next_url), status_code=302)
+    return _oauth_redirect(_safe_next_path(next_url))
 
 
 # ── Project endpoints (per-user isolation) ──────────────────────────────────
@@ -1615,6 +1661,12 @@ async def api_extract_room_material_specs(
 
     if not files:
         raise HTTPException(status_code=400, detail="PDF file required")
+    # Audit backend-security-5 (fixed 2026-10-18): a paid Vision call behind a
+    # plain login — no spend cap, no reservation, no rate limit. Ownership was
+    # checked above; the cache answered for free; only a real read is charged.
+    _check_rate_limit(_client_key(request), "material-specs")
+    _check_user_spend_cap(user["id"])
+    _reserve_billable(user["id"], request.url.path)
     pdf_bytes = await files[0].read()
     # Mirror every other upload endpoint (2026-07-28 audit): this one skipped
     # _validate_pdf_upload entirely, so a non-PDF / 300 MB / 1000-page file went
@@ -5065,7 +5117,7 @@ def _sequential_export_nr(eilutes: list[dict],
 def generate_excel(request: Request, data: dict):
     # Sprint §AUDIT (2026-04-29): require auth — was open endpoint, vulnerable
     # to abuse (each call spins up openpyxl + heavy I/O).
-    _auth.require_user(request)
+    _excel_user = _auth.require_user(request)
     from datetime import date as _date
     # P3 (2026-07-04 pentest, pass 3): this /generate-excel path writes user/AI
     # text (imone, projektas, skyrius, nr, aprašymas, mato_vnt) straight into
@@ -5328,7 +5380,11 @@ def generate_excel(request: Request, data: dict):
                     # P3: cols 1-3 are user/AI text (nr, aprašymas, mato_vnt) —
                     # neutralise formula injection; cols 4-5 (kiekis, kaina) stay
                     # numeric and MUST NOT be quoted.
-                    cell_val = _safe_cell(val) if col in (1, 2, 3) else val
+                    # Audit backend-security-4 (2026-10-18): an UNPARSEABLE
+                    # kiekis/kaina comes back from _excel_number as the raw
+                    # string — it is text then, and gets the same neutralising.
+                    cell_val = (_safe_cell(val)
+                                if col in (1, 2, 3) or isinstance(val, str) else val)
                     c = ws.cell(row=r, column=col, value=cell_val)
                     c.fill      = fill
                     c.border    = border
@@ -5349,6 +5405,9 @@ def generate_excel(request: Request, data: dict):
     # Reverse-VAT — no output VAT line; VISO equals the be-PVM sum. His
     # `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
     _reverse_vat = _is_reverse_vat(data)
+    # v3 M4: his PVM rate (21 / 9 / 0 %) — was a hard-coded 21 %.
+    from extractor.vat_mode import vat_rate_percent as _vat_rate_percent
+    _vat_pct = _vat_rate_percent(data)
 
     def _write_totals(ws, rows: list[dict], r: int):
         ws.row_dimensions[r].height = 6
@@ -5387,7 +5446,7 @@ def generate_excel(request: Request, data: dict):
             _tot(r + 1, "IŠ VISO (be PVM):", f"=F{r}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
         else:
-            _tot(r + 1, "PVM 21%:",      f"=ROUND(F{r}*0.21,2)")
+            _tot(r + 1, f"PVM {_vat_pct}%:", f"=ROUND(F{r}*{_vat_pct / 100:.2f},2)")
             _tot(r + 2, "IŠ VISO su PVM:",  f"=F{r}+F{r+1}",
                  lcolor=C_ORANGE, vcolor=C_ORANGE, fsize=12)
 
@@ -5600,6 +5659,13 @@ def generate_excel(request: Request, data: dict):
                 c.font   = Font(size=9)
             ws_past.row_dimensions[ri].height = 16
 
+    # „Pakeitimų žurnalas" (v3 M5): the internal copy also lists what he changed
+    # and every saved version — only for a project he owns (api/change_log_sheet).
+    if data.get("vidine_kopija") is True and data.get("project_id"):
+        from api.change_log_sheet import change_log_entries, write_change_log_sheet
+        write_change_log_sheet(wb, change_log_entries(str(data["project_id"]), _excel_user),
+                               projektas, safe_cell=_safe_cell)
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -5736,7 +5802,10 @@ def generate_pdf(request: Request, data: dict):
     # 21% here prints an illegal VAT line + a 21%-inflated total. (2026-06-19 hunt.)
     # His `vat_mode` wins; without one, the old label rule (extractor/vat_mode.py).
     _reverse_vat = _is_reverse_vat(data)
-    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * 0.21, 2)
+    # v3 M4: his PVM rate (21 / 9 / 0 %) — was a hard-coded 21 %.
+    from extractor.vat_mode import vat_rate_percent as _vat_rate_percent
+    _vat_pct     = _vat_rate_percent(data)
+    pvm          = 0.0 if _reverse_vat else round(viso_be_pvm * _vat_pct / 100, 2)
     viso_su_pvm  = viso_be_pvm if _reverse_vat else round(viso_be_pvm + pvm, 2)
     # A priced export is a SĄMATA, not a KŽ — a "Kiekių žiniaraštis" by definition
     # carries no prices, so that title over Kaina/Suma columns + a VISO su PVM
@@ -5793,7 +5862,9 @@ def generate_pdf(request: Request, data: dict):
         if v is None or (isinstance(v, str) and not v.strip()):
             return ""
         if not isinstance(v, (int, float)):
-            return str(v)
+            # Audit backend-security-4 (2026-10-18): this lands in a Paragraph,
+            # which parses markup — the unparseable value prints as text.
+            return _esc(v)
         return f"{v:,.2f}".replace(",", _NB).replace(".", ",")
 
     def _money(v):
@@ -6119,7 +6190,7 @@ def generate_pdf(request: Request, data: dict):
         # No output VAT line on a reverse-VAT document; VISO equals the be-PVM sum.
         tot_row("IŠ VISO (be PVM):", viso_be_pvm, bold=True, orange=True)
     else:
-        tot_row("PVM 21%:",      pvm)
+        tot_row(f"PVM {_vat_pct}%:", pvm)
         tot_row("IŠ VISO su PVM:",  viso_su_pvm, bold=True, orange=True)
 
     # Global style
@@ -6995,6 +7066,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # Pure formulas, no Anthropic call → plain login, no spend reservation and
     # no € cap: every room edit lands here (audit 2026-09-29).
     _auth.require_user(request)
+    # v3 M7 rate decision (measured 2026-10-18, DEVELOPING.md › Limits): 50 ms
+    # for an 11-room project, ~390 ms for 110 rooms, on one worker that serves
+    # everyone. 120/min per client (2/s) is far above any person editing rooms
+    # and stops a loop from monopolising the worker.
+    _check_rate_limit(_client_key(request), "recompute-interior", limit=RECOMPUTE_INTERIOR_PER_MIN)
     # DoS guard: bound per-request work. A real interior project is tens of
     # rooms; 500 is generous headroom, absurd payloads are rejected.
     if len(payload.patalpos) > 500:
@@ -7303,6 +7379,18 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     return _user_text.scrub_prose(parsed)
 
 
+def _v9_error(exc: Exception, where: str) -> dict:
+    """Audit backend-security-21 (fixed 2026-10-18): the v9 symbol routes
+    echoed the exception text (module paths, file names) to the browser. Log
+    it under a short reference and answer with a plain sentence that carries
+    the same reference, so a report can be matched to the log line."""
+    import uuid
+    ref = uuid.uuid4().hex[:8]
+    log.warning("v9 symbols %s failed [ref %s]: %r", where, ref, exc)
+    return {"status": "error",
+            "error": f"Simbolių nepavyko suskaičiuoti. Bandykite dar kartą (klaidos nr. {ref})."}
+
+
 @app.post("/v9/symbols/detect")
 async def v9_symbols_detect(
     request: Request,
@@ -7322,7 +7410,7 @@ async def v9_symbols_detect(
     try:
         from interior_v9 import detect_symbols
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     import asyncio
     loop = asyncio.get_running_loop()
@@ -7332,7 +7420,7 @@ async def v9_symbols_detect(
             lambda: detect_symbols(pdf_bytes, symbol_type, page_nr),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     return {"status": "ok", **result}
 
@@ -7362,7 +7450,7 @@ async def v9_symbols_detect_page(
             SYMBOL_TYPES,
         )
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     symbol_types = list_symbol_types_for_page_type(page_type)
     if not symbol_types:
@@ -7381,7 +7469,7 @@ async def v9_symbols_detect_page(
             lambda: detect_symbols_bundled(pdf_bytes, page_nr, symbol_types),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     if isinstance(by_type, dict) and by_type.get("_error"):
         return {"status": "error", "error": by_type["_error"]}
@@ -7417,7 +7505,7 @@ async def v9_symbols_count_by_template(
     try:
         from interior_v9 import count_symbols_by_template
     except ImportError as e:
-        return {"status": "error", "error": f"V9 import: {e}"}
+        return _v9_error(e, "import")
 
     import asyncio
     loop = asyncio.get_running_loop()
@@ -7430,7 +7518,7 @@ async def v9_symbols_count_by_template(
             ),
         )
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return _v9_error(e, "run")
 
     return {"status": "ok", **result}
 
@@ -7843,7 +7931,7 @@ Senų vietų nebėra: mygtukas „Prielaidos" dabar vadinasi „Nustatymai", ski
      kiekvieno skyriaus pavadinimo.
    - Kiekio ir kainos langeliai: spustelėkite ir įrašykite; Enter įrašo ir
      pereina prie kitos eilutės kainos, Esc atsisako. Dešimtainis skirtukas —
-     kablelis arba taškas („12,5"). Suma, skyrių tarpinės sumos ir PVM 21 %
+     kablelis arba taškas („12,5"). Suma, skyrių tarpinės sumos ir PVM (21, 9 ar 0 %)
      perskaičiuojami iš karto. Neteisingas arba per didelis skaičius (virš
      99 999 999) atmetamas su pranešimu. Ranka pakeistas kiekis pažymėtas
      „rank.".
@@ -7873,7 +7961,7 @@ Senų vietų nebėra: mygtukas „Prielaidos" dabar vadinasi „Nustatymai", ski
      lapas „Sąmata", atskiras lapas kiekvienam skyriui ir lapai „Prielaidos",
      „Patalpos", „Pastabos"; pakeitus kiekį ar kainą faile, sumos
      persiskaičiuoja. „PDF pasiūlymas" — spausdinti paruoštas pasiūlymas:
-     antraštė SĄMATA (jei kainos suvestos), skyrių sumos, PVM 21 % eilutė ir
+     antraštė SĄMATA (jei kainos suvestos), skyrių sumos, PVM eilutė pagal pasirinktą tarifą ir
      parašų blokas.
    - Prieš siunčiant parodoma, kiek eilučių be kainos; „Įrašyti kainas"
      nuveda į „Sąmatą" prie pirmos tokios eilutės. Jei kainos neturi nė viena

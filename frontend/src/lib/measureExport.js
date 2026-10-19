@@ -1,6 +1,7 @@
 // Export/import of measurement sets to JSON and CSV (LT locale).
 import { measurementValue } from './measurements.js';
 import { formatNumberLT } from './measureGeometry.js';
+import { csvSafe } from './csvSafe.js';
 
 export function toJSON(doc, pretty = true) { return JSON.stringify(doc, null, pretty ? 2 : 0); }
 
@@ -18,7 +19,11 @@ export function toMeasurementsCSV(doc) {
   const decimals = doc.display?.decimals ?? 2;
   const uncal = { metersPerPointX: 0, metersPerPointY: 0, calibrated: false };
   const SEP = ';';
-  const esc = (v) => (/[";\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  // csvSafe first (audit backend-security-4): a typed label never runs as a formula.
+  const esc = (raw) => {
+    const v = csvSafe(raw);
+    return /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
   const rows = [['Lapas', 'Tipas', 'Klasifikacija', 'Kiekis', 'Vnt.', 'Antrinis', 'Antrinis vnt.', 'Patikimumas', 'Šaltinis']];
   for (const m of measurements) {
     if (m.kind === 'count') continue;

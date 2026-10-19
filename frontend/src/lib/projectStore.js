@@ -21,6 +21,7 @@ import { API_BASE as API } from './apiBase.js';
 import { toast } from 'sonner';
 import { learningEventsFromChange } from './learningEvents.js';
 import { syncMeasuredRows } from './measuredRows.js';
+import { vatRateOf } from './vatMode.js';
 
 const PROJECTS_KEY = 'samatu_projects';
 const PRICE_LISTS_KEY = 'samatu_price_lists';
@@ -705,6 +706,9 @@ export async function seedDemoProject() {
 
 export function createProject(data) {
   const project = {
+    // v3 M4: a new project takes the account's PVM rate (Settings › PVM
+    // tarifas: 21 / 9 / 0 %) unless the caller set one.
+    vat_rate: vatRateOf(null, getSettings()?.vat_rate),
     ...data,
     id: crypto.randomUUID(),
     created_date: new Date().toISOString(),

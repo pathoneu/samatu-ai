@@ -119,7 +119,7 @@ class _FakeGoogle:
         return _Resp({"access_token": "tok"})
 
     async def get(self, *a, **k):
-        return _Resp({"sub": "google-sub-1", "email": "grizta@x.lt", "name": "Grįžta"})
+        return _Resp({"sub": "google-sub-1", "email": "grizta@x.lt", "email_verified": True, "name": "Grįžta"})
 
 
 @pytest.fixture()
