@@ -122,7 +122,7 @@ function Minimap({ documentId, anchorRef, pages }) {
     canvasEl.scrollBy({ left: dx, top: dy, behavior: 'auto' });
   };
   return (
-    <div className="pointer-events-auto rounded-panel border border-border bg-card shadow-md p-1.5" data-minimap data-testid="minimap">
+    <div className="pointer-events-auto mb-16 rounded-panel border border-border bg-card shadow-md p-1.5" data-minimap data-testid="minimap">
       <p className="text-meta text-muted-foreground px-0.5 pb-1">Lapas {page} — spustelėkite, kur rodyti</p>
       <div
         className="relative bg-white ring-1 ring-border cursor-pointer select-none"

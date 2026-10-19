@@ -1546,7 +1546,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     header: '[data-canvas-header]',
     legend: '[data-layer-legend]',
     scaleChip: '[data-testid="scale-chip-root"]',
-    zoom: '[data-zoom-cluster-root]',
+    zoom: '[data-zoom-cluster]',
   });
   // Where the top row of cards ends (pages / zoom and search may wrap to two rows on a narrow canvas).
   const chromeTopBottom = Math.max(

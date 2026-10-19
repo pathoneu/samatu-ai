@@ -132,19 +132,22 @@ test.describe('viewer chrome (W5-B)', () => {
     await page.mouse.up();
     await expect.poll(() => zoomPct(page), { timeout: 10_000 }).toBeGreaterThan(fit * 2);
     note(`area zoom ${fit} % → ${await zoomPct(page)} %`);
+    // the pill (area tool), the column and the open minimap side by side: the pill stays on one line
     await page.getByTestId('zoom-minimap').click();
     await expect(page.getByTestId('minimap-frame')).toBeVisible();
-    await page.getByTestId('zoom-minimap').click();
-    // the pill (area tool) and the column side by side, one line each
     await page.mouse.move(600, 400);
     await page.keyboard.press('3');
+    await page.waitForTimeout(700);           // the chrome is re-measured every 300 ms
     const pill = await box(page.getByTestId('mode-pill'));
     const col = await box(page.locator('[data-zoom-cluster]'));
+    const mini = await box(page.getByTestId('minimap'));
     expect(overlaps(pill, col)).toBe(false);
+    expect(overlaps(pill, mini)).toBe(false);
     expect(pill.height).toBeLessThan(56);
-    note(`1280×720: pill ${Math.round(pill.width)}×${Math.round(pill.height)} px, zoom column ${Math.round(col.width)} px wide`);
+    note(`1280×720: pill ${Math.round(pill.width)}×${Math.round(pill.height)} px, zoom column ${Math.round(col.width)} px wide, minimap above the pill line`);
     await shot(page, 'w5b-1280-pill-zoom');
     await page.keyboard.press('Escape');
+    await page.getByTestId('zoom-minimap').click();
   });
 
   test('B6 the confirm box is 300 px with its consequence; Esc closes only the box; a deleted measurement comes back', async ({ page }) => {
