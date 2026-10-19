@@ -67,7 +67,8 @@ def test_nothing_is_ever_a_quantity_row_and_every_sentence_is_plain():
     assert project == before                                      # pure — the blob is not touched
     assert set(_ids(out)) == {"ugniai_atsparios", "gk_tikslus_praktinis", "deformacine_siule", "dazu_atsarga",
                               "hidroizoliacija", "gruntas", "glaistymas", "kampu_profiliai", "gk_sandarinimas",
-                              "led_transformatoriai", "dumu_davikliai"}
+                              "led_transformatoriai", "dumu_davikliai",
+                              "silpnu_sroviu_lizdai:interneto", "silpnu_sroviu_lizdai:tv"}
     assert out["count"] == len(out["reminders"])
     kinds = [r["kind"] for r in out["reminders"]]
     assert kinds[-1] == "ugniai_atsparios"                          # the general one says the least: last
@@ -290,3 +291,64 @@ def test_a_turned_sheet_still_points_inside_the_page(tmp_path, monkeypatch, rota
     assert fire["specific"] is True and fire["evidence"]["page"] == 1
     x0, y0, x1, y1 = fire["evidence"]["rect_pct"]
     assert 0.0 <= x0 < x1 <= 1.0 and 0.0 <= y0 < y1 <= 1.0
+
+
+# ── E4: data and TV outlets ───────────────────────────────────────────────────────────────────────────
+
+from extractor.reminders import outlet_kind  # noqa: E402
+
+
+def test_outlet_kind_words():
+    assert outlet_kind("Interneto lizdas") == "interneto"
+    assert outlet_kind("Duomenų lizdas RJ45") == "interneto"
+    assert outlet_kind("TV lizdas") == "tv"
+    assert outlet_kind("Televizijos antenos lizdas") == "tv"
+    assert outlet_kind("Dviguba rozetė") is None                    # a power socket names no data / TV
+    assert outlet_kind("Interneto ir TV lizdas") is None             # two kinds in one row: not a reading
+    assert outlet_kind("Internetas") is None                         # no outlet word
+
+
+def _outlet_project(rows):
+    return {"patalpos": [_room("01")], "darbu_sarasas": _FULL_ROWS + rows}
+
+
+def test_no_legend_asks_and_offers_a_blank_row():
+    out = build_reminders(_outlet_project([]))
+    r = _one(out, "silpnu_sroviu_lizdai:interneto")
+    assert r["vieta"] == ["samata"] and r["legendoje"] is False
+    assert r["sentence"].startswith("Sąmatoje interneto lizdų nėra — ar jų bus?")
+    legend_without = build_reminders(_outlet_project([]), legend_rows=[{"row_id": "s", "text": "Šviestuvas"}])
+    assert _one(legend_without, "silpnu_sroviu_lizdai:interneto")["sentence"].startswith(
+        "Brėžinio legendoje interneto lizdų nėra — ar jų bus?")
+    assert r["add_row"] == {"aprasymas": "Interneto lizdų montavimas", "mato_vnt": "vnt", "kiekis": None,
+                            "skyrius": "Elektros instaliacijos darbai"}
+    assert _one(out, "silpnu_sroviu_lizdai:tv")["add_row"]["aprasymas"] == "TV lizdų montavimas"
+    for x in out["reminders"]:
+        assert not user_text.is_banned(x["sentence"]), x["sentence"]
+
+
+def test_legend_row_points_at_the_count():
+    legend = [{"row_id": "a", "text": "Interneto lizdas", "countable": True},
+              {"row_id": "b", "text": "Šviestuvas", "countable": True}]
+    out = build_reminders(_outlet_project([]), legend_rows=legend)
+    r = _one(out, "silpnu_sroviu_lizdai:interneto")
+    assert r["legendoje"] is True and "„Interneto lizdas“" in r["sentence"] and "„Kiekis“" in r["sentence"]
+    assert _one(out, "silpnu_sroviu_lizdai:tv")["legendoje"] is False
+
+
+def test_a_samata_row_silences_its_kind():
+    out = build_reminders(_outlet_project([{"skyrius": "Elektros instaliacijos darbai",
+                                            "aprasymas": "TV lizdų montavimas", "kiekis": 2}]))
+    assert "silpnu_sroviu_lizdai:tv" not in _ids(out)
+    assert "silpnu_sroviu_lizdai:interneto" in _ids(out)
+
+
+def test_route_reads_the_saved_legend(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    import api.legends as legends
+    monkeypatch.setattr(legends, "LEGENDS_DIR", tmp_path / "legends")
+    db.upsert_project("p9", _blob())
+    legends.save_project_legend("p9", {"project_id": "p9", "rows": [{"row_id": "x", "page": 1, "text": "TV lizdas"}]})
+    out = TestClient(app).get("/api/projects/p9/reminders").json()
+    assert _one(out, "silpnu_sroviu_lizdai:tv")["legendoje"] is True
+    assert _one(out, "silpnu_sroviu_lizdai:interneto")["legendoje"] is False

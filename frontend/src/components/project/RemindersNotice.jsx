@@ -9,16 +9,18 @@
  * Nothing is hover-only. The list is read once per project; the server saves nothing.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import Notice from '@/components/ui/Notice';
 import { cleanUserText } from '@/lib/userText';
-import { VISIBLE_FIRST, evidenceTarget, remindersFor, remindersWord } from '@/lib/reminders';
+import { VISIBLE_FIRST, blankRowOf, evidenceTarget, hasBlankRow, remindersFor, remindersWord } from '@/lib/reminders';
 import { fetchReminders } from '@/lib/remindersApi';
 import { useWorkspaceHost } from './workspaceHost';
 
-export default function RemindersNotice({ projectId, where, onJumpToPage = null, reloadKey = 0, className = '' }) {
+export default function RemindersNotice({
+  projectId, where, onJumpToPage = null, reloadKey = 0, className = '', rows = null, onAddRow = null,
+}) {
   const { t } = useTranslation();
   const host = useWorkspaceHost();
   const [list, setList] = useState([]);
@@ -33,7 +35,10 @@ export default function RemindersNotice({ projectId, where, onJumpToPage = null,
     return () => ctrl.abort();
   }, [projectId, reloadKey]);
 
-  const items = useMemo(() => remindersFor(list, where), [list, where]);
+  // E4: a reminder that offers a blank row the sąmata now has is answered — it goes away
+  const items = useMemo(
+    () => remindersFor(list, where).filter((r) => !(rows && hasBlankRow(rows, blankRowOf(r)))),
+    [list, where, rows]);
   if (items.length === 0) return null;
 
   const reveal = (target) => {
@@ -73,6 +78,18 @@ export default function RemindersNotice({ projectId, where, onJumpToPage = null,
               <span className="shrink-0 text-muted-foreground" aria-hidden="true">·</span>
               <div className="min-w-0 flex-1">
                 <span className="text-foreground">{cleanUserText(r.sentence)}</span>
+                {onAddRow && blankRowOf(r) && (
+                  <button
+                    type="button"
+                    onClick={() => onAddRow(blankRowOf(r))}
+                    className="ml-2 inline-flex items-center gap-1 underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={{ color: 'hsl(var(--accent-2))' }}
+                    data-testid="reminder-add-row"
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('project.reminders.addBlankRow')}
+                  </button>
+                )}
                 {target && (
                   <button
                     type="button"

@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { WHERE_PATIKRA, WHERE_SAMATA, evidenceTarget, remindersFor, remindersWord } from './reminders.js';
+import { WHERE_PATIKRA, WHERE_SAMATA, evidenceTarget, remindersFor, remindersWord, blankRowOf, hasBlankRow } from './reminders.js';
 
 const R = (id, extra = {}) => ({ id, kind: id, sentence: `${id}.`, vieta: [WHERE_PATIKRA, WHERE_SAMATA], ...extra });
 
@@ -35,4 +35,18 @@ test('„Rodyti brėžinyje" goes to the page and the box the reminder carries �
   assert.equal(evidenceTarget(R('a', { evidence: null })), null);
   assert.equal(evidenceTarget(R('a', { evidence: { page: 0 } })), null);
   assert.equal(evidenceTarget(R('a')), null);
+});
+
+
+test('E4: the blank row a reminder offers, and whether the sąmata has it already', () => {
+  const r = R('silpnu_sroviu_lizdai:tv', { add_row: { aprasymas: 'TV lizdų montavimas', mato_vnt: 'vnt', kiekis: 7,
+    skyrius: 'Elektros instaliacijos darbai' } });
+  const blank = blankRowOf(r);
+  assert.deepEqual(blank, { aprasymas: 'TV lizdų montavimas', mato_vnt: 'vnt', kiekis: null,
+    skyrius: 'Elektros instaliacijos darbai' });   // the quantity always stays empty
+  assert.equal(blankRowOf(R('a')), null);
+  assert.equal(blankRowOf(R('a', { add_row: { aprasymas: '  ' } })), null);
+  assert.equal(hasBlankRow([{ aprasymas: 'tv lizdų montavimas ' }], blank), true);
+  assert.equal(hasBlankRow([{ aprasymas: 'Interneto lizdų montavimas' }], blank), false);
+  assert.equal(hasBlankRow(null, blank), false);
 });

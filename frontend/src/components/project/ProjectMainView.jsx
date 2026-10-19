@@ -777,6 +777,30 @@ export default function ProjectMainView({
     onProjectChange?.({ ...project, darbu_sarasas: updated });
   };
 
+  // E4 (v3 W5-E): the blank row a reminder offers („Interneto lizdų montavimas", kiekis empty) — added only
+  // by his click, into its section, with Undo like a delete
+  const handleAddReminderRow = (blank) => {
+    pilot('row_add', { kind: 'row', id: String(blank?.aprasymas || '') });
+    const cat = blank.skyrius || t('project.mainView.otherWorks');
+    const next = { eil_nr: nextEilNr(darbai), id: manualRowId(), aprasymas: blank.aprasymas,
+      mato_vnt: blank.mato_vnt, kiekis: null, kaina: 0, skyrius: cat };
+    const updated = insertRowInSection(darbai, cat, next, t('project.mainView.otherWorks'));
+    setDarbai(updated);
+    onProjectChange?.({ ...project, darbu_sarasas: updated });
+    toast(t('project.reminders.rowAdded', { name: blank.aprasymas }), {
+      duration: 6000,
+      action: {
+        label: t('project.mainView.undo'),
+        onClick: () => {
+          const { project: freshProject, darbai: current } = latestRef.current;
+          const restored = current.filter((x) => x.id !== next.id);
+          setDarbai(restored);
+          onProjectChange?.({ ...freshProject, darbu_sarasas: restored });
+        },
+      },
+    });
+  };
+
   const projectWithDarbai = { ...project, darbu_sarasas: darbai };
 
   return (
@@ -861,7 +885,10 @@ export default function ProjectMainView({
           />
         )}
         {/* what is commonly forgotten (v3 W5-E) — notices only, never a row */}
-        <RemindersNotice projectId={project.id} where="samata" onJumpToPage={onJumpToPage} className="mt-2 w-full" />
+        <RemindersNotice
+          projectId={project.id} where="samata" onJumpToPage={onJumpToPage} className="mt-2 w-full"
+          rows={darbai} onAddRow={handleAddReminderRow}
+        />
       </div>
 
       {/* PATALPŲ SUVESTINĖ — collapsible */}

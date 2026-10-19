@@ -130,8 +130,14 @@ def api_project_reminders(request: Request, project_id: str):
         except Exception as exc:  # noqa: BLE001 — an unreadable text layer gives the general reminder
             log.warning("reminders: text layer unreadable for %s: %r", project_id, exc)
             hits = None
+    legend_rows = None
     try:
-        payload = build_reminders(project, fire_hits=hits)
+        from api.legends import load_project_legend
+        legend_rows = (load_project_legend(project_id) or {}).get("rows") or None
+    except Exception as exc:  # noqa: BLE001 — no legend: the outlet reminder asks instead of pointing at it
+        log.info("reminders: no legend for %s (%r)", project_id, exc)
+    try:
+        payload = build_reminders(project, fire_hits=hits, legend_rows=legend_rows)
     except Exception as exc:  # noqa: BLE001 — a malformed legacy blob is not a 500 trace
         log.error("reminders failed project=%s: %r", project_id, exc)
         raise HTTPException(status_code=500, detail="Nepavyko sudaryti priminimų sąrašo") from exc

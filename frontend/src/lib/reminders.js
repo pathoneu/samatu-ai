@@ -34,3 +34,25 @@ export function evidenceTarget(r) {
     ? e.rect_pct : null;
   return { page, rect_pct: rect };
 }
+
+/**
+ * The blank row a reminder offers (E4: „Interneto lizdų montavimas", kiekis empty), or null. He adds it
+ * himself with one click; nothing is added by the reminder, and the quantity stays empty until he writes it.
+ */
+export function blankRowOf(r) {
+  const a = r?.add_row;
+  if (!a || typeof a.aprasymas !== 'string' || !a.aprasymas.trim()) return null;
+  return {
+    aprasymas: a.aprasymas.trim(),
+    mato_vnt: typeof a.mato_vnt === 'string' && a.mato_vnt ? a.mato_vnt : 'vnt',
+    kiekis: null,
+    skyrius: typeof a.skyrius === 'string' && a.skyrius ? a.skyrius : null,
+  };
+}
+
+/** Whether the sąmata already carries that row (same words) — then the offer is not shown again. */
+export function hasBlankRow(rows, blank) {
+  if (!blank) return false;
+  const want = blank.aprasymas.toLowerCase();
+  return (Array.isArray(rows) ? rows : []).some((x) => String(x?.aprasymas || '').trim().toLowerCase() === want);
+}

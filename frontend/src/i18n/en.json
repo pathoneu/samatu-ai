@@ -658,7 +658,9 @@
       "sub": "These are not estimate rows — only what is worth checking before sending.",
       "showAll": "Show all ({{count}})",
       "collapse": "Collapse",
-      "reveal": "Show on the drawing (sheet {{page}})"
+      "reveal": "Show on the drawing (sheet {{page}})",
+      "addBlankRow": "Add an empty row",
+      "rowAdded": "Row “{{name}}” added — enter the quantity."
     },
     "section": {
       "rows": "({{count}} rows)"

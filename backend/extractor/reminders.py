@@ -43,7 +43,7 @@ EVIDENCE_PAD_PCT = 0.01
 
 # The order the notice lists them in: what can change the estimate most first.
 ORDER = ("konturai_uzeina", "ugniai_atsparios", "gk_tikslus_praktinis", "deformacine_siule",
-         "dazu_atsarga", "hidroizoliacija", "gruntas", "glaistymas", "kampu_profiliai",
+         "dazu_atsarga", "silpnu_sroviu_lizdai", "hidroizoliacija", "gruntas", "glaistymas", "kampu_profiliai",
          "gk_sandarinimas", "led_transformatoriai", "dumu_davikliai")
 
 # Words in the drawing's text layer that mark a fire-rated assembly (EI30, EI 60, REI 90, „ugniai atspari").
@@ -367,9 +367,65 @@ def _overlaps(rooms: list[dict]) -> list[dict]:
     return out
 
 
+# ── data and TV outlets (E4, CLAUDE.md §1.13) ─────────────────────────────────────────────────────────
+
+ELECTRIC_SECTION = "Elektros instaliacijos darbai"
+# (kind, the words of a legend row / a sąmata row that name it, the blank row offered when none exists)
+OUTLET_KINDS = (
+    ("interneto", re.compile(r"internet|duomen|kompiuter|\brj ?45\b|\blan\b|\bcat ?[56]", re.IGNORECASE),
+     "Interneto lizdų montavimas", "interneto"),
+    ("tv", re.compile(r"\btv\b|televiz|anten", re.IGNORECASE), "TV lizdų montavimas", "TV"),
+)
+
+
+def outlet_kind(text: str | None) -> str | None:
+    """`interneto` / `tv` for a legend or sąmata row text that names a data or TV outlet, else None."""
+    t = str(text or "")
+    if not re.search(r"lizd|rozet|jungtis|taškas|taskas|outlet|socket", t, re.IGNORECASE):
+        return None
+    hits = [k for k, rx, _row, _lt in OUTLET_KINDS if rx.search(t)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _outlets(rows: list[dict], legend_rows: list[dict] | None) -> list[dict]:
+    """One reminder per outlet kind the sąmata has no row for. With the legend's row („Interneto lizdas")
+    it says to count it with „Kiekis"; without one it asks whether there will be any. Either way it offers
+    a blank row (kiekis empty) he adds himself — a count reaches the row through the legend count, never
+    from here. `legend_rows` None = no legend accepted for the project yet."""
+    present = {outlet_kind(_row_text(r)) for r in rows}
+    in_legend: dict[str, str] = {}
+    for lr in legend_rows or []:
+        if not isinstance(lr, dict):
+            continue
+        text = str(lr.get("name") or lr.get("text") or "")
+        k = outlet_kind(text)
+        if k and k not in in_legend:
+            in_legend[k] = text.strip()
+    out = []
+    for kind, _rx, row_name, lt in OUTLET_KINDS:
+        if kind in present:
+            continue
+        blank = {"aprasymas": row_name, "mato_vnt": "vnt", "kiekis": None, "skyrius": ELECTRIC_SECTION}
+        if kind in in_legend:
+            sentence = (f"Brėžinio legendoje yra „{in_legend[kind]}“, o sąmatoje tokios eilutės nėra — suskaičiuokite "
+                        f"juos įrankiu „Kiekis“ ir įrašykite kiekį į eilutę „{row_name}“.")
+        elif legend_rows:
+            sentence = (f"Brėžinio legendoje {lt} lizdų nėra — ar jų bus? Jei taip, pridėkite eilutę "
+                        f"„{row_name}“ ir įrašykite kiekį.")
+        else:   # no legend marked yet: say only what the sąmata lacks
+            sentence = (f"Sąmatoje {lt} lizdų nėra — ar jų bus? Jei taip, pridėkite eilutę "
+                        f"„{row_name}“ ir įrašykite kiekį (juos galima suskaičiuoti elektros plane įrankiu „Kiekis“).")
+        r = _reminder("silpnu_sroviu_lizdai", sentence, vieta=(SAMATA,), add_row=blank,
+                      legendoje=kind in in_legend)
+        r["id"] = f"silpnu_sroviu_lizdai:{kind}"
+        out.append(r)
+    return out
+
+
 # ── the whole project ─────────────────────────────────────────────────────────────────────────────────
 
-def build_reminders(project: dict, *, fire_hits: list[dict] | None = None) -> dict:
+def build_reminders(project: dict, *, fire_hits: list[dict] | None = None,
+                    legend_rows: list[dict] | None = None) -> dict:
     """{reminders: [...], count} — see the module docstring. `fire_hits`: where the drawing's text layer
     names a fire-rated assembly ([{page, box_pct, text}], the route reads them; None = not read)."""
     if not isinstance(project, dict):
@@ -383,6 +439,7 @@ def build_reminders(project: dict, *, fire_hits: list[dict] | None = None) -> di
         lambda: [_gk_tikslus_praktinis(rooms, rows)],
         lambda: [_long_walls(rooms)],
         lambda: [_touch_up(project, rooms)],
+        lambda: _outlets(rows, legend_rows) if rooms else [],
         lambda: _commonly_missed(project, rooms, rows),
     )
     for build in builders:
