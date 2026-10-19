@@ -8,6 +8,8 @@ import { API_BASE as API } from '@/lib/apiBase';
 import { sanitizeExportFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
 import { ensureSettingsPulled } from '@/lib/projectStore';
+import { csvSafe } from '@/lib/csvSafe';
+import { vatRateOf } from '@/lib/vatMode';
 
 function buildInteriorRows(project) {
   // V8 PRIMARY: jei darbu_sarasas užpildytas (V8 grąžina) — naudojam jį tiesiog
@@ -151,6 +153,10 @@ async function downloadFromBackend(endpoint, project, filename) {
     patalpos:     project.v8_rooms || project.patalpos || [],
     perspejimani: project.perspejimani || [],
     tipas:        project.tipas || project.type || 'kz',
+    // v3 M4: the same PVM the screen shows — mode, label rule and rate.
+    vat_mode:     project.vat_mode || '',
+    archetipas:   project.archetipas || '',
+    vat_rate:     vatRateOf(project, s.vat_rate),
   };
 
   const res = await fetch(`${API}/${endpoint}`, {
@@ -168,14 +174,15 @@ async function downloadFromBackend(endpoint, project, filename) {
 
 function exportErrors(project) {
   const rows = project.rows || [];
-  const vatRate = project.vat_rate || 21;
   const problematic = rows.filter(r => normalizeConfidence(r.confidence) === CONF_RAUDONA || r.warning || !r.kaina);
 
   const lines = [];
   lines.push(['Nr.', 'Aprašymas', 'Skyrius', 'Problema'].join(';'));
   problematic.forEach(r => {
     const issue = r.warning || (normalizeConfidence(r.confidence) === CONF_RAUDONA ? confidenceLabel(r.confidence) : 'Trūksta kainos');
-    lines.push([r.nr || '', `"${(r.aprasymas || '').replace(/"/g, '""')}"`, r.skyrius || '', issue].join(';'));
+    // csvSafe (audit backend-security-4): row text never runs as a spreadsheet formula.
+    const cell = (v) => `"${csvSafe(v).replace(/"/g, '""')}"`;
+    lines.push([cell(r.nr), cell(r.aprasymas), cell(r.skyrius), cell(issue)].join(';'));
   });
 
   if (problematic.length === 0) {

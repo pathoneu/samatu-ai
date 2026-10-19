@@ -40,7 +40,27 @@ export function vatChoice(project) {
   return { mode: reverse ? VAT_REVERSE : VAT_STANDARD, fromLabel: reverse };
 }
 
+/** The rates he can pick (Settings, the export dialog). Twin of backend VAT_RATES. */
+export const VAT_RATES = Object.freeze([21, 9, 0]);
+export const DEFAULT_VAT_RATE = 21;
+
+/** A rate out of any stored value: 21 / 9 / 0 when it is one, else null. */
+export function parseVatRate(value) {
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+  const n = Number(String(value).replace('%', '').replace(',', '.').trim());
+  return Number.isFinite(n) && VAT_RATES.includes(n) ? n : null;
+}
+
+/**
+ * The project's PVM rate (v3 M4, 2026-10-18). 0 % is a real choice — the old
+ * `vat_rate || 21` turned it back into 21. A project with no valid rate takes
+ * the account default (`fallback`, Settings › PVM tarifas), else 21.
+ */
+export function vatRateOf(project, fallback = DEFAULT_VAT_RATE) {
+  return parseVatRate(project?.vat_rate) ?? parseVatRate(fallback) ?? DEFAULT_VAT_RATE;
+}
+
 /** The PVM percent a total adds: 0 under reverse VAT, else the project's rate. */
 export function vatPercent(project) {
-  return isReverseVat(project) ? 0 : (project?.vat_rate || 21);
+  return isReverseVat(project) ? 0 : vatRateOf(project);
 }

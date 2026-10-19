@@ -72,7 +72,7 @@ def test_oneoff_payment_emits_invoice(tmp_path, monkeypatch):
     db.set_stripe_customer_id(user["id"], "cus_one")
     event = {
         "id": "evt_oneoff_inv", "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment",
+        "data": {"object": {"mode": "payment", "payment_status": "paid",
                             "client_reference_id": user["id"]}},
     }
     assert _post_event(event).status_code == 200
@@ -124,7 +124,7 @@ def test_emission_is_best_effort_render_failure_does_not_500(tmp_path, monkeypat
     db.set_stripe_customer_id(user["id"], "cus_boom")
     event = {
         "id": "evt_render_boom", "type": "checkout.session.completed",
-        "data": {"object": {"mode": "payment",
+        "data": {"object": {"mode": "payment", "payment_status": "paid",
                             "client_reference_id": user["id"]}},
     }
     with patch("api.billing_v2.render_pvm_invoice_pdf",

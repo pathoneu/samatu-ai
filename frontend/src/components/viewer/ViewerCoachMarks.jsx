@@ -11,7 +11,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition } from '@/lib/viewerCoachMarks';
+import { COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, modalOpen } from '@/lib/viewerCoachMarks';
 
 const CARD_W = 320;
 
@@ -23,6 +23,9 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
   const [side, setSide] = useState('below');
   const cardRef = useRef(null);   // the card's real height keeps a card beside a low tool inside the window
   const [, setTick] = useState(0);
+  // A dialog or drawer is open: step aside until it closes (v3 M6 — the card
+  // sat on the coach layer above every dialog and covered it).
+  const [yielding, setYielding] = useState(false);
 
   useEffect(() => {
     if (!enabled || coachMarksDone()) return undefined;
@@ -43,6 +46,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
       // No button (e.g. „Taisyti kontūrą" before a room is chosen): sit beside the tool cards instead.
       const bar = rootRef?.current?.querySelector('[data-tool-rail]')?.getBoundingClientRect();
       setBarRect(bar && bar.width > 0 ? { left: bar.left, top: bar.top, width: bar.width, height: Math.min(bar.height, 120), bottom: bar.bottom } : null);
+      setYielding(modalOpen());
       setTick((n) => n + 1);
     };
     measure();
@@ -53,13 +57,17 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
 
   const finish = () => { markCoachMarksDone(); setVisible(false); };
   useEffect(() => {
-    if (!visible) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); finish(); } };
+    if (!visible || yielding) return undefined;   // with a dialog open, Esc is the dialog's
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || modalOpen()) return;
+      e.stopPropagation();
+      finish();
+    };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [visible]);
+  }, [visible, yielding]);
 
-  if (!visible || !current) return null;
+  if (!visible || !current || yielding) return null;
   const pos = rect
     ? coachCardPosition(rect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side })
     : { ...coachCardPosition(barRect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side: 'right' }), arrowLeft: null, arrowTop: null };
@@ -69,7 +77,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
       {rect && (
         <div
           aria-hidden
-          className="fixed z-[60] pointer-events-none rounded-[3px] ring-2 ring-primary ring-offset-2 ring-offset-background"
+          className="fixed z-coach pointer-events-none rounded-[3px] ring-2 ring-primary ring-offset-2 ring-offset-background"
           style={{ left: rect.left - 2, top: rect.top - 2, width: rect.width + 4, height: rect.height + 4 }}
         />
       )}
@@ -77,7 +85,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
         ref={cardRef}
         role="dialog"
         aria-label={`Įvadas: ${current.title}`}
-        className="fixed z-[61] rounded-[2px] border border-border bg-card text-card-foreground shadow-xl p-4"
+        className="fixed z-coach rounded-[2px] border border-border bg-card text-card-foreground shadow-xl p-4"
         style={{ left: pos.left, top: pos.top, width: CARD_W }}
         data-testid="viewer-coach-mark"
         data-coach-step={current.id}

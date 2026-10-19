@@ -630,7 +630,6 @@ export default function NewProject() {
           total_rows:   rows.length,
           total_value:  0,
           status:       'ready',
-          vat_rate:     21,
           // Pages the reading could not finish — rows from them may be missing.
           ...(json.warnings?.length ? { warnings: json.warnings } : {}),
         }, t));

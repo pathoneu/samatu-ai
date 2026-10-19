@@ -56,7 +56,7 @@ def _oneoff_event(event_id="evt_1", user_id="u1"):
         "id": event_id,
         "type": "checkout.session.completed",
         "data": {"object": {
-            "mode": "payment",
+            "mode": "payment", "payment_status": "paid",
             "client_reference_id": user_id,
         }},
     }

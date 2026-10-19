@@ -22,6 +22,7 @@ import { STEPS, StepBar } from '@/components/project/StepRail';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
+import ServerRefreshNotice from '@/components/project/ServerRefreshNotice';
 import ReextractButton from '@/components/project/ReextractButton';
 import ProjectHistoryPanel from '@/components/project/ProjectHistoryPanel';
 import useHeldReread from '@/hooks/useHeldReread';
@@ -1108,6 +1109,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         // shows its own (the question list asks again after a re-read).
         notices={step === 'patikra' ? null : (
           <>
+            <ServerRefreshNotice projectId={project?.id} />
             <FreeRereadBanner project={project} onComplete={(next) => setProject(next)} />
             <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
           </>

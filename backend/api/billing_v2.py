@@ -257,13 +257,35 @@ def _handle_checkout_completed(event: dict) -> None:
         log.warning("checkout.session.completed: unresolvable user %r", user_id)
         return
     mode = obj.get("mode")
+    payment_status = obj.get("payment_status")
     if mode == "payment":
+        # Audit backend-security-7 (2026-09-29): a session completes BEFORE a
+        # delayed method (SEPA, bank transfer) has paid — `payment_status` is
+        # then "unpaid" and the money arrives (or not) later as
+        # checkout.session.async_payment_succeeded / _failed. Grant the credit
+        # and emit the PVM invoice only for money actually received.
+        if payment_status != "paid":
+            log.info("checkout.session (payment) for %s: payment_status=%r — "
+                     "no credit until the payment succeeds", user_id, payment_status)
+            return
         db.grant_oneoff_credit(user_id)
         # Best-effort: a €12 one-off is a taxable sale → emit its PVM invoice.
         # A render/storage failure must NOT undo the credit or 500 the webhook.
         _emit_invoice(user_id, PLAN_BY_ID["oneoff"])
         return
     if mode == "subscription":
+        if payment_status not in _SUBSCRIPTION_LIVE_PAYMENT:
+            # Unpaid first invoice (delayed method): remember the subscription
+            # but grant no tier; customer.subscription.updated (status active)
+            # or async_payment_succeeded finalizes it.
+            db.set_user_plan(
+                user_id,
+                plan_status="incomplete",
+                stripe_subscription_id=obj.get("subscription"),
+            )
+            log.info("checkout.session (subscription) for %s: payment_status=%r — "
+                     "tier waits for the payment", user_id, payment_status)
+            return
         plan_id = _plan_from_session(obj)
         db.set_user_plan(
             user_id,
@@ -274,6 +296,31 @@ def _handle_checkout_completed(event: dict) -> None:
         )
         return
     log.info("checkout.session.completed: unhandled mode %r", mode)
+
+
+# "paid": money received. "no_payment_required": a subscription that starts on
+# a trial (or a 100 % coupon) — Stripe has nothing to collect yet, the
+# subscription itself is live. Any other value ("unpaid") waits for the money.
+_SUBSCRIPTION_LIVE_PAYMENT = ("paid", "no_payment_required")
+
+
+def _handle_async_payment_succeeded(event: dict) -> None:
+    """`checkout.session.async_payment_succeeded` — the delayed payment of a
+    session that completed as "unpaid" has arrived. Same effect as a paid
+    completion: the one-off credit + its invoice, or the subscription tier."""
+    obj = dict(_obj(event))
+    obj["payment_status"] = obj.get("payment_status") or "paid"
+    _handle_checkout_completed({**event, "data": {"object": obj}})
+
+
+def _handle_async_payment_failed(event: dict) -> None:
+    """`checkout.session.async_payment_failed` — the delayed payment never
+    arrived. Nothing was granted on the "unpaid" completion, so there is
+    nothing to take back; a subscription left "incomplete" is ended by Stripe
+    (customer.subscription.updated → incomplete_expired → canceled)."""
+    obj = _obj(event)
+    log.info("checkout.session.async_payment_failed for %r (mode %r) — nothing granted",
+             obj.get("client_reference_id"), obj.get("mode"))
 
 
 # ── price-id → plan-id reverse map + epoch helper ────────────────────────────
@@ -374,9 +421,12 @@ def _handle_subscription_updated(event: dict) -> None:
         return
     raw_status = obj.get("status")
     plan_status = _STATUS_MAP.get(raw_status, raw_status) if raw_status else None
+    # An "incomplete" subscription is not paid yet (audit -7): keep the tier the
+    # user already has until Stripe says the subscription is live.
+    plan = None if raw_status == "incomplete" else _plan_from_subscription(obj)
     db.set_user_plan(
         user["id"],
-        plan=_plan_from_subscription(obj),  # None → tier left unchanged.
+        plan=plan,  # None → tier left unchanged.
         plan_status=plan_status,            # None → status left unchanged.
         current_period_end=_iso_from_epoch(obj.get("current_period_end")),
     )
@@ -409,7 +459,19 @@ def _handle_invoice_paid(event: dict) -> None:
     if plan is None:
         log.info("invoice.paid: unresolvable plan (unmapped price) — skipping emit")
         return
+    # A trial opens with a €0 invoice that Stripe also marks paid: no money
+    # moved, so no PVM invoice at the plan's full price.
+    if _num_or_none(obj.get("amount_paid")) == 0:
+        log.info("invoice.paid: amount_paid=0 (trial / full discount) — skipping emit")
+        return
     _emit_invoice(user["id"], plan)
+
+
+def _num_or_none(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _plan_from_invoice(invoice_obj: dict) -> dict | None:
@@ -482,6 +544,8 @@ def _handle_invoice_payment_failed(event: dict) -> None:
 # present is logged + skipped (still 200).
 _WEBHOOK_HANDLERS: dict = {
     "checkout.session.completed": _handle_checkout_completed,
+    "checkout.session.async_payment_succeeded": _handle_async_payment_succeeded,
+    "checkout.session.async_payment_failed": _handle_async_payment_failed,
     "customer.subscription.updated": _handle_subscription_updated,
     "customer.subscription.deleted": _handle_subscription_deleted,
     "invoice.paid": _handle_invoice_paid,

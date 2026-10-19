@@ -466,3 +466,70 @@ def test_a_merge_counts_the_union_outlines_corners_and_keeps_both_rooms_partitio
     assert (k["_sujungimas"]["kampai_vidiniai"], k["_sujungimas"]["kampai_isoriniai"]) == (4, 0)      # a rectangle
     assert k["n_partition_walls"] == 5 and k["_sujungimas"]["pertvaru_galai_dalys"] == [2, 3]
     assert k["_sujungimas"]["kampai"] == "Kampai iš sujungto kontūro: 4 vidiniai, 0 išoriniai; pertvarų galai: 2 + 3 iš sujungtų patalpų — pataisykite patalpos lape"
+
+
+# ── the kept room's floor covering survives the merge (W0-A-2, Pathon v3 W1-F) ─────────────────────────
+
+_FLOOR_READ = {"danga": "plyteles", "page": 1, "irodymas": "rastas", "tekstas": "60 x 60 cm plytelė", "plotas_m2": None,
+               "rect_pct": [0.1, 0.1, 0.3, 0.3]}
+
+
+def _floors_blob():
+    """01's floor plan says tiles, 02's says laminate — both READ from the plan (`grindu_planas`)."""
+    blob = _blob(grindu_danga="plyteles", grindu_danga_saltinis="grindu_planas", _grindu_danga=dict(_FLOOR_READ),
+                 plyteles_grindys_m2=12.0)
+    blob["patalpos"][1].update(grindu_danga="minksta", grindu_danga_saltinis="grindu_planas", pvc_grindys_m2=9.0,
+                               _grindu_danga={**_FLOOR_READ, "danga": "minksta", "tekstas": "Laminatas"})
+    return blob
+
+
+def _landed(stored: dict, out: dict) -> dict:
+    """What the sheet does with the answer: geometry keys and merge keys onto the rooms (null = remove)."""
+    project = copy.deepcopy(stored)
+    for r in project["patalpos"]:
+        for part in ("rooms", "sujungimas"):
+            for k, v in (out[part].get(str(r["nr"])) or {}).items():
+                if v is None:
+                    r.pop(k, None)
+                else:
+                    r[k] = v
+    return project
+
+
+def test_a_merge_keeps_the_floor_covering_the_plan_gives_the_kept_room(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store(blob=_floors_blob())
+    t = 0.2
+    out = _merge(TestClient(app), [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    kept = out["rooms"]["01"]
+    # „Visam plotui taikoma patalpos 01 apdaila": 01's tiles, as the floor plan read them — never „—"
+    assert kept["grindu_danga"] == "plyteles" and kept["grindu_danga_saltinis"] == "grindu_planas"
+    assert kept["_grindu_danga"] == _FLOOR_READ and kept["_grindu_dangos_dvi"] is None
+    # the two coverings differ: the finishes warning is still said, before and after
+    assert out["ispejimas"].startswith("Patalpų apdaila skiriasi: 02 grindys parketas arba laminatas, 01 plytelės")
+    assert out["sujungimas"]["01"]["_sujungimas"]["apdaila_skiriasi"] == out["ispejimas"]
+
+
+def test_after_a_merge_patikra_does_not_ask_the_kept_rooms_floor_again(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    _store(blob=_floors_blob())
+    c = TestClient(app)
+
+    def asked():
+        qs = c.get("/api/projects/p1/questions").json()["questions"]
+        return [i["room_nr"] for q in qs if q["kind"] == "grindys" for i in q["items"]]
+    assert asked() == []
+    t = 0.2
+    out = _merge(c, [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]).json()
+    db.upsert_project("p1", _landed(db.get_project("p1"), out))
+    assert asked() == []
+    fact = next(f for f in c.get("/api/projects/p1/rooms/01/facts").json()["facts"] if f["key"] == "grindys")
+    assert fact["status"] == "read" and fact["value"] == "plytelės"
+    # the founder guide's next step, „Atimti" a column inside the merged room, re-reads its outline: the union
+    # still holds both coverings, and the merged room's covering is still the one the merge kept
+    ring = [(t, t), (7 + 2 * t, t), (7 + 2 * t, 3 + t), (t, 3 + t)]
+    hole = [(1.0, 1.0), (1.5, 1.0), (1.5, 1.5), (1.0, 1.5)]
+    after = _set_holes(c, ring, [hole]).json()
+    assert after["room"]["grindu_danga"] == "plyteles" and after["room"]["_grindu_danga"] == _FLOOR_READ
+    db.upsert_project("p1", _landed(db.get_project("p1"), {"rooms": {"01": after["room"]}, "sujungimas": {}}))
+    assert asked() == []
