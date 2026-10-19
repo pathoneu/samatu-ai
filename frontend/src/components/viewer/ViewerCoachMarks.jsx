@@ -1,49 +1,66 @@
 /**
- * ViewerCoachMarks — the viewer's first-run walkthrough (lib/viewerCoachMarks):
- * Mastelis → Atstumas → Taisyti kontūrą, each card at its button (`data-coach="…"`
- * inside `rootRef`) — beside a tool card on the left rail, under the selected room's
- * action bar — a ring around the button, shown once per browser. „Praleisti", the X,
- * Esc and finishing all mark it done.
+ * ViewerCoachMarks — the viewer's first-run walkthrough (lib/viewerCoachMarks) and, once it is over, the
+ * one-sentence first-use pills at the panels (lib/firstUseHints).
  *
- * Not the project-level OnboardingTooltips pattern: that one is a centred
- * balloon behind a backdrop; these cards must point at a button and leave the
- * drawing usable underneath.
+ * Walkthrough (B1-E, 2026-10-19 — founder: „more of them, less writing in each, one by one"): ten short
+ * cards, one at a time, each at the element it explains — a ring around it, the card beside, under or over
+ * it. One sentence, at most one key, „Toliau" and „Praleisti viską", progress „3 iš 10". Resumable: the
+ * card he reached is remembered. While a dialog is open it steps aside (v3 W7-A M6) and Esc is the
+ * dialog's; otherwise Esc skips it all.
+ *
+ * Not the project-level OnboardingTooltips pattern: that one is a centred balloon behind a backdrop;
+ * these cards must point at a button and leave the drawing usable underneath.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from '@/i18n/react';
 import { X } from 'lucide-react';
-import { COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, modalOpen } from '@/lib/viewerCoachMarks';
+import {
+  COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, coachStartStep, saveCoachStep, modalOpen,
+} from '@/lib/viewerCoachMarks';
+import { keyText } from '@/lib/viewerShortcuts';
+import { FIRST_USE_PANELS, firstUseSeen, markFirstUseSeen } from '@/lib/firstUseHints';
 
-const CARD_W = 320;
+const CARD_W = 300;
+
+function findAnchor(rootRef, selector) {
+  const inViewer = rootRef?.current?.querySelector(selector);
+  const el = inViewer || (typeof document !== 'undefined' ? document.querySelector(selector) : null);
+  const r = el?.getBoundingClientRect?.();
+  return r && r.width > 0 && r.height > 0 ? { el, rect: { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } } : null;
+}
+
+function stepKey(step) {
+  if (!step.key) return null;
+  return keyText(step.key, { mac: false }) || step.key;
+}
 
 export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 900 }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => coachStartStep());
   const [rect, setRect] = useState(null);
   const [barRect, setBarRect] = useState(null);
-  const [side, setSide] = useState('below');
-  const cardRef = useRef(null);   // the card's real height keeps a card beside a low tool inside the window
+  const cardRef = useRef(null);   // the card's real height keeps it inside the window
   const [, setTick] = useState(0);
   // A dialog or drawer is open: step aside until it closes (v3 M6 — the card
   // sat on the coach layer above every dialog and covered it).
   const [yielding, setYielding] = useState(false);
+  const [over, setOver] = useState(() => coachMarksDone());
 
   useEffect(() => {
     if (!enabled || coachMarksDone()) return undefined;
-    const t = setTimeout(() => setVisible(true), delayMs);
-    return () => clearTimeout(t);
+    const t0 = setTimeout(() => setVisible(true), delayMs);
+    return () => clearTimeout(t0);
   }, [enabled, delayMs]);
 
   const current = COACH_STEPS[step];
-  // Follow the anchor: buttons come and go (the room's action bar exists only while a room is selected).
+  // Follow the anchor: elements come and go (the right panel's tabs, the sheet strip collapsing).
   useLayoutEffect(() => {
-    if (!visible) return undefined;
+    if (!visible || !current) return undefined;
     const measure = () => {
-      const el = rootRef?.current?.querySelector(`[data-coach="${current.anchor}"]`);
-      const r = el?.getBoundingClientRect();
-      setRect(r && r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } : null);
-      // A tool card stands in a column on the left: its card goes beside it, not over the next tools.
-      setSide(el?.closest?.('[data-tool-rail]') || !el ? 'right' : 'below');
-      // No button (e.g. „Taisyti kontūrą" before a room is chosen): sit beside the tool cards instead.
+      const found = findAnchor(rootRef, current.anchor);
+      setRect(found?.rect || null);
+      // No anchor on screen: sit beside the tool cards instead.
       const bar = rootRef?.current?.querySelector('[data-tool-rail]')?.getBoundingClientRect();
       setBarRect(bar && bar.width > 0 ? { left: bar.left, top: bar.top, width: bar.width, height: Math.min(bar.height, 120), bottom: bar.bottom } : null);
       setYielding(modalOpen());
@@ -55,7 +72,8 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
     return () => { clearInterval(id); window.removeEventListener('resize', measure); };
   }, [visible, current, rootRef]);
 
-  const finish = () => { markCoachMarksDone(); setVisible(false); };
+  const finish = () => { markCoachMarksDone(); setVisible(false); setOver(true); };
+  const go = (n) => { saveCoachStep(n); setStep(n); };
   useEffect(() => {
     if (!visible || yielding) return undefined;   // with a dialog open, Esc is the dialog's
     const onKey = (e) => {
@@ -67,14 +85,21 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
     return () => window.removeEventListener('keydown', onKey, true);
   }, [visible, yielding]);
 
-  if (!visible || !current || yielding) return null;
+  if (!visible || !current) return over ? <FirstUsePills rootRef={rootRef} /> : null;
+  if (yielding) return null;
+  const cardH = cardRef.current?.offsetHeight || 150;
+  const vp = { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH };
   const pos = rect
-    ? coachCardPosition(rect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side })
-    : { ...coachCardPosition(barRect, { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH: cardRef.current?.offsetHeight || 300, side: 'right' }), arrowLeft: null, arrowTop: null };
+    ? coachCardPosition(rect, { ...vp, side: current.place || 'below' })
+    : { ...coachCardPosition(barRect, { ...vp, side: 'right' }), arrowLeft: null, arrowTop: null };
   const last = step === COACH_STEPS.length - 1;
+  const title = t(`project.coach.${current.id}.title`);
+  const key = stepKey(current);
+  const keyNote = t(`project.coach.${current.id}.keyNote`, { defaultValue: '' });
+  const ring = rect && current.place !== 'over';
   return (
     <>
-      {rect && (
+      {ring && (
         <div
           aria-hidden
           className="fixed z-coach pointer-events-none rounded-[3px] ring-2 ring-primary ring-offset-2 ring-offset-background"
@@ -84,8 +109,8 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
       <div
         ref={cardRef}
         role="dialog"
-        aria-label={`Įvadas: ${current.title}`}
-        className="fixed z-coach rounded-[2px] border border-border bg-card text-card-foreground shadow-xl p-4"
+        aria-label={t('project.coach.aria', { title })}
+        className="fixed z-coach rounded-[2px] border border-border bg-card text-card-foreground shadow-xl px-4 py-3"
         style={{ left: pos.left, top: pos.top, width: CARD_W }}
         data-testid="viewer-coach-mark"
         data-coach-step={current.id}
@@ -93,7 +118,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
         {pos.arrowLeft != null && (
           <span
             aria-hidden
-            className="absolute -top-[6px] w-[10px] h-[10px] rotate-45 bg-card border-l border-t border-border"
+            className={`absolute w-[10px] h-[10px] rotate-45 bg-card border-border ${pos.arrowDown ? '-bottom-[6px] border-r border-b' : '-top-[6px] border-l border-t'}`}
             style={{ left: pos.arrowLeft - 5 }}
           />
         )}
@@ -104,34 +129,93 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
             style={{ top: pos.arrowTop - 5 }}
           />
         )}
-        <div className="flex items-start justify-between mb-1.5">
-          <span className="mono tabular text-meta font-semibold text-primary">
-            Žingsnis {step + 1} iš {COACH_STEPS.length}
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+          <span className="mono tabular text-ui text-muted-foreground" data-testid="viewer-coach-progress">
+            {t('project.coach.progress', { n: step + 1, total: COACH_STEPS.length })}
           </span>
-          <button type="button" onClick={finish} title="Praleisti įvadą (Esc)" aria-label="Praleisti įvadą" className="p-0.5 -m-0.5 rounded-[2px] text-muted-foreground hover:bg-muted">
-            <X className="w-3.5 h-3.5" />
-          </button>
         </div>
-        <h3 className="text-[14px] font-semibold text-foreground mb-1">{current.title}</h3>
-        <p className="text-ui text-muted-foreground leading-relaxed">{current.body}</p>
-        {!rect && current.missingAnchorNote && (
-          <p className="mt-1.5 text-meta text-foreground">{current.missingAnchorNote}</p>
+        <p className="mt-1 text-ui text-foreground leading-snug" data-testid="viewer-coach-body">{t(`project.coach.${current.id}.body`)}</p>
+        {!rect && <p className="mt-1 text-ui text-muted-foreground">{t('project.coach.missing')}</p>}
+        {key && (
+          <p className="mt-1.5 text-ui text-muted-foreground" data-testid="viewer-coach-key">
+            <kbd className="mono inline-block min-w-[22px] text-center px-1 rounded-[2px] border border-border bg-muted text-foreground">{key}</kbd>
+            {' '}{keyNote ? `— ${keyNote}` : t('project.coach.keyWord')}
+          </p>
         )}
-        <div className="mt-3 flex items-center justify-between">
-          <button type="button" onClick={finish} className="text-meta text-muted-foreground hover:text-foreground hover:underline">Praleisti</button>
-          <div className="flex items-center gap-1.5">
-            {step > 0 && (
-              <button type="button" onClick={() => setStep((s) => s - 1)} className="px-2.5 py-1 rounded-[2px] border border-border text-meta hover:bg-muted">Atgal</button>
-            )}
-            <button
-              type="button"
-              onClick={() => (last ? finish() : setStep((s) => s + 1))}
-              className="px-2.5 py-1 rounded-[2px] bg-primary text-primary-foreground text-meta hover:bg-primary/90"
-              data-testid="viewer-coach-next"
-            >{last ? 'Supratau' : 'Toliau'}</button>
-          </div>
+        <div className="mt-2.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={finish}
+            title={t('project.coach.skipAllTitle')}
+            className="inline-flex items-center gap-1 text-ui text-muted-foreground hover:text-foreground hover:underline"
+            data-testid="viewer-coach-skip"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden /> {t('project.coach.skipAll')}
+          </button>
+          <button
+            type="button"
+            onClick={() => (last ? finish() : go(step + 1))}
+            className="px-3 py-1 rounded-[2px] bg-primary text-primary-foreground text-ui hover:bg-primary/90"
+            data-testid="viewer-coach-next"
+          >{last ? t('project.coach.finish') : t('project.coach.next')}</button>
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The first-use pills at the panels (Matavimai, a Patikra question card): one sentence above the panel
+ * the first time it is on screen; the first click inside it uses it up. One pill at a time, never over a
+ * dialog. Not hover: it is just there until used.
+ */
+function FirstUsePills({ rootRef }) {
+  const { t } = useTranslation();
+  const [hint, setHint] = useState(null);   // { id, rect }
+  useEffect(() => {
+    const measure = () => {
+      if (modalOpen()) { setHint(null); return; }
+      for (const p of FIRST_USE_PANELS) {
+        if (firstUseSeen(p.id)) continue;
+        const found = findAnchor(rootRef, p.anchor);
+        const r = found?.rect;
+        if (!r || r.top > window.innerHeight - 40 || r.bottom < 40) continue;
+        setHint({ id: p.id, rect: r, el: found.el });
+        return;
+      }
+      setHint(null);
+    };
+    measure();
+    const id = setInterval(measure, 700);
+    window.addEventListener('resize', measure);
+    return () => { clearInterval(id); window.removeEventListener('resize', measure); };
+  }, [rootRef]);
+  useEffect(() => {
+    if (!hint?.el) return undefined;
+    const used = (e) => {
+      if (!(e.target instanceof Node) || !hint.el.contains(e.target)) return;
+      markFirstUseSeen(hint.id);
+      setHint(null);
+    };
+    window.addEventListener('pointerdown', used, true);
+    window.addEventListener('keydown', used, true);
+    return () => { window.removeEventListener('pointerdown', used, true); window.removeEventListener('keydown', used, true); };
+  }, [hint?.id, hint?.el]);
+  if (!hint) return null;
+  const width = Math.min(320, Math.max(200, hint.rect.width - 16));
+  const left = Math.min(Math.max(8, hint.rect.left + 8), window.innerWidth - width - 8);
+  const top = hint.rect.top > 44 ? hint.rect.top - 36 : hint.rect.top + 6;   // just above the panel, else inside its top edge
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="first-use-pill"
+      data-first-use={hint.id}
+      className="fixed z-popover pointer-events-none rounded bg-primary text-primary-foreground text-ui leading-snug px-2 py-1 shadow-md"
+      style={{ left, top, maxWidth: width }}
+    >
+      {t(`project.firstUse.${hint.id}`)}
+    </div>
   );
 }

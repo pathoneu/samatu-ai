@@ -1,45 +1,48 @@
-// First-run coach marks for the viewer (2026-10-16, Togal analysis §11): three
-// steps anchored to their buttons — the tool cards on the left, the selected room's action bar (v3 W1-B) —
-// shown once per browser.
-import { keyText } from './viewerShortcuts.js';
+// First-run walkthrough for the viewer (2026-10-16, Togal analysis §11; v3 B1-E 2026-10-19): ten SHORT
+// cards, one at a time, in the order a person meets the screen — the sheet strip, the tool cards, a room
+// by click, the room tool R, the scale chip, a measurement, the legend G, then the steps Patikra, Sąmata,
+// Siųsti. Each card: a title, ONE sentence (≤ 12 words) that says what to do, at most one key.
+// The words live in i18n (`project.coach.<id>.title|body`); this file holds the order and the anchors.
+// Shown once per browser and resumable: the card he stopped on is remembered until he finishes or skips.
 
 export const COACH_STORAGE_KEY = 'samatu_viewer_onboarded';
+/** The card he reached, so a reload brings him back to the same card. */
+export const COACH_STEP_KEY = 'samatu_viewer_onboarded_step';
 
+/**
+ * anchor  CSS selector, looked up inside the viewer first, then in the whole page (the four steps sit in
+ *         the project frame above the viewer).
+ * place   'below' | 'above' | 'right' (beside a column) | 'over' (the drawing itself: the card sits inside
+ *         its top edge and the drawing gets no ring).
+ * key     a shortcut id from viewerShortcuts (its key is shown under the sentence), or a literal key name.
+ */
 export const COACH_STEPS = [
-  {
-    id: 'calibrate',
-    anchor: 'calibrate',
-    title: 'Mastelis',
-    body: 'Prieš matuojant patikrinkite lapo mastelį — jis parašytas apačioje, būsenos juostoje, kartu su tuo, iš kur jis paimtas. '
-      + `Jei rašo „Mastelis nenustatytas", kairėje spauskite „Mastelis" (${keyText('toolCalibrate', { mac: false })}), spustelėkite atkarpos, kurios tikrą ilgį žinote, pradžią ir pabaigą ir įrašykite tą ilgį. `
-      + 'Programa pasiūlys artimiausią įprastą mastelį (1:50, 1:100…).',
-  },
-  {
-    id: 'distance',
-    anchor: 'distance',
-    title: 'Atstumas',
-    body: 'Spustelėkite pradžią ir pabaigą — atstumas įsirašo antru spustelėjimu, rezultatas metrais atsiras dešinėje, skiltyje „Matavimai". '
-      + 'Žymeklis prilimpa: kvadratas — prie brėžinio sienos kampo, rombas — prie sienos, apskritimas — prie jau nubrėžto matavimo taško. '
-      + 'Ką spustelėti toliau, sako sakinys prie žymeklio. '
-      + `Klaviatūra: ${keyText('toolDistance', { mac: false })} — atstumas, ${keyText('toolArea', { mac: false })} — plotas, tarpas — tempti brėžinį; „?" — visi klavišai.`,
-  },
-  {
-    id: 'outline',
-    anchor: 'outline-edit',
-    title: 'Taisyti kontūrą',
-    body: `Pasirinkite patalpą sąraše arba brėžinyje — prie jos užrašo atsiras juosta su „Taisyti kontūrą" (${keyText('roomEditOutline', { mac: false })}). Tempkite kampus (jie prilimpa prie sienų), `
-      + 'spustelėkite vidurio tašką — pridėsite kampą, dukart spustelėkite kampą — pašalinsite. Enter išsaugo: sienos ir angos perskaitomos iš naujo, kiekiai perskaičiuojami.',
-    // The button exists only while a room is selected — say where it will appear instead of pointing at nothing.
-    missingAnchorNote: 'Juosta su šiuo mygtuku atsiras pasirinkus patalpą.',
-  },
+  { id: 'sheets', anchor: '[data-testid="sheet-rail"]', place: 'right' },
+  { id: 'tools', anchor: '[data-tool-rail]', place: 'right', key: 'openGuide' },
+  { id: 'roomClick', anchor: '[data-testid="viewer-canvas"]', place: 'over' },
+  { id: 'roomTool', anchor: '[data-coach="room"]', place: 'right', key: 'toolRoom' },
+  { id: 'scale', anchor: '[data-testid="scale-chip"]', place: 'above', key: 'toolCalibrate' },
+  { id: 'measure', anchor: '[data-coach="distance"]', place: 'right', key: 'toolDistance' },
+  { id: 'legend', anchor: '[data-coach="legend"]', place: 'right', key: 'toolLegend' },
+  { id: 'patikra', anchor: '[data-testid="step-patikra"]', place: 'below', key: 'Enter' },
+  { id: 'samata', anchor: '[data-testid="step-samata"]', place: 'below' },
+  { id: 'siusti', anchor: '[data-testid="step-siusti"]', place: 'below' },
 ];
+
+/** At most this many words in a card's sentence (founder 2026-10-19: more cards, less writing in each). */
+export const COACH_MAX_WORDS = 12;
+
+/** Words in a sentence: dashes, dots and quotes are not words. */
+export function wordCount(text) {
+  return String(text || '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
 
 function store(storage) {
   if (storage) return storage;
   try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
 }
 
-/** True when the coach marks were finished or dismissed in this browser (or storage is unavailable). */
+/** True when the walkthrough was finished or skipped in this browser (or storage is unavailable). */
 export function coachMarksDone(storage) {
   try {
     const s = store(storage);
@@ -49,32 +52,64 @@ export function coachMarksDone(storage) {
 }
 
 export function markCoachMarksDone(storage) {
-  try { store(storage)?.setItem(COACH_STORAGE_KEY, '1'); } catch { /* private mode */ }
+  try {
+    const s = store(storage);
+    s?.setItem(COACH_STORAGE_KEY, '1');
+    s?.removeItem?.(COACH_STEP_KEY);
+  } catch { /* private mode */ }
+}
+
+/** The card to open on: where he stopped last time, else the first. Clamped into the list. */
+export function coachStartStep(storage, steps = COACH_STEPS) {
+  try {
+    const n = Number.parseInt(store(storage)?.getItem(COACH_STEP_KEY), 10);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, steps.length - 1) : 0;
+  } catch { return 0; }
+}
+
+export function saveCoachStep(step, storage) {
+  try { store(storage)?.setItem(COACH_STEP_KEY, String(Math.max(0, Math.trunc(Number(step) || 0)))); } catch { /* private mode */ }
 }
 
 /**
- * Where the card goes for an anchor rect (viewport px): below it — or, with side 'right', beside it (the
- * tool cards stand in a column, so a card below would cover the next tools) — clamped into the viewport.
- * No anchor → centred near the top. Returns { left, top, arrowLeft|null, arrowTop|null }.
+ * Where the card goes for an anchor rect (viewport px), clamped into the viewport:
+ *   'below'  under it, arrow up at its centre      'above'  over it, arrow down at its centre
+ *   'right'  beside it (a column of tool cards — a card below would cover the next tools)
+ *   'over'   inside its top edge (the drawing: pointing at it from outside would leave the screen)
+ * No anchor → centred near the top. Returns { left, top, arrowLeft|null, arrowTop|null, arrowDown }.
  */
 export function coachCardPosition(rect, { vw, vh, cardW = 320, cardH = 220, gap = 10, margin = 12, side = 'below' } = {}) {
-  if (!rect) return { left: Math.max(margin, (vw - cardW) / 2), top: Math.min(96, vh / 4), arrowLeft: null, arrowTop: null };
+  const none = { arrowLeft: null, arrowTop: null, arrowDown: false };
+  if (!rect) return { ...none, left: Math.max(margin, (vw - cardW) / 2), top: Math.min(96, vh / 4) };
+  const clampLeft = (x) => Math.min(Math.max(margin, x), Math.max(margin, vw - cardW - margin));
+  const clampTop = (y) => Math.min(Math.max(margin, y), Math.max(margin, vh - cardH - margin));
   if (side === 'right') {
     const right = rect.left + rect.width;
     const left = Math.min(right + gap, Math.max(margin, vw - cardW - margin));
-    const top = Math.min(Math.max(margin, rect.top - 12), Math.max(margin, vh - cardH - margin));
-    const mid = rect.top + (rect.height || 0) / 2;
-    return { left, top, arrowLeft: null, arrowTop: Math.min(Math.max(14, mid - top), cardH - 14) };
+    const top = clampTop(rect.top - 12);
+    const mid = rect.top + Math.min(rect.height || 0, 120) / 2;
+    return { ...none, left, top, arrowTop: Math.min(Math.max(14, mid - top), cardH - 14) };
+  }
+  if (side === 'over') {
+    const left = clampLeft(rect.left + (rect.width - cardW) / 2);
+    return { ...none, left, top: clampTop(rect.top + 24) };
   }
   const centre = rect.left + rect.width / 2;
-  const left = Math.min(Math.max(margin, centre - cardW / 2), Math.max(margin, vw - cardW - margin));
-  const top = rect.bottom + gap;
-  return { left, top, arrowLeft: Math.min(Math.max(14, centre - left), cardW - 14), arrowTop: null };
+  const left = clampLeft(centre - cardW / 2);
+  const arrowLeft = Math.min(Math.max(14, centre - left), cardW - 14);
+  if (side === 'above') {
+    return { ...none, left, top: clampTop(rect.top - gap - cardH), arrowLeft, arrowDown: true };
+  }
+  return { ...none, left, top: clampTop((rect.bottom ?? rect.top + rect.height) + gap), arrowLeft };
 }
 
-/** „Rodyti įvadą dar kartą" (Pagalba): the next opened drawing shows the walkthrough again. */
+/** „Rodyti įvadą dar kartą" (Pagalba): the next opened drawing shows the walkthrough again, from card 1. */
 export function resetCoachMarks(storage) {
-  try { store(storage)?.removeItem(COACH_STORAGE_KEY); } catch { /* private mode */ }
+  try {
+    const s = store(storage);
+    s?.removeItem(COACH_STORAGE_KEY);
+    s?.removeItem(COACH_STEP_KEY);
+  } catch { /* private mode */ }
 }
 
 /**
