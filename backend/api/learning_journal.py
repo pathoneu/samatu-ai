@@ -25,6 +25,7 @@ QUESTION_TOPICS = {
     # the drawing's schedules against what was read elsewhere (Pathon v3 W3-A; answered in Patikra since W2-B)
     "lentele_durys": "durų žiniaraštį",
     "lentele_langai": "langų žiniaraštį",
+    "lentele_zymos": "žiniaraščio žymes plane",
     "lentele_apdaila": "apdailos lentelę",
     "lentele_suma": "eksplikacijos sumą",
 }

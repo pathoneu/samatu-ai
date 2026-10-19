@@ -29,13 +29,13 @@ from .universal_rules import DOOR_WIDTH_TOL_M
 _log = logging.getLogger("samatu.project_questions")
 
 ORDER = ("aukstis", "konturas", "erdve", "perimetras", "plotas", "angos", "durys", "lentele_durys", "lentele_langai",
-         "grindys", "lentele_apdaila", "apdaila", "lentele_suma")
+         "lentele_zymos", "grindys", "lentele_apdaila", "apdaila", "lentele_suma")
 # The drawing's schedules against what was read elsewhere (Pathon v3 W3-A, `build_questions(lenteles=True)`):
 # `lentele_durys` / `lentele_langai` — the schedule's count against the openings drawn in the walls (answer
 # `reconcile`, proposal = drawn; the answer is his record `_lenteliu_sprendimai[id]`, the estimate is not
 # changed by it); `lentele_apdaila` — the finish schedule's floor against the floor plan's (answer `choices` on
 # `grindu_danga`, proposal = the plan); `lentele_suma` — a table's own sum against the rooms' (answer `info`).
-RECONCILE_KINDS = ("lentele_durys", "lentele_langai", "lentele_apdaila", "lentele_suma")
+RECONCILE_KINDS = ("lentele_durys", "lentele_langai", "lentele_zymos", "lentele_apdaila", "lentele_suma")
 DECISIONS_KEY = "_lenteliu_sprendimai"
 _RECONCILE_CHOICES = ("brezinys", "ziniarastis")
 SUM_TOL_M2 = 0.5                 # a table's sum and the rooms' agree within this…
@@ -483,6 +483,49 @@ def _ask_lentele_angos(project: dict, rooms: list[dict], kind: str) -> dict | No
               lentele={"page": page, "rect_pct": table.get("bbox_pct"), "sentence": str(rec.get("sakinys") or "")})
 
 
+def _ask_lentele_zymos(project: dict) -> dict | None:
+    """„Žiniaraštyje D-1 — 3, plane parašyta 2" (Pathon v3 W5-D, D10): each schedule code's count against the times
+    the plan writes that code (extractor/schedule_tags.py, `zymos_plane` on the schedule record). Asked only when a
+    code differs. Answer `reconcile` — his record (`_lenteliu_sprendimai`); the estimate is not changed by it."""
+    qid = "lentele_zymos"
+    if _decided(project, qid):
+        return None
+    items, listed_total, drawn_total, first = [], 0, 0, None
+    for key, head in (("_duru_ziniarastis", "Durų"), ("_langu_ziniarastis", "Langų")):
+        rec = project.get(key) if isinstance(project.get(key), dict) else {}
+        tags = rec.get("zymos_plane") if isinstance(rec.get("zymos_plane"), dict) else None
+        table = rec.get("lentele") if isinstance(rec.get("lentele"), dict) else None
+        if not tags or not table:
+            continue
+        for row in table.get("eilutes") or []:
+            code = str((row or {}).get("kodas") or "").strip()
+            hit = tags.get(code) if code else None
+            if not isinstance(hit, dict):
+                continue
+            listed, drawn = int(row.get("kiekis") or 1), int(hit.get("kiekis") or 0)
+            if listed == drawn:
+                continue
+            listed_total += listed
+            drawn_total += drawn
+            first = first or table
+            pages = ", ".join(str(p) for p in hit.get("puslapiai") or [])
+            items.append({"room_nr": code, "room_name": f"{head} žiniaraštis", "field": DECISIONS_KEY, "unit": "vnt.",
+                          "page": (hit.get("puslapiai") or [table.get("page")])[0], "drawn": drawn, "listed": listed,
+                          "sentence": (f"Žiniaraštyje — {listed} vnt., plane žymė „{code}“ parašyta {drawn} k."
+                                       + (f" ({pages} lapas)." if pages else "."))})
+    if not items:
+        return None
+    why = ("Kiekvienos žiniaraščio eilutės žymė (pvz. „D-1“) suskaičiuota ten, kur plane parašyta šalia angos — "
+           "ne pačiame žiniaraštyje, ne legendoje ir ne antspaude. Kur skaičiai skiriasi, verta pažiūrėti: gal žymė "
+           "plane praleista, gal žiniaraštis pasenęs. Jūsų atsakymas įsimenamas; sąmatos kiekiai nuo jo nesikeičia.")
+    choices = [{"value": "brezinys", "label": f"Kaip parašyta plane — {drawn_total}"},
+               {"value": "ziniarastis", "label": f"Kaip žiniaraštyje — {listed_total}"}]
+    title = f"Žiniaraščio žymės plane: {len(items)} {'eilutė nesutampa' if len(items) == 1 else 'eilutės nesutampa'}"
+    return _q(qid, "reconcile", title, why, items, unit="vnt.", proposed="ziniarastis", proposed_label=choices[1]["label"],
+              choices=choices, field=DECISIONS_KEY, listed=listed_total, drawn=drawn_total,
+              lentele={"page": first.get("page"), "rect_pct": first.get("bbox_pct"), "sentence": ""})
+
+
 def _ask_lentele_apdaila(project: dict, rooms: list[dict]) -> dict | None:
     """„Apdailos lentelė: patalpa 04 grindys — plytelės, plane — laminatas" — the finish schedule against the
     floor plan's reading, room by room. Proposal: the plan. Rooms whose floor he chose himself ask nothing."""
@@ -606,7 +649,7 @@ def build_questions(project: dict, *, lenteles: bool = False) -> dict:
         try:
             _floor_from_table(project, next((q for q in questions if q["kind"] == "grindys"), None), by_nr)
             for q in (_ask_lentele_angos(project, rooms, "durys"), _ask_lentele_angos(project, rooms, "langai"),
-                      _ask_lentele_apdaila(project, rooms), _ask_lentele_suma(project)):
+                      _ask_lentele_zymos(project), _ask_lentele_apdaila(project, rooms), _ask_lentele_suma(project)):
                 if q:
                     questions.append(q)
         except Exception as exc:  # noqa: BLE001 — a malformed schedule record asks nothing, never breaks the list

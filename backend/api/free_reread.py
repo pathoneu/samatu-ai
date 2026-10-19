@@ -185,6 +185,14 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         vector_symbols = scan_vector_symbols(pdf_bytes)
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
+    # the schedules' codes counted where the plan writes them (Pathon v3 W5-D, D10 — extractor/schedule_tags.py):
+    # evidence on the schedule record for the Patikra question `lentele_zymos`; no quantity reads it
+    from extractor.schedule_tags import count_schedule_tags
+    for rec in (schedule, tables.get("_langu_ziniarastis")):
+        if isinstance(rec, dict):
+            tags = count_schedule_tags(pdf_bytes, rec)
+            if tags is not None:
+                rec["zymos_plane"] = tags
     _store_zones(parsed, pdf_bytes, out, project.get("id"))
     if tables.get("meta") is not None:
         parsed.setdefault("_meta", {})["lenteles"] = tables["meta"]
