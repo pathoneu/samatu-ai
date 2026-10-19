@@ -214,3 +214,36 @@ test('a schedule question records his answer in _lenteliu_sprendimai, keeping th
   assert.equal(tableDecisionAnswer(project, q, ''), null);
   assert.equal(tableDecisionAnswer(project, null, 'brezinys'), null);
 });
+
+test('a room to check answers its door count on the card: set, marked as checked and as his, one recompute', () => {
+  // 2026-10-19 (founder: „negaliu iškart vietoje pataisyti to, ką reikia"): no more „Atidaryti patalpą"
+  const project = {
+    patalpos: [
+      { nr: '03', elementai: [
+        { tipas: 'duris', kiekis: 1, plotis_mm: 800, aukstis_mm: 2100, _anga_ks: [0] },
+        { tipas: 'duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2100, _be_angos: true },
+      ] },
+      { nr: '05', elementai: [] },
+      { nr: '06', elementai: [{ tipas: 'duris', kiekis: 1, plotis_mm: 800, aukstis_mm: 2100 }] },
+    ],
+  };
+  const manual = [
+    { room_nr: '03', durys: { sarase: 2, sienose: 1, laisvos: [] }, langai: { sarase: 0, sienose: 0, laisvos: [] }, proposed: { durys: 1, langai: 0 } },
+    { room_nr: '05', durys: { sarase: 0, sienose: 0, laisvos: [] }, langai: { sarase: 0, sienose: 0, laisvos: [] }, proposed: { durys: 0, langai: 0 } },
+  ];
+  const a = openingsAnswer(project, [], [], {}, { manual, counts: { '05': { langai: 2 } }, now: 'T' });
+  assert.deepEqual(a.touched, ['03', '05']);
+  assert.deepEqual(a.counted, ['03', '05']);
+  const r03 = a.rooms.find((r) => r.nr === '03');
+  assert.equal(r03.elementai.length, 1, 'the door no opening backs is taken out — the proposal');
+  assert.equal(r03._angos_patikrinta_at, 'T');
+  assert.equal(r03._angos_user_at, 'T');
+  const r05 = a.rooms.find((r) => r.nr === '05');
+  assert.deepEqual(r05.elementai.map((e) => [e.tipas, e.kiekis]), [['langas', 2]]);
+  assert.equal(a.rooms.find((r) => r.nr === '06')._angos_patikrinta_at, undefined, 'a room not on the card is not touched');
+  assert.equal(a.sameValue, false);
+  const same = openingsAnswer(project, [], [], {}, { manual: [manual[1]], now: 'T' });
+  assert.equal(same.sameValue, true, 'confirming none changes no number');
+  const t = (key, p) => `${key}|${p.rooms}|${p.count}`;
+  assert.equal(answerSummary({ kind: 'angos' }, a, t), 'project.questions.answeredCounts|03, 05|0');
+});
