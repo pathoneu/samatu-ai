@@ -47,6 +47,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     allowedHosts: true,
+    // Playwright writes trace snapshots (.html) into e2e/.results while a test runs; watched, each one made
+    // Vite reload every open page mid-test (seen 2026-10-19: „page reload e2e/.results/…/traces/…html").
+    watch: { ignored: ['**/e2e/.results/**', '**/e2e/.state/**'] },
     proxy: {
       '/extract-interior': { target: BACKEND, changeOrigin: true },
       '/chat-project':     { target: BACKEND, changeOrigin: true },

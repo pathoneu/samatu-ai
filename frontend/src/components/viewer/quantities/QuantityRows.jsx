@@ -4,10 +4,12 @@
  * verbatim from the server; nothing here adds or rescales a quantity.
  */
 
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, Info } from 'lucide-react';
 import { CONFIDENCE_DOT_CLASS, confidenceLabel } from '@/lib/confidence';
 import { ltNumber, ltQuantity } from '@/lib/ledger';
 import { cleanUserText } from '@/lib/userText';
+import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 
 const SOURCE_CLASS = {
   user: 'text-foreground border-[hsl(var(--ov-read))]',
@@ -53,7 +55,48 @@ export function SectionRow({ section, collapsed, active, onToggle }) {
   );
 }
 
-export function FamilyRow({ family, expanded, active, containsFocused, onToggle, onMouseEnter, onMouseLeave }) {
+/**
+ * The number's inline editor (Pathon v3 W4-A M2): Enter saves, Esc puts the number back, Tab saves and opens
+ * the next line's number (Shift+Tab the previous one). A value that is not a number keeps the editor open.
+ */
+function QuantityEditor({ family, onCommit, onCancel }) {
+  const [draft, setDraft] = useState(() => (family.total == null ? '' : String(family.total).replace('.', ',')));
+  const [bad, setBad] = useState(false);
+  const commit = (move) => {
+    const value = parseLtNumber(draft);
+    if (!isValidAmount(value)) { setBad(true); return; }
+    onCommit(value, move);
+  };
+  return (
+    <input
+      autoFocus
+      onFocus={(e) => e.target.select()}
+      value={draft}
+      onChange={(e) => { setDraft(e.target.value); setBad(false); }}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); commit(0); }
+        else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        else if (e.key === 'Tab') { e.preventDefault(); commit(e.shiftKey ? -1 : 1); }
+      }}
+      onBlur={() => onCancel()}
+      aria-label={`Kiekis: ${family.label}`}
+      aria-invalid={bad || undefined}
+      title="Įrašykite kiekį. Enter — įrašyti, Esc — atsisakyti, Tab — kita eilutė."
+      className={`mono tabular w-24 rounded border bg-card px-1.5 text-right text-ui text-foreground outline-none ${bad ? 'border-destructive' : 'border-primary'}`}
+      style={{ height: 26 }}
+      data-testid="quantity-editor"
+    />
+  );
+}
+
+export function FamilyRow({
+  family, expanded, active, containsFocused, onToggle, onMouseEnter, onMouseLeave,
+  editing = false, onStartEdit = null, onCommitEdit = null, onCancelEdit = null,
+  dropProps = null, dropOver = false, chip = null,
+}) {
   const dot = CONFIDENCE_DOT_CLASS[family.confidence];
   const confTitle = `${confidenceLabel(family.confidence)}${family.confidenceReason
     ? ` — ${cleanUserText(family.confidenceReason)}` : ''}`;
@@ -65,7 +108,8 @@ export function FamilyRow({ family, expanded, active, containsFocused, onToggle,
       onClick={onToggle}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`grid items-center cursor-pointer border-b border-border/50 hover:bg-muted/50 transition-colors ${rowStateClass({ active, focused: containsFocused })}`}
+      {...(dropProps || {})}
+      className={`grid items-center cursor-pointer border-b border-border/50 hover:bg-muted/50 transition-colors ${rowStateClass({ active, focused: containsFocused })} ${dropOver ? 'bg-primary/10 outline outline-2 -outline-offset-2 outline-primary' : ''}`}
       style={{ gridTemplateColumns: '14px 9px 1fr auto', gap: 6, padding: '5px 10px 5px 14px', fontSize: 12 }}
     >
       {expanded
@@ -73,15 +117,29 @@ export function FamilyRow({ family, expanded, active, containsFocused, onToggle,
         : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
       <span className={`dot ${dot}`} title={confTitle} aria-label={confTitle} />
       <span className="text-foreground/90 truncate" title={family.label}>{family.label}</span>
-      <span className="mono tabular whitespace-nowrap text-foreground" style={{ fontSize: 12 }}>
+      <span className="mono tabular whitespace-nowrap text-foreground inline-flex items-center gap-1" style={{ fontSize: 12 }}>
+        {chip}
         {family.overridden && (
-          <span className="mr-1 rounded border border-primary/40 px-1 text-primary" style={{ fontSize: 12, lineHeight: '14px' }} title="Kiekį įrašėte ranka">
+          <span className="rounded border border-primary/40 px-1 text-primary" style={{ fontSize: 12, lineHeight: '14px' }} title="Kiekį įrašėte ranka">
             ranka
           </span>
         )}
-        {family.total == null
-          ? <span className="text-muted-foreground" title="Kiekio programa neapskaičiavo — suveskite jį sąmatoje">— {family.unit}</span>
-          : ltQuantity(family.total, family.unit)}
+        {editing ? (
+          <QuantityEditor family={family} onCommit={onCommitEdit} onCancel={onCancelEdit} />
+        ) : (
+          <span
+            onDoubleClick={onStartEdit ? (e) => { e.stopPropagation(); onStartEdit(); } : undefined}
+            title={onStartEdit
+              ? 'Dukart spustelėkite, kad pataisytumėte kiekį (arba F2)'
+              : undefined}
+            className={onStartEdit ? 'rounded px-0.5 hover:bg-primary/10' : ''}
+            data-testid="family-quantity"
+          >
+            {family.total == null
+              ? <span className="text-muted-foreground" title="Kiekio programa neapskaičiavo — įrašykite jį patys">— {family.unit}</span>
+              : ltQuantity(family.total, family.unit)}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -197,23 +255,63 @@ export function FamilyFooter({ family, onOpenAssumptions }) {
   );
 }
 
-/** Σ per unit of the lines shown — server `kiekis` added up, said plainly. */
-export function TotalsFooter({ totals, shown, all }) {
-  return (
-    <div
-      className="shrink-0 border-t border-border bg-card px-2.5 py-1.5 text-muted-foreground"
-      style={{ fontSize: 12 }}
-      title="Rodomų eilučių kiekių suma pagal mato vienetą. Skirtingi darbai su tuo pačiu vienetu sudedami — tai apžvalga, ne viena sąmatos eilutė."
-    >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-        <span>Rodoma {shown}{shown !== all ? ` iš ${all}` : ''} eil.</span>
-        {totals.units.map((u) => (
-          <span key={u.unit} className="mono tabular text-foreground/90">
-            Σ {ltNumber(u.value)} {u.unit}
-          </span>
-        ))}
-        {totals.missing > 0 && <span>{totals.missing} be kiekio</span>}
+/**
+ * Σ of the lines shown — server `kiekis` added up, said plainly (lib/quantitiesTree.footerTotals). With no
+ * filter, per unit within each work family behind „Rodyti sumas" (never one number over walls, ceilings and
+ * tiles together, #220); with a filter, per unit over the lines he picked.
+ */
+export function TotalsFooter({ footer, shown, all }) {
+  const [open, setOpen] = useState(false);
+  const count = <span>Rodoma {shown}{shown !== all ? ` iš ${all}` : ''} eil.</span>;
+  if (footer.mode === 'units') {
+    return (
+      <div
+        className="shrink-0 border-t border-border bg-card px-2.5 py-1.5 text-ui text-muted-foreground"
+        title="Rodomų eilučių kiekių suma pagal mato vienetą — tai apžvalga, ne viena sąmatos eilutė."
+        data-testid="quantities-footer"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          {count}
+          {footer.units.map((u) => (
+            <span key={u.unit} className="mono tabular text-foreground/90">
+              Σ {ltNumber(u.value)} {u.unit}
+            </span>
+          ))}
+          {footer.missing > 0 && <span>{footer.missing} be kiekio</span>}
+        </div>
       </div>
+    );
+  }
+  const sections = footer.sections.filter((s) => s.units.length || s.missing);
+  return (
+    <div className="shrink-0 border-t border-border bg-card text-ui text-muted-foreground" data-testid="quantities-footer">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-2.5 py-1">
+        {count}
+        <span>· sumos pagal darbų grupes</span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="ml-auto inline-flex min-h-[32px] items-center gap-1 rounded px-1.5 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="quantities-footer-toggle"
+        >
+          {open ? <ChevronDown className="w-4 h-4" aria-hidden /> : <ChevronRight className="w-4 h-4" aria-hidden />}
+          {open ? 'Slėpti sumas' : `Rodyti sumas (${sections.length})`}
+        </button>
+      </div>
+      {open && (
+        <ul className="max-h-[40vh] overflow-y-auto border-t border-border/60 px-2.5 py-1" data-testid="quantities-footer-sections">
+          {sections.map((s) => (
+            <li key={s.key} className="flex items-baseline gap-2 py-0.5">
+              <span className="min-w-0 flex-1 truncate text-foreground/85" title={s.label}>{s.label}</span>
+              <span className="mono tabular whitespace-nowrap text-foreground/90">
+                {s.units.map((u) => `Σ ${ltNumber(u.value)} ${u.unit}`).join(' · ')}
+                {s.missing > 0 ? `${s.units.length ? ' · ' : ''}${s.missing} be kiekio` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

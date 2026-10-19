@@ -10,18 +10,59 @@
  *
  * The rules are the re-read's rules (lib/mergeReextract.js): a room he verified
  * keeps its facts, a number he typed or an outline he corrected stays, and what
- * changed is recorded in `_reread_diff` for the banner. Only the rooms and the
- * lane's own record (`_meta.geometrija`) change here — rows, prices,
+ * changed is recorded in `_reread_diff` for the banner. Only the rooms, the
+ * lane's own records (`_meta.geometrija`, the tables stage's `_meta.lenteles`,
+ * the sheet zones `_meta.zonos`) and the drawing's project-level reads
+ * (PROJECT_READ_KEYS) change here — rows, prices,
  * assumptions and scope are not this module's to touch; the caller rebuilds the
  * rows on the merged rooms through the usual /recompute-interior path. Pure.
  */
 
 import { mergeReextractRooms } from './mergeReextract.js';
 
-/** Project-level reads the free re-read returns beside the rooms (api/free_reread.py). */
-export const PROJECT_READ_KEYS = Object.freeze(['_duru_ziniarastis', '_vector_symbols']);
+/**
+ * Project-level reads the free re-read returns beside the rooms (api/free_reread.py): the door schedule, the
+ * symbols counted from the paths, and the window and finish schedules of the „lentelės" stage (Pathon v3 W3-A).
+ */
+export const PROJECT_READ_KEYS = Object.freeze(['_duru_ziniarastis', '_vector_symbols', '_langu_ziniarastis', '_apdailos_lentele']);
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+// A zone he drew or corrected himself — kept on its sheet whatever the read finds there (the re-read's rule for
+// everything he set: lib/mergeReextract.js).
+const USER_ZONE_SOURCES = new Set(['naudotojas', 'manual', 'corrected']);
+const isUserZone = (z) => USER_ZONE_SOURCES.has(String(z?.evidence?.source || ''));
+
+/**
+ * `_meta.zonos` = {page: [zone]} (extractor/sheet_zones.py) for the sheets the read looked at. Sheet by sheet:
+ * a sheet the read covered takes its zones (plus the ones he drew there), a sheet it did not keeps the stored ones.
+ * Undefined when the read brought no zones — the stored map stays as it is.
+ */
+export function mergeZones(stored, read) {
+  if (!isObj(read)) return undefined;
+  const out = { ...(isObj(stored) ? stored : {}) };
+  for (const [page, zones] of Object.entries(read)) {
+    const his = (Array.isArray(out[page]) ? out[page] : []).filter(isUserZone);
+    out[page] = [...(Array.isArray(zones) ? zones : []).filter((z) => !isUserZone(z)), ...his];
+  }
+  return out;
+}
+
+/**
+ * The lane's records under `_meta` that land with the re-read: its own (`geometrija`), the tables stage's
+ * (`lenteles`, a record of the whole document — taken whole) and the sheet zones (`zonos`, sheet by sheet).
+ * Only what the read brought; nothing is overwritten by its absence.
+ */
+export function mergeReadMeta(storedMeta, readMeta) {
+  const base = isObj(storedMeta) ? storedMeta : {};
+  if (!isObj(readMeta)) return { ...base };
+  const out = { ...base };
+  if (readMeta.geometrija !== undefined) out.geometrija = readMeta.geometrija;
+  if (isObj(readMeta.lenteles)) out.lenteles = readMeta.lenteles;
+  const zonos = mergeZones(base.zonos, readMeta.zonos);
+  if (zonos !== undefined) out.zonos = zonos;
+  return out;
+}
 
 /**
  * `{ project, diff }` — the stored project with the lane's read merged in, or
@@ -34,12 +75,11 @@ export function mergeFreeReread(base, result, now = new Date().toISOString()) {
   if (!fresh.length) return { project: null, diff: null };
   const stored = Array.isArray(base.v8_rooms) && base.v8_rooms.length ? base.v8_rooms : base.patalpos;
   const { rooms, diff } = mergeReextractRooms(stored, fresh, now);
-  const geometrija = isObj(result._meta) ? result._meta.geometrija : undefined;
   const project = {
     ...base,
     patalpos: rooms,
     v8_rooms: rooms,
-    _meta: { ...(isObj(base._meta) ? base._meta : {}), ...(geometrija !== undefined ? { geometrija } : {}) },
+    _meta: mergeReadMeta(base._meta, result._meta),
     _reread_diff: diff,
     _geometrija_perskaityta_at: now,
   };

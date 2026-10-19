@@ -206,3 +206,34 @@ test('the counts come from the merged project — the banner\'s whole path', () 
     'Brėžinys perskaitytas. Iš 3 patalpų: tikslus kontūras — 2, sienų ilgiai, kuriuos nustatėte patys — 1, '
     + 'grindų danga iš grindų plano — 2. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.');
 });
+
+test('the drawing\'s tables land with the re-read: the window and finish schedules, and the „lentelės" record', () => {
+  const lenteles = { versija: 1, status: 'ok', lapai: [5], lenteles: { 5: [{ table_id: 't1', bbox_pct: [0.1, 0.1, 0.4, 0.3] }] }, ziniarasciai: {} };
+  const withTables = {
+    ...result(),
+    _meta: { ...result()._meta, lenteles },
+    _langu_ziniarastis: { status: 'lentele', eilutes: 4 },
+    _apdailos_lentele: { status: 'lentele', eilutes: 7 },
+  };
+  const { project } = mergeFreeReread(base(), withTables, 'T');
+  assert.equal(project._langu_ziniarastis.eilutes, 4);
+  assert.equal(project._apdailos_lentele.eilutes, 7);
+  assert.deepEqual(project._meta.lenteles, lenteles);
+  assert.equal(project._meta.model, 'x', 'the rest of the stored meta stays');
+  // a read without them keeps the stored ones — never overwritten by their absence
+  const stored = { ...base(), _langu_ziniarastis: { status: 'lentele', eilutes: 2 }, _meta: { ...base()._meta, lenteles } };
+  const kept = mergeFreeReread(stored, result(), 'T').project;
+  assert.equal(kept._langu_ziniarastis.eilutes, 2);
+  assert.deepEqual(kept._meta.lenteles, lenteles);
+});
+
+test('sheet zones merge sheet by sheet — a sheet the read did not look at keeps its zones, a zone he drew stays', () => {
+  const zone = (kind, source = 'vektoriai') => ({ kind, bbox_pct: [0, 0, 0.2, 0.2], evidence: { source, detail: '' } });
+  const stored = { ...base(), _meta: { ...base()._meta, zonos: { 1: [zone('planas'), zone('legenda', 'naudotojas')], 2: [zone('antspaudas')] } } };
+  const read = { ...result(), _meta: { ...result()._meta, zonos: { 1: [zone('planas'), zone('lentele')] } } };
+  const { project } = mergeFreeReread(stored, read, 'T');
+  assert.deepEqual(project._meta.zonos[1].map((z) => z.kind), ['planas', 'lentele', 'legenda'], 'his zone stays on the re-read sheet');
+  assert.deepEqual(project._meta.zonos[2].map((z) => z.kind), ['antspaudas'], 'a sheet the read skipped keeps its zones');
+  // no zones in the read: the stored ones stay as they were
+  assert.deepEqual(mergeFreeReread(stored, result(), 'T').project._meta.zonos, stored._meta.zonos);
+});

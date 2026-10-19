@@ -61,6 +61,11 @@ import {
   adjustPositionQuantity,
   updatePositionQuantity,
 } from '@/lib/quantityOverride';
+// Pathon v3 W4-A: a measurement dragged onto a row (or „Į eilutę…" from its chip), the „iš matavimų" chip
+import { useMeasureRows } from './measure/useMeasureRows';
+import MeasureRowPicker from './measure/MeasureRowPicker';
+import MeasuredChip from './measure/MeasuredChip';
+import MeasureTray from './measure/MeasureTray';
 import {
   TAKEOFF_FILTER_MODES,
   filterTakeoffRows,
@@ -98,6 +103,7 @@ function groupByCategory(darbu_sarasas, otherLabel) {
 function WorkRow({
   item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger,
   focusPriceNonce = 0, onPriceFocused, kodas = null, materialNote = null, packSizes = null,
+  measure = null,
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -300,7 +306,10 @@ function WorkRow({
   const confDot = null;
 
   return (
-    <tr className="hover:bg-muted/30 group transition-colors">
+    <tr
+      {...(measure ? measure.dropProps(item) : {})}
+      className={`hover:bg-muted/30 group transition-colors ${measure && item.id && measure.overRowId === item.id ? 'bg-primary/10 outline outline-2 -outline-offset-2 outline-primary' : ''}`}
+    >
       <td className="px-3 py-2 text-sm text-muted-foreground tabular-nums">{item.eil_nr || '—'}</td>
       <td className="px-3 py-2 text-foreground">
         <div className="flex items-center gap-2 min-w-0">
@@ -320,6 +329,12 @@ function WorkRow({
           >
             {item.aprasymas}
           </button>
+          <MeasuredChip
+            row={item}
+            onSetKaip={measure ? measure.setKaip : null}
+            onUnlink={measure ? measure.unlink : null}
+            onJumpToPage={onJumpToSource}
+          />
           {/* 2026-05-06: source badge removed per user — visual clutter. */}
           {confDot}
         </div>
@@ -547,6 +562,8 @@ export default function ProjectMainView({
 }) {
   const { t } = useTranslation();
   const [darbai, setDarbai] = useState(project.darbu_sarasas || []);
+  const measure = useMeasureRows(project, onProjectChange);
+  const [measurePickerKey, setMeasurePickerKey] = useState(null);
   // togal-v2 W9: rinkiniai + section codes for the „Kodas" chip, and why a
   // „Medžiagos" row carries no price of its own.
   const { assemblies, kodai } = useAssemblies();
@@ -1055,6 +1072,9 @@ export default function ProjectMainView({
           </div>
         </div>
 
+        {/* What he measured on the drawing, as chips to drag onto a row below (Pathon v3 W4-A). */}
+        {onProjectChange && <MeasureTray project={project} onPickRow={setMeasurePickerKey} />}
+
         {/* LT contractors habitually quote a work rate „su medžiagomis". Since
             the materials became their own section, entering an all-in rate on a
             work row AND letting the kainynas price the materials bills the same
@@ -1151,6 +1171,7 @@ export default function ProjectMainView({
                             kodas={effectiveKodas(item, assemblies, kodai)}
                             materialNote={materialNotes.get(item) || null}
                             packSizes={packSizes}
+                            measure={onProjectChange ? measure : null}
                           />
                         );
                       })}
@@ -1223,6 +1244,15 @@ export default function ProjectMainView({
           onFocusRoom={onJumpToPage}
           onOpenAssumptions={onOpenAssumptions}
           projectId={project?.id}
+        />
+      )}
+      {onProjectChange && (
+        <MeasureRowPicker
+          open={!!measurePickerKey}
+          onOpenChange={(v) => { if (!v) setMeasurePickerKey(null); }}
+          project={project}
+          sourceKey={measurePickerKey}
+          onPick={(row, kaip) => measure.link(measurePickerKey, row, kaip)}
         />
       )}
     </div>

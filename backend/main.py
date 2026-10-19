@@ -7252,6 +7252,9 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     }
     if apimtis:
         parsed["_apimtis"] = apimtis
+    # What he measured and which row it belongs to (Pathon v3 W4-A, api/measured_rows.py) rides in the
+    # context; it is applied to the rebuilt rows below and never lands on the project as a key of its own.
+    _matavimai = parsed.pop("matavimai", None)
     # The anchor must be in `parsed` BEFORE _build_pozicijos_from_rooms runs —
     # that is where `_ceiling_paint_base` looks for it. An explicit field wins
     # over whatever a stale `context` copy carries.
@@ -7302,6 +7305,11 @@ def recompute_interior(payload: RecomputePayload, request: Request):
         parsed["pozicijos"] = parsed.get("pozicijos") or []
         _pozicijos_failed = True
     parsed = _emit_v8_compat_fields(parsed)
+    # Measurements on rows: the `matavimas` ledger lines (user input, never a default — with none, nothing changes).
+    if _matavimai:
+        from api.measured_rows import apply_measured_rows, clean_contributions
+        parsed["darbu_sarasas"] = apply_measured_rows(parsed.get("darbu_sarasas") or [],
+                                                      clean_contributions(_matavimai))
 
     # Re-run the CLAUDE.md §6 cross-checks (paint/floor ratio, ceiling≈floor,
     # baseboard≈perimeter, GKP lapai, angokraščiai) against the recomputed
