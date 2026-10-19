@@ -3690,6 +3690,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     lubos_share = (1 - walls_share) * _ceiling_keep if _dazymo_all > 0 else 0.5
     glaistas_total = _sum("glaistas_kg")
     dazai_total = round(sum(_room_dazai_l(r) for r in rooms), 2)
+    from . import waste_pattern as _waste
+    if _waste.enabled():  # v3 W5-E E7, default off: paint litres + the §3 paint waste
+        dazai_total = round(dazai_total * _waste.factor("paint", _waste.STRAIGHT), 2)
     gruntas_total = _sum("gruntas_l")
 
     # Wet rooms (vonia/wc/san) — voniose dažymas tik virš plytelių zonos
@@ -4225,6 +4228,18 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 else (lambda r: in_group(r) and _floor_rule_is_tile(r)))
         return contribs, _choice_excluded("plyteles", keep)
 
+    def _tile_waste(field: str | None, pasks: set | None) -> float:
+        """TILE_WASTE; under SAMATU_WASTE_BY_PATTERN=1 (v3 W5-E E7) the §1.7 factor of the pattern the
+        drawing writes for this location (floor-plan label for floor tiles, tile-spec excerpt)."""
+        if not _waste.enabled() or not field:
+            return TILE_WASTE
+        grp = [r for r in rooms if ((_pask(r) in pasks) if pasks is not None
+                                    else (_pask(r) not in WET and _pask(r) != "virtuve"))]
+        texts = [_waste.room_floor_text(r) for r in grp] if field == "plyteles_grindys_m2" else []
+        where = None if pasks is None else ({"virtuve"} if pasks == {"virtuve"} else {"vonia", "wc"})
+        texts += _waste.tile_spec_texts(parsed, where)
+        return _waste.factor("tiles", _waste.pattern_of_texts(texts))
+
     def _add_tile_lines(skyrius_loc: str, kiekis: float, vieta: str,
                         field: str | None = None, pasks: set | None = None):
         """Add 4 lines per tile location: klijavimas + klijai, fugavimas + fugos.
@@ -4253,7 +4268,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         pozicijos.append({
             "skyrius": SK_PL,
             "aprasymas": f"{vieta} plytelės",
-            "vnt": "m2", "kiekis": round(kiekis * TILE_WASTE, 2), "saltinis": SAL,
+            "vnt": "m2", "kiekis": round(kiekis * _tile_waste(field, pasks), 2), "saltinis": SAL,
             "susijes_darbas": f"{vieta} plytelių klijavimas",
             _IS_MATERIAL_LINE: True,
         })
@@ -4660,6 +4675,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "medziagos_aprasymas": "Grindų danga (m² + 10% atliekų)",
             "medziagos_kiekis": round(pvc_billed * FLOOR_COVERING_WASTE, 2),
             "medziagos_vnt": "m2"}
+        if _waste.enabled():  # v3 W5-E E7, default off: §1.6 waste of the pattern the floor plan writes
+            _fw = _waste.factor("floor", _waste.pattern_of_texts(
+                _waste.room_floor_text(r) for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0))
+            _lam_row["medziagos_aprasymas"] = f"Grindų danga (m² + {_waste.pct_label(_fw)}% atliekų)"
+            _lam_row["medziagos_kiekis"] = round(pvc_billed * _fw, 2)
         if _lam_meta["source"] == "anchor":
             _lam_row["_confidence_reason"] = _lam_meta["provenance"]
             _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,

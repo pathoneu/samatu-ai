@@ -100,6 +100,9 @@ UNIVERSAL_RULES = {
         "laminate_straight": 0.10,
         "laminate_diagonal": 0.13,
         "parquet_herringbone": 0.16,  # CLAUDE.md §1.6 +12-16% range
+        # v3 W5-E E7: read only under SAMATU_WASTE_BY_PATTERN=1 (extractor/waste_pattern.py)
+        "tiles_hexagonal": 0.16,      # CLAUDE.md §1.7 +16%, §3 15-17%
+        "laminate_hexagonal": 0.16,   # CLAUDE.md §1.6 hexagonal +16%
     },
 
     # Wallpaper
