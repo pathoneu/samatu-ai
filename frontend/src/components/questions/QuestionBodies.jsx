@@ -9,6 +9,9 @@
  *   outline    — a room to point at on the drawing: the outline the program PROPOSES when the walls close a
  *                different area than the table gives (2026-09-23, objektas_h tambūras), „Tinka" or a click
  *                elsewhere — and always the way without a click, the wall length typed by hand.
+ *   reconcile  — the drawing's schedule against what the walls show (Pathon v3 W3-A `lentele_durys` / `lentele_langai`):
+ *                which count is right, the proposal (as drawn) pressed, the schedule one click away on the drawing;
+ *   info       — a table's own sum against the rooms' (`lentele_suma`): read it, see it on the drawing, „Supratau".
  *
  * „Programa siūlo — jūs patvirtinate": every body opens filled in with the proposal, so the usual action is the
  * one big button. All of them report through `onAnswer(payload)`; the page turns the payload into the project
@@ -17,11 +20,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, ExternalLink } from 'lucide-react';
+import { Check, ExternalLink, MapPin } from 'lucide-react';
 
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { ltNumber } from '@/lib/ledger';
 import { cleanUserText } from '@/lib/userText';
+import { API_BASE } from '@/lib/apiBase';
 
 export const Q_BTN = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[2px] border px-4 '
   + 'text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 '
@@ -40,6 +44,106 @@ const DOOR_WIDTH_M = { min: 0.6, max: 1.2 };
 
 const lt = (v) => (v == null || v === '' ? '' : ltNumber(Number(v), 2));
 const roomLabel = (item) => [item.room_nr, item.room_name].filter(Boolean).join(' ');
+
+/**
+ * „Rodyti brėžinyje" for a schedule's row or table (`where = {page, rect_pct}`): inside the workspace the drawing
+ * jumps there and frames it (`onShow`); on its own page the crop of the table opens under the button.
+ */
+export function TablePeek({ where, onShow = null, projectId = null, compact = false }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rect = Array.isArray(where?.rect_pct) && where.rect_pct.length === 4 ? where.rect_pct : null;
+  if (!where?.page || !rect) return null;
+  const crop = projectId
+    ? `${API_BASE}/api/projects/${encodeURIComponent(projectId)}/evidence?page=${Number(where.page)}&rect=${rect.map((v) => Number(v).toFixed(4)).join(',')}&dpi=110`
+    : null;
+  return (
+    <span className="inline-flex flex-col items-start gap-1.5">
+      <button
+        type="button"
+        className={`${Q_PLAIN} ${compact ? 'min-h-[36px] px-3 text-[14px]' : ''}`}
+        onClick={() => (onShow ? onShow({ page: Number(where.page), rect_pct: rect }) : setOpen((v) => !v))}
+        data-testid="question-show-table"
+      >
+        <MapPin className="h-4 w-4" aria-hidden="true" />
+        {t('project.questions.showOnDrawing')}
+      </button>
+      {!onShow && open && crop && (
+        <img src={crop} alt={`Lentelė, ${where.page} lapas`} className="max-h-72 max-w-full rounded-[2px] border border-border bg-white object-contain" />
+      )}
+    </span>
+  );
+}
+
+/** Which of two counts is right — the schedule's or the walls' — with the schedule one click away. */
+export function ReconcileBody({ question, busy, onAnswer, onShowTable = null, projectId = null }) {
+  const { t } = useTranslation();
+  const [picked, setPicked] = useState(null);
+  useEffect(() => { setPicked(null); }, [question.id]);
+  const current = picked ?? question.proposed;
+  const edited = picked != null && picked !== question.proposed;
+  return (
+    <div className="flex flex-col gap-3" data-testid="question-reconcile">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={question.title}>
+        {(question.choices || []).map((c) => (
+          <button
+            key={String(c.value)} type="button" aria-pressed={current === c.value}
+            onClick={() => setPicked(c.value)}
+            className={`inline-flex min-h-[44px] items-center rounded-[2px] border px-3 text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+              ${current === c.value ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-[hsl(var(--accent-2))]' : 'border-border bg-card hover:bg-muted'}`}
+            data-testid={`reconcile-${c.value}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {Array.isArray(question.items) && question.items.length > 0 && (
+        <ul className="rounded-[2px] border border-border">
+          {question.items.map((item) => (
+            <li key={item.room_nr} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-border px-3 py-2 first:border-t-0 text-[14px]">
+              <span className="font-semibold"><span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}</span>
+              <span className="text-[hsl(var(--ink-2))]">{cleanUserText(item.sentence || '')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {question.lentele?.sentence && <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(question.lentele.sentence)}</p>}
+      <div className="flex flex-wrap items-start gap-2">
+        <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={() => onAnswer({ value: current })}>
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {edited ? t('project.questions.save') : t('project.questions.accept')}
+        </button>
+        <TablePeek where={question.lentele} onShow={onShowTable} projectId={projectId} />
+      </div>
+    </div>
+  );
+}
+
+/** A difference to know about, not to decide: see it on the drawing, then „Supratau". */
+export function InfoBody({ question, busy, onAnswer, onShowTable = null, projectId = null }) {
+  const { t } = useTranslation();
+  const item = (question.items || [])[0] || {};
+  const unit = question.unit || '';
+  return (
+    <div className="flex flex-col gap-3" data-testid="question-info">
+      {item.lentele != null && item.musu != null && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-[2px] border border-border px-3 py-2 text-[15px]">
+          <dt className="text-[hsl(var(--ink-2))]">{item.room_name || 'Lentelėje'}</dt>
+          <dd className="font-mono tabular-nums">{lt(item.lentele)} {unit}</dd>
+          <dt className="text-[hsl(var(--ink-2))]">Patalpų suma</dt>
+          <dd className="font-mono tabular-nums">{lt(item.musu)} {unit}</dd>
+        </dl>
+      )}
+      <div className="flex flex-wrap items-start gap-2">
+        <button type="button" className={Q_PRIMARY} disabled={busy} data-testid="question-accept" onClick={() => onAnswer({ value: 'matyta' })}>
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {t('project.questions.infoSeen')}
+        </button>
+        <TablePeek where={question.lentele || { page: item.page, rect_pct: item.rect_pct }} onShow={onShowTable} projectId={projectId} />
+      </div>
+    </div>
+  );
+}
 
 function Row({ item, focused, onFocus, children, note, stacked = false }) {
   return (
@@ -252,7 +356,7 @@ export function NumbersBody({ question, busy, focusNr, onFocus, onAnswer }) {
 }
 
 /** Rooms with the program's choice pressed. */
-export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer }) {
+export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer, onShowTable = null, projectId = null }) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState({});
   useEffect(() => { setPicked({}); }, [question.id]);
@@ -278,6 +382,10 @@ export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer }) {
                   </button>
                 ))}
               </div>
+              {/* the schedule's row this choice was read from (v3 W3-A `lentele_apdaila`, a floor proposed from the table) */}
+              {focusNr === item.room_nr && (
+                <TablePeek where={item.rect_pct ? { page: item.page, rect_pct: item.rect_pct } : item.lentele} onShow={onShowTable} projectId={projectId} compact />
+              )}
             </Row>
           );
         })}

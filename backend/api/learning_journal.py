@@ -22,6 +22,11 @@ QUESTION_TOPICS = {
     "durys": "vidaus duris",
     "grindys": "grindų dangas",
     "apdaila": "sienų apdailą",
+    # the drawing's schedules against what was read elsewhere (Pathon v3 W3-A; answered in Patikra since W2-B)
+    "lentele_durys": "durų žiniaraštį",
+    "lentele_langai": "langų žiniaraštį",
+    "lentele_apdaila": "apdailos lentelę",
+    "lentele_suma": "eksplikacijos sumą",
 }
 
 # `_konturas.saltinis` (api/room_outline.py) → what the person did to the outline.
