@@ -21,7 +21,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
+import { ChevronUp, ChevronDown, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -54,6 +54,8 @@ import MeasureContextMenu, { RenameDialog } from './MeasureContextMenu';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
+import SheetHeaderBadge from './SheetHeaderBadge';
+import ZoomCluster from './ZoomCluster';
 import ModePill from './ModePill';
 import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
@@ -64,6 +66,7 @@ import { escStep, openLayerInDocument } from '@/lib/escOrder';
 import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
+import useMiddlePan from './useMiddlePan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
@@ -171,8 +174,8 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-// The two small cards of the canvas chrome that the horizontal toolbar used to hold (v3 W1-B B6): the
-// reading / editions buttons and the search at the top right, pages and zoom at the bottom right.
+// The canvas chrome's cards (v3 W1-B B6, W5-B): the sheet header (SheetHeaderBadge) and the reading / editions
+// buttons with the search at the top right, the zoom column (ZoomCluster) at the bottom right.
 const chromeBtn = 'h-8 min-w-8 px-1.5 inline-flex items-center justify-center rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 const chromeCard = 'pointer-events-auto rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
 
@@ -192,41 +195,6 @@ function CanvasHeader({ documentId, totalPages, addon = null, searchOpen, onTogg
         aria-pressed={!!searchOpen}
         onClick={onToggleSearch}
       ><Search className="w-4 h-4" /></button>
-    </div>
-  );
-}
-
-/** Bottom right: page back / forward, zoom out / in with the level, fit width / fit page. */
-function NavCluster({ documentId, totalPages }) {
-  const { state: zoom, provides: zoomApi } = useZoom(documentId);
-  const { state: scroll, provides: scrollApi } = useScroll(documentId);
-  const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
-  const cur = visiblePageOf(scroll);
-  // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
-  const total = totalPages || 1;
-  // Fit actions consult the PLUGIN's currentPage, which can lag the viewport
-  // (audit P1: fit yanked the view back to a stale page) — sync it first.
-  const syncPageThen = (fn) => {
-    if (cur !== (scroll?.currentPage ?? cur)) scrollApi?.scrollToPage({ pageNumber: cur });
-    fn();
-  };
-  const sep = <span aria-hidden="true" className="w-px h-5 bg-border mx-0.5" />;
-  return (
-    <div className={chromeCard} data-nav-cluster role="group" aria-label="Puslapiai ir mastelis ekrane">
-      {/* Deterministic: jump to visible page ± 1. The plugin's relative
-          scrollToNext/PreviousPage steps from its own (stale) currentPage —
-          under wheel scrolling that no-ops or bounces (founder: "page changer
-          does not work"). */}
-      <button type="button" className={chromeBtn} title={withKey('Ankstesnis puslapis', 'prevPage')} aria-label="Ankstesnis puslapis" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
-      <span className="mono tabular text-ui text-foreground px-0.5 whitespace-nowrap" aria-label={`Puslapis ${cur} iš ${total}`}>{cur} / {total}</span>
-      <button type="button" className={chromeBtn} title={withKey('Kitas puslapis', 'nextPage')} aria-label="Kitas puslapis" disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
-      {sep}
-      <button type="button" className={chromeBtn} title={withKey('Tolinti', 'zoomOut')} aria-label="Tolinti" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
-      <span className="mono tabular text-ui text-foreground w-12 text-center">{pct}%</span>
-      <button type="button" className={chromeBtn} title={withKey('Artinti', 'zoomIn')} aria-label="Artinti" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
-      {sep}
-      <button type="button" className={chromeBtn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} aria-label="Sutalpinti per visą plotį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
-      <button type="button" className={chromeBtn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} aria-label="Sutalpinti visą puslapį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
     </div>
   );
 }
@@ -1291,6 +1259,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     chromeObserver.current = ro;
   }, []);
   const railCompact = chromeHeight > 0 && chromeHeight < railHeight() + 16;
+  // The middle button drags the drawing from any tool (W5-B B5); the chrome element exists once the document has.
+  useMiddlePan({ rootRef: tvRootRef, enabled: !!chromeEl });
   // „Patalpa" (R, W1-D): the one-click room outline, armed as the measure tool 'room' when the host gives the
   // preview and the save; otherwise the card stays disabled with its reason.
   const onRoomTool = !check && onRoomToolPreview && onRoomToolCommit ? () => armMeasureTool('room') : null;
@@ -1494,6 +1464,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     header: '[data-canvas-header]',
     legend: '[data-layer-legend]',
     scaleChip: '[data-testid="scale-chip-root"]',
+    zoom: '[data-zoom-cluster-root]',
   });
   // Where the top row of cards ends (pages / zoom and search may wrap to two rows on a narrow canvas).
   const chromeTopBottom = Math.max(
@@ -1508,11 +1479,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const r = chromeRects.rects;
     const size = { width: r.legend?.width || 280, height: r.legend?.height || 96 };
     const spots = [
-      { id: 'bottom-right', left: f.width - 8 - size.width, top: f.height - 8 - size.height },
+      { id: 'bottom-right', left: f.width - 8 - size.width - (r.zoom ? r.zoom.width + 8 : 0), top: f.height - 8 - size.height },
       { id: 'top-right', left: f.width - 8 - size.width, top: chromeTopBottom + 8 },
       { id: 'bottom-left', left: (check ? 8 : RAIL_WIDTH + 16), top: f.height - 8 - size.height - (r.scaleChip ? r.scaleChip.height + 8 : 0) },
     ];
-    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip].filter(Boolean) });
+    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip, r.zoom].filter(Boolean) });
   })();
 
   if (!activeDocumentId) return <div className="p-5 text-sm text-muted-foreground">Kraunamas dokumentas…</div>;
@@ -1677,10 +1648,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   />
                 </div>
               )}
-              {/* Top right, one row: pages and zoom, then the reading / editions buttons and the search. (At the
-                  bottom right the pages / zoom card left the pill too little room at 1280 px — the pill wrapped.) */}
+              {/* Top right, one row: the sheet (badge, name, „← 1 iš N →", W5-B B1), then the reading / editions
+                  buttons and the search. Zoom is the column at the bottom right (ZoomCluster). */}
               <div className="absolute top-2 right-2 flex flex-wrap items-start justify-end gap-2" style={{ left: check ? 8 : RAIL_WIDTH + 16 }} data-chrome-top>
-                <NavCluster documentId={activeDocumentId} totalPages={totalPages} />
+                <SheetHeaderBadge documentId={activeDocumentId} totalPages={totalPages} sheets={sheetRail?.sheets || null} />
                 <CanvasHeader
                   documentId={activeDocumentId}
                   totalPages={totalPages}
@@ -1690,9 +1661,15 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   onCloseSearch={() => setSearchOpen(false)}
                 />
               </div>
+              {/* Zoom, area zoom, minimap, full screen — one column at the bottom right (W5-B B5). */}
+              <ZoomCluster
+                documentId={activeDocumentId}
+                pages={documentState?.document?.pages}
+                onAreaZoom={({ page, rect }) => { frameNonce.current += 1; setFrameFocus({ page, rect, nonce: `area-${frameNonce.current}` }); }}
+              />
               {/* The active mode's pill, bottom centre right of the tool cards. */}
               {pill && (
-                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: Math.max(check ? 8 : RAIL_WIDTH + 16, chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.left + chromeRects.rects.scaleChip.width + 8 : 0) }}>
+                <div className="absolute bottom-2 flex justify-center" style={{ left: Math.max(check ? 8 : RAIL_WIDTH + 16, chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.left + chromeRects.rects.scaleChip.width + 8 : 0), right: chromeRects.frame && chromeRects.rects.zoom ? chromeRects.frame.width - chromeRects.rects.zoom.left + 8 : 8 }}>
                   <ModePill pill={pill} onAction={onPillAction} />
                 </div>
               )}
@@ -1704,7 +1681,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 <SelectionBar
                   frame={chromeRects.frame}
                   anchor={null}
-                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip, chromeRects.rects.label, chromeRects.rects.anchor].filter(Boolean)}
+                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip, chromeRects.rects.zoom, chromeRects.rects.label, chromeRects.rects.anchor].filter(Boolean)}
                   insetLeft={check ? 8 : RAIL_WIDTH + 16}
                   room={barRoomActions}
                   marks={barRoomActions ? null : barMarks}
