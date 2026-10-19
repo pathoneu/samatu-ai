@@ -212,7 +212,7 @@ export default function PageOverlayHost({
     && (measureTool == null || measureTool === 'select')) ? (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       const raw = adapter.toPdf({ x: e.clientX - r.left, y: e.clientY - r.top });
-      const measureId = hitTestMeasurement(raw, (measurements || []).filter((m) => m.kind !== 'count'), layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
+      const measureId = hitTestMeasurement(raw, (measurements || []).filter((m) => ['distance', 'perimeter', 'area'].includes(m.kind)), layout.pageNumber, MEASURE_HIT_TOL_PX / (adapter.scale || 1));
       onPageDoubleClick({
         measureId: measureId || null, pageIndex: layout.pageIndex, x: raw.x, y: raw.y, pageWidth: pageWidthPt, pageHeight: pageHeightPt,
         pageRotation, renderedWidth: width, renderedHeight: height,

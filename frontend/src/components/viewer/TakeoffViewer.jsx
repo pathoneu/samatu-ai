@@ -754,7 +754,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const startMeasureEdit = (id) => {
     const m = measurements.find((x) => x.id === id);
     const pg = m && pageSizeOf(m.page);
-    if (!m || m.kind === 'count' || !pg?.size || !Array.isArray(m.points) || m.points.length < 2) return;
+    if (!m || !['distance', 'perimeter', 'area'].includes(m.kind) || !pg?.size || !Array.isArray(m.points) || m.points.length < 2) return;
     setMeasureTool(null); setSelectedMeasureId(null); setFillFor(null); if (symbol.active) symbol.close(); outlineTools.cancel();
     setOutlineEdit({
       target: 'measure',
