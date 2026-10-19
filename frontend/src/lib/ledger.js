@@ -247,6 +247,8 @@ export function sourceLabel(saltinis) {
  * a hand-added row says so, a computed row without a ledger names its source.
  */
 export function ledgerFallback(row) {
+  // a count made from a legend row (v3 W2-B, lib/legendReview syncLegendRows) says how it was counted
+  if (typeof row?.ledger_note_lt === 'string' && row.ledger_note_lt.trim()) return { kind: 'note', text: row.ledger_note_lt.trim() };
   if (isManualRow(row)) return { kind: 'manual' };
   return { kind: 'unwired', source: sourceLabel(row?.saltinis) };
 }

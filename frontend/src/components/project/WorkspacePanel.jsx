@@ -220,7 +220,7 @@ export default function WorkspacePanel({
       if (m.kind !== 'count' || !m.typeId) continue;
       const cur = byType.get(m.typeId);
       // „Rasti panašius" marks (lib/symbolSearch): found by shape, not checked — the row says so.
-      const ai = m.source === 'symbol_search' ? 1 : 0;
+      const ai = m.source === 'symbol_search' || m.source === 'legenda' ? 1 : 0;
       if (cur) {
         cur.count += 1;
         cur.ai += ai;
@@ -235,6 +235,8 @@ export default function WorkspacePanel({
           count: 1,
           ai,
           firstPage: m.page || null,
+          // v3 W2-B: a type made from a legend row — its sąmata row follows the count by itself
+          legend: Boolean(type?.legend_row_id),
         });
       }
     }
@@ -704,23 +706,30 @@ export default function WorkspacePanel({
                 title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage})` : undefined}
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
-                <span className="flex-1 min-w-0 truncate">{r.label}</span>
+                <span className="flex-1 min-w-0 truncate">
+                  {r.label}
+                  {r.legend && <span className="ml-1.5 text-muted-foreground" data-testid="meas-legend-tag">· pagal legendą</span>}
+                </span>
                 {r.ai > 0 && (
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${CONFIDENCE_DOT_CLASS[normalizeConfidence('yellow')]}`}
-                    title={`${confidenceLabel('yellow')}: ${r.ai} iš ${r.count} rasta automatiškai („Rasti panašius") — peržiūrėkite brėžinyje`}
+                    title={`${confidenceLabel('yellow')}: ${r.ai} iš ${r.count} rasta automatiškai (${r.legend ? 'pagal legendą' : '„Rasti panašius"'}) — peržiūrėkite brėžinyje`}
                     data-testid="meas-ai-dot"
                   />
                 )}
                 <span className="font-mono tabular-nums text-foreground">{r.count} vnt.</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); addCountToEstimate(r); }}
-                  className="text-primary hover:underline shrink-0"
-                  title="Įtraukti kiekį į sąmatą (kainą suvesite patys)"
-                >
-                  Į sąmatą
-                </button>
+                {r.legend ? (
+                  <span className="shrink-0 text-muted-foreground" title="Sąmatos eilutė „Matavimai“ skyriuje keičiasi kartu su žymėmis brėžinyje">sąmatoje</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); addCountToEstimate(r); }}
+                    className="text-primary hover:underline shrink-0"
+                    title="Įtraukti kiekį į sąmatą (kainą suvesite patys)"
+                  >
+                    Į sąmatą
+                  </button>
+                )}
               </div>
             ))}
             {!collapsed.meas && measGeomRows.map((m) => (
