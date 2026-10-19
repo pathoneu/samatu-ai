@@ -57,3 +57,23 @@ test('„Iškirpti angą" on an outline edge takes the opening the walls show th
   assert.equal(openingText('durys', 900), 'Durys 0,90 m');
   assert.equal(openingText('praejimas'), 'Praėjimas');
 });
+
+test('a width-only edit of a hidden door keeps it hidden and keeps its height (B2-B item 1)', () => {
+  const els = [{ tipas: 'pasleptos_duris', kiekis: 1, plotis_mm: 900, aukstis_mm: 2400, _anga_ks: [0] }];
+  const o = { k: 0, i: '01' };
+  const out = applyOpeningEdit(els, o, { kind: 'durys', plotisMm: 800 });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].tipas, 'pasleptos_duris');
+  assert.equal(out[0].aukstis_mm, 2400);
+  assert.equal(out[0].plotis_mm, 800);
+  // saved unchanged as „Durys": nothing changes
+  assert.equal(applyOpeningEdit(els, o, { kind: 'durys', plotisMm: 900 }), null);
+  // the kind changed to a window: a plain window of the standard height
+  const win = applyOpeningEdit(els, o, { kind: 'langas', plotisMm: 1200 });
+  assert.equal(win[0].tipas, 'langas');
+  assert.notEqual(win[0].aukstis_mm, 2400);
+  // a shared hidden-door entry gives one opening up: the new entry is still a hidden door of that height
+  const shared = [{ tipas: 'pasleptos_duris', kiekis: 2, plotis_mm: 900, aukstis_mm: 2400, _anga_ks: [0, 1] }];
+  const split = applyOpeningEdit(shared, o, { kind: 'durys', plotisMm: 800 });
+  assert.deepEqual(split.map((e) => [e.tipas, e.kiekis, e.plotis_mm, e.aukstis_mm]), [['pasleptos_duris', 1, 900, 2400], ['pasleptos_duris', 1, 800, 2400]]);
+});
