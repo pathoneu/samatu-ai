@@ -51,6 +51,7 @@ import { effectiveKodas } from '@/lib/kodas';
 import { materialPriceNotes } from '@/lib/assemblyPricing';
 import SanityWarningsBanner from './SanityWarningsBanner';
 import RemindersNotice from './RemindersNotice';
+import { packagingNote, packagingSizes } from '@/lib/packaging';
 import SamataTemplateView from './SamataTemplateView';
 import { fetchSamataTemplates } from '@/lib/samataTemplateApi';
 import { LAYOUT_PATHON, LAYOUT_TEMPLATE, hasLayoutChoice, loadLayoutChoice, saveLayoutChoice } from '@/lib/samataTemplate';
@@ -95,7 +96,7 @@ function groupByCategory(darbu_sarasas, otherLabel) {
 
 function WorkRow({
   item, onChange, onRemove, onJumpToSource, targetPage, onOpenLedger,
-  focusPriceNonce = 0, onPriceFocused, kodas = null, materialNote = null,
+  focusPriceNonce = 0, onPriceFocused, kodas = null, materialNote = null, packSizes = null,
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -422,6 +423,10 @@ function WorkRow({
             {t('project.mainView.aiOriginal', { value: fmt(item.ai_kiekis_original) })}
           </div>
         )}
+        {/* „17 maišų po 25 kg" beside the putty kg, „7 kibirai po 10 l" beside paint (v3 W5-E) — a note, the kg stay */}
+        {packSizes && packagingNote(item, packSizes) && (
+          <div className="text-ui text-muted-foreground leading-tight whitespace-nowrap" data-packaging>{packagingNote(item, packSizes)}</div>
+        )}
       </td>
       <td
         ref={priceCellRef}
@@ -544,6 +549,7 @@ export default function ProjectMainView({
   // togal-v2 W9: rinkiniai + section codes for the „Kodas" chip, and why a
   // „Medžiagos" row carries no price of its own.
   const { assemblies, kodai } = useAssemblies();
+  const packSizes = useMemo(() => packagingSizes(project._overrides), [project._overrides]);
   const materialNotes = useMemo(() => {
     const byIndex = materialPriceNotes(darbai);
     return new Map([...byIndex].map(([i, note]) => [darbai[i], note]));
@@ -1118,6 +1124,7 @@ export default function ProjectMainView({
                             onPriceFocused={() => setPendingPriceFocus(null)}
                             kodas={effectiveKodas(item, assemblies, kodai)}
                             materialNote={materialNotes.get(item) || null}
+                            packSizes={packSizes}
                           />
                         );
                       })}

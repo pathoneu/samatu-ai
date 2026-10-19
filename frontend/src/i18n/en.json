@@ -1173,6 +1173,11 @@
       "introOrphans": "A few rows may keep their original values — we will say which ones separately.",
       "wallThicknessHint": "Partition thickness in metres — used for the reveals row",
       "wallThicknessRangeErr": "Wall thickness must be between {{min}} and {{max}} m.",
+      "packagingLabel": "Packaging",
+      "packagingNote": "How many kilograms a putty bag holds and how many litres a paint or primer bucket holds. The estimate shows how many bags or buckets are needed beside the quantity; the kilograms and litres themselves do not change.",
+      "packagingBag": "Putty bag",
+      "packagingBucket": "Paint, primer bucket",
+      "packagingRangeErr": "Enter a number from {{min}} to {{max}}.",
       "puttyLevelTitles": {
         "Q1": "Q1 — under heavy wallpaper, 0.8 kg/m² of filler per mm",
         "Q2": "Q2 — under matt paint, 1.0 kg/m² of filler per mm",

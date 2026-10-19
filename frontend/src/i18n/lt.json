@@ -1195,6 +1195,11 @@
       "introOrphans": "Kelios eilutės gali likti su pradinėmis reikšmėmis — apie tokias pranešime atskirai.",
       "wallThicknessHint": "Pertvaros storis metrais — naudojamas angokraščių eilutėje",
       "wallThicknessRangeErr": "Sienos storis turi būti nuo {{min}} iki {{max}} m.",
+      "packagingLabel": "Pakuotės",
+      "packagingNote": "Kiek kilogramų telpa į glaisto maišą ir kiek litrų — į dažų ar grunto kibirą. Sąmatoje prie kiekio parašoma, kiek maišų ar kibirų reikės; patys kilogramai ir litrai nesikeičia.",
+      "packagingBag": "Glaisto maišas",
+      "packagingBucket": "Dažų, grunto kibiras",
+      "packagingRangeErr": "Įrašykite skaičių nuo {{min}} iki {{max}}.",
       "puttyLevelTitles": {
         "Q1": "Q1 — po sunkiais tapetais, glaisto 0,8 kg/m² kiekvienam mm",
         "Q2": "Q2 — po matiniais dažais, glaisto 1,0 kg/m² kiekvienam mm",
