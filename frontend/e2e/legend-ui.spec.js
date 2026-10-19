@@ -76,14 +76,29 @@ test.describe('legend marking (W2-B)', () => {
     const keptBefore = await kept.count();
     await kept.nth(1).getByTestId('legend-drop').click();
     await expect(kept).toHaveCount(keptBefore - 1);
-    const first = kept.first();
+    // a row with marks gets his own name
+    const withMarks = kept.filter({ has: page.getByTestId('legend-row-count').filter({ hasText: /^[1-9]\d* vnt/ }) });
+    const first = withMarks.first();
     const firstId = await first.getAttribute('data-row-id');
     await first.getByTestId('legend-rename').click();
     await page.getByTestId('legend-rename-input').fill('Jungiklis (mano pavadinimas)');
     await page.getByTestId('legend-rename-input').press('Enter');
     await expect(page.locator(`[data-row-id="${firstId}"]`)).toContainText('Jungiklis (mano pavadinimas)');
-    const n = keptBefore - 1;
+    // a row the drawing shows NO mark of, kept anyway: the panel says beside it that the sąmata row stays blank
+    const zero = page.locator('[data-testid="legend-row"][data-keep="0"]')
+      .filter({ has: page.getByTestId('legend-row-count').filter({ hasText: /^0 vnt/ }) }).first();
+    const blankId = await zero.getAttribute('data-row-id');
+    await zero.getByTestId('legend-keep').click();
+    await expect(page.locator(`[data-row-id="${blankId}"] [data-testid="legend-row-blank"]`))
+      .toContainText('legendoje yra, brėžinyje ženklų nerasta — suskaičiuokite „Kiekis“ įrankiu');
+    // „Sukurti kiekius (N)" counts only the kept rows with at least one mark
+    const n = await page.$$eval('[data-testid="legend-row"][data-keep="1"]', (els) => els.filter((el) => {
+      const t = el.querySelector('[data-testid="legend-row-count"]')?.textContent || '';
+      return /^[1-9]/.test(t.trim());
+    }).length);
+    expect(n).toBeGreaterThan(0);
     await expect(create).toHaveText(new RegExp(`Sukurti kiekius \\(${n}\\)`));
+    await shot(page, 'w2b-02b-review-blank');
 
     // still nothing on the project
     expect((await getProject()).measurements || []).toHaveLength(0);
@@ -96,7 +111,8 @@ test.describe('legend marking (W2-B)', () => {
     await shot(page, 'w2b-03-created');
 
     // B3: the project carries the types, the marks and ONE live sąmata row per type
-    const after = await poll(getProject, (p) => (p.measurements || []).length > 0 && legendRows(p).length === n);
+    const after = await poll(getProject, (p) => (p.measurements || []).length > 0 && legendRows(p).length === n
+      && (p.darbu_sarasas || []).some((r) => r.legend_row_id === blankId));
     const types = (after.countTypes || []).filter((t) => t.legend_row_id);
     expect(types).toHaveLength(n);
     expect(types.find((t) => t.legend_row_id === firstId)?.label).toBe('Jungiklis (mano pavadinimas)');
@@ -111,6 +127,13 @@ test.describe('legend marking (W2-B)', () => {
       expect(r.matavimai?.[0]?.tekstas).toMatch(/^suskaičiuota pagal legendą: eilutė „.+“, \d+ ženkl/);
       expect(String(r.id)).toMatch(/^rnk-legenda-/);
     }
+    // the kept row with no mark: a BLANK row with the question — no count claimed
+    const blank = (after.darbu_sarasas || []).find((r) => r.legend_row_id === blankId);
+    expect(blank, 'blank sąmata row').toBeTruthy();
+    expect(blank.kiekis).toBeNull();
+    expect(blank._confidence_reason).toBe('Legendoje yra, brėžinyje ženklų nerasta — suskaičiuokite „Kiekis“ įrankiu');
+    expect(blank.ledger_note_lt).not.toMatch(/ženkl(ai|as|ų) lape/);
+    expect(blank.matavimai ?? null).toBeNull();
     note(`created: ${n} count types, ${marks.length} marks, ${lrows.length} sąmata rows`);
 
     // the journal: one „legenda" row per countable legend row he judged
@@ -125,10 +148,11 @@ test.describe('legend marking (W2-B)', () => {
     // Undo: the marks, the types and the rows go
     await toast(page, 'Sukurta pagal legendą').getByRole('button', { name: 'Atšaukti' }).click();
     await expect(aiMarks).toHaveCount(0);
-    const undone = await poll(getProject, (p) => (p.measurements || []).length === 0 && legendRows(p).length === 0);
+    const undone = await poll(getProject, (p) => (p.measurements || []).length === 0 && !(p.darbu_sarasas || []).some((r) => r.legend_row_id));
     expect(undone.measurements || []).toHaveLength(0);
     expect((undone.countTypes || []).filter((t) => t.legend_row_id)).toHaveLength(0);
     expect(legendRows(undone)).toHaveLength(0);
+    expect((undone.darbu_sarasas || []).filter((r) => r.legend_row_id)).toHaveLength(0);
     await shot(page, 'w2b-04-undone');
   });
 
