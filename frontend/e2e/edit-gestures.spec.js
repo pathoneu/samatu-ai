@@ -188,4 +188,27 @@ test.describe('W5-A editing gestures', () => {
     await expect(toast(page, 'Atšaukta: patalpos 06 angos grąžintos')).toBeVisible();
     await expect.poll(async () => JSON.stringify((await stored(page)).rooms['06'].elementai || [])).toBe(JSON.stringify(before));
   });
+
+  test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, ...ROOM_06);
+    await page.mouse.click(...Object.values(await at(page, ...ROOM_06)));      // the room selected first
+    await expect(page.getByTestId('outline-tool-subtract')).toBeVisible();
+    const k = counter();
+    await k.key(page, 'x');
+    await expect(page.locator('[data-outline-tool-layer="subtract"]')).toBeVisible();
+    await k.click(page, await at(page, 0.785, 0.358));
+    await expect(page.locator('[data-proposed-hole]')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-outline-tool-chip]').filter({ hasText: 'Enter: atimti' })).toBeVisible();
+    // nothing saved while it is a proposal
+    expect((await stored(page)).rooms['06'].polygon_holes_pct ?? null).toBeNull();
+    await shot(page, 'w5a-a4-proposed-hole');
+    await k.key(page, 'Enter');
+    const saved = toast(page, 'kontūras išsaugotas su 1 išpjova');
+    await expect(saved).toBeVisible({ timeout: 30_000 });
+    note(`T1 atimti koloną (patalpa jau pažymėta): ${k.text()} (tikslas 3; su patalpos spustelėjimu +1)`);
+    await expect.poll(async () => ((await stored(page)).rooms['06'].polygon_holes_pct || []).length).toBe(1);
+    await saved.getByRole('button', { name: 'Atšaukti' }).click();
+    await expect(toast(page, 'Atšaukta: patalpos 06 kontūras grąžintas')).toBeVisible({ timeout: 30_000 });
+  });
 });

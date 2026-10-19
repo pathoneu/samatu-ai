@@ -8,7 +8,7 @@
  *   {mode, nr, page, ring, holes, tableAreaM2, history,
  *    split:    a, b, parts: [{ring, holes}], keep, otherNr
  *    merge:    targetNr, union: {ring, holes}, refused
- *    subtract: shape ('rect' | 'poly'), draft, dirty}
+ *    subtract: shape ('rect' | 'poly'), draft, dirty, proposedHole: {ring, kind, m2} (W5-A A4)}
  * OutlineToolLayer computes the geometry (it knows the sheet's size and scale) and writes results
  * back through `change`; OutlineToolPanel reads them and offers the choices and the save.
  */
@@ -65,8 +65,10 @@ function operationOf(tool) {
     return { kind: 'merge', keptNr: tool.nr, goneNr: tool.targetNr, page: tool.page, polygon: tool.union.ring, holes: tool.union.holes };
   }
   if (tool.mode === 'subtract') {
-    if (!tool.dirty) return null;
-    return { kind: 'set', nr: tool.nr, page: tool.page, polygon: tool.ring, holes: tool.holes };
+    // a hole the drawing PROPOSED for his click (W5-A A4) is saved with Enter — reviewed, then it exists
+    const proposed = tool.proposedHole?.ring ? [tool.proposedHole.ring] : [];
+    if (!tool.dirty && !proposed.length) return null;
+    return { kind: 'set', nr: tool.nr, page: tool.page, polygon: tool.ring, holes: [...(tool.holes || []), ...proposed] };
   }
   return null;
 }

@@ -88,6 +88,8 @@ export default function PageOverlayHost({
   // Outline tools (2026-10-16): the active split / merge / subtract state (useOutlineTool) and its setter.
   outlineTool = null,
   onOutlineToolChange = null,
+  // „Atimti" in one click (W5-A A4): (pct point) => Promise<hole-at answer>.
+  onRequestHole = null,
   onRoomZoneClick,
   onPagePoint,
   // Double-click on the sheet (Pathon v3 W5-A A1): ({measureId?, pageIndex, x, y, …}) — a measurement under it, or
@@ -392,6 +394,7 @@ export default function PageOverlayHost({
             scale={measureScale}
             pageSizePt={pageSizePt}
             pageRotation={pageRotation}
+            onRequestHole={onRequestHole ? (p) => onRequestHole({ page: layout.pageNumber, x_pct: p[0], y_pct: p[1] }) : null}
           />
         </div>
       )}

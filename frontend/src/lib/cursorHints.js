@@ -89,7 +89,7 @@ export function cursorHintFor(state = {}) {
     case 'subtract':
       return outlineTool?.shape === 'poly'
         ? 'Spustelėkite kampus patalpos viduje · dukart — baigti'
-        : 'Tempkite stačiakampį patalpos viduje';
+        : 'Spustelėkite koloną ar spintą · arba tempkite stačiakampį';
     case 'fill':
       if (fill?.busy) return `Ieškoma patalpos ${fill.nr} kontūro…`;
       return fill?.nr != null ? `Spustelėkite patalpos ${fill.nr} viduje` : 'Spustelėkite patalpos viduje';

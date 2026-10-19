@@ -26,6 +26,7 @@ import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
 import { clickToFill } from '@/lib/clickToFillApi';
+import { fetchHoleAt } from '@/lib/roomOutlineApi';
 import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue } from '@/lib/measurements';
 import { draftReducer } from '@/lib/measureOverlayReducer';
 import { uncalibratedScale, draftCommitPoints } from '@/lib/measureGeometry';
@@ -1785,6 +1786,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onOutlineGestureStart={snapshotOutline}
                       outlineTool={outlineTools.tool}
                       onOutlineToolChange={outlineTools.change}
+                      onRequestHole={projectId && outlineTools.tool?.mode === 'subtract' ? (point) => fetchHoleAt(projectId, outlineTools.tool.nr, point) : null}
                       onRoomZoneClick={onRoomZoneClick}
                       onPagePoint={handlePagePoint}
                       onPageDoubleClick={handlePageDoubleClick}

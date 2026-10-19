@@ -38,6 +38,14 @@ export async function fetchOutlineAt(projectId, roomNr, point, { signal, pritart
       ...(klausimas ? { klausimas: String(klausimas) } : {}), ...(perziura ? { perziura: true } : {}) }, signal);
 }
 
+/**
+ * „Atimti" in one click (Pathon v3 W5-A A4): the closed shape of the drawing under `point` inside the room, PROPOSED
+ * as its hole — `{status: 'ok', hole_pct, kind, plotas_m2?}` | `{status: 'none' | 'outside'}`. Saves nothing.
+ */
+export async function fetchHoleAt(projectId, roomNr, point, { signal } = {}) {
+  return post(projectId, roomNr, 'hole-at', { page: point.page, x_pct: point.x_pct, y_pct: point.y_pct }, signal);
+}
+
 /** `{status: 'ok', rooms: {nr: geometry}, kitu_angos}` | `{status: 'bad_line'|'not_shared'|'too_many'|'no_walls'}` */
 export async function fetchSplitSpace(projectId, roomNr, request, { signal, klausimas = null } = {}) {
   return post(projectId, roomNr, 'split-space', { ...request, ...(klausimas ? { klausimas: String(klausimas) } : {}) }, signal);
