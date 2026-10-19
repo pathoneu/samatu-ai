@@ -6,7 +6,7 @@
  */
 export default {
   testDir: '.',
-  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures)\.spec\.js$/,
+  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures|safari-robustness)\.spec\.js$/,
   outputDir: './.results',
   fullyParallel: false,
   workers: 1,
@@ -26,4 +26,17 @@ export default {
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // chromium runs everything; webkit (Safari's engine) runs a smoke subset so a Safari-only regression is caught
+  // (B1-A, 2026-10-19). One-time install: npm exec --yes --package=playwright@1.55.1 -- playwright install webkit
+  // Only one engine: --project=chromium or --project=webkit.
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    {
+      name: 'webkit',
+      use: { browserName: 'webkit' },
+      testMatch: /(founder-guide|workspace-frame|safari-robustness)\.spec\.js$/,
+      // founder-guide: tests 1–3 only (coach marks, sheet rail, Perskaityti iš naujo)
+      grepInvert: /4 Masteliai|5 room tools|6 measure tools|7 Rasti panašius|8 right panel|9 Palyginti|10 after 04|Versijos|Sąmata: Eksportuoti/,
+    },
+  ],
 };
