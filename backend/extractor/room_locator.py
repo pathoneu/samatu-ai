@@ -29,9 +29,18 @@ read in the direction they are written.
 Writes nothing; returns {nr: {page, cx, cy, W, H, saltinis}} with cx, cy as
 page fractions (display frame, origin top-left) and W, H the page size in
 points.
+
+Behind `SAMATU_ROOMS_BY_ZONES=1` (Pathon v3 W5-B, B3; default OFF — nothing
+changes): on a sheet whose zones (extractor/sheet_zones.py) name at least one
+plan viewport, a badge counts only when it stands inside a `planas` zone and
+no title block, legend, table or notes block holds it (`zone_at`: the
+innermost zone wins, a plan comes last) — instead of the fixed 0,88 cut. A
+sheet with no plan zone keeps the cut. The zones are read with the free
+re-read's table cap, so the re-read's own `_meta.zonos` reuses the cache.
 """
 from __future__ import annotations
 
+import os
 from typing import Sequence
 
 from .plan_area_annotations import _iter_pages, _words
@@ -45,6 +54,30 @@ COLUMN_ALIGN_PT = 1.5
 SAME_LINE_PT = 2.5
 TOUCH_EM = 1.2                   # another number within this many badge heights is the same number, split
 TITLE_BLOCK_FRAC = 0.88          # a badge below this fraction of the height is in the title block
+ROOMS_BY_ZONES_ENV = "SAMATU_ROOMS_BY_ZONES"
+
+
+def rooms_by_zones() -> bool:
+    """The zone-based badge filter (B3) — off unless the flag says 1 / true / yes / on."""
+    return os.environ.get(ROOMS_BY_ZONES_ENV, "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def plan_zone_filter(pdf_bytes: bytes, page: int):
+    """For a sheet with plan zones: a function (cx, cy display fractions) → True when a badge there is in a
+    plan and in nothing that is not a room (title block, legend, table, notes, ambiguous). None when the
+    sheet has no plan zone (scan, no walls, failed reading) — the caller keeps the 0,88 cut."""
+    try:
+        from .sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones, zone_at
+        zones = read_zones(pdf_bytes, int(page), table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
+    except Exception:  # noqa: BLE001 — zones are a refinement; without them the old cut stands
+        return None
+    if not any(z.get("kind") == "planas" for z in zones):
+        return None
+
+    def in_plan(cx: float, cy: float) -> bool:
+        z = zone_at(zones, cx, cy)
+        return z is not None and z.get("kind") == "planas"
+    return in_plan
 
 
 def _nr_int(nr) -> int | None:
@@ -133,10 +166,18 @@ def locate_rooms(pdf_bytes: bytes, rooms: Sequence[dict], plan_pages: Sequence[i
         except Exception:  # noqa: BLE001 — no text layer is not a failure
             directions = []
         long_numbers = frozenset(str(n) for n in want if _long_number(str(n)))
+        by_zones = rooms_by_zones()
+        zone_filters: dict[int, object] = {}
         for pn, W, H, chars, to_display in directions:
+            if by_zones and int(pn) not in zone_filters:
+                zone_filters[int(pn)] = plan_zone_filter(pdf_bytes, int(pn))
+            in_plan = zone_filters.get(int(pn)) if by_zones else None
             for w in _badge_words(_words(chars), long_numbers):
                 x0, top, x1, bottom = to_display([w["x0"], w["top"], w["x1"], w["bottom"]])
-                if top > TITLE_BLOCK_FRAC * H:
+                if in_plan is not None:
+                    if not in_plan((x0 + x1) / 2 / float(W), (top + bottom) / 2 / float(H)):
+                        continue
+                elif top > TITLE_BLOCK_FRAC * H:
                     continue
                 n = int(w["text"])
                 for r in want.get(n, []):
