@@ -14,7 +14,7 @@ export const HELP_SECTIONS = Object.freeze([
       'Sąmatoje spustelėkite eilutę — po ja atsivers patalpos, iš kurių kiekis sudėtas, ir kiekvienos dalis.',
       'Prie skaičiaus parašyta, iš kur jis paimtas: perskaitytas iš brėžinio, apskaičiuotas iš kitų matmenų ar įrašytas jūsų.',
       'Žingsnyje „Patikra" programa užduoda kelis klausimus su siūlomais atsakymais. Atsakę matysite, kiek eilučių perskaičiuota.',
-      'Prielaidas (sienos storį, glaistymo lygį, angas) keiskite projekto viršuje, mygtuku „Nustatymai" — kiekiai perskaičiuojami iš karto.',
+      'Prielaidas (sienos storį, glaistymo lygį, angas) keiskite projekto viršuje, mygtuku „Nustatymai" — kiekiai perskaičiuojami iš karto, o pakeitimą galima atšaukti.',
     ],
   },
   {
@@ -49,6 +49,15 @@ export const HELP_SECTIONS = Object.freeze([
 ]);
 
 export const WHATS_NEW = Object.freeze([
+  {
+    date: '2026-10-19',
+    items: [
+      'Įvadas brėžinyje — dešimt trumpų patarimų po vieną, prie to, ką kiekvienas paaiškina.',
+      'Pirmą kartą įjungus įrankį ar atidarius skydelį, šalia parodomas vienas sakinys apie jį.',
+      '„Nustatymai" suskirstyti į penkis skyrius; patalpos rodomos tik tos, kurių reikšmė skiriasi.',
+      'Pakeitę nustatymą matysite, kas sąmatoje pasikeitė, ir galėsite tai atšaukti.',
+    ],
+  },
   {
     date: '2026-10-18',
     items: [

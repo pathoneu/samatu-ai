@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Info, Calculator, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -12,6 +12,10 @@ import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/li
 import { estimatedLedRooms, ledEstimateBilled, ledEstimateText } from '@/lib/ledEstimate';
 import { createDebouncedRun, createRequestOrder } from '@/lib/debouncedRun';
 import { BAG_KEY, BAG_RANGE, BUCKET_KEY, BUCKET_RANGE, packagingSizes } from '@/lib/packaging';
+import { perRoomSplit, sectionForField, visibleRoomRows } from '@/lib/settingsSections';
+import { firstUseSeen, markFirstUseSeen } from '@/lib/firstUseHints';
+import { diffDarbuSarasas } from '@/lib/takeoffWorkflow';
+import { rippleText } from '@/lib/roomSheet';
 
 // Every assumption edit triggers a backend recompute. Without a debounce each
 // keystroke fired its own request and the answers raced (2026-07-27 audit).
@@ -66,7 +70,9 @@ function ltDecimal(val) {
  * local draft: an empty or out-of-range draft is shown with a subtle error
  * border and commits NOTHING (so no recompute fires until the number is valid).
  */
-function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, errorMessage, label, hint }) {
+// `commitOnBlur` (B1-E): the value is written when he leaves the field or presses Enter, not per keystroke —
+// for the „Visoms patalpoms" height, where a half-typed „2" would set every room to 2,00 m for a moment.
+function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, errorMessage, label, hint, placeholder, commitOnBlur = false }) {
   const [draft, setDraft] = useState(() => ltDecimal(value ?? ''));
   const [invalid, setInvalid] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -88,7 +94,7 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
     const outOfRange = (min != null && n < min) || (max != null && n > max);
     if (!Number.isFinite(n) || outOfRange) { setInvalid(true); return; }
     setInvalid(false);
-    onChange(n);
+    if (!commitOnBlur) onChange(n);
   };
 
   return (
@@ -100,7 +106,15 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
           value={draft}
           step={step}
           onFocus={(e) => { setFocused(true); e.target.select(); }}  // typing replaces, never appends (3,22,8)
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            if (!commitOnBlur || draft.trim() === '') return;
+            const n = parseLtNumber(draft);
+            const ok = Number.isFinite(n) && !((min != null && n < min) || (max != null && n > max));
+            if (ok && !(Number.isFinite(Number(value)) && Math.abs(Number(value) - n) < 1e-9)) onChange(n);
+          }}
+          onKeyDown={(e) => { if (commitOnBlur && e.key === 'Enter') e.currentTarget.blur(); }}
+          placeholder={placeholder}
           onChange={handleChange}
           aria-invalid={invalid || undefined}
           aria-label={label || undefined}
@@ -113,18 +127,18 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
               ? `${hint ? hint + ' — ' : ''}${ltDecimal(min)}–${ltDecimal(max)}${unit ? ' ' + unit : ''}`
               : (hint || undefined)
           }
-          className={`${className || 'h-7 w-20'} text-xs bg-card text-right tabular-nums ${
+          className={`${className || 'h-8 w-20'} text-ui bg-card text-right tabular-nums ${
             invalid ? 'border-destructive text-destructive' : 'border-border'
           }`}
         />
-        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+        {unit && <span className="text-ui text-muted-foreground">{unit}</span>}
       </div>
       {/* A red border + a title tooltip was the ONLY feedback for an
           out-of-range value — invisible in practice. Say it out loud; the
           commit behaviour (nothing is written, nothing is clamped) is
           unchanged. (2026-07-28 UX walkthrough.) */}
       {invalid && errorMessage && (
-        <p className="mt-0.5 text-[10px] leading-tight text-destructive" role="alert">
+        <p className="mt-0.5 text-ui leading-tight text-destructive" role="alert">
           {errorMessage}
         </p>
       )}
@@ -132,22 +146,6 @@ function NumberInput({ value, onChange, min, max, step = 0.01, unit, className, 
   );
 }
 
-// The control sits beside the label and note while both fit, and drops BELOW
-// them when it does not: the note keeps at least 13rem, the control is never
-// wider than the row. A `shrink-0` control used to squeeze the note to one word
-// per line, and the four reveal kinds (~500 px in a ~480 px row) pushed the
-// drawer into a horizontal scroll. (2026-10-06.)
-function Row({ label, note, children }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2 border-b border-border/40 last:border-0">
-      <div className="min-w-0 flex-1 basis-52">
-        <span className="text-sm text-foreground">{label}</span>
-        {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
-      </div>
-      <div className="max-w-full">{children}</div>
-    </div>
-  );
-}
 
 // ── Window/Door list editor ───────────────────────────────────────────────────
 
@@ -166,7 +164,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
   return (
     <div className="space-y-1">
       {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-2 text-xs">
+        <div key={i} className="flex items-center gap-2 text-ui">
           <span className="text-muted-foreground w-4 text-right">{i + 1}.</span>
           {item.patalpa && (
             <span className="text-muted-foreground truncate max-w-[80px]">{item.patalpa}</span>
@@ -175,7 +173,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             type="number"
             value={item.width_mm}
             onChange={e => handleChange(i, 'width_mm', e.target.value)}
-            className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
+            className="h-8 w-20 text-ui bg-card border-border text-right tabular-nums"
             placeholder={t('project.assumptions.widthPlaceholder')}
             title={t('project.assumptions.openingWidthTitle', { label })}
             aria-label={t('project.assumptions.openingWidthTitle', { label })}
@@ -185,7 +183,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             type="number"
             value={item.height_mm}
             onChange={e => handleChange(i, 'height_mm', e.target.value)}
-            className="h-6 w-16 text-xs bg-card border-border text-right tabular-nums"
+            className="h-8 w-20 text-ui bg-card border-border text-right tabular-nums"
             placeholder={t('project.assumptions.heightPlaceholder')}
             title={t('project.assumptions.openingHeightTitle', { label })}
             aria-label={t('project.assumptions.openingHeightTitle', { label })}
@@ -195,7 +193,7 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
             <Badge
               variant="outline"
               title={t('project.assumptions.estimatedTitle')}
-              className="text-[10px] border-amber-400/50 text-amber-600 py-0 px-1"
+              className="text-ui border-conf-med/50 text-conf-med py-0 px-1"
             >
               {t('project.assumptions.estimatedBadge')}
             </Badge>
@@ -213,11 +211,116 @@ function OpeningEditor({ items, onChange, label, defaultItem }) {
       ))}
       <button
         onClick={handleAdd}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-1"
+        className="flex items-center gap-1 text-ui text-muted-foreground hover:text-foreground mt-1"
       >
         <Plus className="w-3 h-3" /> {t('project.assumptions.add', { label: label.toLowerCase() })}
       </button>
     </div>
+  );
+}
+
+
+// ── Building blocks of a setting line (B1-E, 2026-10-19) ─────────────────────
+//
+// Founder: „Nustatymai all messed up" — a wall of buttons. Each setting is now
+// ONE line: label · its current value in words · the control. Its note is one
+// sentence behind a „?" button (a real button: Tab reaches it, Enter opens it —
+// never hover-only).
+
+const CHOICE_BASE = 'min-h-[34px] px-2.5 text-ui border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+/** 2–4 choices side by side; the one in force is pressed. */
+function Segmented({ options, value, onChange, label, dataAssumption }) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex flex-wrap rounded-[2px]">
+      {options.map((o, i) => {
+        const on = String(value) === String(o.value);
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            onClick={() => { if (!on) onChange(o.value); }}
+            title={o.title || undefined}
+            aria-pressed={on}
+            data-assumption={dataAssumption ? `${dataAssumption}:${o.value}` : undefined}
+            className={`${CHOICE_BASE} ${i > 0 ? '-ml-px' : ''} ${
+              on ? 'relative z-[1] bg-primary/10 border-primary text-foreground font-medium'
+                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The „?" that opens a setting's one-sentence note. */
+function NoteToggle({ open, onToggle, label }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={t('project.settings.whatIs', { label })}
+      title={t('project.settings.whatIs', { label })}
+      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full border border-border text-ui text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-testid="setting-note-toggle"
+    >
+      ?
+    </button>
+  );
+}
+
+/** One setting: label · value in words · control · „?"; the note under it when opened. */
+function SettingLine({ id, label, value, note, evidence, children, wide = false }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="py-2 border-b border-border/50 last:border-0" data-setting={id}>
+      <div className={`flex ${wide ? 'flex-wrap' : 'flex-wrap sm:flex-nowrap'} items-center gap-x-3 gap-y-1.5`}>
+        <div className="min-w-0 flex-1 basis-40">
+          <span className="text-ui font-medium text-foreground">{label}</span>
+          {value != null && value !== '' && (
+            <span className="text-ui text-muted-foreground" data-testid="setting-value"> · {value}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 max-w-full">
+          {children}
+          {note && <NoteToggle open={open} onToggle={() => setOpen((v) => !v)} label={label} />}
+        </div>
+      </div>
+      {open && note && (
+        <p className="mt-1 text-ui text-muted-foreground" data-testid="setting-note">
+          {note}
+          {evidence && <span className="block mt-0.5 text-foreground">{t('project.settings.fromDrawing', { text: evidence })}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A collapsible group of settings; its summary says the main values in words while closed. */
+function Section({ id, title, summary, open, onToggle, children }) {
+  return (
+    <section className="border border-border rounded-[2px] bg-card" data-settings-section={id}>
+      <h3>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid={`settings-section-${id}`}
+        >
+          <span className="text-[15px] font-semibold text-foreground">{title}</span>
+          {!open && summary && <span className="min-w-0 flex-1 truncate text-ui text-muted-foreground">{summary}</span>}
+          {open && <span className="flex-1" />}
+          {open ? <ChevronUp className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />}
+        </button>
+      </h3>
+      {open && <div className="px-3 pb-2 border-t border-border/60">{children}</div>}
+    </section>
   );
 }
 
@@ -242,9 +345,25 @@ export default function AssumptionsPanel({
   const { t } = useTranslation();
   const resolvedTitle = title ?? t('project.assumptions.defaultTitle');
   const [open, setOpen] = useState(defaultOpen);
-  const [windowsExpanded, setWindowsExpanded] = useState(false);
-  const [doorsExpanded, setDoorsExpanded] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
+  // Sections: collapsed except the one a caller asked for (B1-E).
+  const [openSections, setOpenSections] = useState(() => {
+    const s = sectionForField(focusField?.field);
+    return new Set(s ? [s] : []);
+  });
+  const toggleSection = (id) => setOpenSections((prev) => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const [showAllRooms, setShowAllRooms] = useState({});
+  const [touchedRooms, setTouchedRooms] = useState({});
+  const [windowsOpen, setWindowsOpen] = useState(false);
+  const [doorsOpen, setDoorsOpen] = useState(false);
+  // The last change, with Undo and — once the recompute answered — what moved in the sąmata.
+  const [lastEdit, setLastEdit] = useState(null);
+  const [undone, setUndone] = useState(null);
+  const [firstUseOpen, setFirstUseOpen] = useState(() => !firstUseSeen('nustatymai'));
 
   // 2026-05-06: defensive defaults so a fresh project (assumptions={}) doesn't
   // throw when accessing lubu_auksciai[room.nr] etc.
@@ -277,8 +396,6 @@ export default function AssumptionsPanel({
   const metaDoors = rawData?.meta?.doors || [];
   const displayDoors = custom_doors ?? metaDoors;
 
-  const setField = (field, val) => onChange({ ...safeAssumptions, [field]: val });
-
   // Debounced + request-ordered recompute (2026-07-27 audit):
   //  - `debounced` collapses a burst of keystrokes into ONE backend call
   //  - recomputeOrder makes stale answers unusable, so a slow first response can
@@ -299,6 +416,9 @@ export default function AssumptionsPanel({
 
   const handleRecompute = useCallback((field, newValue, meta = null) => {
     if (!onRecomputed || isDemo) return;  // Skip if parent won't accept results, or on the view-only sample
+    // The assumptions the edit applies to: the current ones — or, for an Undo, the
+    // snapshot being restored (this render's props still hold the edited value).
+    const base = meta?.base || assumptions || {};
     // Keep the OLDEST pre-edit snapshot of the burst as the rollback target.
     if (revertRef.current === null) revertRef.current = assumptions || {};
     // Write the correction down BEFORE the debounce: `assumptions` still holds
@@ -332,7 +452,7 @@ export default function AssumptionsPanel({
           darbu_sarasas: darbuSarasas || rawData?.darbu_sarasas || [],
           edits: [{ field, new_value: newValue }],
           // the contractor's scope choices ride on every recompute (extractor/scope.py)
-          current_assumptions: rulesWithScope(assumptions, rawData?._apimtis),
+          current_assumptions: rulesWithScope(base, rawData?._apimtis),
           // Reader/extraction context so a ceiling-height edit rebuilds the
           // canonical pozicijos (paint iki/virš split, kampai…) without losing
           // the door/fixture/symbol lines. (2026-06-17 recompute fix.)
@@ -349,6 +469,7 @@ export default function AssumptionsPanel({
         const revertTo = revertRef.current;
         revertRef.current = null;
         if (revertTo) onChange(revertTo);
+        setLastEdit(null);
         toast.error(t('project.assumptions.toastRecomputeErr', { msg: err.message }));
       } finally {
         if (recomputeOrder.isLatest(orderKey, reqId)) setRecomputing(false);
@@ -356,39 +477,108 @@ export default function AssumptionsPanel({
     });
   }, [rawData, pozicijos, darbuSarasas, assumptions, onRecomputed, onChange, onCorrection, isDemo, t, debounced]);
 
-  const setLubuAukstis = (roomNr, val) => {
-    const next = { ...safeAssumptions, lubu_auksciai: { ...lubu_auksciai, [roomNr]: val } };
+  /**
+   * Every write goes through here: the new assumptions, the recompute (unless the
+   * setting is a note only, like packaging), and the Undo for it. A burst on the
+   * same setting (typing a number) keeps the FIRST snapshot, so Undo goes back to
+   * where he started, not to the previous keystroke.
+   */
+  const commit = (next, { field, value, label, recompute: doRecompute = true, roomNr = null }) => {
+    const now = Date.now();
+    if (roomNr != null) {
+      setTouchedRooms((m) => (m[field]?.includes(String(roomNr)) ? m : { ...m, [field]: [...(m[field] || []), String(roomNr)] }));
+    }
+    const sameBurst = lastEdit && lastEdit.field === field && lastEdit.roomNr === roomNr && now - lastEdit.at < 4000;
+    setLastEdit({
+      field, roomNr, label, at: now, recompute: doRecompute, moved: null,
+      prev: sameBurst ? lastEdit.prev : safeAssumptions,
+      prevValue: sameBurst ? lastEdit.prevValue : effectiveValue(field),
+      prior: sameBurst ? lastEdit.prior : (darbuSarasas || []),
+      waiting: doRecompute,
+    });
+    setUndone(null);
+    if (firstUseOpen) { markFirstUseSeen('nustatymai'); setFirstUseOpen(false); }
     onChange(next);
-    handleRecompute('lubu_auksciai', next.lubu_auksciai, { roomNr });
+    if (doRecompute) handleRecompute(field, value, roomNr != null ? { roomNr } : null);
+  };
+  const setOne = (field, value, label, opts = {}) => commit({ ...safeAssumptions, [field]: value }, { field, value, label, ...opts });
+
+  const undo = () => {
+    if (!lastEdit) return;
+    const { prev, prevValue, field, label, recompute: doRecompute } = lastEdit;
+    setLastEdit(null);
+    setUndone({ label, prior: darbuSarasas || [], waiting: !!doRecompute, moved: null });
+    onChange(prev);
+    // The recompute gets the value the panel SHOWED before the change, explicitly: a
+    // key that was absent cannot be sent back as „absent" — the engine keeps the
+    // quantity it has when a setting is missing (e.g. the putty kg stay at Q3).
+    if (doRecompute) {
+      const back = prevValue !== undefined ? prevValue : (prev[field] ?? null);
+      handleRecompute(field, back, { base: { ...prev, [field]: back } });
+    }
   };
 
-  // Bulk override — set the same height for ALL rooms at once. Useful when
-  // the house has uniform ceilings and the user doesn't want to edit each
-  // row individually.
+  /** What the panel shows for a setting right now — the value Undo goes back to. */
+  function effectiveValue(field) {
+    switch (field) {
+      case 'glaistimo_lygis': return glaistimo_lygis;
+      case 'santechnika_potinkinis': return mixersOn;
+      case 'vidaus_durys_beapvadines': return framelessCurrent;
+      case 'angokrasciai_apimtis': return { ...revealsCurrent };
+      case 'led_nisu_ivertinimas': return ledBilled;
+      case 'sienos_storis_m': return sienos_storis_m ?? 0.10;
+      case 'lubu_auksciai': return Object.fromEntries(rooms.map((r) => [String(r.nr), heightOf(r)]));
+      case 'walls_paint_override': return Object.fromEntries(rooms.map((r) => [r.nr, isWallsPainted(r) ? 1 : 0]));
+      case 'stretch_ceiling_override': return Object.fromEntries(rooms.map((r) => [r.nr, isStretchCeiling(r) ? 1 : 0]));
+      case 'custom_windows': return displayWindows;
+      case 'custom_doors': return displayDoors;
+      default: return safeAssumptions[field];
+    }
+  }
+
+  // What the recompute moved: compared once the page has handed the new rows back.
+  useEffect(() => {
+    if (recomputing) return;
+    const movedSince = (prior) => rippleText(diffDarbuSarasas(prior || [], darbuSarasas || []), t);
+    if (lastEdit?.waiting) setLastEdit((e) => (e ? { ...e, waiting: false, moved: movedSince(e.prior) } : e));
+    if (undone?.waiting) setUndone((u) => (u ? { ...u, waiting: false, moved: movedSince(u.prior) } : u));
+  }, [darbuSarasas, recomputing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rooms = panelRooms(rawData);
+  const roomLabel = (room) => room.pavadinimas || room.nr;
+
+  const heightOf = (room) => {
+    const v = Number(lubu_auksciai[room.nr] ?? room.lubu_aukstis_m);
+    return Number.isFinite(v) && v > 0 ? v : 2.80;
+  };
+  const setLubuAukstis = (roomNr, val) => {
+    const next_lubu = { ...lubu_auksciai, [roomNr]: val };
+    commit({ ...safeAssumptions, lubu_auksciai: next_lubu },
+      { field: 'lubu_auksciai', value: next_lubu, roomNr, label: `${t('project.settings.heightLabel')} — ${roomLabel(rooms.find((r) => String(r.nr) === String(roomNr)) || { nr: roomNr })}` });
+  };
+  // Bulk override — set the same height for ALL rooms at once.
   const setLubuAukstisAll = (val) => {
-    const rooms = panelRooms(rawData);
     const next_lubu = {};
     rooms.forEach(r => { if (r.nr != null) next_lubu[String(r.nr)] = val; });
-    const next = { ...safeAssumptions, lubu_auksciai: next_lubu };
-    onChange(next);
-    handleRecompute('lubu_auksciai', next_lubu);
+    commit({ ...safeAssumptions, lubu_auksciai: next_lubu },
+      { field: 'lubu_auksciai', value: next_lubu, label: `${t('project.settings.heightLabel')} — ${t('project.settings.allRooms').toLowerCase()}` });
   };
 
   // Per-room finishing override (2026-07-05). Some rooms (garažas, tambūras)
   // default to raw/unpainted walls; when a contractor finishes them the user
   // flips this and the paint quantities recalc live (same path as ceiling height).
-  const setWallsPaint = (roomNr, painted) => {
-    const next = {
-      ...safeAssumptions,
-      walls_paint_override: { ...walls_paint_override, [roomNr]: painted ? 1 : 0 },
-    };
-    onChange(next);
-    handleRecompute('walls_paint_override', next.walls_paint_override, { roomNr });
-  };
   const isWallsPainted = (room) => {
     const ov = walls_paint_override[room.nr];
     if (ov != null) return Number(ov) >= 0.5;
     return Number(room.walls_paintable_m2 || 0) > 0;
+  };
+  const setWallsPaint = (targetRooms, painted, label) => {
+    const map = { ...walls_paint_override };
+    targetRooms.forEach((r) => { map[r.nr] = painted ? 1 : 0; });
+    commit({ ...safeAssumptions, walls_paint_override: map }, {
+      field: 'walls_paint_override', value: map, label,
+      roomNr: targetRooms.length === 1 ? targetRooms[0].nr : null,
+    });
   };
 
   // Per-room ĮTEMPIAMOS LUBOS (2026-09-02 contractor ask). A stretch ceiling is
@@ -397,24 +587,30 @@ export default function AssumptionsPanel({
   // backend drops it from the sąmata. Karnizas, LED nišos, GKP lubos and
   // grindjuostės stay. Absent key = dažomos, so nothing changes until the
   // user actually flips a room.
-  const setStretchCeiling = (roomNr, stretch) => {
-    const next = withStretchCeiling(safeAssumptions, roomNr, stretch);
-    onChange(next);
-    handleRecompute('stretch_ceiling_override', next.stretch_ceiling_override, { roomNr });
-  };
   const isStretchCeiling = (room) => isStretchCeilingNr(safeAssumptions, room.nr);
+  const setStretchCeiling = (targetRooms, stretch, label) => {
+    let next = safeAssumptions;
+    targetRooms.forEach((r) => { next = withStretchCeiling(next, r.nr, stretch); });
+    commit(next, {
+      field: 'stretch_ceiling_override', value: next.stretch_ceiling_override, label,
+      roomNr: targetRooms.length === 1 ? targetRooms[0].nr : null,
+    });
+  };
 
-  // Land on the control that was named, not at the top of a long panel. The
-  // panel can arrive collapsed (Prielaidos tab opens it, a sanity jump may not),
-  // so open it first and scroll on the NEXT frame, once the section is laid out.
+  // Land on the control that was named, not at the top of a long panel: open
+  // its section (and, for a room, that room's row), scroll on the next macrotask
+  // once it is laid out, ring it for a moment and focus it.
   const rootRef = useRef(null);
+  const [focusRoom, setFocusRoom] = useState(focusField?.roomNr ?? null);
   useEffect(() => {
     if (!focusField?.field) return undefined;
     setOpen(true);
+    const section = sectionForField(focusField.field);
+    if (section) setOpenSections((prev) => (prev.has(section) ? prev : new Set([...prev, section])));
+    setFocusRoom(focusField.roomNr ?? null);
     // A macrotask, NOT requestAnimationFrame: rAF does not fire while the tab is
     // in the background, so a jump made from a hidden tab (or a browser that
-    // throttles frames) silently did nothing. `setOpen(true)` has been flushed
-    // by the time this runs, so the section is laid out either way.
+    // throttles frames) silently did nothing.
     const timer = window.setTimeout(() => {
       const selector = focusField.roomNr != null
         ? `[data-assumption="${focusField.field}:${focusField.roomNr}"]`
@@ -436,17 +632,93 @@ export default function AssumptionsPanel({
     return () => window.clearTimeout(timer);
   }, [focusField?.field, focusField?.roomNr, focusField?.nonce]);
 
-  const rooms = panelRooms(rawData);
-  const avgH  = rooms.length > 0
-    ? rooms.reduce((s, r) => s + (Number(r.lubu_aukstis_m) || 2.80), 0) / rooms.length
-    : 2.80;
   // LED niches with no length read (2026-10-06): the rooms, their estimate, and whether the
   // niche rows carry it right now (his answer, or — before he gave one — what the rows do)
   const ledEstimates = estimatedLedRooms(rooms);
   const ledBilled = ledEstimateBilled(rooms, safeAssumptions.led_nisu_ivertinimas);
 
+  // ── values in words ──
+  const puttyWords = (q) => String(t(`project.assumptions.puttyLevelPlain.${q}`)).replace(/^Q\d\s*—\s*/, '');
+  const heights = perRoomSplit(rooms, heightOf);
+  const walls = perRoomSplit(rooms, isWallsPainted);
+  const stretch = perRoomSplit(rooms, isStretchCeiling);
+  const paintedCount = rooms.filter(isWallsPainted).length;
+  const stretchCount = rooms.filter(isStretchCeiling).length;
+  const m = (v) => `${ltDecimal(Number(v).toFixed(2))} m`;
+  const framelessCurrent = Boolean(safeAssumptions.vidaus_durys_beapvadines ?? rawData?._paruosimas?.frameless?.value ?? false);
+  const revealDefaults = { langai: true, lauko_durys: true, praejimai: true, vidaus_durys: false };
+  const revealsCurrent = {
+    ...revealDefaults,
+    ...(rawData?._paruosimas?.angokrasciai?.value || {}),
+    ...(safeAssumptions.angokrasciai_apimtis || {}),
+  };
+  const REVEAL_KINDS = ['langai', 'lauko_durys', 'praejimai', 'vidaus_durys'];
+  const revealsWords = REVEAL_KINDS.filter((k) => revealsCurrent[k])
+    .map((k) => String(t(`project.assumptions.revealKinds.${k}`)).toLowerCase()).join(', ') || t('project.settings.noneOn');
+  const mixersOn = String(safeAssumptions.santechnika_potinkinis ?? true) === 'true';
+  const paintedWords = t('project.settings.paintedRooms', { n: paintedCount, total: rooms.length });
+  const stretchWords = t('project.settings.stretchRooms', { n: stretchCount, total: rooms.length });
+  const heightWords = heights.allSame ? m(heights.common) : `${m(heights.common)}, ${t('project.settings.differs')}: ${heights.differing.length}`;
+
+  const summaries = {
+    bendra: `${glaistimo_lygis} — ${puttyWords(glaistimo_lygis)}`,
+    patalpos: rooms.length ? [
+      `${t('project.settings.heightLabel')} ${heightWords}`,
+      `${t('project.settings.wallsPaintLabel').toLowerCase()} ${paintedWords}`,
+      `${t('project.settings.stretchLabel').toLowerCase()} ${stretchWords}`,
+    ].join(' · ') : '',
+    angos: `${framelessCurrent ? t('project.assumptions.framelessYes') : t('project.assumptions.framelessNo')} · ${revealsWords}`,
+    medziagos: `${ltDecimal(packSizes.bagKg)} kg · ${ltDecimal(packSizes.bucketL)} l`,
+    pasirinkimai: mixersOn ? t('project.assumptions.concealedYes') : t('project.assumptions.concealedNo'),
+  };
+
+  /**
+   * A per-room setting: the value for all rooms first, then a row only for the
+   * rooms that differ (or every room, on request; or the one a jump named).
+   */
+  const perRoom = ({ id, split, renderAll, renderRoom }) => {
+    const all = !!showAllRooms[id];
+    // a room he is editing keeps its row even once it matches the rest (the field must not vanish mid-typing)
+    const also = [...(touchedRooms[id] || []), focusField?.field === id ? focusRoom : null];
+    const rows = visibleRoomRows(rooms, split.differing, { showAll: all, also });
+    return (
+      <div className="pl-3 border-l-2 border-border/60 ml-0.5 mt-1">
+        {renderAll()}
+        {rows.length > 0 && (
+          <table className="w-full mt-1 text-ui">
+            <tbody>
+              {rows.map((room) => (
+                <tr key={room.nr} className="border-t border-border/40">
+                  <td className="py-1 pr-2 text-muted-foreground mono tabular w-10">{room.nr}</td>
+                  <td className="py-1 pr-2 text-foreground truncate max-w-[180px]" title={room.pavadinimas || undefined}>{room.pavadinimas || ''}</td>
+                  <td className="py-1 text-right">{renderRoom(room)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="flex items-center gap-3 mt-1">
+          {split.allSame && !all && <span className="text-ui text-muted-foreground">{t('project.settings.allSame')}</span>}
+          {rooms.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setShowAllRooms((s) => ({ ...s, [id]: !all }))}
+              className="text-ui text-primary hover:underline"
+              aria-expanded={all}
+              data-testid={`settings-rooms-${id}`}
+            >
+              {all ? t('project.settings.onlyDiffering') : t('project.settings.showAllRooms', { count: rooms.length })}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const yesNo = (onLabel, offLabel) => [{ value: true, label: onLabel }, { value: false, label: offLabel }];
+
   return (
-    <div ref={rootRef} className={bare ? '' : 'border border-border rounded-xl overflow-hidden'}>
+    <div ref={rootRef} className={bare ? '' : 'border border-border rounded-xl overflow-hidden'} data-testid="settings-panel">
       {!bare && (
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/40 transition-colors"
@@ -458,7 +730,7 @@ export default function AssumptionsPanel({
           <Info className="w-4 h-4 text-muted-foreground" />
           {resolvedTitle}
           {isFallback && (
-            <Badge className="text-xs bg-amber-500/15 text-amber-300 border-amber-500/30 border font-normal">
+            <Badge className="text-ui bg-conf-med/15 text-conf-med border-conf-med/30 border font-normal">
               {t('project.assumptions.windowsFallbackBadge')}
             </Badge>
           )}
@@ -468,529 +740,361 @@ export default function AssumptionsPanel({
       )}
 
       {(open || bare) && (
-        <div className={`${bare ? '' : 'px-4 '}pb-4 pt-1 space-y-1${isDemo ? ' pointer-events-none' : ''}`}>
+        <div className={`${bare ? '' : 'px-4 '}pb-4 pt-1 space-y-2${isDemo ? ' pointer-events-none' : ''}`}>
 
-          {/* Intro: explain that edits live-recalculate everything in the
-              right panel (Kiekiai). On the view-only sample, explain instead
-              that these are the AI's assumptions and editing is disabled. */}
           {isDemo ? (
-            <div className="flex items-start gap-2 p-3 bg-primary/10 border border-primary/30 rounded-lg mb-3">
+            <div className="flex items-start gap-2 p-3 bg-primary/10 border border-primary/30 rounded-[2px]">
               <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-              <p className="text-xs text-foreground leading-relaxed">
-                {t('project.assumptions.demoReadonly')}
-              </p>
+              <p className="text-ui text-foreground">{t('project.assumptions.demoReadonly')}</p>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-              {t('project.assumptions.intro')}
-              {' '}
-              {/* Not every row survives a recompute — rows the backend cannot
-                  rebuild are carried over with their ORIGINAL numbers and a
-                  warning toast. Say so here so the toast isn't a surprise.
-                  (2026-07-28 explainability pass.) */}
-              {t('project.assumptions.introOrphans')}
+            <p className="text-ui text-muted-foreground">
+              {t('project.settings.intro')}
+              {firstUseOpen && (
+                <span className="ml-1.5 inline-block rounded bg-primary text-primary-foreground px-2 py-0.5" data-testid="first-use-pill" data-first-use="nustatymai">
+                  {t('project.firstUse.nustatymai')}
+                </span>
+              )}
             </p>
+          )}
+
+          {/* The last change: what it was, what it moved, and the way back. */}
+          {(lastEdit || undone || recomputing) && !isDemo && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="sticky top-0 z-[2] flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-[2px] border border-primary/40 bg-background text-ui"
+              data-testid="settings-last-change"
+            >
+              <span className="min-w-0 flex-1 text-foreground">
+                {lastEdit ? t('project.settings.changed', { label: lastEdit.label }) : t('project.settings.undone', { label: undone?.label || '' })}
+                {' '}
+                <span className="text-muted-foreground">
+                  {recomputing ? t('project.settings.recomputing') : ((lastEdit ? lastEdit.moved : undone?.moved) || '')}
+                </span>
+              </span>
+              {lastEdit && (
+                <button
+                  type="button"
+                  onClick={undo}
+                  className="inline-flex items-center gap-1 min-h-[30px] px-2.5 rounded-[2px] border border-border bg-card text-foreground hover:bg-muted"
+                  data-testid="settings-undo"
+                >
+                  <Undo2 className="w-3.5 h-3.5" aria-hidden /> {t('project.settings.undo')}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Window fallback warning */}
           {isFallback && (
-            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300 mb-3">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 p-3 bg-conf-med/10 border border-conf-med/30 rounded-[2px] text-ui text-foreground">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-conf-med" />
               <div>
                 <p className="font-medium">{t('project.assumptions.windowsNotFound')}</p>
-                <p className="text-xs mt-0.5">
-                  {t('project.assumptions.windowsNotFoundDesc')}
-                </p>
+                <p className="mt-0.5 text-muted-foreground">{t('project.assumptions.windowsNotFoundDesc')}</p>
               </div>
             </div>
           )}
 
-          {/* Glaistymo lygis */}
-          <Row
-            label={t('project.assumptions.puttyLevel')}
-            note={t('project.assumptions.puttyLevelNote')}
-          >
-            {/* Design §3, word for word: „Q2 — po matiniais dažais (įprasta)"
-                / „Q3 — po pusiau blizgiais" / „Q4 — po blizgiais, pilnas
-                glaistymas". Q1 stays reachable (it is under heavy wallpaper and
-                a real choice) but is named the same way. A bare Q1–Q4 chip row
-                is a spec-sheet, not a question a contractor can answer. */}
-            <div className="flex flex-col items-stretch gap-1.5 w-full">
-              {['Q1','Q2','Q3','Q4'].map(q => (
-                <button
-                  key={q}
-                  onClick={() => { setField('glaistimo_lygis', q); handleRecompute('glaistimo_lygis', q); }}
-                  title={t(`project.assumptions.puttyLevelTitles.${q}`)}
-                  aria-pressed={glaistimo_lygis === q}
-                  className={`text-left rounded border transition-colors ${
-                    glaistimo_lygis === q
-                      ? 'bg-primary/10 text-foreground border-primary font-medium'
-                      : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                  }`}
-                  style={{ minHeight: 44, padding: '0 12px', fontSize: 15 }}
-                >
-                  {t(`project.assumptions.puttyLevelPlain.${q}`)}
-                </button>
-              ))}
-            </div>
-          </Row>
-
-          {/* Santechnika: potinkiniai ar virštinkiniai maišytuvai.
-              The backend defaults to CONCEALED (LT convention: an in-wall body
-              during rough-in + visible trim after tiling = two separate jobs,
-              two lines). Measured against four real sąmatos, 3 of 4 contractors
-              build concealed but only 2 of 4 BILL it as a pair — one bundles it
-              into a single line, and one project's own text says "(ne
-              potinkinės)". So this is a genuine per-project convention, and the
-              contractor must be able to flip it. (2026-07-29) */}
-          <Row
-            label={t('project.assumptions.concealedMixers')}
-            note={t('project.assumptions.concealedMixersNote')}
-          >
-            <div className="flex flex-wrap gap-1">
-              {[['true', t('project.assumptions.concealedYes')],
-                ['false', t('project.assumptions.concealedNo')]].map(([val, lbl]) => {
-                const on = String(safeAssumptions.santechnika_potinkinis ?? true) === val;
-                return (
-                  <button
-                    key={val}
-                    onClick={() => {
-                      const v = val === 'true';
-                      setField('santechnika_potinkinis', v);
-                      handleRecompute('santechnika_potinkinis', v);
-                    }}
-                    title={t(`project.assumptions.concealedTitles.${val}`)}
-                    aria-pressed={on}
-                    className={`rounded border font-medium transition-colors ${
-                      on
-                        ? 'bg-primary/10 text-foreground border-primary'
-                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                    }`}
-                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
-                  >
-                    {lbl}
-                  </button>
-                );
-              })}
-            </div>
-          </Row>
-
-          {/* Vidaus durys: beapvadinės ar su apvadais (2026-09-23). The drawing's text (a door schedule, a
-              note, the openings annotated for frameless doors, the door products on a finish board) decides
-              it when it says anything; the plan's symbols alone only propose. His choice here wins over all
-              of it — the same `_overrides.vidaus_durys_beapvadines` the Patikra question writes. */}
-          <Row
-            label={t('project.assumptions.framelessDoors')}
-            note={[t('project.assumptions.framelessDoorsNote'), rawData?._paruosimas?.frameless?.sakinys].filter(Boolean).join(' ')}
-          >
-            <div className="flex flex-wrap gap-1">
-              {[['true', t('project.assumptions.framelessYes')],
-                ['false', t('project.assumptions.framelessNo')]].map(([val, lbl]) => {
-                const current = safeAssumptions.vidaus_durys_beapvadines ?? rawData?._paruosimas?.frameless?.value ?? false;
-                const on = String(Boolean(current)) === val;
-                return (
-                  <button
-                    key={val}
-                    onClick={() => {
-                      const v = val === 'true';
-                      setField('vidaus_durys_beapvadines', v);
-                      handleRecompute('vidaus_durys_beapvadines', v);
-                    }}
-                    title={t(`project.assumptions.framelessTitles.${val}`)}
-                    aria-pressed={on}
-                    data-assumption={`vidaus_durys_beapvadines:${val}`}
-                    className={`rounded border font-medium transition-colors ${
-                      on
-                        ? 'bg-primary/10 text-foreground border-primary'
-                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                    }`}
-                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
-                  >
-                    {lbl}
-                  </button>
-                );
-              })}
-            </div>
-          </Row>
-
-          {/* Angokraščiai — kurių angų (2026-09-25). The drawing shows the openings; which reveals the finisher
-              bills is his scope: windows, exterior doors and door-less passages by default, interior doors
-              off (their reveals sit under architraves or on the frameless-door row). Same
-              `_overrides.angokrasciai_apimtis` the engine reads (universal_rules.settle_reveals_scope). */}
-          <Row
-            label={t('project.assumptions.revealsScope')}
-            note={[t('project.assumptions.revealsScopeNote'), rawData?._paruosimas?.angokrasciai?.sakinys].filter(Boolean).join(' ')}
-          >
-            <div className="flex flex-wrap gap-1">
-              {['langai', 'lauko_durys', 'praejimai', 'vidaus_durys'].map((kind) => {
-                const defaults = { langai: true, lauko_durys: true, praejimai: true, vidaus_durys: false };
-                const current = {
-                  ...defaults,
-                  ...(rawData?._paruosimas?.angokrasciai?.value || {}),
-                  ...(safeAssumptions.angokrasciai_apimtis || {}),
-                };
-                const on = Boolean(current[kind]);
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => {
-                      const next = { ...current, [kind]: !on };
-                      setField('angokrasciai_apimtis', next);
-                      handleRecompute('angokrasciai_apimtis', next);
-                    }}
-                    title={t(`project.assumptions.revealKindTitles.${kind}`)}
-                    aria-pressed={on}
-                    data-assumption={`angokrasciai_apimtis:${kind}:${on ? 'on' : 'off'}`}
-                    className={`rounded border font-medium transition-colors ${
-                      on
-                        ? 'bg-primary/10 text-foreground border-primary'
-                        : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                    }`}
-                    style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
-                  >
-                    {on ? '✓ ' : ''}{t(`project.assumptions.revealKinds.${kind}`)}
-                  </button>
-                );
-              })}
-            </div>
-          </Row>
-
-          {/* LED nišos be perskaityto ilgio (2026-10-06, founder decision). A niche length estimated from the
-              room type is billed only once he accepts it — `_overrides.led_nisu_ivertinimas`, read by
-              niche_inference.estimate_accepted on every path. Until then the niche rows carry the metres read
-              off the drawing and the blank row „LED nišos — suveskite ilgį" names these rooms. Shown only when
-              the project HAS such an estimate. */}
-          {ledEstimates.length > 0 && (
-            <Row
-              label={t('project.assumptions.ledEstimate')}
-              note={t('project.assumptions.ledEstimateNote', ledEstimateText(ledEstimates))}
-            >
-              <div className="flex flex-wrap gap-1">
-                {[['false', t('project.assumptions.ledEstimateLeave')],
-                  ['true', t('project.assumptions.ledEstimateAccept')]].map(([val, lbl]) => {
-                  const on = String(ledBilled) === val;
-                  return (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        const v = val === 'true';
-                        setField('led_nisu_ivertinimas', v);
-                        handleRecompute('led_nisu_ivertinimas', v);
-                      }}
-                      title={t(`project.assumptions.ledEstimateTitles.${val}`)}
-                      aria-pressed={on}
-                      data-assumption={`led_nisu_ivertinimas:${val}`}
-                      className={`rounded border font-medium transition-colors ${
-                        on
-                          ? 'bg-primary/10 text-foreground border-primary'
-                          : 'bg-card text-muted-foreground border-border hover:border-foreground/30'
-                      }`}
-                      style={{ minHeight: 44, padding: '0 14px', fontSize: 15 }}
-                    >
-                      {lbl}
-                    </button>
-                  );
-                })}
-              </div>
-            </Row>
-          )}
-
-          {/* Sienos storis */}
-          <Row
-            label={t('project.assumptions.wallThickness')}
-            note={t('project.assumptions.wallThicknessNote')}
-          >
-            <NumberInput
-              value={sienos_storis_m}
-              onChange={v => { setField('sienos_storis_m', v); handleRecompute('sienos_storis_m', v); }}
-              min={0.05} max={0.50} step={0.01} unit="m"
-              label={t('project.assumptions.wallThickness')}
-              hint={t('project.assumptions.wallThicknessHint')}
-              errorMessage={t('project.assumptions.wallThicknessRangeErr', {
-                min: ltDecimal('0.05'), max: ltDecimal('0.50'),
-              })}
-            />
-          </Row>
-
-          {/* Pakuotės (v3 W5-E): only the note beside the Medžiagos kg / l — nothing recomputes, the kg stay */}
-          <Row label={t('project.assumptions.packagingLabel')} note={t('project.assumptions.packagingNote')}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="text-ui text-muted-foreground">{t('project.assumptions.packagingBag')}</span>
-              <NumberInput
-                value={packSizes.bagKg}
-                onChange={v => setField(BAG_KEY, v)}
-                min={BAG_RANGE[0]} max={BAG_RANGE[1]} step={1} unit="kg"
-                label={t('project.assumptions.packagingBag')}
-                errorMessage={t('project.assumptions.packagingRangeErr', { min: BAG_RANGE[0], max: BAG_RANGE[1] })}
+          {/* ── Bendra ── */}
+          <Section id="bendra" title={t('project.settings.sections.bendra')} summary={summaries.bendra}
+            open={openSections.has('bendra')} onToggle={() => toggleSection('bendra')}>
+            {/* Design §3: the levels are named by what goes on top („po matiniais dažais");
+                the button says Q1–Q4 and the line says it in words. */}
+            <SettingLine id="glaistimo_lygis" label={t('project.assumptions.puttyLevel')} value={puttyWords(glaistimo_lygis)}
+              note={t('project.settings.notes.putty')}>
+              <Segmented
+                label={t('project.assumptions.puttyLevel')}
+                dataAssumption="glaistimo_lygis"
+                value={glaistimo_lygis}
+                options={['Q1', 'Q2', 'Q3', 'Q4'].map((q) => ({ value: q, label: q, title: t(`project.assumptions.puttyLevelTitles.${q}`) }))}
+                onChange={(q) => setOne('glaistimo_lygis', q, `${t('project.assumptions.puttyLevel')} ${q}`)}
               />
-              <span className="text-ui text-muted-foreground">{t('project.assumptions.packagingBucket')}</span>
-              <NumberInput
-                value={packSizes.bucketL}
-                onChange={v => setField(BUCKET_KEY, v)}
-                min={BUCKET_RANGE[0]} max={BUCKET_RANGE[1]} step={0.5} unit="l"
-                label={t('project.assumptions.packagingBucket')}
-                errorMessage={t('project.assumptions.packagingRangeErr', { min: ltDecimal(BUCKET_RANGE[0]), max: BUCKET_RANGE[1] })}
-              />
-            </div>
-          </Row>
+            </SettingLine>
+          </Section>
 
-          {/* ── Per-room settings ────────────────────────────────────────
-              Design §4 says these belong on the room's own sheet, not in a
-              project-wide settings panel. They stay HERE until that sheet
-              exists: the room grid (RoomsGrid/RoomCard) edits plotas,
-              perimetras and paskirtis but exposes no height, no walls-painted
-              and no stretch-ceiling toggle, and it is not reachable from the
-              UI at all. Removing them now would delete the only way to fix a
-              defaulted 2,80 m. Move them the day the room sheet ships. */}
+          {/* ── Patalpos ──
+              Design §4 says these belong on the room's own sheet; they stay HERE
+              until that sheet edits height / walls / ceilings — removing them would
+              delete the only way to fix a defaulted 2,80 m. */}
           {rooms.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-border">
-              <h3 className="text-foreground font-medium" style={{ fontSize: 15 }}>
-                {t('project.assumptions.perRoomHeading')}
-              </h3>
-              <p className="text-muted-foreground mt-0.5" style={{ fontSize: 13 }}>
-                {t('project.assumptions.perRoomNote')}
-              </p>
-            </div>
-          )}
-
-          {/* Lubų aukštis per kambarį */}
-          {rooms.length > 0 && (
-            <div className="py-2">
-              <p className="text-sm text-foreground mb-1">
-                {t('project.assumptions.ceilingHeightLabel')}<span className="text-xs text-muted-foreground">{t('project.assumptions.ceilingHeightDefault', { avg: ltDecimal(avgH.toFixed(2)) })}</span>
-              </p>
-              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                {t('project.assumptions.ceilingHeightNote')}
-              </p>
-
-              {/* 2026-05-06: bulk override — set all rooms' aukštis at once.
-                  Works for the common case where the whole house has the same
-                  height; user can then tweak individual rooms below if needed. */}
-              <div className="mb-3 flex items-center gap-2 px-2 py-2 rounded-md bg-muted/40 border border-border/60">
-                <span className="text-xs font-medium text-foreground flex-1">
-                  {t('project.assumptions.allRooms')}
-                </span>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  /* „Lubų aukštis, jei žinote" from the upload screen lands
-                     here — the one place the upload copy promises it will. */
-                  defaultValue={Number(rawData?.lubu_aukstis_default_m) > 0
-                    ? ltDecimal(Number(rawData.lubu_aukstis_default_m).toFixed(2)) : ''}
-                  placeholder={ltDecimal(avgH.toFixed(2))}
-                  step={0.05}
-                  onBlur={e => {
-                    const raw = e.target.value.trim();
-                    if (!raw) return;                       // nothing typed — no-op
-                    const v = parseLtNumber(raw);
-                    // Same 2.0–6.0 window the per-room inputs enforce; out of
-                    // range is reported, not silently clamped or ignored.
-                    if (!Number.isFinite(v) || v < H_MIN_M || v > H_MAX_M) {
-                      toast.error(t('project.assumptions.heightRangeErr', {
-                        min: ltDecimal(H_MIN_M.toFixed(2)),
-                        max: ltDecimal(H_MAX_M.toFixed(2)),
-                      }));
-                      return;
-                    }
-                    setLubuAukstisAll(v);
-                    e.target.value = '';
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.target.blur();
-                    }
-                  }}
-                  className="h-7 w-20 text-xs bg-card border-border text-right tabular-nums"
-                  title={t('project.assumptions.allRoomsTitle')}
-                />
-                <span className="text-xs text-muted-foreground">m</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {rooms.map(room => (
-                  <div
-                    key={room.nr}
-                    data-assumption={`lubu_auksciai:${room.nr}`}
-                    className="flex items-center gap-2 rounded transition-colors"
-                  >
-                    <span className="text-xs text-muted-foreground truncate flex-1" title={room.pavadinimas}>
-                      {room.pavadinimas || room.nr}
-                    </span>
-                    {/* Blanking this field used to commit 2.8 m and fire a
-                        recompute; NumberInput now waits for a valid number. */}
+            <Section id="patalpos" title={t('project.settings.sections.patalpos')} summary={summaries.patalpos}
+              open={openSections.has('patalpos')} onToggle={() => toggleSection('patalpos')}>
+              <SettingLine id="lubu_auksciai" label={t('project.settings.heightLabel')} value={heightWords}
+                note={t('project.settings.notes.height')} wide>
+                <span />
+              </SettingLine>
+              {perRoom({
+                id: 'lubu_auksciai',
+                split: heights,
+                renderAll: () => (
+                  <div className="flex items-center justify-between gap-2 py-1" data-assumption="lubu_auksciai:*">
+                    <span className="text-ui font-medium text-foreground">{t('project.settings.allRooms')}</span>
                     <NumberInput
-                      value={lubu_auksciai[room.nr] ?? (Number(room.lubu_aukstis_m) || 2.80)}
-                      min={H_MIN_M} max={H_MAX_M} step={0.05}
-                      unit="m"
-                      className="h-6 w-16"
-                      label={t('project.assumptions.roomHeightAria', {
-                        room: room.pavadinimas || room.nr,
-                      })}
-                      hint={t('project.assumptions.roomHeightHint', {
-                        room: room.pavadinimas || room.nr,
-                      })}
-                      errorMessage={t('project.assumptions.heightRangeErr', {
-                        min: ltDecimal(H_MIN_M.toFixed(2)),
-                        max: ltDecimal(H_MAX_M.toFixed(2)),
-                      })}
-                      onChange={v => setLubuAukstis(room.nr, v)}
+                      key={`all-${heights.common}`}
+                      value={heights.common}
+                      commitOnBlur
+                      min={H_MIN_M} max={H_MAX_M} step={0.05} unit="m"
+                      label={`${t('project.settings.heightLabel')} — ${t('project.settings.allRooms')}`}
+                      hint={t('project.assumptions.allRoomsTitle')}
+                      errorMessage={t('project.assumptions.heightRangeErr', { min: ltDecimal(H_MIN_M.toFixed(2)), max: ltDecimal(H_MAX_M.toFixed(2)) })}
+                      onChange={setLubuAukstisAll}
                     />
                   </div>
-                ))}
-              </div>
-            </div>
+                ),
+                renderRoom: (room) => (
+                  <div className="inline-flex" data-assumption={`lubu_auksciai:${room.nr}`}>
+                    <NumberInput
+                      value={lubu_auksciai[room.nr] ?? heightOf(room)}
+                      min={H_MIN_M} max={H_MAX_M} step={0.05} unit="m"
+                      label={t('project.assumptions.roomHeightAria', { room: roomLabel(room) })}
+                      hint={t('project.assumptions.roomHeightHint', { room: roomLabel(room) })}
+                      errorMessage={t('project.assumptions.heightRangeErr', { min: ltDecimal(H_MIN_M.toFixed(2)), max: ltDecimal(H_MAX_M.toFixed(2)) })}
+                      onChange={(v) => setLubuAukstis(room.nr, v)}
+                    />
+                  </div>
+                ),
+              })}
+
+              <SettingLine id="walls_paint_override" label={t('project.settings.wallsPaintLabel')}
+                value={paintedWords} note={t('project.settings.notes.wallsPaint')} wide>
+                <span />
+              </SettingLine>
+              {perRoom({
+                id: 'walls_paint_override',
+                split: walls,
+                renderAll: () => (
+                  <div className="flex items-center justify-between gap-2 py-1" data-assumption="walls_paint_override:*">
+                    <span className="text-ui font-medium text-foreground">{t('project.settings.allRooms')}</span>
+                    <Segmented
+                      label={`${t('project.settings.wallsPaintLabel')} — ${t('project.settings.allRooms')}`}
+                      value={walls.allSame ? walls.common : ''}
+                      options={yesNo(t('project.assumptions.wallsPaintOn'), t('project.assumptions.wallsPaintOff'))}
+                      onChange={(v) => setWallsPaint(rooms, v, `${t('project.settings.wallsPaintLabel')} — ${t('project.settings.allRooms').toLowerCase()}`)}
+                    />
+                  </div>
+                ),
+                renderRoom: (room) => (
+                  <span className="inline-flex" data-assumption={`walls_paint_override:${room.nr}`}>
+                    <Segmented
+                      label={t('project.assumptions.wallsPaintLabel')}
+                      value={isWallsPainted(room)}
+                      options={yesNo(t('project.assumptions.wallsPaintOn'), t('project.assumptions.wallsPaintOff'))}
+                      onChange={(v) => setWallsPaint([room], v, `${t('project.settings.wallsPaintLabel')} — ${roomLabel(room)}`)}
+                    />
+                  </span>
+                ),
+              })}
+
+              <SettingLine id="stretch_ceiling_override" label={t('project.settings.stretchLabel')}
+                value={stretchWords} note={t('project.settings.notes.stretch')} wide>
+                <span />
+              </SettingLine>
+              {perRoom({
+                id: 'stretch_ceiling_override',
+                split: stretch,
+                renderAll: () => (
+                  <div className="flex items-center justify-between gap-2 py-1" data-assumption="stretch_ceiling_override:*">
+                    <span className="text-ui font-medium text-foreground">{t('project.settings.allRooms')}</span>
+                    <Segmented
+                      label={`${t('project.settings.stretchLabel')} — ${t('project.settings.allRooms')}`}
+                      value={stretch.allSame ? stretch.common : ''}
+                      options={yesNo(t('project.assumptions.stretchCeilingOn'), t('project.assumptions.stretchCeilingOff'))}
+                      onChange={(v) => setStretchCeiling(rooms, v, `${t('project.settings.stretchLabel')} — ${t('project.settings.allRooms').toLowerCase()}`)}
+                    />
+                  </div>
+                ),
+                renderRoom: (room) => (
+                  <span className="inline-flex" data-assumption={`stretch_ceiling_override:${room.nr}`}>
+                    <Segmented
+                      label={t('project.assumptions.stretchCeilingLabel')}
+                      value={isStretchCeiling(room)}
+                      options={yesNo(t('project.assumptions.stretchCeilingOn'), t('project.assumptions.stretchCeilingOff'))}
+                      onChange={(v) => setStretchCeiling([room], v, `${t('project.settings.stretchLabel')} — ${roomLabel(room)}`)}
+                    />
+                  </span>
+                ),
+              })}
+            </Section>
           )}
 
-          {/* Sienų apdaila per kambarį — dažomos vs nedažomos (2026-07-05).
-              Garažas/tambūras pagal nutylėjimą nedažomi; užbaigtiems projektams
-              vartotojas perjungia ir kiekiai persiskaičiuoja gyvai. */}
-          {rooms.length > 0 && (
-            <div className="py-2">
-              <p className="text-sm text-foreground mb-1">
-                {t('project.assumptions.wallsPaintLabel')}
-              </p>
-              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                {t('project.assumptions.wallsPaintNote')}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {rooms.map(room => {
-                  const painted = isWallsPainted(room);
+          {/* ── Angos ir angokraščiai ── */}
+          <Section id="angos" title={t('project.settings.sections.angos')} summary={summaries.angos}
+            open={openSections.has('angos')} onToggle={() => toggleSection('angos')}>
+            {/* Vidaus durys: beapvadinės ar su apvadais (2026-09-23). The drawing's text decides
+                it when it says anything; his choice here wins — the same
+                `_overrides.vidaus_durys_beapvadines` the Patikra question writes. */}
+            <SettingLine id="vidaus_durys_beapvadines" label={t('project.assumptions.framelessDoors')}
+              note={t('project.settings.notes.frameless')} evidence={rawData?._paruosimas?.frameless?.sakinys}>
+              <Segmented
+                label={t('project.assumptions.framelessDoors')}
+                dataAssumption="vidaus_durys_beapvadines"
+                value={framelessCurrent}
+                options={[true, false].map((v) => ({
+                  value: v,
+                  label: v ? t('project.assumptions.framelessYes') : t('project.assumptions.framelessNo'),
+                  title: t(`project.assumptions.framelessTitles.${v}`),
+                }))}
+                onChange={(v) => setOne('vidaus_durys_beapvadines', v, `${t('project.assumptions.framelessDoors')}: ${v ? t('project.assumptions.framelessYes') : t('project.assumptions.framelessNo')}`)}
+              />
+            </SettingLine>
+
+            {/* Angokraščiai — kurių angų (2026-09-25): his scope; same `_overrides.angokrasciai_apimtis`. */}
+            <SettingLine id="angokrasciai_apimtis" label={t('project.assumptions.revealsScope')} value={revealsWords}
+              note={t('project.settings.notes.reveals')} evidence={rawData?._paruosimas?.angokrasciai?.sakinys} wide>
+              <div role="group" aria-label={t('project.assumptions.revealsScope')} className="flex flex-wrap gap-1">
+                {REVEAL_KINDS.map((kind) => {
+                  const on = Boolean(revealsCurrent[kind]);
                   return (
                     <button
-                      key={room.nr}
-                      data-assumption={`walls_paint_override:${room.nr}`}
-                      onClick={() => setWallsPaint(room.nr, !painted)}
-                      title={t(painted ? 'project.assumptions.wallsPaintOffTitle' : 'project.assumptions.wallsPaintOnTitle', {
-                        room: room.pavadinimas || room.nr,
-                      })}
-                      aria-pressed={painted}
-                      className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${
-                        painted
-                          ? 'bg-primary/10 border-primary/40 text-foreground'
-                          : 'bg-card border-border text-muted-foreground hover:border-foreground/30'
-                      }`}
+                      key={kind}
+                      type="button"
+                      onClick={() => {
+                        const next = { ...revealsCurrent, [kind]: !on };
+                        setOne('angokrasciai_apimtis', next, `${t('project.assumptions.revealsScope')}: ${t(`project.assumptions.revealKinds.${kind}`)}`);
+                      }}
+                      title={t(`project.assumptions.revealKindTitles.${kind}`)}
+                      aria-pressed={on}
+                      data-assumption={`angokrasciai_apimtis:${kind}:${on ? 'on' : 'off'}`}
+                      className={`${CHOICE_BASE} rounded-[2px] ${on
+                        ? 'bg-primary/10 border-primary text-foreground font-medium'
+                        : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}`}
                     >
-                      <span className="truncate">{room.pavadinimas || room.nr}</span>
-                      <span className={`shrink-0 text-[10px] font-medium ${painted ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {painted ? t('project.assumptions.wallsPaintOn') : t('project.assumptions.wallsPaintOff')}
-                      </span>
+                      {on ? '✓ ' : ''}{t(`project.assumptions.revealKinds.${kind}`)}
                     </button>
                   );
                 })}
               </div>
-            </div>
-          )}
+            </SettingLine>
 
-          {/* Lubų apdaila per kambarį — dažomos vs įtempiamos (2026-09-02).
-              Įtempiamos lubos = atskiras darbas; tos patalpos lubų glaistymas,
-              gruntavimas, dažymas ir šlifavimas iškrenta iš sąmatos. Karnizas,
-              LED nišos, GKP lubos ir grindjuostės nekeičiami. */}
-          {rooms.length > 0 && (
-            <div className="py-2">
-              <p className="text-sm text-foreground mb-1">
-                {t('project.assumptions.stretchCeilingLabel')}
-              </p>
-              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                {t('project.assumptions.stretchCeilingNote')}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {rooms.map(room => {
-                  const stretch = isStretchCeiling(room);
-                  return (
-                    <button
-                      key={room.nr}
-                      data-assumption={`stretch_ceiling_override:${room.nr}`}
-                      onClick={() => setStretchCeiling(room.nr, !stretch)}
-                      title={t(stretch ? 'project.assumptions.stretchCeilingOffTitle' : 'project.assumptions.stretchCeilingOnTitle', {
-                        room: room.pavadinimas || room.nr,
-                      })}
-                      aria-pressed={stretch}
-                      className={`flex items-center justify-between gap-1.5 px-2 py-1.5 rounded text-xs border transition-colors ${
-                        stretch
-                          ? 'bg-primary/10 border-primary/40 text-foreground'
-                          : 'bg-card border-border text-muted-foreground hover:border-foreground/30'
-                      }`}
-                    >
-                      <span className="truncate">{room.pavadinimas || room.nr}</span>
-                      <span className={`shrink-0 text-[10px] font-medium ${stretch ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {stretch ? t('project.assumptions.stretchCeilingOn') : t('project.assumptions.stretchCeilingOff')}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Langai */}
-          <div className="py-2 border-b border-border/40">
-            <button
-              className="flex items-center justify-between w-full mb-2"
-              onClick={() => setWindowsExpanded(v => !v)}
-              title={t('project.assumptions.windowsTitle')}
-              aria-expanded={windowsExpanded}
-            >
-              <span className="text-sm text-foreground">
-                {t('project.assumptions.windows')}
-                <span className="text-xs text-muted-foreground ml-2">
-                  {t('project.assumptions.windowsCount', { count: displayWindows.length })}
-                  {isFallback && !custom_windows && <span className="text-amber-600 ml-1">{t('project.assumptions.windowsFallback')}</span>}
-                </span>
+            <SettingLine id="sienos_storis_m" label={t('project.assumptions.wallThickness')} note={t('project.settings.notes.wallThickness')}>
+              <span className="inline-flex" data-assumption="sienos_storis_m:value">
+                <NumberInput
+                  value={sienos_storis_m}
+                  placeholder="0,10"
+                  onChange={v => setOne('sienos_storis_m', v, t('project.assumptions.wallThickness'))}
+                  min={0.05} max={0.50} step={0.01} unit="m"
+                  label={t('project.assumptions.wallThickness')}
+                  hint={t('project.assumptions.wallThicknessHint')}
+                  errorMessage={t('project.assumptions.wallThicknessRangeErr', { min: ltDecimal('0.05'), max: ltDecimal('0.50') })}
+                />
               </span>
-              {windowsExpanded
-                ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
-                : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-              }
-            </button>
-            {windowsExpanded && (
+            </SettingLine>
+
+            <SettingLine id="custom_windows" label={t('project.settings.windowsLabel')}
+              value={`${t('project.settings.openingsCount', { count: displayWindows.length })}${isFallback && !custom_windows ? ` (${t('project.assumptions.windowsFallback')})` : ''}`}
+              note={t('project.settings.notes.windows')}>
+              <button type="button" onClick={() => setWindowsOpen((v) => !v)} aria-expanded={windowsOpen}
+                title={t('project.assumptions.windowsTitle')}
+                className="min-h-[34px] px-2.5 rounded-[2px] border border-border bg-card text-ui text-foreground hover:bg-muted"
+                data-assumption="custom_windows:edit">
+                {windowsOpen ? t('project.settings.hide') : t('project.settings.edit')}
+              </button>
+            </SettingLine>
+            {windowsOpen && (
               <OpeningEditor
                 items={displayWindows}
-                onChange={wins => { setField('custom_windows', wins); handleRecompute('custom_windows', wins); }}
+                onChange={wins => setOne('custom_windows', wins, t('project.settings.windowsLabel'))}
                 label={t('project.assumptions.windowLabel')}
                 defaultItem={{ width_mm: 1200, height_mm: 1500 }}
               />
             )}
-          </div>
 
-          {/* Durys */}
-          <div className="py-2">
-            <button
-              className="flex items-center justify-between w-full mb-2"
-              onClick={() => setDoorsExpanded(v => !v)}
-              title={t('project.assumptions.doorsTitle')}
-              aria-expanded={doorsExpanded}
-            >
-              <span className="text-sm text-foreground">
-                {t('project.assumptions.doors')}
-                <span className="text-xs text-muted-foreground ml-2">{t('project.assumptions.doorsCount', { count: displayDoors.length })}</span>
-              </span>
-              {doorsExpanded
-                ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
-                : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-              }
-            </button>
-            {doorsExpanded && (
+            <SettingLine id="custom_doors" label={t('project.settings.doorsLabel')}
+              value={t('project.settings.openingsCount', { count: displayDoors.length })}
+              note={t('project.settings.notes.doors')}>
+              <button type="button" onClick={() => setDoorsOpen((v) => !v)} aria-expanded={doorsOpen}
+                title={t('project.assumptions.doorsTitle')}
+                className="min-h-[34px] px-2.5 rounded-[2px] border border-border bg-card text-ui text-foreground hover:bg-muted"
+                data-assumption="custom_doors:edit">
+                {doorsOpen ? t('project.settings.hide') : t('project.settings.edit')}
+              </button>
+            </SettingLine>
+            {doorsOpen && (
               <OpeningEditor
                 items={displayDoors}
-                onChange={ds => { setField('custom_doors', ds); handleRecompute('custom_doors', ds); }}
+                onChange={ds => setOne('custom_doors', ds, t('project.settings.doorsLabel'))}
                 label={t('project.assumptions.doorLabel')}
                 defaultItem={{ width_mm: 800, height_mm: 2200 }}
               />
             )}
-          </div>
+          </Section>
 
-          {recomputing && (
-            <p className="text-xs text-muted-foreground pt-1">
-              {t('project.assumptions.recomputing')}
-            </p>
-          )}
+          {/* ── Medžiagos ir pakuotės ── (v3 W5-E): only the note beside the Medžiagos kg / l —
+              nothing recomputes, the kg stay. */}
+          <Section id="medziagos" title={t('project.settings.sections.medziagos')} summary={summaries.medziagos}
+            open={openSections.has('medziagos')} onToggle={() => toggleSection('medziagos')}>
+            <SettingLine id={BAG_KEY} label={t('project.assumptions.packagingBag')} note={t('project.settings.notes.packaging')}>
+              <span className="inline-flex" data-assumption={`${BAG_KEY}:value`}>
+                <NumberInput
+                  value={packSizes.bagKg}
+                  onChange={v => setOne(BAG_KEY, v, t('project.assumptions.packagingBag'), { recompute: false })}
+                  min={BAG_RANGE[0]} max={BAG_RANGE[1]} step={1} unit="kg"
+                  label={t('project.assumptions.packagingBag')}
+                  errorMessage={t('project.assumptions.packagingRangeErr', { min: BAG_RANGE[0], max: BAG_RANGE[1] })}
+                />
+              </span>
+            </SettingLine>
+            <SettingLine id={BUCKET_KEY} label={t('project.assumptions.packagingBucket')} note={t('project.settings.notes.packaging')}>
+              <span className="inline-flex" data-assumption={`${BUCKET_KEY}:value`}>
+                <NumberInput
+                  value={packSizes.bucketL}
+                  onChange={v => setOne(BUCKET_KEY, v, t('project.assumptions.packagingBucket'), { recompute: false })}
+                  min={BUCKET_RANGE[0]} max={BUCKET_RANGE[1]} step={0.5} unit="l"
+                  label={t('project.assumptions.packagingBucket')}
+                  errorMessage={t('project.assumptions.packagingRangeErr', { min: ltDecimal(BUCKET_RANGE[0]), max: BUCKET_RANGE[1] })}
+                />
+              </span>
+            </SettingLine>
+          </Section>
+
+          {/* ── Skaičiavimo pasirinkimai ── */}
+          <Section id="pasirinkimai" title={t('project.settings.sections.pasirinkimai')} summary={summaries.pasirinkimai}
+            open={openSections.has('pasirinkimai')} onToggle={() => toggleSection('pasirinkimai')}>
+            {/* Santechnika: potinkiniai ar virštinkiniai maišytuvai. The backend defaults to
+                CONCEALED (two jobs, two lines); measured against four real sąmatos this is a
+                genuine per-project convention, so the contractor must be able to flip it. (2026-07-29) */}
+            <SettingLine id="santechnika_potinkinis" label={t('project.assumptions.concealedMixers')} note={t('project.settings.notes.mixers')}>
+              <Segmented
+                label={t('project.assumptions.concealedMixers')}
+                dataAssumption="santechnika_potinkinis"
+                value={mixersOn}
+                options={[true, false].map((v) => ({
+                  value: v,
+                  label: v ? t('project.assumptions.concealedYes') : t('project.assumptions.concealedNo'),
+                  title: t(`project.assumptions.concealedTitles.${v}`),
+                }))}
+                onChange={(v) => setOne('santechnika_potinkinis', v, `${t('project.assumptions.concealedMixers')}: ${v ? t('project.assumptions.concealedYes') : t('project.assumptions.concealedNo')}`)}
+              />
+            </SettingLine>
+
+            {/* LED nišos be perskaityto ilgio (2026-10-06, founder decision): an estimate is billed
+                only once he accepts it — `_overrides.led_nisu_ivertinimas`. Shown only when the
+                project HAS such an estimate. */}
+            {ledEstimates.length > 0 && (
+              <SettingLine id="led_nisu_ivertinimas" label={t('project.assumptions.ledEstimate')}
+                note={t('project.settings.notes.led', ledEstimateText(ledEstimates))} wide>
+                <Segmented
+                  label={t('project.assumptions.ledEstimate')}
+                  dataAssumption="led_nisu_ivertinimas"
+                  value={ledBilled}
+                  options={[false, true].map((v) => ({
+                    value: v,
+                    label: v ? t('project.assumptions.ledEstimateAccept') : t('project.assumptions.ledEstimateLeave'),
+                    title: t(`project.assumptions.ledEstimateTitles.${v}`),
+                  }))}
+                  onChange={(v) => setOne('led_nisu_ivertinimas', v, `${t('project.assumptions.ledEstimate')}: ${v ? t('project.assumptions.ledEstimateAccept') : t('project.assumptions.ledEstimateLeave')}`)}
+                />
+              </SettingLine>
+            )}
+          </Section>
         </div>
       )}
     </div>
   );
 }
+
 
 // ── Calculation formulas card (Phase 14 / QW03) ──────────────────────────────
 //

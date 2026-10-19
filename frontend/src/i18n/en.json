@@ -1241,7 +1241,8 @@
       "showAllRooms": "Show all rooms ({{count}})",
       "onlyDiffering": "Show only the ones that differ",
       "allSame": "All rooms are the same.",
-      "roomsOf": "{{n}} of {{total}}",
+      "paintedRooms": "painted {{n}} of {{total}}",
+      "stretchRooms": "stretch {{n}} of {{total}}",
       "puttyShort": { "Q1": "Q1", "Q2": "Q2", "Q3": "Q3", "Q4": "Q4" },
       "heightLabel": "Ceiling height",
       "wallsPaintLabel": "Walls",
@@ -1268,7 +1269,7 @@
       },
       "changed": "Changed: {{label}}.",
       "undo": "Undo",
-      "undone": "Restored: {{label}}.",
+      "undone": "Undone: {{label}}.",
       "recomputing": "Recalculating…"
     },
     "assumptions": {

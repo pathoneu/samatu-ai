@@ -1296,7 +1296,8 @@
       "showAllRooms": "Rodyti visas patalpas ({{count}})",
       "onlyDiffering": "Rodyti tik besiskiriančias",
       "allSame": "Visos patalpos vienodos.",
-      "roomsOf": "{{n}} iš {{total}}",
+      "paintedRooms": "dažomos {{n}} iš {{total}}",
+      "stretchRooms": "įtempiamos {{n}} iš {{total}}",
       "puttyShort": { "Q1": "Q1", "Q2": "Q2", "Q3": "Q3", "Q4": "Q4" },
       "heightLabel": "Lubų aukštis",
       "wallsPaintLabel": "Sienos",
@@ -1323,7 +1324,7 @@
       },
       "changed": "Pakeista: {{label}}.",
       "undo": "Atšaukti",
-      "undone": "Grąžinta: {{label}}.",
+      "undone": "Atšaukta: {{label}}.",
       "recomputing": "Perskaičiuojama…"
     },
     "assumptions": {
