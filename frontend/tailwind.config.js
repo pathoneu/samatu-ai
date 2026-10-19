@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    // the app runs the light theme only; "class" (not "media") keeps any stray `dark:` class inert (v3 W6-A)
     darkMode: ["class"],
     content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
   theme: {
@@ -109,7 +110,21 @@ module.exports = {
   			'viewer-chrome-border': 'hsl(var(--viewer-chrome-border))',
   			'viewer-chrome-hover': 'hsl(var(--viewer-chrome-hover))',
   			'viewer-chrome-active': 'hsl(var(--viewer-chrome-active))',
-  			'viewer-blueprint-bg': 'hsl(var(--viewer-blueprint-bg))'
+  			'viewer-blueprint-bg': 'hsl(var(--viewer-blueprint-bg))',
+  			// v3 W6-A: the confidence and overlay tokens (index.css) as utilities — `text-conf-med`,
+  			// `border-ov-proposed`, `bg-ov-read/10` — instead of `[hsl(var(--…))]` arbitrary classes.
+  			'conf-high': 'hsl(var(--conf-high))',
+  			'conf-med': 'hsl(var(--conf-med))',
+  			'conf-low': 'hsl(var(--conf-low))',
+  			'ov-read': 'hsl(var(--ov-read))',
+  			'ov-estimated': 'hsl(var(--ov-estimated))',
+  			'ov-proposed': 'hsl(var(--ov-proposed))',
+  			'ov-user': 'hsl(var(--ov-user))',
+  			'ov-opening': 'hsl(var(--ov-opening))',
+  			'ov-wall': 'hsl(var(--ov-wall))',
+  			'ov-selected': 'hsl(var(--ov-selected))',
+  			'ov-editing': 'hsl(var(--ov-editing))',
+  			'ov-error': 'hsl(var(--ov-error))'
   		},
   		keyframes: {
   			'accordion-down': {
