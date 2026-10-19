@@ -30,7 +30,7 @@ export default function MeasuredChip({ row, onSetKaip = null, onUnlink = null, o
           type="button"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          className={`inline-flex shrink-0 items-center gap-1 rounded border border-[hsl(var(--ov-read))] px-1 text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${compact ? '' : 'min-h-[24px]'}`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded border border-ov-read px-1 text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${compact ? '' : 'min-h-[24px]'}`}
           style={{ fontSize: 12, lineHeight: '16px' }}
           title="Kiekis su jūsų matavimais — spustelėkite, kad pamatytumėte, kurie ir kaip įtraukti"
           data-testid="measured-chip"

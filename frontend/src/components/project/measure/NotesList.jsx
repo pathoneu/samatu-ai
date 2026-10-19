@@ -23,7 +23,7 @@ export default function NotesList({ project, onJumpToPage = null }) {
           onClick={() => setNoteToolArmed(!armed)}
           aria-pressed={armed}
           className={`inline-flex min-h-[32px] items-center rounded-[2px] border px-2.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${armed
-            ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.1)] text-foreground'
+            ? 'border-accent-2 bg-accent-2/10 text-foreground'
             : 'border-border bg-card text-foreground hover:bg-muted'}`}
           data-testid="note-arm"
         >

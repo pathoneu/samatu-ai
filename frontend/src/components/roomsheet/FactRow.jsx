@@ -57,9 +57,9 @@ function SizeEditor({ detail, busy, onSave, t }) {
     if (!(pw > 0) || !(ph > 0)) return;
     onSave?.(detail, { plotis_mm: pw * 10, aukstis_mm: ph * 10 });
   };
-  const box = 'h-11 w-16 rounded-[2px] border border-[hsl(var(--conf-med))] bg-card px-2 text-right font-mono text-[15px]';
+  const box = 'h-11 w-16 rounded-[2px] border border-conf-med bg-card px-2 text-right font-mono text-[15px]';
   return (
-    <span className="flex flex-wrap items-center gap-1.5 font-sans text-[13px] text-[hsl(var(--ink-2))]">
+    <span className="flex flex-wrap items-center gap-1.5 font-sans text-[13px] text-ink-2">
       <label className="sr-only" htmlFor={`w-${detail.tipas}-${detail.plotis_mm}`}>{t('project.roomSheet.sizeWidth')}</label>
       <input id={`w-${detail.tipas}-${detail.plotis_mm}`} className={box} inputMode="numeric" value={w}
         onChange={(e) => setW(e.target.value)} onFocus={(e) => e.target.select()}
@@ -147,7 +147,7 @@ export default function FactRow({
     <div
       className={`grid grid-cols-[104px_minmax(0,1fr)] gap-3 border-t border-border px-4 py-3
         sm:grid-cols-[104px_minmax(0,1fr)_auto]
-        ${attention ? 'border-l-[3px] border-l-[hsl(var(--conf-med))] bg-[hsl(var(--conf-med)/0.08)]' : ''}`}
+        ${attention ? 'border-l-[3px] border-l-conf-med bg-conf-med/[0.08]' : ''}`}
     >
       <EvidenceCrop
         fact={fact}
@@ -161,7 +161,7 @@ export default function FactRow({
           {/* His own value — typed, chosen, accepted or drawn by him (room_facts `_is_yours`). */}
           {fact?.yours && (
             <span
-              className="rounded-[2px] border border-[hsl(var(--accent-2)/0.5)] bg-[hsl(var(--accent-2)/0.08)] px-1.5 py-px text-meta font-semibold normal-case tracking-normal text-[hsl(var(--accent-2))]"
+              className="rounded-[2px] border border-accent-2/50 bg-accent-2/[0.08] px-1.5 py-px text-meta font-semibold normal-case tracking-normal text-accent-2"
               data-testid="fact-yours"
             >
               {t('project.roomSheet.yoursBadge')}
@@ -169,12 +169,12 @@ export default function FactRow({
           )}
         </p>
         <p className={`font-mono text-[16px] font-semibold leading-snug
-          ${attention ? 'text-[hsl(var(--conf-med))]' : 'text-foreground'}`}
+          ${attention ? 'text-conf-med' : 'text-foreground'}`}
         >
           {value}
         </p>
         {sentence && (
-          <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{sentence}</p>
+          <p className="mt-0.5 text-[14px] leading-snug text-ink-2">{sentence}</p>
         )}
         {/* The floor sheet's key line this covering was read by (Pathon v3 W5-D, D1): its own crop — the swatch
             and the words — beside the room's, so he sees which colour the reading matched. */}
@@ -193,7 +193,7 @@ export default function FactRow({
                     showCaption={false}
                   />
                 )}
-                <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(ev.sentence || '')}</p>
+                <p className="text-[14px] leading-snug text-ink-2">{cleanUserText(ev.sentence || '')}</p>
               </li>
             ))}
           </ul>
@@ -207,7 +207,7 @@ export default function FactRow({
               imgClassName="h-[34px] object-contain"
               showCaption={false}
             />
-            <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(fact.legenda.sentence || '')}</p>
+            <p className="text-[14px] leading-snug text-ink-2">{cleanUserText(fact.legenda.sentence || '')}</p>
           </div>
         )}
         {/* The sharp drawing is one click away from every number: the pane on the
@@ -216,7 +216,7 @@ export default function FactRow({
           <button
             type="button"
             onClick={onShowOnDrawing}
-            className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-[hsl(var(--accent-2))] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-accent-2 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
             {t('project.roomSheet.showOnDrawing')}
@@ -236,7 +236,7 @@ export default function FactRow({
             type="button"
             disabled={busy}
             onClick={onSplitSpace}
-            className={`${BTN} mt-2 flex w-fit border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            className={`${BTN} mt-2 flex w-fit border-accent-2 bg-accent-2 text-white disabled:opacity-50`}
             data-testid="fact-split-space"
           >
             <Scissors className="h-4 w-4" aria-hidden="true" />
@@ -248,7 +248,7 @@ export default function FactRow({
             type="button"
             disabled={busy}
             onClick={onPickOutline}
-            className={`${BTN} mt-2 flex w-fit border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+            className={`${BTN} mt-2 flex w-fit border-accent-2 bg-accent-2 text-white disabled:opacity-50`}
             data-testid="fact-pick-outline"
           >
             <MousePointerClick className="h-4 w-4" aria-hidden="true" />
@@ -342,7 +342,7 @@ export default function FactRow({
                     type="button"
                     disabled={busy}
                     onClick={() => onAddOpening?.(sug)}
-                    className={`${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-left text-white disabled:opacity-50`}
+                    className={`${BTN} border-accent-2 bg-accent-2 text-left text-white disabled:opacity-50`}
                   >
                     <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {cleanUserText(sug.label || '')}
@@ -373,7 +373,7 @@ export default function FactRow({
         {/* Number editor — aukštis, plotas, perimetras, pertvaros. */}
         {editing && kind === 'number' && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`f-${fact.key}`}>
+            <label className="text-[14px] text-ink-2" htmlFor={`f-${fact.key}`}>
               {t(`project.roomSheet.edit${EDIT_LABEL[fact.key] || 'Perimetras'}`)}
             </label>
             <input
@@ -387,13 +387,13 @@ export default function FactRow({
                 if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitNumber(); }
                 if (e.key === 'Escape') setEditing(false);
               }}
-              className="h-11 w-28 rounded-[2px] border border-[hsl(var(--conf-med))] bg-card px-2 text-right font-mono text-[16px]"
+              className="h-11 w-28 rounded-[2px] border border-conf-med bg-card px-2 text-right font-mono text-[16px]"
             />
             <button
               type="button"
               disabled={busy}
               onClick={commitNumber}
-              className={`${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white disabled:opacity-50`}
+              className={`${BTN} border-accent-2 bg-accent-2 text-white disabled:opacity-50`}
             >
               {busy ? t('project.roomSheet.saving') : t('project.roomSheet.save')}
             </button>
@@ -402,7 +402,7 @@ export default function FactRow({
                 type="button"
                 disabled={busy}
                 onClick={commitNumberForAll}
-                className={`${BTN} border-[hsl(var(--accent-2))] bg-card text-[hsl(var(--accent-2))] hover:bg-[hsl(var(--accent-2)/0.08)] disabled:opacity-50`}
+                className={`${BTN} border-accent-2 bg-card text-accent-2 hover:bg-accent-2/[0.08] disabled:opacity-50`}
                 data-testid="save-for-all"
               >
                 {t('project.roomSheet.saveForAll', { count: alsoRooms.length + 1 })}
@@ -459,7 +459,7 @@ export default function FactRow({
                   aria-pressed={room?.grindu_danga === v}
                   onClick={() => { onSaveChoice?.(field, v); setEditing(false); }}
                   className={`${BTN} ${room?.grindu_danga === v
-                    ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]'
+                    ? 'border-accent-2 bg-accent-2/[0.08]'
                     : 'border-border bg-card hover:bg-muted'} disabled:opacity-50`}
                 >
                   {t(`project.roomSheet.${key}`)}
@@ -474,7 +474,7 @@ export default function FactRow({
 
         {editing && kind === 'choice' && field === 'paskirtis' && (
           <div className="mt-2">
-            <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`p-${fact.key}`}>
+            <label className="text-[14px] text-ink-2" htmlFor={`p-${fact.key}`}>
               {t('project.roomSheet.paskirtisLabel')}
             </label>
             <select
@@ -501,7 +501,7 @@ export default function FactRow({
           disabled={busy}
           onClick={onAccept}
           className={`${BTN} ${verified
-            ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+            ? 'border-accent-2 bg-accent-2 text-white'
             : 'border-border bg-card hover:bg-muted'} disabled:opacity-50`}
         >
           <Check className="h-4 w-4" aria-hidden="true" />

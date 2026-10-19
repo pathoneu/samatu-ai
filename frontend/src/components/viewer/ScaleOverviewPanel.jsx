@@ -19,7 +19,7 @@ import { visiblePageOf } from '@/lib/visiblePage';
 
 const STATE_CLASS = {
   nenustatytas: 'border-border text-muted-foreground',
-  spejamas: 'border-[hsl(var(--conf-med))] text-foreground bg-[hsl(var(--conf-med)/0.12)]',
+  spejamas: 'border-conf-med text-foreground bg-conf-med/[0.12]',
   patvirtintas: 'border-primary text-primary',
 };
 

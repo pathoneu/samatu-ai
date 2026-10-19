@@ -45,7 +45,7 @@ function AreaSummarySection({ project }) {
     <div className="border-t border-border" data-testid="area-summary">
       <div className="px-4 pt-4 pb-2">
         <h3 className="text-[15px] font-semibold">Projekto plotas</h3>
-        <p className="mt-0.5 text-[14px] text-[hsl(var(--ink-2))]">
+        <p className="mt-0.5 text-[14px] text-ink-2">
           Tas pats plotas trimis būdais — jei skaičiai labai skiriasi, verta pažiūrėti, kodėl.
         </p>
       </div>
@@ -54,7 +54,7 @@ function AreaSummarySection({ project }) {
           <li key={e.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-border px-4 py-3">
             <div className="min-w-0">
               <p className="text-[14px] font-semibold">{e.label}</p>
-              <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{e.sentence}</p>
+              <p className="mt-0.5 text-[14px] leading-snug text-ink-2">{e.sentence}</p>
             </div>
             <p className={`font-mono text-[16px] ${e.value == null ? 'text-muted-foreground' : ''}`}>
               {e.value == null ? '—' : `${ltNumber(e.value, 2)} m²`}
@@ -76,14 +76,14 @@ function ReadTablesSection({ project }) {
     <div className="border-t border-border" data-testid="read-tables">
       <div className="px-4 pt-4 pb-2">
         <h3 className="text-[15px] font-semibold">Brėžinio lentelės</h3>
-        <p className="mt-0.5 text-[14px] text-[hsl(var(--ink-2))]">Lentelės, perskaitytos iš brėžinio, — atsisiųskite ir palyginkite savo Excel.</p>
+        <p className="mt-0.5 text-[14px] text-ink-2">Lentelės, perskaitytos iš brėžinio, — atsisiųskite ir palyginkite savo Excel.</p>
       </div>
       <ul className="list-none p-0">
         {list.map(([kind, s]) => (
           <li key={kind} className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
             <span className="text-[14px]">
               <span className="font-semibold">{s.title || kind}</span>
-              <span className="text-[hsl(var(--ink-2))]"> · {s.rows.length} eil.{s.page ? ` · ${s.page} lapas` : ''}</span>
+              <span className="text-ink-2"> · {s.rows.length} eil.{s.page ? ` · ${s.page} lapas` : ''}</span>
             </span>
             <a
               href={evidenceUrl(`/api/projects/${encodeURIComponent(project.id)}/lenteles/${encodeURIComponent(kind)}.xlsx`)}
@@ -177,7 +177,7 @@ function AuthorFigureRow({ row, projectId, lastOfGroup }) {
         <p className="font-mono text-[16px]">
           {ltNumber(row.value, 2)} {unitLabel}
           {showOursHere && (
-            <span className="ml-3 text-[hsl(var(--ink-2))]">
+            <span className="ml-3 text-ink-2">
               {' · '}{t('project.roomSheet.generalAuthorOurs', { value: ltNumber(row.ours.value, 2), unit: unitLabel })}
             </span>
           )}
@@ -192,7 +192,7 @@ function AuthorFigureRow({ row, projectId, lastOfGroup }) {
             {t('project.roomSheet.generalAuthorGroupTotal', {
               count: row.group.size, total: ltNumber(row.group.designerTotal, 2), unit: unitLabel,
             })}
-            <span className="ml-3 text-[hsl(var(--ink-2))]">
+            <span className="ml-3 text-ink-2">
               {' · '}{t('project.roomSheet.generalAuthorOurs', { value: ltNumber(row.ours.value, 2), unit: unitLabel })}
             </span>
           </p>
@@ -219,7 +219,7 @@ function Choice({ label, options, value, notes, busy, onPick, labelOf }) {
               onClick={() => onPick(opt)}
               className={`inline-flex min-h-[44px] items-center rounded-[2px] border px-4 text-[15px] font-semibold ${
                 active
-                  ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+                  ? 'border-accent-2 bg-accent-2 text-white'
                   : 'border-border bg-card hover:bg-muted disabled:opacity-60'
               }`}
             >
@@ -246,7 +246,7 @@ function RotbandShare({ scope, busy, onSaveScope }) {
   };
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
-      <label className="flex items-center gap-2 text-[14px] text-[hsl(var(--ink-2))]">
+      <label className="flex items-center gap-2 text-[14px] text-ink-2">
         {t('project.roomSheet.scopeRotbandPct')}
         <input
           type="text"
@@ -280,7 +280,7 @@ function UnclaimedLabels({ project, busy, onAddRoom }) {
     <div>
       <div className="border-t border-border px-4 pt-4 pb-1">
         <h3 className="text-[15px] font-semibold">{t('project.roomSheet.unclaimedTitle')}</h3>
-        <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.unclaimedIntro')}</p>
+        <p className="mt-0.5 text-[13px] text-ink-2">{t('project.roomSheet.unclaimedIntro')}</p>
       </div>
       <ul className="list-none p-0">
         {labels.map((u) => {
@@ -303,7 +303,7 @@ function UnclaimedLabels({ project, busy, onAddRoom }) {
                 type="button"
                 disabled={busy}
                 onClick={() => onAddRoom(roomFromPlanLabel(project, u))}
-                className="inline-flex min-h-[44px] items-center rounded-[2px] border border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] px-3 text-[14px] font-semibold text-white disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center rounded-[2px] border border-accent-2 bg-accent-2 px-3 text-[14px] font-semibold text-white disabled:opacity-50"
               >
                 {t('project.roomSheet.unclaimedAdd')}
               </button>
@@ -323,7 +323,7 @@ function ScopeSection({ project, busy, onSaveScope }) {
     <div>
       <div className="border-t border-border px-4 pt-4 pb-1">
         <h3 className="text-[15px] font-semibold">{t('project.roomSheet.scopeTitle')}</h3>
-        <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.scopeIntro')}</p>
+        <p className="mt-0.5 text-[13px] text-ink-2">{t('project.roomSheet.scopeIntro')}</p>
       </div>
       <Choice
         label={t('project.roomSheet.scopeLubosLabel')}
@@ -378,11 +378,11 @@ function ScopeSection({ project, busy, onSaveScope }) {
                 disabled={busy}
                 onClick={() => onSaveScope?.(withFamily(scope, fam, !on))}
                 className={`inline-flex min-h-[44px] items-center gap-2 rounded-[2px] border px-3 text-[15px] ${
-                  on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))]/10 font-semibold' : 'border-border bg-card text-muted-foreground'
+                  on ? 'border-accent-2 bg-accent-2/10 font-semibold' : 'border-border bg-card text-muted-foreground'
                 }`}
               >
                 <span aria-hidden className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border text-[12px] ${
-                  on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white' : 'border-border'}`}>
+                  on ? 'border-accent-2 bg-accent-2 text-white' : 'border-border'}`}>
                   {on ? '✓' : ''}
                 </span>
                 {t(`newProject.q.family.${fam}`)}
@@ -425,7 +425,7 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
         <h2 id="general-facts" className="text-[17px] font-semibold">
           {t('project.roomSheet.generalTitle')}
         </h2>
-        <p className="mt-0.5 text-[14px] text-[hsl(var(--ink-2))]">
+        <p className="mt-0.5 text-[14px] text-ink-2">
           {t('project.roomSheet.generalIntro')}
         </p>
       </div>
@@ -464,7 +464,7 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
                 : 'project.roomSheet.generalCeilingWhy')}
             </p>
           </div>
-          <Check className="mt-1 h-5 w-5 text-[hsl(var(--accent-2))]" aria-hidden="true" />
+          <Check className="mt-1 h-5 w-5 text-accent-2" aria-hidden="true" />
         </div>
       )}
 
@@ -491,7 +491,7 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
         <div>
           <div className="border-t border-border px-4 pt-4 pb-2">
             <h3 className="text-[15px] font-semibold">{t('project.roomSheet.generalAuthorTitle')}</h3>
-            <p className="mt-0.5 text-[13px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.generalAuthorIntro')}</p>
+            <p className="mt-0.5 text-[13px] text-ink-2">{t('project.roomSheet.generalAuthorIntro')}</p>
           </div>
           <ul className="list-none p-0">
             {authorRows.map((row, i) => {

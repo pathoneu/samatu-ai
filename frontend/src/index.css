@@ -18,7 +18,7 @@
        parchment surfaces, white panels, slate ink, deep-slate primary buttons,
        ONE muted evergreen accent (focus/active/links), grey hairlines, sharp
        2px radius. IBM Plex Sans + IBM Plex Mono. The app runs the LIGHT theme
-       (no `dark` class on <html>); the `.dark` block below is inert compat.
+       (no `dark` class on <html>; the inert `.dark` block and `dark:` classes went in v3 W6-A).
        ────────────────────────────────────────────────────────────────────── */
 
     /* Surfaces — parchment page, white elevated panels */
@@ -151,43 +151,6 @@
 
     /* Elevation: one tinted slate shadow ink (tailwind boxShadow sm…2xl), not Tailwind's black. */
     --shadow-ink: 201 32% 14%;
-  }
-
-  /* Dark parity block — INERT: the app runs the light theme and no element carries a `.dark`
-     class (CLAUDE.md "Operational rules"). Kept as compat until the look is decided (v3 wave 6). */
-  .dark {
-    --background: 220 18% 10%;
-    --foreground: 216 16% 94%;
-    --card: 220 18% 13%;
-    --card-foreground: 216 16% 94%;
-    --popover: 220 18% 13%;
-    --popover-foreground: 216 16% 94%;
-    --primary: 22 93% 54%;
-    --primary-foreground: 220 18% 10%;
-    --secondary: 222 16% 16%;
-    --secondary-foreground: 216 16% 94%;
-    --muted: 222 16% 16%;
-    --muted-foreground: 215 11% 59%;
-    --accent: 217 18% 14%;
-    --accent-foreground: 216 16% 94%;
-    --destructive: 0 62% 52%;
-    --destructive-foreground: 216 16% 94%;
-    --border: 220 15% 19%;
-    --input: 220 15% 19%;
-    --ring: 22 93% 54%;
-    --chart-1: 22 93% 54%;
-    --chart-2: 215 11% 59%;
-    --chart-3: 152 45% 45%;
-    --chart-4: 22 100% 64%;
-    --chart-5: 216 16% 94%;
-    --sidebar-background: 220 18% 13%;
-    --sidebar-foreground: 215 11% 59%;
-    --sidebar-primary: 22 93% 54%;
-    --sidebar-primary-foreground: 220 18% 10%;
-    --sidebar-accent: 217 18% 14%;
-    --sidebar-accent-foreground: 216 16% 94%;
-    --sidebar-border: 220 15% 19%;
-    --sidebar-ring: 22 93% 54%;
   }
 }
 

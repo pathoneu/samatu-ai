@@ -195,7 +195,7 @@ export function ViewCrosshair({ rootRef, enabled }) {
   }, [rootRef, enabled]);
   if (!enabled || !at) return null;
   // fixed, in client px: the lines span the canvas wherever the viewer sits on the page
-  const line = 'fixed pointer-events-none z-panel bg-[hsl(var(--ov-selected)/0.55)]';
+  const line = 'fixed pointer-events-none z-panel bg-ov-selected/55';
   return (
     <div className="pointer-events-none" data-testid="view-crosshair-lines" aria-hidden="true">
       <span className={line} style={{ left: at.left, width: at.w, top: at.y, height: 1 }} />

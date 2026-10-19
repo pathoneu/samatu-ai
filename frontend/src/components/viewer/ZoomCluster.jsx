@@ -80,7 +80,7 @@ function AreaZoomOverlay({ anchorRef, onDone, onCancel }) {
     >
       {box && (
         <div
-          className="fixed border-2 border-dashed border-[hsl(var(--ov-proposed))] bg-[hsl(var(--ov-proposed)/0.08)] pointer-events-none"
+          className="fixed border-2 border-dashed border-ov-proposed bg-ov-proposed/[0.08] pointer-events-none"
           style={box}
         />
       )}

@@ -1096,7 +1096,7 @@ export default function InteriorWorkspace({
           className="shrink-0 max-h-[45%] overflow-y-auto border-b border-border bg-card px-3 py-2 empty:hidden"
         />
         <div
-          className={`relative flex-1 min-h-0 overflow-hidden ${picking ? 'ring-2 ring-inset ring-[hsl(var(--accent-2))] [&_*]:!cursor-crosshair' : ''}`}
+          className={`relative flex-1 min-h-0 overflow-hidden ${picking ? 'ring-2 ring-inset ring-accent-2 [&_*]:!cursor-crosshair' : ''}`}
           data-picking={picking ? '1' : undefined}
         >
           <div

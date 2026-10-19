@@ -143,7 +143,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         aria-expanded={open}
         aria-haspopup="dialog"
         title={`${chip.sentence}. Spustelėkite — patvirtinti arba nustatyti.`}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-panel border bg-card text-ui shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${guessed ? 'border-[hsl(var(--ov-proposed))]' : 'border-border'}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-panel border bg-card text-ui shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${guessed ? 'border-ov-proposed' : 'border-border'}`}
         data-testid="scale-chip"
         data-scale-state={chip.state}
       >

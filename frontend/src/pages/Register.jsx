@@ -170,7 +170,7 @@ export default function Register() {
             <label className="flex items-start gap-2.5 text-sm cursor-pointer pt-1">
               <input
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
+                className="mt-0.5 h-4 w-4 accent-primary"
                 checked={agreed}
                 onChange={e => setAgreed(e.target.checked)}
               />

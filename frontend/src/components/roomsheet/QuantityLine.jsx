@@ -55,7 +55,7 @@ export default function QuantityLine({
   };
 
   return (
-    <div className={`border-t border-border px-4 py-2.5 ${open ? 'bg-[hsl(var(--surface-2))]' : ''}`}>
+    <div className={`border-t border-border px-4 py-2.5 ${open ? 'bg-surface-2' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
@@ -92,7 +92,7 @@ export default function QuantityLine({
       </div>
 
       {overridden && (
-        <p className="mt-1 flex items-center gap-1.5 text-[13px] text-[hsl(var(--accent-2))]">
+        <p className="mt-1 flex items-center gap-1.5 text-[13px] text-accent-2">
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
           {t('project.roomSheet.overrideSaved')}
         </p>
@@ -100,7 +100,7 @@ export default function QuantityLine({
 
       {editing && canOverride && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <label className="text-[14px] text-[hsl(var(--ink-2))]" htmlFor={`q-${quantity.row_id}`}>
+          <label className="text-[14px] text-ink-2" htmlFor={`q-${quantity.row_id}`}>
             {t('project.roomSheet.overrideLabel')}
           </label>
           <input
@@ -113,13 +113,13 @@ export default function QuantityLine({
               if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commit(); }
               if (e.key === 'Escape') setEditing(false);
             }}
-            className="h-11 w-28 rounded-[2px] border border-[hsl(var(--accent-2))] bg-card px-2 text-right font-mono text-[16px]"
+            className="h-11 w-28 rounded-[2px] border border-accent-2 bg-card px-2 text-right font-mono text-[16px]"
           />
           <button
             type="button"
             disabled={busy}
             onClick={commit}
-            className="inline-flex min-h-[44px] items-center rounded-[2px] border border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] px-3 text-[14px] font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center rounded-[2px] border border-accent-2 bg-accent-2 px-3 text-[14px] font-semibold text-white disabled:opacity-50"
           >
             {t('project.roomSheet.save')}
           </button>
@@ -135,7 +135,7 @@ export default function QuantityLine({
             <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5">
               {terms.map((term) => (
                 <div key={term.label} className="contents">
-                  <dt className="text-[14px] text-[hsl(var(--ink-2))]">{term.label}</dt>
+                  <dt className="text-[14px] text-ink-2">{term.label}</dt>
                   <dd className="text-right font-mono text-[14px] tabular-nums">
                     {ltNumber(term.value, 2)}
                   </dd>

@@ -131,9 +131,9 @@ export default function ProcessingStateStream({
       {validationWarning && !error && (
         <div
           role="status"
-          className="mb-5 max-w-md rounded-lg border border-[hsl(var(--conf-med))]/45 bg-card p-3 text-xs text-foreground"
+          className="mb-5 max-w-md rounded-lg border border-conf-med/45 bg-card p-3 text-xs text-foreground"
         >
-          <span className="mr-1.5 font-medium text-[hsl(var(--conf-med))]">
+          <span className="mr-1.5 font-medium text-conf-med">
             {t('upload.stream.warningLabel')}
           </span>
           {validationWarning}

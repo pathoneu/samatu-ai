@@ -56,12 +56,14 @@ export default function SanitySeverityPill({ sanity, onOpen }) {
         padding: '0 8px',
         fontSize: 12,
         fontWeight: 500,
-        color: `hsl(${tone})`,
+        // the words in ink, the tone on the frame, tint and icon (the Notice rule): amber words on the
+        // amber tint were 4,1:1 on the parchment bar (ui-probe, v3 W6-A)
+        color: 'hsl(var(--foreground))',
         border: `1px solid hsl(${tone} / 0.4)`,
         background: `hsl(${tone} / 0.08)`,
       }}
     >
-      <Icon className="w-3 h-3 shrink-0" />
+      <Icon className="w-3 h-3 shrink-0" style={{ color: `hsl(${tone})` }} />
       <span className="whitespace-nowrap">
         {t('project.sanity.pillWarnings', { count: counts.warnings })}
         {' · '}

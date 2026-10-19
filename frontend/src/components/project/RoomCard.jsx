@@ -408,7 +408,7 @@ export default function RoomCard({ room, onChange, onRemove, onShowOnPdf, projec
 
       {/* Eksplikacija row anchor — ground-truth source widget (replaces unreliable bbox overlay) */}
       {!editing && room.eksplikacija_row_idx != null && (
-        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-[11px] rounded-full border border-emerald-200 dark:border-emerald-800">
+        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[11px] rounded-full border border-emerald-200">
           <BookOpen className="w-3 h-3" />
           <span>{t('project.roomCard.eksRowPrefix', { idx: room.eksplikacija_row_idx })}</span>
           {project?._eksplikacija?.eksplikacija_source_page && onJumpToPage && (
@@ -525,7 +525,7 @@ function DesignerMaterialSpecs({ room, project }) {
       <button
         onClick={handleFetch}
         disabled={loading}
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 text-[11px] rounded-full border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-950/50 transition-colors disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-violet-50 text-violet-700 text-[11px] rounded-full border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50"
         title={t('project.roomCard.designerMaterialsTitle')}
       >
         {loading
@@ -542,7 +542,7 @@ function DesignerMaterialSpecs({ room, project }) {
       )}
 
       {open && specs && (
-        <div className="mt-2 p-2 bg-violet-50/50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-800/50 rounded text-[11px] space-y-1.5">
+        <div className="mt-2 p-2 bg-violet-50/50 border border-violet-200/50 rounded text-[11px] space-y-1.5">
           {!hasAny && (
             <div className="text-muted-foreground italic">
               {t('project.roomCard.noDesignerSpecs')}
@@ -550,8 +550,8 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.paint && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specPaint')}</div>
-              <div className="text-violet-800 dark:text-violet-300">
+              <div className="font-medium text-violet-900">{t('project.roomCard.specPaint')}</div>
+              <div className="text-violet-800">
                 {[specs.paint.brand, specs.paint.code, specs.paint.name]
                   .filter(Boolean).join(' — ')}
                 {specs.paint.where && (
@@ -562,8 +562,8 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.sienos_plyteles && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specWallTiles')}</div>
-              <div className="text-violet-800 dark:text-violet-300">
+              <div className="font-medium text-violet-900">{t('project.roomCard.specWallTiles')}</div>
+              <div className="text-violet-800">
                 {[specs.sienos_plyteles.brand, specs.sienos_plyteles.model]
                   .filter(Boolean).join(' ')}
                 {specs.sienos_plyteles.size_mm && (
@@ -577,8 +577,8 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.grindys_plyteles && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specFloorTiles')}</div>
-              <div className="text-violet-800 dark:text-violet-300">
+              <div className="font-medium text-violet-900">{t('project.roomCard.specFloorTiles')}</div>
+              <div className="text-violet-800">
                 {[specs.grindys_plyteles.brand, specs.grindys_plyteles.model]
                   .filter(Boolean).join(' ')}
                 {specs.grindys_plyteles.size_mm && (
@@ -592,8 +592,8 @@ function DesignerMaterialSpecs({ room, project }) {
           )}
           {specs.grindys_medines && (
             <div>
-              <div className="font-medium text-violet-900 dark:text-violet-200">{t('project.roomCard.specWoodFloor')}</div>
-              <div className="text-violet-800 dark:text-violet-300">
+              <div className="font-medium text-violet-900">{t('project.roomCard.specWoodFloor')}</div>
+              <div className="text-violet-800">
                 {[specs.grindys_medines.brand, specs.grindys_medines.model]
                   .filter(Boolean).join(' ')}
                 {specs.grindys_medines.supplier && (
@@ -603,7 +603,7 @@ function DesignerMaterialSpecs({ room, project }) {
             </div>
           )}
           {specs._meta?.pages_inspected && (
-            <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-violet-200/50 dark:border-violet-800/50">
+            <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-violet-200/50">
               {t('project.roomCard.specSource', { pages: specs._meta.pages_inspected.join(', ') })}{specs._cached && t('project.roomCard.specCache')}
             </div>
           )}

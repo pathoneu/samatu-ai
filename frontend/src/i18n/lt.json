@@ -2128,10 +2128,10 @@
   },
   "workspace": {
     "search": "🔍 Ieškoti",
-    "aiRun": "✨ Pathon",
+    "aiRun": "Pathon",
     "ai": {
       "running": "⏳ Skaitome…",
-      "run": "✨ Paleisti Pathon",
+      "run": "Paleisti Pathon",
       "desc": "Peržvelgsime visus puslapius ir užpildysime KŽ eilutes. Esamos 🔒 užfiksuotos eilutės liks nepakitusios.",
       "recentRuns": "Paskutiniai paleidimai",
       "noRuns": "Dar nebuvo skaitymų.",

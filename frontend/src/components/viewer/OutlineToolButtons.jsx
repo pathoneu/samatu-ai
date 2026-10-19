@@ -12,8 +12,8 @@ const TOOLS = [
 
 export default function OutlineToolButtons({ focusedRoomNr, active = null, onStart, onCancel }) {
   if (focusedRoomNr == null || !onStart) return null;
-  const btn = 'inline-flex items-center gap-1 px-1.5 py-1 rounded text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]';
-  const pressed = 'inline-flex items-center gap-1 px-1.5 py-1 rounded bg-[hsl(var(--viewer-chrome-active)/0.18)] text-[hsl(var(--viewer-chrome-active))]';
+  const btn = 'inline-flex items-center gap-1 px-1.5 py-1 rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover';
+  const pressed = 'inline-flex items-center gap-1 px-1.5 py-1 rounded bg-viewer-chrome-active/[0.18] text-viewer-chrome-active';
   return (
     <span className="inline-flex items-center gap-0.5 mr-1" data-testid="outline-tool-buttons">
       {TOOLS.map(({ id, Icon, label, title }) => (

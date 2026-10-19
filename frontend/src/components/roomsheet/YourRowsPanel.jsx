@@ -38,7 +38,7 @@ function BlankRow({ row, onSave }) {
         <p className="text-[16px]">{row.aprasymas}</p>
         {row._pastaba && <p className="text-[13px] text-muted-foreground">{row._pastaba}</p>}
       </div>
-      <label className="flex items-center gap-2 text-[14px] text-[hsl(var(--ink-2))]">
+      <label className="flex items-center gap-2 text-[14px] text-ink-2">
         <input
           type="text"
           inputMode="decimal"
@@ -55,7 +55,7 @@ function BlankRow({ row, onSave }) {
         type="button"
         onClick={save}
         disabled={saving || draft.trim() === ''}
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[2px] border border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] px-3 text-[14px] font-semibold text-white disabled:opacity-50"
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[2px] border border-accent-2 bg-accent-2 px-3 text-[14px] font-semibold text-white disabled:opacity-50"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
         {t('project.roomSheet.save')}
@@ -115,7 +115,7 @@ export default function YourRowsPanel({ project, onProjectChange }) {
             </span>
           )}
         </h2>
-        <p className="mt-1 text-[15px] text-[hsl(var(--ink-2))]">{t('project.roomSheet.yourRowsIntro')}</p>
+        <p className="mt-1 text-[15px] text-ink-2">{t('project.roomSheet.yourRowsIntro')}</p>
       </div>
       {rows == null ? (
         <p className="flex items-center gap-2 border-t border-border px-4 py-3 text-[14px] text-muted-foreground">

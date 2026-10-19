@@ -56,7 +56,7 @@ function useNearViewport(rootRef) {
   return [ref, near];
 }
 
-const selectCls = 'w-full h-7 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] px-1.5 text-meta text-[hsl(var(--viewer-chrome-foreground))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--viewer-chrome-active))]';
+const selectCls = 'w-full h-7 rounded-[2px] border border-viewer-chrome-border bg-viewer-chrome-muted px-1.5 text-meta text-viewer-chrome-foreground focus:outline-none focus:ring-1 focus:ring-viewer-chrome-active';
 
 function SheetEditor({ sheet, onSave, onCancel, onReset, skipped = false, onToggleSkip = null }) {
   const [name, setName] = useState(sheet.fullName);
@@ -89,19 +89,19 @@ function SheetEditor({ sheet, onSave, onCancel, onReset, skipped = false, onTogg
       <select value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Lapo grupė" className={selectCls}>
         {DISCIPLINE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <p className="text-meta leading-snug text-[hsl(var(--viewer-chrome-foreground)/0.75)]" title={sheet.autoName}>
+      <p className="text-meta leading-snug text-viewer-chrome-foreground/75" title={sheet.autoName}>
         Automatinis: {sheet.autoName} · {sheetTypeLabel(sheet.autoTipas)}
       </p>
       <div className="flex items-center gap-1">
-        <button type="button" onClick={save} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] text-white text-meta">
+        <button type="button" onClick={save} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] bg-viewer-chrome-active text-white text-meta">
           <Check className="w-3 h-3" />Išsaugoti
         </button>
-        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] text-meta text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))]">
+        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 h-6 px-2 rounded-[2px] border border-viewer-chrome-border text-meta text-viewer-chrome-foreground hover:bg-viewer-chrome-hover">
           <X className="w-3 h-3" />Atšaukti
         </button>
       </div>
       {sheet.overridden && (
-        <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-active))] hover:underline">
+        <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-meta text-viewer-chrome-active hover:underline">
           <RotateCcw className="w-3 h-3" />Atkurti automatinį
         </button>
       )}
@@ -116,7 +116,7 @@ function SkipButton({ skipped, onClick }) {
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="inline-flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] hover:text-[hsl(var(--viewer-chrome-active))] hover:underline"
+      className="inline-flex items-center gap-1 text-meta text-viewer-chrome-foreground hover:text-viewer-chrome-active hover:underline"
       title={skipped
         ? 'Programa vėl skaitys šį lapą, kai perskaitysite brėžinį iš naujo'
         : 'Lapas lieka PDF ir brėžinyje, bet programa jo neskaitys (perskaitant iš naujo ir „Perskaityti lapą“) — pvz. viršelis ar kitas objektas'}
@@ -137,43 +137,43 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
       ref={setRefs}
       data-sheet-page={sheet.page}
       aria-current={current ? 'page' : undefined}
-      className={`group relative px-2 py-1.5 border-l-2 ${current ? 'border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-muted))]' : 'border-transparent hover:bg-[hsl(var(--viewer-chrome-hover))]'}`}
+      className={`group relative px-2 py-1.5 border-l-2 ${current ? 'border-viewer-chrome-active bg-viewer-chrome-muted' : 'border-transparent hover:bg-viewer-chrome-hover'}`}
       data-skipped={skipped ? '1' : undefined}
     >
       <button type="button" onClick={onOpen} onDoubleClick={onEdit} className="flex w-full items-start gap-2 text-left focus:outline-none" title={`Lapas ${sheet.page}: ${sheet.fullName}`}>
-        <span className={`shrink-0 w-[60px] min-h-[42px] flex items-start justify-center bg-white rounded-[2px] overflow-hidden ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
+        <span className={`shrink-0 w-[60px] min-h-[42px] flex items-start justify-center bg-white rounded-[2px] overflow-hidden ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-viewer-chrome-active' : 'ring-1 ring-viewer-chrome-border'}`}>
           {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 60, height: 'auto', display: 'block' }} />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className={`mono tabular text-meta ${current ? 'text-[hsl(var(--viewer-chrome-active))] font-semibold' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`} title={numberTitle}>
+            <span className={`mono tabular text-meta ${current ? 'text-viewer-chrome-active font-semibold' : 'text-viewer-chrome-foreground/75'}`} title={numberTitle}>
               {sheet.shortNumber || sheet.page}
             </span>
-            {sheet.shortNumber && <span className="mono tabular text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]">psl. {sheet.page}</span>}
+            {sheet.shortNumber && <span className="mono tabular text-meta text-viewer-chrome-foreground/75">psl. {sheet.page}</span>}
             {searching && (
               <span
-                className={`ml-auto mono tabular text-meta px-1 rounded-[2px] ${hits ? 'bg-[hsl(var(--viewer-chrome-active))] text-white' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}
+                className={`ml-auto mono tabular text-meta px-1 rounded-[2px] ${hits ? 'bg-viewer-chrome-active text-white' : 'text-viewer-chrome-foreground/75'}`}
                 title={hits ? `Paieškos rezultatų šiame lape: ${hits}` : 'Šiame lape paieška nieko nerado'}
                 data-testid="sheet-hits"
               >{hits || 0}</span>
             )}
           </span>
-          <span className="block text-meta leading-tight text-[hsl(var(--viewer-chrome-foreground))] line-clamp-2 break-words">
+          <span className="block text-meta leading-tight text-viewer-chrome-foreground line-clamp-2 break-words">
             {sheet.name}
           </span>
           <span className="mt-0.5 flex items-center gap-1 flex-wrap">
-            <span className="inline-flex items-center gap-1 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] px-1 text-meta leading-[14px] text-[hsl(var(--viewer-chrome-foreground)/0.75)]">
+            <span className="inline-flex items-center gap-1 rounded-[2px] border border-viewer-chrome-border px-1 text-meta leading-[14px] text-viewer-chrome-foreground/75">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: pageTypeColor(sheet.tipas) }} />
               {sheetTypeLabel(sheet.tipas)}
             </span>
             {sheet.overridden && (
-              <span className="text-meta text-[hsl(var(--viewer-chrome-active))]" title={`Pakeitėte jūs. Automatinis: ${sheet.autoName} · ${sheetTypeLabel(sheet.autoTipas)}`}>jūsų</span>
+              <span className="text-meta text-viewer-chrome-active" title={`Pakeitėte jūs. Automatinis: ${sheet.autoName} · ${sheetTypeLabel(sheet.autoTipas)}`}>jūsų</span>
             )}
             {!sheet.classified && !sheet.overridden && (
-              <span className="text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]" title="Šio lapo programa neklasifikavo — pavadinkite jį patys">neklasifikuotas</span>
+              <span className="text-meta text-viewer-chrome-foreground/75" title="Šio lapo programa neklasifikavo — pavadinkite jį patys">neklasifikuotas</span>
             )}
             {skipped && (
-              <span className="text-meta font-semibold text-[hsl(var(--viewer-chrome-foreground))]" data-testid="sheet-skipped-tag" title="Programa šio lapo neskaito — jis lieka PDF ir brėžinyje">neskaitomas</span>
+              <span className="text-meta font-semibold text-viewer-chrome-foreground" data-testid="sheet-skipped-tag" title="Programa šio lapo neskaito — jis lieka PDF ir brėžinyje">neskaitomas</span>
             )}
           </span>
         </span>
@@ -187,7 +187,7 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
           title="Pervadinti lapą"
           aria-label={`Pervadinti lapą ${sheet.page}`}
-          className="absolute right-1.5 top-1.5 w-6 h-6 rounded-[2px] flex items-center justify-center text-[hsl(var(--viewer-chrome-foreground)/0.75)] bg-[hsl(var(--viewer-chrome))] border border-[hsl(var(--viewer-chrome-border))] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[hsl(var(--viewer-chrome-active))]"
+          className="absolute right-1.5 top-1.5 w-6 h-6 rounded-[2px] flex items-center justify-center text-viewer-chrome-foreground/75 bg-viewer-chrome border border-viewer-chrome-border opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-viewer-chrome-active"
         >
           <Pencil className="w-3 h-3" />
         </button>
@@ -217,20 +217,20 @@ function SheetStripRow({ documentId, sheet, current, hits, searching, label, roo
         onFocus={onShowLabel}
         onBlur={onHideLabel}
         aria-label={label}
-        className={`flex w-full flex-col items-center gap-0.5 border-l-2 px-1 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--viewer-chrome-active))] ${current
-          ? 'border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-muted))]'
-          : 'border-transparent hover:bg-[hsl(var(--viewer-chrome-hover))]'}`}
+        className={`flex w-full flex-col items-center gap-0.5 border-l-2 px-1 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-viewer-chrome-active ${current
+          ? 'border-viewer-chrome-active bg-viewer-chrome-muted'
+          : 'border-transparent hover:bg-viewer-chrome-hover'}`}
       >
-        <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
+        <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-viewer-chrome-active' : 'ring-1 ring-viewer-chrome-border'}`}>
           {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 40, height: 'auto', display: 'block' }} />}
         </span>
-        <span className={`mono tabular text-meta leading-tight ${current ? 'font-semibold text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}>
+        <span className={`mono tabular text-meta leading-tight ${current ? 'font-semibold text-viewer-chrome-active' : 'text-viewer-chrome-foreground/75'}`}>
           {stripTag(sheet)}
         </span>
       </button>
       {searching && hits > 0 && (
         <span
-          className="pointer-events-none absolute right-1 top-1 rounded-[2px] bg-[hsl(var(--viewer-chrome-active))] px-1 text-meta leading-[16px] text-white mono tabular"
+          className="pointer-events-none absolute right-1 top-1 rounded-[2px] bg-viewer-chrome-active px-1 text-meta leading-[16px] text-white mono tabular"
           data-testid="sheet-hits"
         >{hits}</span>
       )}
@@ -288,7 +288,7 @@ function SheetStrip({ documentId, rail, currentPageOf, onExpand = null, skipped 
   return (
     <aside
       ref={rootRef}
-      className="w-14 shrink-0 overflow-y-auto overflow-x-hidden bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]"
+      className="w-14 shrink-0 overflow-y-auto overflow-x-hidden bg-viewer-chrome border-r border-viewer-chrome-border"
       aria-label="Brėžinio lapai"
       data-testid="sheet-rail"
       data-mode="strip"
@@ -300,7 +300,7 @@ function SheetStrip({ documentId, rail, currentPageOf, onExpand = null, skipped 
           title="Lapų sąrašas su pavadinimais ir tipais (T)"
           aria-label="Rodyti lapų sąrašą su pavadinimais"
           data-testid="sheet-rail-expand"
-          className="sticky top-0 z-10 flex w-full flex-col items-center gap-0.5 border-b border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome))] py-1.5 text-[hsl(var(--viewer-chrome-foreground))] hover:bg-[hsl(var(--viewer-chrome-hover))] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--viewer-chrome-active))]"
+          className="sticky top-0 z-10 flex w-full flex-col items-center gap-0.5 border-b border-viewer-chrome-border bg-viewer-chrome py-1.5 text-viewer-chrome-foreground hover:bg-viewer-chrome-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-viewer-chrome-active"
         >
           <PanelLeftOpen className="h-4 w-4" aria-hidden />
           <span className="text-[14px] leading-tight">Lapai</span>
@@ -308,7 +308,7 @@ function SheetStrip({ documentId, rail, currentPageOf, onExpand = null, skipped 
       )}
       {rail.groups.map((g, gi) => (
         <section key={g.key} aria-label={g.label}>
-          {gi > 0 && <div aria-hidden className="mx-2 my-1 border-t border-[hsl(var(--viewer-chrome-border))]" />}
+          {gi > 0 && <div aria-hidden className="mx-2 my-1 border-t border-viewer-chrome-border" />}
           <ul>
             {g.sheets.map((s) => (
               <SheetStripRow
@@ -375,7 +375,7 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
   return (
     <aside
       ref={rootRef}
-      className="w-[232px] shrink-0 overflow-y-auto bg-[hsl(var(--viewer-chrome))] border-r border-[hsl(var(--viewer-chrome-border))]"
+      className="w-[232px] shrink-0 overflow-y-auto bg-viewer-chrome border-r border-viewer-chrome-border"
       aria-label="Brėžinio lapai"
       data-testid="sheet-rail"
     >
@@ -388,11 +388,11 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
               type="button"
               onClick={() => toggleGroup(g.key)}
               aria-expanded={!isClosed}
-              className="sticky top-0 z-10 flex w-full items-center gap-1 px-2 h-7 bg-[hsl(var(--viewer-chrome))] border-b border-[hsl(var(--viewer-chrome-border))] text-meta font-semibold text-[hsl(var(--viewer-chrome-foreground)/0.75)] hover:text-[hsl(var(--viewer-chrome-foreground))]"
+              className="sticky top-0 z-10 flex w-full items-center gap-1 px-2 h-7 bg-viewer-chrome border-b border-viewer-chrome-border text-meta font-semibold text-viewer-chrome-foreground/75 hover:text-viewer-chrome-foreground"
             >
               {isClosed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               <span className="truncate">{g.label}</span>
-              <span className="ml-auto shrink-0 whitespace-nowrap mono tabular font-normal normal-case text-[hsl(var(--viewer-chrome-foreground)/0.75)]">
+              <span className="ml-auto shrink-0 whitespace-nowrap mono tabular font-normal normal-case text-viewer-chrome-foreground/75">
                 {searching ? `${groupHits} / ` : ''}{g.sheets.length}
               </span>
             </button>
@@ -424,7 +424,7 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
         );
       })}
       {rail.sheets.length === 0 && (
-        <p className="p-3 text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]">Lapų sąrašas dar neparuoštas.</p>
+        <p className="p-3 text-meta text-viewer-chrome-foreground/75">Lapų sąrašas dar neparuoštas.</p>
       )}
     </aside>
   );
