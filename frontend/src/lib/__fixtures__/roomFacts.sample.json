@@ -63,7 +63,7 @@
       "unit": "vnt.",
       "status": "read",
       "source": { "kind": "duru_zinynas", "page": 3, "rect_pct": [0.17, 0.27, 0.43, 0.58] },
-      "sentence": "1 langas, 1 durys. Matmenys — iš durų žiniaraščio. Brėžinys jų vietos nenurodo, todėl pažymėti negaliu — perskaičiuokite patalpoje.",
+      "sentence": "1 langas, 1 durys. Matmenys — iš durų žiniaraščio. Brėžinys jų vietos nenurodo, todėl pažymėti negaliu — jei skaičius kitas, įrašykite jį čia.",
       "crop_url": "/api/projects/objektas-x/evidence?page=3&rect=0.1700,0.2700,0.4300,0.5800&dpi=110",
       "editable": { "field": "elementai", "kind": "count" },
       "details": [
