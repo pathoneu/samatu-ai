@@ -132,7 +132,7 @@ export default function RoomDrawingPane({
   const pointRef = host?.pointRef;
   useEffect(() => {
     if (!hosted || !setCanvasCheck) return undefined;
-    if (pointRef) pointRef.current = pickOn ? (pt) => pickRef.current?.onPoint?.(displayPointOf(pt)) : null;
+    if (pointRef) pointRef.current = pickOn ? (pt) => pickRef.current?.onPoint?.(displayPointOf(pt), pt) : null;
     setCanvasCheck({ check: checkRef.current, pickActive: pickOn });
     return () => {
       if (pointRef) pointRef.current = null;
@@ -301,7 +301,7 @@ export default function RoomDrawingPane({
               check={check}
               focus={focus}
               laneScales={sheetScales}
-              onPagePoint={pick?.active && !pick.busy ? (pt) => pick.onPoint?.(displayPointOf(pt)) : null}
+              onPagePoint={pick?.active && !pick.busy ? (pt) => pick.onPoint?.(displayPointOf(pt), pt) : null}
             />
           </ViewerBoundary>
         ) : (

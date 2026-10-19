@@ -101,9 +101,9 @@ def _ask_aukstis(rows: list[tuple[dict, dict]], everyone: list[tuple[dict, dict]
         where = ", ".join(_nr(r) for r in same[:6]) + ("…" if len(same) > 6 else "")
         others = "Kitai patalpai" if n == 1 else f"Kitoms {n} patalpoms"
         why = (f"Aukštį radau užrašytą tik {_in_rooms(len(same))} {where}: {lt_num(proposed)} m. "
-               f"{others} imu tiek pat.")
+               f"{others} imu tiek pat. Pagal jūsų skaičių perskaičiuosiu sienų plotus.")
     else:
-        why = f"Lubų aukščio brėžinyje neradau — skaičiuoju su {lt_num(proposed)} m."
+        why = f"Lubų aukščio brėžinyje neradau — skaičiuoju su {lt_num(proposed)} m. Pagal jūsų skaičių perskaičiuosiu sienų plotus."
     return _q("aukstis", "number_all", "Kokio aukščio lubos?", why, items, unit="m", proposed=proposed)
 
 
@@ -195,15 +195,22 @@ def _ask_numbers(kind: str, rows: list[tuple[dict, dict]], one: str, many: str, 
     return _q(kind, "numbers", title, why, items, unit=asked[0][1].get("unit"))
 
 
+CHECKED_OPENINGS_KEY = "_angos_patikrinta_at"   # room: he answered its door and window count on the question card
+
+
 def _opening_check(fact: dict) -> tuple[str, str]:
-    """(what does not match and what to check — two short sentences; the room sheet's full account, for a
-    second look) for a room whose doors and windows no one click can settle.
+    """(what does not match — one or two short sentences; the room sheet's full account, for a second look) for a
+    room whose doors and windows no one click can settle.
 
     2026-10-06, contractor walkthrough on objektas_h: the question printed the fact's own sentence — every
     opening with its width, then „2 durys sąraše, kurioms angos sienose nematau" — and he could not tell what
-    was wrong or what to do. The mismatch is now said first, in his terms (the list against the walls), with
-    the one thing to check; the full account stays beside it for a second look. Counted off the fact's own
-    element rows, so the numbers are the ones the room sheet shows.
+    was wrong or what to do. The mismatch is now said first, in his terms (the list against the walls); the
+    full account stays beside it for a second look. Counted off the fact's own element rows, so the numbers
+    are the ones the room sheet shows.
+
+    2026-10-19 (founder, first walk of v3: „negaliu iškart vietoje pataisyti to, ką reikia"): the card answers
+    the count itself (`_opening_numbers` — the fields „Durų" / „Langų" pre-filled with what the walls show), so
+    the sentence no longer sends him to the room: it says what does not match, the card says what „Tinka" does.
 
     2026-10-06: leftover openings held back from the one-click list because a listed window (or door) of
     that kind stands in no opening (`fact["withheld"]`, room_facts._against_the_walls_stood) are said with
@@ -218,17 +225,17 @@ def _opening_check(fact: dict) -> tuple[str, str]:
             unbacked += n
         if not d.get("praejimas"):                # a passage is no door of the list
             listed += n
-    held = {str(w.get("tipas") or ""): str(w.get("sentence") or "") for w in fact.get("withheld") or []
-            if isinstance(w, dict) and w.get("sentence")}
+    # the held-back sentence without its „go and fix it on the room sheet" tail — the card fixes it
+    held = {str(w.get("tipas") or ""): str(w.get("sentence") or "").split(" Patikrinkite brėžinyje;")[0].strip()
+            for w in fact.get("withheld") or [] if isinstance(w, dict) and w.get("sentence")}
     heads = []
     if held.get("duris"):
         heads.append(held["duris"])               # names the doors no opening backs and the openings left
     elif unbacked:
         doors = f"Sąraše {listed} {element_label('duris', listed)}"
         fits = max(0, listed - unbacked)
-        head = (f"{doors}, o sienose — tik {fits} {_anga_word(fits)} durims: {unbacked} durų sienose neradau."
-                if fits else f"{doors}, bet sienose angų joms neradau.")
-        heads.append(head + " Atidarykite patalpą ir patikrinkite durų skaičių.")
+        heads.append(f"{doors}, o sienose — tik {fits} {_anga_word(fits)} durims: {unbacked} durų sienose neradau."
+                     if fits else f"{doors}, bet sienose angų joms neradau.")
     if held.get("langas"):
         heads.append(held["langas"])
     elif int(_f(fact.get("langai_be_angos")) or 0) > 0:
@@ -238,21 +245,61 @@ def _opening_check(fact: dict) -> tuple[str, str]:
                       if isinstance(d, dict) and d.get("tipas") == "langas")
         fits = max(0, windows - loose)
         lango = "lango" if loose % 10 == 1 and loose % 100 != 11 else "langų"
-        head = (f"Sąraše {windows} {element_label('langas', windows)}, o sienose — tik {fits} {_anga_word(fits)} "
-                f"langams: {loose} {lango} sienose neradau." if fits
-                else f"Sąraše {windows} {element_label('langas', windows)}, bet sienose "
+        heads.append(f"Sąraše {windows} {element_label('langas', windows)}, o sienose — tik {fits} {_anga_word(fits)} "
+                     f"langams: {loose} {lango} sienose neradau." if fits
+                     else f"Sąraše {windows} {element_label('langas', windows)}, bet sienose "
                      + ("angos jam neradau." if element_label("langas", windows) == "langas" else "angų jiems neradau."))
-        heads.append(head + " Atidarykite patalpą ir patikrinkite langų skaičių.")
     if heads:
         return " ".join(heads), said
     if not fact.get("details") and not (fact.get("openings") or {}).get("items"):
-        return "Durų ir langų šioje patalpoje neradau. Jei jų yra, atidarykite patalpą ir įrašykite.", ""
+        return "Durų ir langų šioje patalpoje neradau — šios patalpos sienų brėžinyje neperskaičiau.", ""
     if fact.get("status") == "assumed":
         # the walls show more openings than the list has doors and windows, and none of them is one a click
         # could add (a door to a room that has its doors, a window to a room that has its windows)
-        return ("Sienose matau daugiau angų, nei sąraše yra durų ir langų. Atidarykite patalpą ir patikrinkite, "
-                "ar sąraše nieko netrūksta."), said
+        return "Sienose matau daugiau angų, nei sąraše yra durų ir langų.", said
     return said, ""
+
+
+def _opening_proposal(numbers: dict) -> dict:
+    """What the card's fields open on: as drawn — except that a room whose listed doors the walls show NO
+    opening for at all keeps one of them. Every room has a way in; walls with no door opening at all mean the
+    walls missed it (the walls pass keeps such a door for the same reason), not that the room has none."""
+    d, w = numbers["durys"], numbers["langai"]
+    doors = d["sienose"] if d["sienose"] or not d["sarase"] else 1
+    return {"durys": doors, "langai": w["sienose"]}
+
+
+def _opening_numbers(room: dict, fact: dict) -> dict:
+    """The two numbers per kind the question card shows for a room to check (2026-10-19): how many doors
+    (windows) the list has, how many the walls show — the listed units an opening backs plus the openings
+    of that kind held back from the one-click list (`withheld`: most likely the same units at another
+    width) — and those free openings themselves, which the card's answer stands the units in. The proposal
+    is the walls' number (as drawn, the schedule reconcile's rule). Nothing is changed here.
+
+    Counted the walls pass's way (room_facts._stood_in_walls): a door marked `_be_angos` stands in no
+    opening, a window's units beyond its `_anga_ks` stand in none; a room the pass has not seen (an older
+    blob, or no walls read) shows the list's own numbers on both sides."""
+    from .universal_rules import kiekis_units
+    els = [e for e in (room.get("elementai") or []) if isinstance(e, dict)]
+    stood = any(e.get("_anga_ks") or e.get("_be_angos") or e.get("_praejimas") for e in els)
+    doors = [e for e in els if (e.get("tipas") or "") in _DOOR_TIPAI and not e.get("_praejimas")]
+    windows = [e for e in els if (e.get("tipas") or "") == "langas"]
+    units = lambda e: kiekis_units(_f(e.get("kiekis")))  # noqa: E731
+    listed_d = sum(units(e) for e in doors)
+    backed_d = listed_d - (sum(units(e) for e in doors if e.get("_be_angos")) if stood else 0)
+    listed_w = sum(units(e) for e in windows)
+    backed_w = sum(min(units(e), len(e.get("_anga_ks") or [])) for e in windows) if stood else listed_w
+    held = {str(w.get("tipas") or ""): w for w in fact.get("withheld") or [] if isinstance(w, dict)}
+
+    def free(tipas: str) -> list[dict]:
+        return [{"plotis_m": _f(o.get("plotis_m")), "i": str(o.get("i") or "")}
+                for o in (held.get(tipas) or {}).get("openings") or [] if isinstance(o, dict) and _f(o.get("plotis_m"))]
+
+    free_d, free_w = free("duris"), free("langas")
+    return {"durys": {"sarase": listed_d, "sienose": backed_d + len(free_d), "laisvos": free_d},
+            "langai": {"sarase": listed_w, "sienose": backed_w + len(free_w), "laisvos": free_w},
+            "sienos": isinstance(room.get("_angos_sienose"), dict),
+            "angos_brezinyje": len(((fact.get("openings") or {}).get("items")) or [])}
 
 
 def _offered_from_beyond(offered: list[dict], nr: str, s: dict) -> bool:
@@ -290,10 +337,16 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
                                page=((f.get("openings") or {}).get("page") or (f.get("source") or {}).get("page"))))
         # a room whose leftover openings were held back (2026-10-06) is named for a look even when it also
         # has an opening to offer — the held-back ones are said nowhere else in the question
-        if not suggestions or f.get("withheld"):
+        if (not suggestions or f.get("withheld")) and not r.get(CHECKED_OPENINGS_KEY):
+            # a room whose count he answered on the card (`_angos_patikrinta_at`) is answered — asking again
+            # would be a question about OUR evidence, not about his estimate
             sentence, details = _opening_check(f)
+            numbers = _opening_numbers(r, f)
+            src = f.get("source") or {}
             manual.append({"room_nr": _nr(r), "room_name": str(r.get("pavadinimas") or "").strip(),
-                           "sentence": sentence, "details": details})
+                           "sentence": sentence, "details": details, "page": src.get("page"),
+                           "rect_pct": src.get("rect_pct"), **numbers,
+                           "proposed": _opening_proposal(numbers)})
     n = len(items)
     if n:
         anga = "angą, kurios" if n % 10 == 1 and n % 100 != 11 else "angas, kurių" if n % 10 in range(2, 10) and n % 100 not in range(12, 20) else "angų, kurių"
@@ -302,10 +355,13 @@ def _ask_angos(rows: list[tuple[dict, dict]]) -> dict | None:
                "Plotį, aukštį ir rūšį galite pataisyti čia pat; nuimkite varnelę, jei tai ne durys ir ne langas.")
     else:
         m = len(manual)
+        if not m:
+            return None
         title = f"Durys ir langai: patikrinkite {m} {_rooms_word(m)}"
-        # each room says what to check (`_opening_check`); this only says why there is no „Tinka" here
-        why = ("Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta žemiau." if m == 1 else
-               "Čia vienu paspaudimu pataisyti negaliu — ką patikrinti, parašyta prie kiekvienos patalpos.")
+        # 2026-10-19: the count is answered on the card — the sentence says what the answer does
+        why = ("Įrašykite, kiek durų ir langų yra " + ("šioje patalpoje" if m == 1 else "kiekvienoje patalpoje")
+               + " — siūlau tiek, kiek nubraižyta sienose. Pagal jūsų skaičių perskaičiuosiu angokraščius, "
+               "dažomą sienų plotą ir grindjuostes.")
     q = _q("angos", "openings", title, why, items, unit="vnt.")
     q["manual"] = manual
     return q
@@ -367,8 +423,9 @@ def _ask_grindys(rows: list[tuple[dict, dict]]) -> dict | None:
     title = (f"Kokia grindų danga patalpoje {_name(asked[0][0])}?" if n == 1 else f"Kokia grindų danga šiose {n} patalpose?")
     return _q("grindys", "choices", title,
               # a plan that writes TWO coverings in a room asks too — the item's own sentence says which
-              "Brėžinys šių patalpų dangos vienareikšmiškai nepasako — parinkau pagal patalpos paskirtį." if n > 1 else
-              "Brėžinys šios patalpos dangos vienareikšmiškai nepasako — parinkau pagal patalpos paskirtį.", items)
+              ("Brėžinys šių patalpų dangos vienareikšmiškai nepasako — parinkau pagal patalpos paskirtį." if n > 1 else
+               "Brėžinys šios patalpos dangos vienareikšmiškai nepasako — parinkau pagal patalpos paskirtį.")
+              + " Pagal jūsų pasirinkimą perskaičiuosiu grindų dangos eilutes.", items)
 
 
 def _ask_apdaila(rows: list[tuple[dict, dict]]) -> dict | None:
@@ -382,7 +439,8 @@ def _ask_apdaila(rows: list[tuple[dict, dict]]) -> dict | None:
     n = len(items)
     title = (f"Ar dažomos patalpos {_name(asked[0][0])} sienos?" if n == 1 else f"Ar dažomos šių {n} patalpų sienos?")
     return _q("apdaila", "choices", title,
-              "Sienų apdailos brėžinyje neradau — parinkau pagal patalpos paskirtį. Plytelių plotus taisykite patalpos lape.",
+              "Sienų apdailos brėžinyje neradau — parinkau pagal patalpos paskirtį. Nedažomų sienų plotą išimsiu iš "
+              "dažymo eilučių.",
               items)
 
 
@@ -467,8 +525,9 @@ def _ask_lentele_angos(project: dict, rooms: list[dict], kind: str) -> dict | No
     head = "Durų žiniaraštyje" if kind == "durys" else "Langų žiniaraštyje"
     why = (f"{head} ({page} lapas) surašyta: {listed_text}. Sienose suskaičiuotos nubraižytos "
            + ("durų angos (durys tarp dviejų patalpų — vieną kartą)" if kind == "durys" else "langų angos")
-           + ". Siūlau skaičiuoti taip, kaip nubraižyta; jei teisingas žiniaraštis, patikrinkite patalpas, kuriose "
-           + f"{what} trūksta ar per daug.")
+           + ". Siūlau laikyti teisingu tai, kas nubraižyta. Jūsų atsakymas įsimenamas; sąmatos kiekiai nuo jo "
+           "nesikeičia — jie skaičiuojami pagal kiekvienos patalpos " + ("durų" if kind == "durys" else "langų")
+           + " sąrašą.")
     walls_missing = sum(1 for r in rooms if _nr(r) not in per)
     if walls_missing:
         why += (f" Sienos perskaitytos {len(per)} iš {len(rooms)} patalpų — kitose {what} nesuskaičiuota.")
@@ -554,8 +613,8 @@ def _ask_lentele_apdaila(project: dict, rooms: list[dict]) -> dict | None:
              f"plane — {_FLOOR_LT[first['proposed']]}. Kuri danga teisinga?" if n == 1 else
              f"Apdailos lentelė ir grindų planas nurodo skirtingas grindis {n} patalpose. Kurios teisingos?")
     return _q("lentele_apdaila", "choices", title,
-              "Siūlau taip, kaip nubraižyta grindų plane. Jei teisinga apdailos lentelė — pasirinkite jos dangą; "
-              "lentelės eilutę galite pamatyti brėžinyje.", items)
+              "Siūlau taip, kaip nubraižyta grindų plane. Jei teisinga apdailos lentelė — pasirinkite jos dangą: ją "
+              "įrašysiu patalpai ir perskaičiuosiu grindų kiekius.", items)
 
 
 def _ask_lentele_suma(project: dict) -> dict | None:
@@ -582,7 +641,8 @@ def _ask_lentele_suma(project: dict) -> dict | None:
            f"suma — {lt_num(ours)} m² (skirtumas {lt_num(abs(diff))} m²).")
     if table_rows and abs(table_rows - total) > SUM_TOL_M2:
         why += f" Pačios lentelės eilučių suma — {lt_num(table_rows)} m²."
-    why += " Tai tik informacija: patikrinkite, ar įtrauktos visos patalpos ir ar plotai perrašyti teisingai."
+    why += (" Tai tik informacija: patikrinkite, ar įtrauktos visos patalpos ir ar plotai perrašyti teisingai. "
+            "„Supratau“ pažymi, kad matėte — kiekiai nuo to nesikeičia.")
     item = {"room_nr": "", "room_name": label, "field": None, "unit": "m²", "page": page,
             "rect_pct": pick.get("bbox_pct"), "sentence": why, "lentele": total, "musu": ours}
     return _q("lentele_suma", "info", "Eksplikacijos suma ir patalpų plotų suma skiriasi", why, [item], unit="m²",
@@ -635,9 +695,11 @@ def build_questions(project: dict, *, lenteles: bool = False) -> dict:
         *_ask_erdves(waiting, by_nr),
         _ask_numbers("perimetras", waiting, "Patalpos {room} sienų ilgiai plane neužrašyti",
                      "{n} patalpų sienų ilgiai plane neužrašyti",
-                     "Paėmiau juos iš sienų kontūro brėžinyje arba iš ploto. Jei žinote tiksliau — įrašykite."),
+                     "Paėmiau juos iš sienų kontūro brėžinyje arba iš ploto. Jei žinote tiksliau — įrašykite: pagal jūsų "
+                     "skaičių perskaičiuosiu dažomą sienų plotą ir grindjuostes."),
         _ask_numbers("plotas", waiting, "Patalpos {room} ploto plane neradau", "{n} patalpų ploto plane neradau",
-                     "Skaičiuoju su plotu, kurį pavyko nustatyti iš plano vaizdo. Patikrinkite ir, jei reikia, įrašykite tikrą."),
+                     "Skaičiuoju su plotu, kurį pavyko nustatyti iš plano vaizdo. Jei reikia, įrašykite tikrą: pagal jį "
+                     "perskaičiuosiu grindis ir lubas."),
         _ask_angos(waiting),
         _ask_durys(project, rooms),
         _ask_grindys(waiting),

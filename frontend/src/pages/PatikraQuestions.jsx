@@ -34,7 +34,8 @@ import { fetchQuestions } from '@/lib/questionsApi';
 import { fetchRoomFacts, saveAssumptionEdit, saveRoomEdit } from '@/lib/roomSheetApi';
 import { fetchOutlineAt, fetchSplitProposal, fetchSplitSpace } from '@/lib/roomOutlineApi';
 import { nextSplitClick, outlineFailureKey, roomsWithOutline, roomsWithSplit, splitFailureKey } from '@/lib/roomOutline';
-import { orderFacts, roomsInDrawingOrder } from '@/lib/roomSheet';
+import { openingsPatch, orderFacts, roomsInDrawingOrder } from '@/lib/roomSheet';
+import { applyOpeningEdit, openingAt, openingState, openingText } from '@/lib/openingEdit';
 import { ltNumber } from '@/lib/ledger';
 import { ltPlural } from '@/lib/ltPlural';
 import { cleanUserText } from '@/lib/userText';
@@ -49,6 +50,7 @@ import RemindersNotice from '@/components/project/RemindersNotice';
 import NoticeFold from '@/components/project/NoticeFold';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
+import OpeningPopover from '@/components/viewer/OpeningPopover';
 import {
   ChoicesBody, InfoBody, NumberAllBody, NumbersBody, OpeningsBody, OutlineBody, Q_PLAIN, Q_PRIMARY, ReconcileBody,
 } from '@/components/questions/QuestionBodies';
@@ -62,6 +64,7 @@ const WITH_DRAWING = new Set(['outline', 'split', 'numbers', 'choices', 'opening
 // questions whose evidence is on ANOTHER sheet than the room's outline (the floor plan, the area label): the
 // drawing goes to that fact's own place instead of the room
 const OWN_PLACE = new Set(['grindys', 'plotas']);
+const roomsOf = (project) => (project?.v8_rooms?.length ? project.v8_rooms : (project?.patalpos || []));
 
 export default function PatikraQuestions() {
   const { t } = useTranslation();
@@ -96,6 +99,11 @@ export default function PatikraQuestions() {
   // or a line he draws himself (`joinDrawing`)
   const [join, setJoin] = useState(null);
   const [joinDrawing, setJoinDrawing] = useState(false);
+  // the doors and windows of a room placed on the drawing beside the card (2026-10-19): the room whose openings
+  // a click edits, and the A9 pop-up for the opening clicked — no page change
+  const [openingPick, setOpeningPick] = useState(null);       // room nr | null
+  const [openingEdit, setOpeningEdit] = useState(null);       // {o, nr, state, x, y} | null
+  const showAfterLoad = useRef(null);                          // room nr whose openings the drawing frames once its facts are in
 
   const skippedRef = useRef(skipped);
   skippedRef.current = skipped;
@@ -184,6 +192,10 @@ export default function PatikraQuestions() {
         if (!alive) return;
         setRoomFacts(facts);
         if (OWN_PLACE.has(current.kind)) setFocusRequest((cur) => ({ key: FACT_OF[current.kind], nonce: (cur?.nonce || 0) + 1 }));
+        if (showAfterLoad.current && String(showAfterLoad.current) === String(focusNr)) {
+          showAfterLoad.current = null;
+          setFocusRequest((cur) => ({ key: 'angos', nonce: (cur?.nonce || 0) + 1 }));
+        }
       })
       .catch(() => { if (alive) setRoomFacts(null); });
     return () => { alive = false; };
@@ -192,6 +204,7 @@ export default function PatikraQuestions() {
 
   // ── a shared space: ask the program for its boundary as soon as the question is in front of him ────
   useEffect(() => { setPickNotice(null); setJoin(null); setJoinDrawing(false); setSplitFirst(null); }, [currentId, focusNr]);
+  useEffect(() => { setOpeningPick(null); setOpeningEdit(null); }, [currentId]);
 
   useEffect(() => {
     setDrawing(false);
@@ -287,9 +300,59 @@ export default function PatikraQuestions() {
     } else if (q.answer === 'choices') {
       answer(q, floorAnswer(project, q.items, payload.values), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
     } else if (q.answer === 'openings') {
-      answer(q, openingsAnswer(project, q.items, payload.picked, payload.edits), (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
+      // the ticked openings AND the door and window numbers of the rooms to check — one save, one undo
+      setOpeningPick(null);
+      answer(q, openingsAnswer(project, q.items, payload.picked, payload.edits, { manual: q.manual, counts: payload.counts }),
+        (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { payload } });
     }
   };
+
+  // „Rodyti brėžinyje" on a room to check: the drawing beside the card frames that room's openings
+  const showRoomOpenings = useCallback((row) => {
+    const nr = String(row?.room_nr ?? '');
+    if (!nr) return;
+    if (String(focusNr) === nr && roomFacts?.room && String(roomFacts.room.nr) === nr) {
+      setFocusRequest((cur) => ({ key: 'angos', nonce: (cur?.nonce || 0) + 1 }));
+    } else {
+      showAfterLoad.current = nr;
+      setFocusNr(nr);
+    }
+  }, [focusNr, roomFacts]);
+
+  // „Pažymėti brėžinyje": a click on one of that room's openings opens the drawing's own opening pop-up (W5-A A9)
+  const placeOnDrawing = useCallback((nr) => {
+    setOpeningEdit(null);
+    setPickNotice(null);
+    setOpeningPick(nr);
+    if (nr) showRoomOpenings({ room_nr: nr });
+  }, [showRoomOpenings]);
+
+  const pickOpening = useCallback((point, raw) => {
+    if (!point || !openingPick) return;
+    const room = roomsOf(project).find((r) => String(r?.nr) === String(openingPick));
+    const o = room ? openingAt([room], point.page, [point.x_pct, point.y_pct], {
+      w: Number(raw?.renderedWidth) || 1000, h: Number(raw?.renderedHeight) || 1000, tolPx: 14, nr: openingPick,
+    }) : null;
+    if (!o) {
+      setPickNotice(t('project.questions.openingPickMiss', { room: openingPick }));
+      return;
+    }
+    setPickNotice(null);
+    setOpeningEdit({ o, nr: o.nr, state: openingState(room, o), x: Number(raw?.clientX) || 400, y: Number(raw?.clientY) || 300 });
+  }, [openingPick, project, t]);
+
+  // the pop-up's „Išsaugoti": that opening rewritten the room sheet's way, recomputed, what moved shown with „Atšaukti"
+  const saveOpeningEdit = useCallback(({ kind, plotisMm }) => {
+    const ed = openingEdit;
+    setOpeningEdit(null);
+    if (!ed || !current) return;
+    const room = roomsOf(project).find((r) => String(r?.nr) === String(ed.nr));
+    const elementai = room ? applyOpeningEdit(room.elementai, ed.o, { kind, plotisMm }) : null;
+    if (!elementai) return;
+    const rooms = roomsOf(project).map((r) => (String(r?.nr) === String(ed.nr) ? { ...r, ...openingsPatch(elementai) } : r));
+    answer(current, { rooms, touched: [String(ed.nr)], placed: openingText(kind, plotisMm) },
+      (a) => saveRoomEdit(project, a.rooms), { fromInterior: true, learn: { how: 'own' } });
+  }, [openingEdit, current, project, answer]);
 
   // „Parodyti patalpą": one click inside the room → its wall-exact outline, walls read again
   // an outline the server found for a click (or for „Tinka" on the proposed one) lands on the project — or, when
@@ -476,7 +539,13 @@ export default function PatikraQuestions() {
     }
     : current?.answer === 'split' && drawing
       ? { active: true, mode: 'split', first: splitFirst, busy, notice: pickNotice, onStart: () => {}, onCancel: () => { setSplitFirst(null); if (proposed) setDrawing(false); }, onPoint: pickSplit }
-      : null;
+      : current?.answer === 'openings' && openingPick && String(focusNr) === String(openingPick)
+        ? {
+          active: true, mode: 'opening', first: null, busy, notice: pickNotice,
+          text: { hint: t('project.questions.openingPickHint', { room: openingPick }), why: t('project.questions.openingPickWhy') },
+          onStart: () => {}, onCancel: () => { setOpeningPick(null); setOpeningEdit(null); }, onPoint: pickOpening,
+        }
+        : null;
 
   return (
     <div ref={topRef} className="flex min-h-full flex-col bg-background text-[16px]" data-testid="patikra-questions">
@@ -620,7 +689,12 @@ export default function PatikraQuestions() {
                   {current.answer === 'choices' && <ChoicesBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
                   {current.answer === 'reconcile' && <ReconcileBody question={current} busy={busy} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
                   {current.answer === 'info' && <InfoBody question={current} busy={busy} onAnswer={onBodyAnswer} onShowTable={showTable} projectId={id} />}
-                  {current.answer === 'openings' && <OpeningsBody question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer} onOpenRoom={openRoom} />}
+                  {current.answer === 'openings' && (
+                    <OpeningsBody
+                      question={current} busy={busy} focusNr={focusNr} onFocus={setFocusNr} onAnswer={onBodyAnswer}
+                      rooms={roomsOf(project)} onShowRoom={showRoomOpenings} onPlaceOnDrawing={placeOnDrawing} placingNr={openingPick}
+                    />
+                  )}
 
                   {current.answer === 'outline' && !join && (
                     <OutlineBody question={current} item={outlineItem} busy={busy} onAccept={acceptOutline} onTypeLength={typeOutlineLength} />
@@ -722,7 +796,7 @@ export default function PatikraQuestions() {
                       room={roomFacts.room}
                       facts={factList}
                       activeFactKey={FACT_OF[current.kind] || null}
-                      focusRequest={OWN_PLACE.has(current.kind) ? focusRequest : null}
+                      focusRequest={OWN_PLACE.has(current.kind) || current.kind === 'angos' ? focusRequest : null}
                       pick={pick}
                       hidePickButtons
                       proposal={current.answer === 'split' && proposed && !drawing
@@ -743,6 +817,10 @@ export default function PatikraQuestions() {
           )}
         </div>
       </div>
+      <OpeningPopover
+        key={openingEdit ? `${openingEdit.nr}-${openingEdit.o.k}` : 'none'}
+        target={openingEdit} onSave={saveOpeningEdit} onClose={() => setOpeningEdit(null)}
+      />
     </div>
   );
 }

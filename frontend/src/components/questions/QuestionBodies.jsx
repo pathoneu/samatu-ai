@@ -5,7 +5,9 @@
  *   number_all — one number for every room that asked (the ceiling height), a field per room on request;
  *   numbers    — a list of rooms, each with the program's number in a field (perimeters, areas);
  *   choices    — a list of rooms, each with the program's choice pressed (floor covering, painted or not);
- *   openings   — the openings the walls show and the list lacks, ticked — untick what is not a door;
+ *   openings   — the openings the walls show and the list lacks, ticked — untick what is not a door; and the
+ *                rooms whose doors and windows no tick settles, each with the list's and the walls' number and
+ *                a field per kind pre-filled with the walls' (2026-10-19 — answered here, never on another page);
  *   outline    — a room to point at on the drawing: the outline the program PROPOSES when the walls close a
  *                different area than the table gives (2026-09-23, objektas_h tambūras), „Tinka" or a click
  *                elsewhere — and always the way without a click, the wall length typed by hand.
@@ -20,12 +22,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@/i18n/react';
-import { Check, ExternalLink, MapPin } from 'lucide-react';
+import { Check, MapPin, MousePointerClick } from 'lucide-react';
 
 import { isValidAmount, parseLtNumber } from '@/lib/parseLtNumber';
 import { ltNumber } from '@/lib/ledger';
 import { cleanUserText } from '@/lib/userText';
 import { API_BASE } from '@/lib/apiBase';
+import { countChangeText, setOpeningCount } from '@/lib/openingCounts';
 
 export const Q_BTN = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[2px] border px-4 '
   + 'text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 '
@@ -400,12 +403,61 @@ export function ChoicesBody({ question, busy, focusNr, onFocus, onAnswer, onShow
   );
 }
 
-/** The openings the walls show and the list lacks — ticked; and the rooms to look at by hand. */
-export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpenRoom }) {
+/** One count field of a room to check: the two numbers, the field, and what „Tinka" will do with it. */
+function CountField({ row, kind, value, onChange, onCommit, room, busy }) {
+  const { t } = useTranslation();
+  const nums = row[kind] || { sarase: 0, sienose: 0, laisvos: [] };
+  const n = Number(String(value).trim());
+  const valid = String(value).trim() !== '' && Number.isInteger(n) && n >= 0 && n <= 50;
+  const effect = valid ? setOpeningCount(room?.elementai || [], kind, n, nums.laisvos) : null;
+  const id = `q-count-${row.room_nr}-${kind}`;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <label htmlFor={id} className="w-16 text-[15px] font-semibold text-foreground">
+          {t(kind === 'durys' ? 'project.questions.countDoors' : 'project.questions.countWindows')}
+        </label>
+        <input
+          id={id} value={value} inputMode="numeric" className={SMALL_INPUT} disabled={busy}
+          data-testid={`opening-count-${row.room_nr}-${kind}`}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCommit(); } }}
+        />
+        <span className="font-mono text-[14px] text-ink-2" data-testid={`opening-numbers-${row.room_nr}-${kind}`}>
+          {t('project.questions.countNumbers', { listed: nums.sarase, walls: nums.sienose })}
+        </span>
+      </div>
+      <p className={`text-[14px] leading-snug ${valid ? 'text-ink-2' : 'text-conf-low'}`} data-testid={`opening-effect-${row.room_nr}-${kind}`}>
+        {valid ? countChangeText(effect, kind) : t('project.questions.needWhole')}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The openings the walls show and the list lacks — ticked; and the rooms whose doors and windows no tick settles,
+ * each answered on the card: the number of doors and of windows (the walls' number proposed), „Rodyti brėžinyje"
+ * frames the room on the drawing beside, „Pažymėti brėžinyje" lets him click its openings there. One „Tinka".
+ */
+export function OpeningsBody({
+  question, busy, focusNr, onFocus, onAnswer, rooms = [], onShowRoom = null, onPlaceOnDrawing = null, placingNr = null,
+}) {
   const { t } = useTranslation();
   const [off, setOff] = useState(() => new Set());
   const [edits, setEdits] = useState({});                       // index → {plotis, aukstis, tipas} as he typed them
-  useEffect(() => { setOff(new Set()); setEdits({}); }, [question.id, question.items.length]);
+  const [counts, setCounts] = useState({});                     // room nr → {durys, langai} as he typed them
+  useEffect(() => { setOff(new Set()); setEdits({}); setCounts({}); }, [question.id, question.items.length, question.manual?.length]);
+  const manual = Array.isArray(question.manual) ? question.manual : [];
+  const roomOf = (nr) => (Array.isArray(rooms) ? rooms : []).find((r) => String(r?.nr) === String(nr)) || null;
+  const countOf = (row, kind) => counts[row.room_nr]?.[kind] ?? String(row.proposed?.[kind] ?? row[kind]?.sienose ?? 0);
+  const countsValid = manual.every((row) => ['durys', 'langai'].every((kind) => {
+    const v = String(countOf(row, kind)).trim();
+    const n = Number(v);
+    return v !== '' && Number.isInteger(n) && n >= 0 && n <= 50;
+  }));
+  const countsEdited = manual.some((row) => ['durys', 'langai'].some((kind) => counts[row.room_nr]?.[kind] !== undefined
+    && String(counts[row.room_nr][kind]).trim() !== String(row.proposed?.[kind] ?? '')));
   const count = question.items.length - off.size;
   const draftOf = (item, i) => ({
     plotis: edits[i]?.plotis ?? ltNumber(Number(item.plotis_mm) / 1000, 2),
@@ -426,8 +478,11 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
         tipas: d.tipas,
       };
     });
-    onAnswer({ picked: question.items.map((_, i) => !off.has(i)), edits: out });
+    const typed = {};
+    for (const row of manual) typed[row.room_nr] = { durys: Number(countOf(row, 'durys')), langai: Number(countOf(row, 'langai')) };
+    onAnswer({ picked: question.items.map((_, i) => !off.has(i)), edits: out, counts: typed });
   };
+  const commitIfValid = () => { if (!busy && countsValid && (count > 0 || manual.length > 0)) commit(); };
 
   return (
     <div className="flex flex-col gap-3">
@@ -495,48 +550,60 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
               );
             })}
           </ul>
-          <div>
-            <button
-              type="button" className={Q_PRIMARY} disabled={busy || count === 0} data-testid="question-accept"
-              onClick={commit}
-            >
-              <Check className="h-4 w-4" aria-hidden="true" />
-              {t('project.questions.addPicked', { count })}
-            </button>
-            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{t('project.questions.openingsConsequence')}</p>
-          </div>
         </>
       )}
 
-      {question.manual?.length > 0 && (
+      {manual.length > 0 && (
         <div>
-          {/* 2026-10-06 (contractor walkthrough): the shouting caps line is gone. A calm line separates these
-              rooms only from the one-click rows above; alone, the question's own title and reason say it. */}
           {question.items.length > 0 && (
             <p className="text-[15px] font-semibold text-foreground">{t('project.questions.manualTitle')}</p>
           )}
           <ul className={`${question.items.length > 0 ? 'mt-1 ' : ''}rounded-[2px] border border-border`}>
-            {question.manual.map((m) => (
+            {manual.map((m) => (
               <li
                 key={m.room_nr}
                 className={`border-t border-border px-3 py-2.5 first:border-t-0 ${focusNr === m.room_nr ? 'bg-accent-2/[0.06]' : ''}`}
                 data-testid={`opening-manual-${m.room_nr}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col items-start gap-1.5">
                   <button
                     type="button" onClick={() => onFocus?.(m.room_nr)}
-                    className="min-w-0 flex-1 text-left text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="min-w-0 text-left text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="font-mono text-muted-foreground">{m.room_nr}</span> {m.room_name}
                   </button>
-                  <button type="button" className={`${Q_PLAIN} min-h-[36px] px-3 text-[14px]`} onClick={() => onOpenRoom?.(m.room_nr)}>
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                    {t('project.questions.openRoom')}
-                  </button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button" className={`${Q_PLAIN} min-h-[36px] px-3 text-[14px]`} disabled={busy}
+                      onClick={() => onShowRoom?.(m)} data-testid={`opening-show-${m.room_nr}`}
+                    >
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
+                      {t('project.questions.showOnDrawing')}
+                    </button>
+                    {onPlaceOnDrawing && Number(m.angos_brezinyje) > 0 && (
+                      <button
+                        type="button" aria-pressed={placingNr === m.room_nr} disabled={busy}
+                        className={`${Q_PLAIN} min-h-[36px] px-3 text-[14px] ${placingNr === m.room_nr ? 'border-accent-2 bg-accent-2/[0.08]' : ''}`}
+                        onClick={() => onPlaceOnDrawing(placingNr === m.room_nr ? null : m.room_nr)}
+                        data-testid={`opening-place-${m.room_nr}`}
+                      >
+                        <MousePointerClick className="h-4 w-4" aria-hidden="true" />
+                        {t(placingNr === m.room_nr ? 'project.questions.placeStop' : 'project.questions.placeOnDrawing')}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {/* what does not match and what to check first; the room sheet's full account (which openings)
-                    one click away — secondary, never the first thing he has to read */}
+                {/* what does not match, in his terms; the fields answer it right here */}
                 <p className="mt-1 text-[15px] leading-snug text-foreground">{cleanUserText(m.sentence || '')}</p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {['durys', 'langai'].map((kind) => (
+                    <CountField
+                      key={kind} row={m} kind={kind} value={countOf(m, kind)} room={roomOf(m.room_nr)} busy={busy}
+                      onChange={(v) => setCounts((cur) => ({ ...cur, [m.room_nr]: { ...(cur[m.room_nr] || {}), [kind]: v } }))}
+                      onCommit={commitIfValid}
+                    />
+                  ))}
+                </div>
                 {m.details && (
                   <details className="mt-1.5 text-[13px] leading-snug text-ink-2">
                     <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -550,6 +617,20 @@ export function OpeningsBody({ question, busy, focusNr, onFocus, onAnswer, onOpe
           </ul>
         </div>
       )}
+
+      <div>
+        <button
+          type="button" className={Q_PRIMARY} disabled={busy || !countsValid || (count === 0 && manual.length === 0)}
+          data-testid="question-accept" onClick={commit}
+        >
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {question.items.length > 0
+            ? t(manual.length ? 'project.questions.addPickedAndCounts' : 'project.questions.addPicked', { count })
+            : countsEdited ? t('project.questions.save')
+              : manual.length === 1 ? t('project.questions.accept') : t('project.questions.acceptAll', { count: manual.length })}
+        </button>
+        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{t('project.questions.openingsConsequence')}</p>
+      </div>
     </div>
   );
 }
