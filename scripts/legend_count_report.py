@@ -8,7 +8,9 @@ the command line (`--eye objektas_h=9`), never written into the repository.
 
 Per project:
   1. every sheet's `legenda` zones (sheet_zones) → the rows found in each, by kind;
-  2. the coloured rows counted from the paths on every sheet carrying their legend: count per sheet;
+  2. the coloured rows counted from the paths on every sheet carrying their legend: count per sheet; the
+     text-glyph rows counted by their character standing alone (api/legend_count._text_count); the black rows
+     whose glyph is one ring with arms (switches) counted from the paths (api/legend_count._ring_count);
   3. the diffusers: the old entry (count_legend_symbols) beside the generalised one — rows whose text says
      „difuzorius", from the zones or, where no zone holds them, from a box drawn round the label the way a
      person would — and the eye count when given;
@@ -131,6 +133,36 @@ def main() -> int:
             print(f"    p{r['page']} {a['status']:<10} {a['count']:>4}  [{pp or '—'}]"
                   f"{' PARTIAL' if a['partial'] else ''}  {name}")
         print(f"   coloured rows counted: {len(coloured)} in {t_count:.1f}s")
+
+        # 2b. the text-glyph rows counted by their character standing alone (the route's text counter)
+        texted = [r for r in rows if r["glyph_kind"] == "tekstas" and r["countable"]]
+        if texted:
+            from api.legend_count import _text_count
+            t5 = time.time()
+            for r in texted:
+                a = _text_count(pdf, r, list(range(1, n + 1)), False)
+                name = "" if args.no_labels else r["text"][:40]
+                pp = ", ".join(f"p{x['page']}:{x['count']}{'(kart.)' if x['kartojasi'] else ''}"
+                               f"{'' if x['legenda_lape'] else '(be leg.)'}" for x in a["per_page"])
+                print(f"    p{r['page']} tekstas „{r['glyph_text']}“ {len(a['instances']):>4}  [{pp or '—'}]  {name}")
+            print(f"   text rows counted: {len(texted)} in {time.time() - t5:.1f}s")
+
+        # 2c. black rows whose glyph is one ring with arms (switches) — counted from the paths (B2-A (c))
+        black = [r for r in rows if r["glyph_kind"] == "juodas" and r["countable"]]
+        if black:
+            from api.legend_count import _ring_count
+            t6 = time.time()
+            rung = 0
+            for r in black:
+                a = _ring_count(pdf, {**r, "legend_bbox_pct": None}, list(range(1, n + 1)), False)
+                if a is None:
+                    continue
+                rung += 1
+                name = "" if args.no_labels else r["text"][:40]
+                pp = ", ".join(f"p{x['page']}:{x['count']}" for x in a["per_page"])
+                print(f"    p{r['page']} žiedas {len(a['instances']):>4}  [{pp or '—'}]  ne plane / zonose "
+                      f"{len(a['uz_zonu'])}  {name}")
+            print(f"   black rows: {len(black)}, of them a ring with arms: {rung} in {time.time() - t6:.1f}s")
 
         # 3. diffusers: old entry vs generalised vs eye
         t2 = time.time()

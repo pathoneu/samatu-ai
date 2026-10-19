@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CURSOR_HINT_MODES, CURSOR_HINT_EVENT, cursorHintFor, flashCursorHint } from './cursorHints.js';
+import { armedKeyHint, CURSOR_HINT_MODES, CURSOR_HINT_EVENT, cursorHintFor, FILL_ARMED_KEY_HINT, flashCursorHint } from './cursorHints.js';
 import { RAIL_TOOLS } from './toolRail.js';
 
 test('every mode has a sentence; rest has none', () => {
@@ -63,5 +63,19 @@ test('W5-A follow-up: once a draft has its first point, the hint says what Shift
   for (const mode of ['distance', 'area', 'perimeter']) {
     assert.doesNotMatch(cursorHintFor({ mode, points: 0 }), /45°/, mode);
     for (const points of [1, 2, 3, 5]) assert.match(cursorHintFor({ mode, points }), /Shift — .*tik tiesiai arba 45°/, `${mode} ${points}`);
+  }
+});
+
+test('B2-A: a key held by an armed mode answers with one sentence, never silence', () => {
+  assert.equal(FILL_ARMED_KEY_HINT, 'Pirmiausia baikite „Kontūras paspaudus“ (Esc)');
+  assert.equal(armedKeyHint({ fill: true, draftPoints: 2 }), FILL_ARMED_KEY_HINT);
+  assert.match(armedKeyHint({ draftPoints: 1 }), /užbaikite arba atšaukite braižomą/);
+  assert.match(armedKeyHint({ outlineEdit: true }), /kontūro taisymą \(Enter \/ Esc\)/);
+  assert.equal(armedKeyHint({ outlineTool: 'merge' }), 'Pirmiausia baikite „Sujungti“ (Esc)');
+  assert.equal(armedKeyHint({ outlineTool: 'split' }), 'Pirmiausia baikite „Padalyti“ (Esc)');
+  assert.equal(armedKeyHint({ outlineTool: 'subtract' }), 'Pirmiausia baikite „Atimti“ (Esc)');
+  assert.equal(armedKeyHint({}), null);
+  for (const s of [FILL_ARMED_KEY_HINT, armedKeyHint({ draftPoints: 1 }), armedKeyHint({ outlineEdit: true })]) {
+    assert.ok(s.length <= 90, s);
   }
 });

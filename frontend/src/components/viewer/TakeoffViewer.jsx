@@ -73,7 +73,7 @@ import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
 import { pickSpot } from '@/lib/selectionPlacement';
 import CursorHint from './CursorHint';
-import { cursorHintFor, flashCursorHint } from '@/lib/cursorHints';
+import { armedKeyHint, cursorHintFor, FILL_ARMED_KEY_HINT, flashCursorHint } from '@/lib/cursorHints';
 import { escStep, openLayerInDocument } from '@/lib/escOrder';
 import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
@@ -372,8 +372,8 @@ function RailHost({ documentId, compact, activeTool, onTool, available, layers, 
  * prints); this component only maps a matched entry id to its action. Guarded:
  * typing surfaces (input/textarea/select/contentEditable) are never intercepted,
  * and meta/ctrl combos the table does not list stay with the browser.
- * Notes kept from the hand-written switch: measure-tool keys are ignored while
- * fill is armed; Delete/Backspace only act in select mode with a selection (so
+ * Notes kept from the hand-written switch: tool keys do not switch tools while
+ * fill is armed — they say so beside the pointer (B2-A: they used to be silent); Delete/Backspace only act in select mode with a selection (so
  * they never collide with MeasureLayer's Backspace = remove-last-vertex); Esc
  * chain: close search → measure (outline edit / calibration dialog / tool) →
  * cancel fill-mode → clear focused room.
@@ -393,7 +393,9 @@ function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, on
       if (vp !== (scrollRef.current?.currentPage ?? vp)) scrollApi?.scrollToPage({ pageNumber: vp });
       zoomApi?.requestZoom(mode);
     };
-    const tool = (id) => (fillArmed || !onMeasureToolKey ? false : (onMeasureToolKey(id), true));
+    // while „Kontūras paspaudus" is armed a tool key changes nothing and says why (B2-A), never silence
+    const refused = () => { flashCursorHint(FILL_ARMED_KEY_HINT); return true; };
+    const tool = (id) => (!onMeasureToolKey ? false : fillArmed ? refused() : (onMeasureToolKey(id), true));
     const step = (d) => {
       const vp = visiblePageOf(scrollRef.current);
       const last = scrollRef.current?.totalPages ?? vp + 1;
@@ -416,11 +418,11 @@ function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, on
       toolSelect: () => tool('select'),
       toolPan: () => tool('pan'),
       toolCalibrate: () => tool('calibrate'),
-      toolFindSimilar: () => (fillArmed || !onToggleSymbolSearch ? false : (onToggleSymbolSearch(), true)),
+      toolFindSimilar: () => (!onToggleSymbolSearch ? false : fillArmed ? refused() : (onToggleSymbolSearch(), true)),
       // G — „Pažymėti legendą" (Pathon v3 W2-B): the legend proposed, counted, reviewed, then created
-      toolLegend: () => (fillArmed || !onToggleLegend ? false : (onToggleLegend(), true)),
+      toolLegend: () => (!onToggleLegend ? false : fillArmed ? refused() : (onToggleLegend(), true)),
       // R — the room tool (W1-D): one click inside a room, its outline off the walls, proposed, then saved.
-      toolRoom: () => (fillArmed || !onRoomTool ? false : (onRoomTool(), true)),
+      toolRoom: () => (!onRoomTool ? false : fillArmed ? refused() : (onRoomTool(), true)),
       toolDistance: () => tool('distance'),
       toolArea: () => tool('area'),
       toolPerimeter: () => tool('perimeter'),
@@ -1049,7 +1051,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     toast(`Atšaukta: ${last.label}`, { description: `${keyText('redo')} — grąžinti` });
   };
   const redoMeasure = () => {
-    if (outlineEdit || outlineTools.tool || draftPoints > 0) return;
+    // the work under the cursor holds the step (as undo does) — say so rather than nothing (B2-A)
+    const held = armedKeyHint({ outlineEdit: !!outlineEdit, outlineTool: outlineTools.tool?.mode || null, draftPoints });
+    if (held) { flashCursorHint(held); return; }
     const next = measureHist.future[measureHist.future.length - 1];
     if (!next) { toast.info('Nėra ką grąžinti'); return; }
     dispatchMeasureHist({ type: 'redo' });
@@ -1766,10 +1770,15 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     return true;
   };
   // E / M / X act on the selected room — never in the middle of a drawing or another outline action.
-  const roomKeysFree = !check && focusedRoomNr != null && !outlineEdit && !outlineTools.tool && draftPoints === 0 && fillFor == null;
-  const onRoomEdit = roomKeysFree && onRoomOutlineEdit ? startOutlineEdit : null;
-  const onRoomMerge = roomKeysFree && onOutlineTool ? () => startMerge() : null;
-  const onRoomSubtract = roomKeysFree && onOutlineTool ? () => outlineTools.start('subtract') : null;
+  // While something armed holds the keys they say why beside the pointer instead of nothing (B2-A).
+  const roomKeysHeld = !check && focusedRoomNr != null
+    ? armedKeyHint({ fill: fillFor != null, outlineEdit: !!outlineEdit, outlineTool: outlineTools.tool?.mode || null, draftPoints })
+    : null;
+  const roomKeysFree = !check && focusedRoomNr != null && !roomKeysHeld;
+  const roomKeyRefused = roomKeysHeld ? () => flashCursorHint(roomKeysHeld) : null;
+  const onRoomEdit = onRoomOutlineEdit ? (roomKeysFree ? startOutlineEdit : roomKeyRefused) : null;
+  const onRoomMerge = onOutlineTool ? (roomKeysFree ? () => startMerge() : roomKeyRefused) : null;
+  const onRoomSubtract = onOutlineTool ? (roomKeysFree ? () => outlineTools.start('subtract') : roomKeyRefused) : null;
 
   // ---- Selection bar (W1-B B6) ---------------------------------------------
   // A selected room's actions, or the selected marks' — where the eye is, never on the label.

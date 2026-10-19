@@ -336,9 +336,40 @@ def _raster_count(pdf_bytes: bytes, row: dict, geo, wanted: list[int], min_score
             "raster_pages": [e["page"] for e in res["pages"] if e["skipped"] == "raster"]}
 
 
+IN_WORD_GAP_EM = 0.2           # a neighbour character this close (line heights) on the glyph's line makes it a letter of a
+                               # word: letters inside a word stand ≤ 0,13 apart on the corpus, words ≥ 0,25 (a space)
+
+
+def _in_word(tp, idx: int, n: int, boxes: list) -> bool:
+    """True when the hit is letters of a longer word the text layer split (B2-A): PDFium's whole-word search
+    answers „Ž" inside „UŽSAKOVAS" (objektas_h title block, the neighbours 0,27–0,46 pt away at a 3,6 pt line)
+    and „I" inside „IŠKLOTINĖS" (objektas_a). A symbol standing alone has no character of its line that close."""
+    left, bottom = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    right, top = max(b[2] for b in boxes), max(b[3] for b in boxes)
+    h = max(max(b[3] - b[1], b[2] - b[0]) for b in boxes) or 1.0
+    total = tp.count_chars()
+    for j, step in ((idx - 1, -1), (idx + n, 1)):
+        # past a space the text layer may have made up — a space that takes no room still leaves one word
+        for _ in range(2):
+            if 0 <= j < total and not tp.get_text_range(j, 1).strip():
+                j += step
+        if not (0 <= j < total) or not tp.get_text_range(j, 1).isalnum():
+            continue                                   # a bracket or a dot ends a word: „JD(2)" is the symbol JD
+        x0, y0, x1, y1 = tp.get_charbox(j)
+        if min(top, y1) - max(bottom, y0) >= 0.5 * min(top - bottom, y1 - y0):         # the same line, read along x
+            gap = max(x0 - right, left - x1)
+        elif min(right, x1) - max(left, x0) >= 0.5 * min(right - left, x1 - x0):       # turned text, read along y
+            gap = max(y0 - top, bottom - y1)
+        else:
+            continue
+        if -0.5 * h < gap < IN_WORD_GAP_EM * h:
+            return True
+    return False
+
+
 def _text_hits(pdf_bytes: bytes, glyph: str, pages: list[int]) -> dict[int, list[dict]]:
     """Where the character `glyph` stands as a word of its own on each page — DISPLAY-frame boxes. PDFium's
-    text search under PDFIUM_LOCK."""
+    text search under PDFIUM_LOCK; a hit that is letters of a longer word (`_in_word`) is not one."""
     from extractor.pdf_vectors import _to_display
     from extractor.pdfium_guard import PDFIUM_LOCK
     import pypdfium2 as pdfium
@@ -363,6 +394,8 @@ def _text_hits(pdf_bytes: bytes, glyph: str, pages: list[int]) -> dict[int, list
                                     break
                                 idx, n = occ
                                 boxes = [tp.get_charbox(i) for i in range(idx, idx + n)]
+                                if _in_word(tp, idx, n, boxes):
+                                    continue
                                 left = min(b[0] for b in boxes)
                                 bottom = min(b[1] for b in boxes)
                                 right = max(b[2] for b in boxes)
@@ -406,6 +439,58 @@ def _text_count(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: bo
     return {"status": "ok", "detail": None, **_sheet_rules(pdf_bytes, row, per_page)}
 
 
+RING_HOW_LT = "pagal ženklo žiedą ir jo atšakas brėžinio linijose"
+
+
+def _ring_count(pdf_bytes: bytes, row: dict, wanted: list[int], other_sheets: bool) -> dict | None:
+    """A black glyph that is ONE ring with arms (objektas_h's switches) counted from the paths — the ring's size,
+    the number of its arms and whether two stand opposite (vector_symbols `ring_arm_*`, B2-A (c)): the shape
+    search scores the four switch rows alike and cannot tell them apart. None when the glyph is no ring with
+    arms, or a sheet holds more objects than the reader takes — the shape search counts it then, as before.
+    Nothing in a legend, a table or the title block; on a sheet with a plan zone, nothing outside the plan
+    (objektas_h p3's switch-height detail draws a door handle: a ring with one arm)."""
+    from extractor.sheet_zones import REREAD_TABLE_MAX_OBJECTS, read_zones, zone_at
+    from extractor.vector_symbols import ZONE_KINDS_WITHOUT_MARKS, ring_arm_instances, ring_arm_template
+    tpl = ring_arm_template(pdf_bytes, row["page"], row["glyph_bbox_pct"])
+    if not tpl:
+        return None
+    first, rest = _pages_for(pdf_bytes, row, wanted, other_sheets)
+    if not first:
+        first, rest = rest, []
+    per_page: dict[int, list[dict]] = {}
+    listed: list[dict] = []
+    own = [row["glyph_bbox_pct"]] + ([row["legend_bbox_pct"]] if row.get("legend_bbox_pct") else [])
+
+    def read(seq: list[int]) -> bool:
+        for p in seq:
+            found, complete = ring_arm_instances(pdf_bytes, p, tpl)
+            if not complete:
+                return False
+            zones = read_zones(pdf_bytes, p, table_max_objects=REREAD_TABLE_MAX_OBJECTS).get("zones") or []
+            plans = [z["bbox_pct"] for z in zones if z.get("kind") == "planas"]
+            keep = []
+            for i in found:
+                x, y = i["x_pct"], i["y_pct"]
+                if p == row["page"] and any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in own):
+                    continue
+                z = zone_at(zones, x, y)
+                zona = (str(z.get("kind")) if z is not None and z.get("kind") in ZONE_KINDS_WITHOUT_MARKS
+                        else "kita" if plans and not any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in plans)
+                        else None)
+                if zona:
+                    listed.append({"page": p, "x_pct": x, "y_pct": y, "zona": zona})
+                    continue
+                keep.append(i)
+            per_page[p] = keep
+        return True
+    if not read(first):
+        return None
+    if rest and (other_sheets or not any(per_page.values())) and not read(rest):
+        return None
+    return {"status": "ok", "detail": None, "uz_zonu": listed[:200], "kaip_lt": RING_HOW_LT,
+            **_sheet_rules(pdf_bytes, row, per_page)}
+
+
 def _pages_word(pages: list[int]) -> str:
     return ("lape " if len(pages) == 1 else "lapuose ") + ", ".join(str(p) for p in pages)
 
@@ -425,6 +510,7 @@ def sentence_lt(row: dict, ans: dict) -> str:
     how = {"vektoriai": "pagal ženklo spalvą ir formą brėžinyje",
            "rastras": "pagal ženklo formą — peržiūrėkite kiekvieną vietą, forma gali sutapti ir su kitu ženklu",
            "tekstas": f"pagal ženklą „{(row.get('glyph_text') or '').strip()}“ tekste"}.get(ans.get("saltinis"), "")
+    how = ans.get("kaip_lt") or how
     if ans["count"]:
         s = f"„{name}“: rasta {ans['count']} vnt. ({'; '.join(parts)}) {how}."
     else:
@@ -510,6 +596,14 @@ def api_legend_count(request: Request, project_id: str, body: CountBody):
                           "kiti": [{**i, "score": None, "saltinis": "tekstas"} for i in got["kiti"]]}
             answers[k]["count"] = len(answers[k]["instances"])
             continue
+        if r["glyph_kind"] == "juodas":
+            ring = _ring_count(pdf_bytes, r, wanted, bool(body.other_sheets))
+            if ring is not None:                           # a ring with arms: counted from the paths (B2-A (c))
+                answers[k] = {**base, **ring, "saltinis": "vektoriai",
+                              "instances": [{**i, "score": None, "saltinis": "vektoriai"} for i in ring["instances"]],
+                              "kiti": [{**i, "score": None, "saltinis": "vektoriai"} for i in ring["kiti"]]}
+                answers[k]["count"] = len(answers[k]["instances"])
+                continue
         if remaining <= 0:
             answers[k] = {**base, "partial": True, "pages_not_read": wanted, "saltinis": "rastras"}
             continue

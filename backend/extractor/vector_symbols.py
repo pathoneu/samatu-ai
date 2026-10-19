@@ -271,8 +271,11 @@ def _has_twin(g: dict, pool: list[dict]) -> bool:
 def _row_anchors(pool: list[dict]) -> list[dict]:
     """The symbols of one legend row: the largest glyph is an anchor, everything within its radius is its
     parts, what is left starts the next symbol (objektas_d: two rings with petals side by side)."""
-    # a lone hairline (a table border beside the label) is never a symbol
-    pool = [g for g in pool if not (g["short"] < 0.3 and g["long"] > 30 and not _has_twin(g, pool))]
+    # a lone hairline (a table border beside the label, a dimension line round a material sample) is never a
+    # symbol: as an anchor it has no parts and every line of its colour on the sheet is an „instance" (B2-A:
+    # objektas_e p11, a box over the material column took the sample's red dimension lines → 124 on one sheet).
+    # A slot diffuser's double line has its twin and stays (objektas_b).
+    pool = [g for g in pool if not (g["short"] < 0.3 and g["thin"] and not _has_twin(g, pool))]
     pool.sort(key=lambda g: (-g["long"], -g["fill"]))
     anchors: list[dict] = []
     while pool:
@@ -816,3 +819,108 @@ def _row_key(text: str | None) -> str | None:
 def count_glyph_instances(pdf_bytes: bytes, template_glyph: dict, pages: list[int] | None = None, **kw) -> dict:
     """One legend row's glyph counted on every sheet — see `count_glyph_instances_many`."""
     return count_glyph_instances_many(pdf_bytes, [template_glyph], pages, **kw)[0]
+
+
+# ── a black ring with arms (switches) — Pathon v3 B2-A (c) ─────────────────────────────────────────────────
+#
+# objektas_h p3 draws its four switch rows as ONE black ring (4,92 pt) with arms: „Viengubas jungiklis" one arm,
+# „Viengubas perjungėjas" two arms on opposite sides, „Dvigubas jungiklis" two arms on one side, „Dvigubas
+# perjungėjas" four. The shape search scores all four the same on the plan (0,92–0,94) and cannot tell them
+# apart; the paths can: every ring of the legend's size on the sheet, its arms (the strokes touching it, each
+# given to the ring it is nearest), their number and — for two — whether they stand opposite. Measured on h p3:
+# 27 rings on the plan, 9 / 12 / 3 / 3, the stacked pairs checked by eye. Only a row whose glyph IS one ring
+# with arms is counted here; every other black glyph keeps the shape search.
+
+RING_SIZE_TOL_PT = 0.4        # a plan ring is the legend ring's size within this
+RING_ROUND_TOL = 0.1          # a ring's width and height differ by at most this share
+ARM_TOUCH_PT = 0.6            # an arm's box comes this close to the ring's circle
+ARM_MIN_SHARE, ARM_MAX_SHARE = 0.3, 1.2   # an arm's longer side against the ring's diameter
+OPPOSITE_DEG = 150.0          # two arms this far apart stand on opposite sides (h: legend 180°, plan 177–180°;
+                              # one side: legend 85°, plan 61–67°)
+
+
+def _dark(p) -> bool:
+    return p is not None and max(p) < 0.35 and max(p) - min(p) < 0.12
+
+
+def _is_ring(m: dict, d: float | None = None) -> bool:
+    w, h = m["x1"] - m["x0"], m["bottom"] - m["top"]
+    if m["image"] or m["fill"] is not None or not _dark(m["stroke"]) or abs(w - h) > RING_ROUND_TOL * max(w, h, 0.1):
+        return False
+    return 2.0 <= w <= 12.0 if d is None else abs(w - d) <= RING_SIZE_TOL_PT and abs(h - d) <= RING_SIZE_TOL_PT
+
+
+def _ring_arms(marks: list[dict], d: float) -> list[tuple[dict, list[float]]]:
+    """(ring, arm angles in degrees) for every ring of diameter `d` among `marks` (display points)."""
+    rings = [m for m in marks if _is_ring(m, d)]
+    if not rings:
+        return []
+    centres = [((r["x0"] + r["x1"]) / 2, (r["top"] + r["bottom"]) / 2) for r in rings]
+    angles: list[list[float]] = [[] for _ in rings]
+    ring_ids = {id(r) for r in rings}
+    for a in marks:
+        if id(a) in ring_ids or a["image"] or not _dark(a["stroke"]):
+            continue
+        long = max(a["x1"] - a["x0"], a["bottom"] - a["top"])
+        if not ARM_MIN_SHARE * d <= long <= ARM_MAX_SHARE * d:
+            continue
+        ax, ay = (a["x0"] + a["x1"]) / 2, (a["top"] + a["bottom"]) / 2
+        k = min(range(len(rings)), key=lambda i: math.hypot(ax - centres[i][0], ay - centres[i][1]))
+        cx, cy = centres[k]
+        nx, ny = min(max(cx, a["x0"]), a["x1"]), min(max(cy, a["top"]), a["bottom"])
+        if math.hypot(nx - cx, ny - cy) > d / 2 + ARM_TOUCH_PT or math.hypot(ax - cx, ay - cy) <= 0.3 * d:
+            continue                                   # not touching its ring, or a mark inside it
+        angles[k].append(math.degrees(math.atan2(ay - cy, ax - cx)) % 360.0)
+    return list(zip(rings, angles))
+
+
+def ring_signature(angles: list[float]) -> tuple[int, bool | None] | None:
+    """(number of arms, two arms opposite?) — the same whichever way the symbol is turned or mirrored."""
+    if not angles:
+        return None
+    if len(angles) != 2:
+        return (len(angles), None)
+    gap = abs(angles[0] - angles[1]) % 360.0
+    return (2, min(gap, 360.0 - gap) >= OPPOSITE_DEG)
+
+
+def ring_arm_template(pdf_bytes: bytes, page: int, glyph_bbox_pct) -> dict | None:
+    """{d, signature} when a legend row's glyph is exactly one black ring with arms, else None."""
+    from .legend_rows import read_marks
+    from .sheet_zones import display_frame
+    frame = display_frame(pdf_bytes, page)
+    if not frame:
+        return None
+    W, H = frame[0], frame[1]
+    g = [float(v) for v in glyph_bbox_pct]
+    marks, _ = read_marks(pdf_bytes, page, (g[0] * W - 0.5, g[1] * H - 0.5, g[2] * W + 0.5, g[3] * H + 0.5))
+    rings = [m for m in marks if _is_ring(m)]
+    if len(rings) != 1:
+        return None
+    d = rings[0]["x1"] - rings[0]["x0"]
+    found = _ring_arms(marks, d)
+    sig = ring_signature(found[0][1]) if found else None
+    return {"d": d, "signature": sig} if sig else None
+
+
+def ring_arm_instances(pdf_bytes: bytes, page: int, template: dict) -> tuple[list[dict], bool]:
+    """(instances, complete) of a ring-with-arms template on one sheet: [{page, box_pct, x_pct, y_pct}]
+    (DISPLAY fractions) of every ring of the template's size whose arms give its signature. `complete` is False
+    when the sheet has more objects than read_marks reads (the caller then keeps the shape search)."""
+    from .legend_rows import read_marks
+    from .sheet_zones import display_frame
+    frame = display_frame(pdf_bytes, page)
+    if not frame:
+        return [], False
+    W, H = frame[0], frame[1]
+    marks, truncated = read_marks(pdf_bytes, page)
+    out = []
+    pad = template["d"] * 0.6                          # the arms reach about this far beyond the ring
+    for ring, angles in _ring_arms(marks, template["d"]):
+        if ring_signature(angles) != template["signature"]:
+            continue
+        x0, y0, x1, y1 = ring["x0"], ring["top"], ring["x1"], ring["bottom"]
+        out.append({"page": page, "box_pct": [round(max(0.0, (x0 - pad) / W), 5), round(max(0.0, (y0 - pad) / H), 5),
+                                              round(min(1.0, (x1 + pad) / W), 5), round(min(1.0, (y1 + pad) / H), 5)],
+                    "x_pct": round((x0 + x1) / 2 / W, 4), "y_pct": round((y0 + y1) / 2 / H, 4)})
+    return out, not truncated

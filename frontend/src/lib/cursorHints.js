@@ -108,3 +108,21 @@ export function flashCursorHint(text, target = (typeof window !== 'undefined' ? 
   if (!target || !text) return;
   target.dispatchEvent(new CustomEvent(CURSOR_HINT_EVENT, { detail: { text: String(text) } }));
 }
+
+/** The sentence a tool key gets while „Kontūras paspaudus" is armed (B2-A: it used to be swallowed in silence). */
+export const FILL_ARMED_KEY_HINT = 'Pirmiausia baikite „Kontūras paspaudus“ (Esc)';
+
+const OUTLINE_TOOL_NAMES = { split: 'Padalyti', merge: 'Sujungti', subtract: 'Atimti' };
+
+/**
+ * Why a key that acts on the selected room (E / M / X) does nothing right now — one sentence beside the pointer
+ * instead of silence — or null when nothing armed holds the keys. Order = what the person sees on top.
+ * state = { fill: bool, outlineEdit: bool, outlineTool: 'split'|'merge'|'subtract'|null, draftPoints: number }
+ */
+export function armedKeyHint({ fill = false, outlineEdit = false, outlineTool = null, draftPoints = 0 } = {}) {
+  if (fill) return FILL_ARMED_KEY_HINT;
+  if (draftPoints > 0) return 'Pirmiausia užbaikite arba atšaukite braižomą (Enter / Esc)';
+  if (outlineEdit) return 'Pirmiausia išsaugokite arba atšaukite kontūro taisymą (Enter / Esc)';
+  if (outlineTool) return `Pirmiausia baikite „${OUTLINE_TOOL_NAMES[outlineTool] || 'kontūro veiksmą'}“ (Esc)`;
+  return null;
+}
