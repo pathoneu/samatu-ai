@@ -29,7 +29,41 @@ import {
   withSienosAngos,
 } from '@/lib/scope';
 import { planLabelsUnionRect, roomFromPlanLabel, unclaimedPlanLabels } from '@/lib/planLabels';
+import { areaSummary } from '@/lib/areaSummary';
 import EvidenceCrop from './EvidenceCrop';
+
+/**
+ * „Projekto plotas" (Pathon v3 W5-D, D13): the room table's total, the outlines' sum and the footprint, each
+ * with the sentence that says where it comes from; what the drawing does not give is a blank that says so.
+ * Read-only — no new formula, nothing here changes a quantity.
+ */
+function AreaSummarySection({ project }) {
+  const entries = areaSummary(project);
+  if (!entries.some((e) => e.value != null)) return null;
+  return (
+    <div className="border-t border-border" data-testid="area-summary">
+      <div className="px-4 pt-4 pb-2">
+        <h3 className="text-[15px] font-semibold">Projekto plotas</h3>
+        <p className="mt-0.5 text-[14px] text-[hsl(var(--ink-2))]">
+          Tas pats plotas trimis būdais — jei skaičiai labai skiriasi, verta pažiūrėti, kodėl.
+        </p>
+      </div>
+      <ul className="list-none p-0">
+        {entries.map((e) => (
+          <li key={e.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-border px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold">{e.label}</p>
+              <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{e.sentence}</p>
+            </div>
+            <p className={`font-mono text-[16px] ${e.value == null ? 'text-muted-foreground' : ''}`}>
+              {e.value == null ? '—' : `${ltNumber(e.value, 2)} m²`}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function SymbolRow({ row, projectId, busy, onSave }) {
   const { t } = useTranslation();
@@ -399,6 +433,8 @@ export default function GeneralFactsPanel({ project, busy = false, onSaveSymbol,
           <Check className="mt-1 h-5 w-5 text-[hsl(var(--accent-2))]" aria-hidden="true" />
         </div>
       )}
+
+      <AreaSummarySection project={project} />
 
       <ul className="list-none p-0">
         {rows.map((row) => (
