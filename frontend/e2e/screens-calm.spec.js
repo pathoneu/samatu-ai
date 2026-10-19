@@ -111,15 +111,18 @@ test.describe('screens calmed — one step, its own panel, the sąmata as the pa
       await expect(page.getByTestId('samata-rooms-summary').locator('tbody tr')).toHaveCount(0);
     });
 
-    test(`one line each: the free re-read offer and the room-list source in the 340 px panel, ${w}×${h}`, async ({ page }) => {
-      // B2-B item 5 — the offer wrapped to 2–3 lines (93 px), the source header to 2 (53 px)
+    test(`the free re-read offer in two short lines, the room-list source in one, 340 px panel, ${w}×${h}`, async ({ page }) => {
+      // B2-B item 5 — the offer wrapped to 2–3 lines (93 px), the source header to 2 (53 px); the offer is now
+      // line 1 (title + button + ✕) and line 2 (what stays)
       await page.setViewportSize({ width: w, height: h });
       await openProject(page);
       await waitForDrawing(page);
       const offer = page.locator('[data-testid="free-reread-banner"]:visible');
       if (await offer.count()) {
         await expect(offer.first().getByRole('button', { name: 'Perskaityti' })).toBeVisible();
-        expect((await offer.first().boundingBox()).height, 'offer height').toBeLessThanOrEqual(52);
+        // line 2, visible (never a tooltip): what stays — at the 12 px meta size; both lines ≤ 66 px
+        await expect(offer.first().locator('[data-notice-meta]')).toHaveText('Pataisymai, kainos ir patikrintos patalpos lieka.');
+        expect((await offer.first().boundingBox()).height, 'offer height').toBeLessThanOrEqual(66);
       }
       const src = page.getByTestId('rooms-source-line');
       expect((await src.boundingBox()).height, 'source line height').toBeLessThanOrEqual(40);
