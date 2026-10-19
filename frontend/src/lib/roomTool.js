@@ -204,3 +204,37 @@ export function insideProposal(proposal, point) {
   return Boolean(ring && Number(point?.page) === Number(proposal.page)
     && pointInPolygonPoints(Number(point.x_pct), Number(point.y_pct), ring));
 }
+
+/**
+ * One click's reading, proposal first (the network halves are passed in): ask `onPreview(nr, where)` for the
+ * outline of room `nr`; when the room was only GUESSED (`how` = 'number') and the walls name another room, ask
+ * once more for that one; when the click was inside the room's own outline (`how` = 'outline') or the retry
+ * moved to another room and still no wall separates them, say so. A sheet with no vector walls (`no_walls`)
+ * falls back to `onRasterPreview(nr, where)` → `{ring, data}` — its proposal says it is an estimate.
+ * `stale()` true after an await → null (he left the tool; the answer lands nowhere).
+ * → `{proposal}` | `{error: sentence}` | `{failure: answer}` (the caller words it) | null.
+ */
+export async function readOutlineProposal({ nr, where, how = 'number', onPreview, onRasterPreview = null, roomByNr, stale = () => false }) {
+  let tried = nr;
+  let answer = await onPreview(tried, where);
+  if (stale()) return null;
+  const again = how === 'number' ? retryNrFor(answer, tried) : null;
+  if (again && roomByNr(again)) {
+    tried = again;
+    answer = await onPreview(tried, where);
+    if (stale()) return null;
+  }
+  const noWall = noWallSentence(tried, answer);
+  if (noWall && (how === 'outline' || tried !== nr)) return { error: noWall };
+  if (answer?.status === 'ok' && Array.isArray(answer.room?.polygon_pct)) {
+    return { proposal: { kind: 'vector', nr: String(tried), page: where.page, ring: answer.room.polygon_pct, answer, lines: proposalLines(roomByNr(tried), answer) } };
+  }
+  if (answer?.status === 'no_walls' && onRasterPreview) {
+    const raster = await onRasterPreview(tried, where).catch(() => null);
+    if (stale()) return null;
+    if (raster?.ring) {
+      return { proposal: { kind: 'raster', nr: String(tried), page: where.page, ring: raster.ring, data: raster.data, lines: rasterProposalLines(roomByNr(tried), raster.ring) } };
+    }
+  }
+  return { failure: answer };
+}
