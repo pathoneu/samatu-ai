@@ -6,7 +6,7 @@
  */
 export default {
   testDir: '.',
-  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures)\.spec\.js$/,
+  testMatch: /(founder-guide|workspace-frame|room-click|click-model|measure-rows|market-readiness|legend-ui|guidance|viewer-chrome|edit-gestures|screens-calm)\.spec\.js$/,
   outputDir: './.results',
   fullyParallel: false,
   workers: 1,
