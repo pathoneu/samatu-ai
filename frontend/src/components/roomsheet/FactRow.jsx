@@ -81,7 +81,7 @@ function SizeEditor({ detail, busy, onSave, t }) {
 export default function FactRow({
   fact, room, busy = false, verified = false,
   onAccept, onSaveNumber, onSaveChoice, onAdjustOpening, onSaveOpeningSize, onAddOpening, onShowOnDrawing = null,
-  onPickOutline = null, onSplitSpace = null,
+  onPickOutline = null, onSplitSpace = null, typed = null,
 }) {
   const { t } = useTranslation();
   const attention = factTone(fact?.status) === 'attention';
@@ -93,6 +93,23 @@ export default function FactRow({
     setEditing(factNeedsInput(fact));
     setDraft(prefillValue(fact));
   }, [fact]);
+
+  // a digit typed while this fact is focused (C7, lib/roomSheetNav.typedDigit): the field opens with it in
+  const keepCaret = useRef(false);
+  useEffect(() => {
+    if (!typed || fact?.editable?.kind !== 'number') return;
+    keepCaret.current = true;
+    setDraft(typed.char);
+    setEditing(true);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      const end = el.value.length;
+      el.setSelectionRange?.(end, end);
+    });
+    // a new nonce is a new keypress
+  }, [typed?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // preventScroll: a blank fact opens with its field focused, and a focus that
@@ -344,7 +361,7 @@ export default function FactRow({
               ref={inputRef}
               value={draft}
               inputMode="decimal"
-              onFocus={(e) => e.target.select()}
+              onFocus={(e) => { if (keepCaret.current) { keepCaret.current = false; return; } e.target.select(); }}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitNumber(); }

@@ -22,6 +22,7 @@ import {
   EMPTY_SELECTION, addRoom, addRow, answerParts, chatRequest, givenPills, removePill, rowLabel, selectedRoomNrs,
   selectionPayload, selectionPills, toggleRoom,
 } from '@/lib/chatSelection';
+import { loadChatHistory, saveChatHistory } from '@/lib/chatHistory';
 
 // Every entry is answerable from what is sent (the project context, or the selection).
 const SUGGESTED_QUESTIONS = [
@@ -74,8 +75,28 @@ export default function AiChat({
     () => (project?.v8_rooms?.length ? project.v8_rooms : (project?.patalpos || [])),
     [project?.v8_rooms, project?.patalpos]);
 
-  // A new project is a new conversation.
-  useEffect(() => { setMessages([]); setSelection(EMPTY_SELECTION); }, [projectId]);
+  // A new project is a new conversation — and its own earlier one comes back (C12: kept per project across
+  // reloads, api/chat_history.py). Saved after every change once loaded; a failed load starts empty, never blocks.
+  const loadedFor = useRef(null);
+  const [historyNote, setHistoryNote] = useState(null);
+  const [cleared, setCleared] = useState(null);           // the list „Pradėti iš naujo" removed — for „Atšaukti"
+  useEffect(() => {
+    setMessages([]); setSelection(EMPTY_SELECTION); setHistoryNote(null); setCleared(null);
+    loadedFor.current = null;
+    if (!projectId) return undefined;
+    let alive = true;
+    loadChatHistory(projectId)
+      .then((list) => { if (alive) { setMessages(list); loadedFor.current = projectId; } })
+      .catch(() => { if (alive) { loadedFor.current = projectId; setHistoryNote('Ankstesnio pokalbio atkurti nepavyko — naujas pokalbis vis tiek veikia.'); } });
+    return () => { alive = false; };
+  }, [projectId]);
+  useEffect(() => {
+    if (!projectId || loadedFor.current !== projectId || loading) return undefined;
+    const timer = setTimeout(() => {
+      saveChatHistory(projectId, messages).catch(() => setHistoryNote('Pokalbio išsaugoti nepavyko — perkrovus jis gali dingti.'));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [projectId, messages, loading]);
   // Another room in focus brings the focus pill back.
   useEffect(() => {
     setSelection((s) => (s.droppedFocus && s.droppedFocus !== String(focusedRoomNr ?? '') ? { ...s, droppedFocus: null } : s));
@@ -145,6 +166,32 @@ export default function AiChat({
           {HONESTY} Pokalbis nieko nekeičia — kiekį pakeisite žingsnyje „Sąmata".
         </span>
       </div>
+
+      {(messages.length > 0 || cleared || historyNote) && (
+        <div className="shrink-0 flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-ui text-muted-foreground" data-testid="chat-history-bar">
+          {historyNote && <span className="text-foreground">{historyNote}</span>}
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { setCleared(messages); setMessages([]); }}
+              className="ml-auto inline-flex min-h-[32px] items-center rounded px-2 text-foreground hover:bg-muted"
+              data-testid="chat-clear"
+            >
+              Pradėti iš naujo
+            </button>
+          )}
+          {cleared && messages.length === 0 && (
+            <button
+              type="button"
+              onClick={() => { setMessages(cleared); setCleared(null); }}
+              className="ml-auto inline-flex min-h-[32px] items-center rounded px-2 text-foreground hover:bg-muted"
+              data-testid="chat-clear-undo"
+            >
+              Atšaukti — grąžinti pokalbį
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 bg-background">

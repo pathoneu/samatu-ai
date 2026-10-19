@@ -9,6 +9,7 @@ import UploadZone from '@/components/upload/UploadZone';
 import PreflightCard from '@/components/upload/PreflightCard';
 import ProcessingState from '@/components/upload/ProcessingState';
 import ProcessingStateStream from '@/components/upload/ProcessingStateStream';
+import RunTeaching, { ReadScopeCard } from '@/components/upload/RunTeaching';
 import { fetchPreflight, preflightCard, pollLimitMs } from '@/lib/preflight';
 import { WORK_FAMILIES, filterRowsByFamilies } from '@/lib/workFamilies';
 import { LUBOS_CHOICES, SIENOS_ANGOS_CHOICES, scopeForBackend } from '@/lib/scope';
@@ -778,6 +779,16 @@ export default function NewProject() {
         ) : (
           <ProcessingState />
         )}
+        {isStreaming && !error && (
+          <RunTeaching
+            className="mt-2"
+            phase={streamPhase}
+            progress={streamProgress}
+            elapsed={streamElapsed}
+            started={recovering || Boolean(runIdRef.current)}
+            estMinutes={preflight?.est_minutes || ''}
+          />
+        )}
         {!isStreaming && status && !error && (
           <p className="text-center text-xs text-muted-foreground mt-2">{status}</p>
         )}
@@ -841,6 +852,9 @@ export default function NewProject() {
       <p className="text-sm text-muted-foreground mb-8">
         {t('newProject.subtitle')}
       </p>
+
+      {/* before the first run: what is read and what is not (C2) — never blocks, „Supratau" closes it */}
+      <ReadScopeCard className="mb-6" />
 
       {error && (
         <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
