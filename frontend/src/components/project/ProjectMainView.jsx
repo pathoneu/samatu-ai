@@ -21,7 +21,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { isReverseVat, vatPercent } from '@/lib/vatMode';
 import { toast } from 'sonner';
 import {

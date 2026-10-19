@@ -25,7 +25,7 @@
 
 import { Component, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Loader2, Maximize2, MousePointerClick, ScanSearch, Scissors, X } from 'lucide-react';
 import TakeoffViewer from '@/components/viewer/TakeoffViewer';
 import RoomPlanPane from '@/components/roomsheet/RoomPlanPane';

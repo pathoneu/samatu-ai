@@ -11,6 +11,7 @@
 //
 // Nothing here changes a number: view only. Pure — the popover is components/viewer/ViewSettingsPopover.jsx and
 // the CSS is applied by TakeoffViewer through viewCss().
+import { browserStorage } from './browserStorage.js';
 
 export const VIEW_SETTINGS_KEY = 'samatu_viewer_view';
 
@@ -50,7 +51,7 @@ export function sanitizeViewSettings(raw) {
   };
 }
 
-export function readViewSettings(storage = (typeof window !== 'undefined' ? window.localStorage : null)) {
+export function readViewSettings(storage = browserStorage()) {
   try {
     return sanitizeViewSettings(JSON.parse(storage?.getItem?.(VIEW_SETTINGS_KEY) || '{}'));
   } catch {
@@ -58,7 +59,7 @@ export function readViewSettings(storage = (typeof window !== 'undefined' ? wind
   }
 }
 
-export function writeViewSettings(settings, storage = (typeof window !== 'undefined' ? window.localStorage : null)) {
+export function writeViewSettings(settings, storage = browserStorage()) {
   try { storage?.setItem?.(VIEW_SETTINGS_KEY, JSON.stringify(sanitizeViewSettings(settings))); } catch { /* private mode */ }
 }
 

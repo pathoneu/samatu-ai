@@ -10,7 +10,7 @@
  * general page. Two big buttons, one sentence saying what the state means.
  */
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ROOM_FAMILIES } from '@/lib/scope';
 
 export default function RoomScopeSwitch({ included, familiesOff = [], busy = false, onChange, onFamily, mergedInto = null }) {

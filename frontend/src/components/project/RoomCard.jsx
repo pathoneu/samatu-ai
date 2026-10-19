@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Edit2, Check, X, AlertCircle, Eye, BookOpen, Palette, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { getPdfBlob } from '@/lib/pdfStore';
 import ConfidenceBadge from './ConfidenceBadge';

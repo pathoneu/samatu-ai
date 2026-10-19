@@ -4,7 +4,7 @@
  * loading / error / empty states. Dark-graphite identity throughout.
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ArrowUp, ArrowDown, Minus, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';

@@ -15,7 +15,7 @@
  * email, and has no action — the backend refuses to switch it either way.
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Search, ShieldAlert, UserX, UserCheck, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

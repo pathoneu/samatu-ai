@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { FileUp, Zap, Clock, CheckCircle2, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { seedDemoProject, DEMO_PROJECT_ID } from '@/lib/projectStore';

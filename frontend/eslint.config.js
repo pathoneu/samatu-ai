@@ -59,6 +59,13 @@ export default [
         { ignore: ["cmdk-input-wrapper", "toast-close"] },
       ],
       "react-hooks/rules-of-hooks": "error",
+      // useTranslation / Trans come from @/i18n/react, which binds our i18next instance explicitly — a
+      // second copy of react-i18next in the browser then still translates instead of printing keys
+      // (2026-10-19, Safari walk).
+      "no-restricted-imports": [
+        "error",
+        { paths: [{ name: "react-i18next", message: "Import useTranslation / Trans from '@/i18n/react'." }] },
+      ],
     },
   },
 ];

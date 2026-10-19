@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Check, Tag } from 'lucide-react';
 
 import { fetchNameHints, namesAreAsked, openHints, ROOM_NAME_CHOICES } from '@/lib/roomNames';

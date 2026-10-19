@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileSearch, Brain, Search, CheckCircle2 } from 'lucide-react';
 

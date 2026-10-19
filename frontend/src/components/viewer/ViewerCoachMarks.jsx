@@ -12,7 +12,7 @@
  * these cards must point at a button and leave the drawing usable underneath.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { X } from 'lucide-react';
 import {
   COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, coachStartStep, saveCoachStep, modalOpen,

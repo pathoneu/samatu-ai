@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { CURSOR_HINT_EVENT, CURSOR_HINT_FLASH_MS } from '@/lib/cursorHints';
 import { OPEN_LAYER_SELECTOR } from '@/lib/escOrder';
 import { firstUseSeen, firstUseToolFor, markFirstUseSeen } from '@/lib/firstUseHints';

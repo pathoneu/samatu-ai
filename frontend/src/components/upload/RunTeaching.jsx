@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Check, Clock, Minus, ScanLine, X } from 'lucide-react';
 
 import { markReadScopeSeen, readScopeDue, runTeachingFor } from '@/lib/runTeaching';
