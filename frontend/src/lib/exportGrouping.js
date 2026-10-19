@@ -25,10 +25,23 @@ export const GROUPINGS = Object.freeze([
   { value: 'seimos', label: 'Darbų šeimas', desc: 'Kaip „Kiekiai" skiltyje: eilutė ir patalpos po ja' },
   { value: 'lapai', label: 'Lapus', desc: 'Pagal brėžinio lapą, kuriame patalpa nubraižyta' },
   { value: 'be_grupavimo', label: 'Be grupavimo', desc: 'Viena eilutė kiekvienai patalpos daliai, su filtru' },
+  { value: 'aukstai', label: 'Aukštus', desc: 'Pagal aukštą, kurį nurodo projektas ar patalpos numeris (pvz. „2F-05“); kitos — „Aukštas nenurodytas“' },
+  { value: 'butai', label: 'Butus', desc: 'Pagal butą, kuriam priskirta patalpa' },
 ]);
 
 export function isGrouping(value) {
   return GROUPINGS.some((g) => g.value === value);
+}
+
+/** Whether any room carries an apartment (`butas`) — nothing reads one off a drawing yet. */
+export function projectHasFlats(project) {
+  const rooms = project?.v8_rooms || project?.patalpos || [];
+  return rooms.some((r) => String(r?.butas ?? '').trim() !== '');
+}
+
+/** The choices this project can use: „Butus" only when some room has a flat. */
+export function groupingsFor(project) {
+  return GROUPINGS.filter((g) => g.value !== 'butai' || projectHasFlats(project));
 }
 
 /** Where a sąmata row's number came from: 'jusu' (a row he added), 'pataisyta' (he typed over it), 'programa'. */

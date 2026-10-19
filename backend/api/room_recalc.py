@@ -34,6 +34,7 @@ from extractor.vision_call import _elementai_to_counts
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 import json
+import os
 FIXTURES = {
     "objektas_a": REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/app-output-to-the-dot.json",
 }
@@ -50,7 +51,10 @@ def _load_project(request: Request, project_id: str, fixture: str | None) -> dic
     # FIRST (before this fixture branch), or ``?fixture=`` becomes an unauth
     # cross-tenant read (the P1/P2 class). Do not "optimise" the fixture branch to
     # touch a per-project file.
-    if fixture:
+    # Audit backend-security-10 (fixed 2026-10-18): in production ?fixture= is
+    # ignored, the same gate room_graph/symbols got on 2026-07-15 — the demo
+    # fixture is a dev tool (pages/Annotator.jsx, DEV-only), never prod data.
+    if fixture and os.environ.get("ENV") != "production":
         p = FIXTURES.get(fixture)
         if not p or not p.exists():
             raise HTTPException(status_code=404, detail=f"unknown fixture: {fixture}")

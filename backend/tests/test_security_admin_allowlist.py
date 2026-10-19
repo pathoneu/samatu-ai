@@ -23,15 +23,25 @@ def _isolate(tmp_path, monkeypatch):
     db._migrate_schema()
 
 
-def test_allowlist_matching_email_becomes_admin(tmp_path, monkeypatch):
+def test_allowlist_matching_email_becomes_admin_once_verified(tmp_path, monkeypatch):
+    """Audit backend-security-6 (2026-10-18): a typed allowlisted address is not
+    proof — admin arrives only when the verification link is opened."""
+    import email_sender
     _isolate(tmp_path, monkeypatch)
+    email_sender.clear_outbox()
     # case-insensitive + trimmed + comma-separated
     monkeypatch.setenv("SAMATU_ADMIN_EMAIL", " Boss@X.LT , other@x.lt ")
     c = TestClient(app)
     r = c.post("/api/auth/register",
                json={"email": "boss@x.lt", "password": _PW, "name": "Boss"})
     assert r.status_code == 200, r.text
-    assert r.json()["is_first_admin"] is True
+    assert r.json()["is_first_admin"] is False
+    assert not db.get_user_by_email("boss@x.lt")["is_admin"]
+
+    sent = [m for m in email_sender.outbox() if m.to == "boss@x.lt"]
+    assert sent, "a verification link was mailed"
+    token = sent[-1].text.split("token=", 1)[1].split()[0]
+    assert c.post("/api/auth/verify-email", json={"token": token}).status_code == 200
     assert db.get_user_by_email("boss@x.lt")["is_admin"]
 
 

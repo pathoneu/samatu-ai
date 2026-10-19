@@ -164,6 +164,20 @@ def validate_password(pw: str) -> None:
         )
 
 
+# ── What a user row may say about itself in a response ─────────────────────────
+# Audit backend-security-12 (fixed 2026-10-18): /me, /login, /register and
+# /profile returned the whole row — google_sub, the Stripe ids and the session
+# nonce included. Responses carry only what the app shows or decides on.
+_PRIVATE_USER_KEYS = ("password_hash", "google_sub", "stripe_customer_id",
+                      "stripe_subscription_id", "session_version", "deleted_at")
+
+
+def public_user(user: dict | None) -> dict | None:
+    if not user:
+        return user
+    return {k: v for k, v in user.items() if k not in _PRIVATE_USER_KEYS}
+
+
 # ── FastAPI dependencies ──────────────────────────────────────────────────────
 
 def get_current_user(request: Request) -> dict | None:

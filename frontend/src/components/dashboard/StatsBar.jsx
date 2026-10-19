@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { vatPercent } from '@/lib/vatMode';
 
 /**
  * StatsBar — 3-cell summary grid for dashboard. Mirrors claude.ai/design
@@ -54,7 +55,7 @@ export default function StatsBar({ projects }) {
       (s, it) => s + (it.kiekis || 0) * (it.kaina || 0),
       0,
     );
-    const vat = p.vat_rate || 21;
+    const vat = vatPercent(p);
     return sum + net * (1 + vat / 100);
   }, 0);
 

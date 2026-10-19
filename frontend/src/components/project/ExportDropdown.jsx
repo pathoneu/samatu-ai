@@ -23,6 +23,7 @@ import { listAssemblies } from '@/lib/assembliesApi';
 import { effectiveKodas } from '@/lib/kodas';
 import { DEFAULT_GROUPING, exportLinesWithParts, exportSheets } from '@/lib/exportGrouping';
 import OverlayPdfDialog from './OverlayPdfDialog';
+import { vatRateOf } from '@/lib/vatMode';
 
 // Collect human-readable warnings from new + legacy schema sources.
 // Backend `lt_sanity.warnings[]` (post-Phase 9 mirror) merges _lt_warnings
@@ -145,7 +146,13 @@ async function downloadFile(endpoint, project, filename, allowedSkyriai, extra =
     ...(base.perspejimani && !internalCopy ? { perspejimani: [] } : {}),
     ...branding,
     vat_mode: extra.vat_mode || project.vat_mode || '',
+    // v3 M4: the rate the dialog showed (his pick, else the project's, else the
+    // account default) — the server used to print 21 % whatever was chosen.
+    vat_rate: vatRateOf({ vat_rate: extra.vat_rate ?? project.vat_rate }, s.vat_rate),
     vidine_kopija: internalCopy,
+    // v3 M5: his internal copy gets „Pakeitimų žurnalas" — the server reads the
+    // project's own change log (ownership-checked); the client's copy never asks.
+    ...(internalCopy && project.id ? { project_id: project.id } : {}),
     ...(suKodu ? { su_kodu: true } : {}),
   };
   const res = await fetch(`${API}/${endpoint}`, {
@@ -244,7 +251,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     });
   };
 
-  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, su_kodu, grupavimas }) => {
+  const handleConfirm = async ({ skyriai, format, uzsakovas, objektas, pasiulymo_nr, vat_mode, vat_rate, vidine_kopija, su_kodu, grupavimas }) => {
     // Prices (2026-10-06 walkthrough): the dialog he just confirmed already says
     // „N eilučių be kainos — klientas jas matys su 0,00 € suma", counted on these
     // very lines (lib/exportLines.js), so the two confirms that followed it —
@@ -265,7 +272,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
     setLoading(format);
     try {
       const safeName = sanitizeExportFilename(project.name);
-      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vidine_kopija, su_kodu, grupavimas };
+      const extra = { uzsakovas, objektas, pasiulymo_nr, vat_mode, vat_rate, vidine_kopija, su_kodu, grupavimas };
       if (format === 'excel') {
         await downloadFile('generate-excel', project, `${safeName}.xlsx`, skyriai, extra);
       } else if (format === 'excel-template') {
@@ -384,6 +391,7 @@ export default function ExportDropdown({ project, onProjectChange, onGoToPrices 
           onCancel={() => { if (loading == null) setFilterFor(null); }}
           onConfirm={handleConfirm}
           onVatModeChange={(mode) => onProjectChange?.({ ...project, vat_mode: mode })}
+          onVatRateChange={(rate) => onProjectChange?.({ ...project, vat_rate: rate })}
           onStaleChoice={onProjectChange ? handleStaleChoice : undefined}
           onGoToPrices={onGoToPrices ? (excluded) => {
             setFilterFor(null);

@@ -317,7 +317,7 @@ def _fake_google(monkeypatch, sub: str, email: str):
             return _Resp({"access_token": "tok"})
 
         async def get(self, *a, **k):
-            return _Resp({"sub": sub, "email": email, "name": "Rimas"})
+            return _Resp({"sub": sub, "email": email, "email_verified": True, "name": "Rimas"})
 
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
     monkeypatch.setattr(main, "GOOGLE_OAUTH_ENABLED", True)
@@ -550,7 +550,7 @@ def test_delete_account_helper_runs_once(env):
     uid = env.owner["id"]
     first = db.delete_account(uid)
     assert first == {"user_settings": 1, "extraction_jobs": 1, "price_lists": 1,
-                     "samata_templates": 1, "assemblies": 1}
+                     "samata_templates": 1, "assemblies": 1, "email_tokens": 0}
     tomb = db.get_user_by_id(uid)
     assert db.delete_account(uid) is None
     assert db.get_user_by_id(uid) == tomb

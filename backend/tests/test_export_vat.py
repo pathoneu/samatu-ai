@@ -136,6 +136,61 @@ def test_excel_absent_mode_keeps_todays_result_for_both_labels():
     assert "PVM 21%:" not in _excel_labels(_payload("renovacija"))
 
 
+# ── His rate reaches both exports (v3 W7-A M4, 2026-10-18) ──────────────────
+# Settings › PVM tarifas offered 21 / 9 / 0 % but both exports printed 21 %.
+
+import pytest  # noqa: E402
+
+from extractor.vat_mode import vat_rate_percent  # noqa: E402
+
+
+def _rated(rate, **kw):
+    p = _payload(kw.pop("archetipas", None), vat_mode=kw.pop("vat_mode", None))
+    if rate is not ...:
+        p["vat_rate"] = rate
+    return p
+
+
+@pytest.mark.parametrize("rate, expected_pvm", [(21, "10,50"), (9, "4,50"), (0, "0,00")])
+def test_pdf_prints_his_rate_and_the_matching_total(rate, expected_pvm):
+    r = client.post("/generate-pdf", json=_rated(rate))
+    assert r.status_code == 200, r.text
+    txt = _pdf_text(r.content)
+    assert f"PVM {rate}%" in txt
+    assert expected_pvm in txt
+    total = {21: "60,50", 9: "54,50", 0: "50,00"}[rate]
+    assert total in txt
+
+
+@pytest.mark.parametrize("rate", [21, 9, 0])
+def test_excel_prints_his_rate_with_the_matching_formula(rate):
+    from openpyxl import load_workbook
+    r = client.post("/generate-excel", json=_rated(rate))
+    assert r.status_code == 200, r.text
+    ws = load_workbook(io.BytesIO(r.content))["Sąmata"]
+    rows = {ws.cell(row, 1).value: ws.cell(row, 6).value for row in range(1, ws.max_row + 1)}
+    assert f"PVM {rate}%:" in rows
+    assert f"*{rate / 100:.2f},2)" in rows[f"PVM {rate}%:"]
+    assert "PVM 21%:" not in rows or rate == 21
+
+
+def test_reverse_vat_wording_unchanged_whatever_the_rate():
+    r = client.post("/generate-pdf", json=_rated(9, vat_mode="reverse_vat"))
+    txt = _pdf_text(r.content)
+    assert "Atvirkštinis PVM" in txt and "PVM 9%" not in txt
+    assert "IŠ VISO (be PVM):" in _excel_labels(_rated(9, vat_mode="reverse_vat"))
+
+
+def test_rate_helper_reads_his_value_and_never_invents_one():
+    assert vat_rate_percent({"vat_rate": 9}) == 9
+    assert vat_rate_percent({"vat_rate": "0"}) == 0
+    assert vat_rate_percent({"vat_rate": "9 %"}) == 9
+    assert vat_rate_percent({"vat_rate": 15}) == 21        # not a rate he can pick
+    assert vat_rate_percent({"vat_rate": True}) == 21
+    assert vat_rate_percent({}) == 21                      # old clients: unchanged
+    assert vat_rate_percent({"vat_rate": 9, "vat_mode": "reverse_vat"}) == 0
+
+
 def test_chat_price_summary_follows_the_same_rule():
     """The assistant's „kiek su PVM?" must agree with the top bar and the files."""
     from main import _build_chat_context

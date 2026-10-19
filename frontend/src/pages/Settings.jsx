@@ -18,6 +18,7 @@ import { useAuth } from '@/lib/authContext';
 import { API_BASE } from '@/lib/apiBase';
 import { confirmMatches, deleteAccount, forgetCachedDrawings } from '@/lib/accountApi';
 import BillingSettings from '@/components/billing/BillingSettings';
+import { parseVatRate } from '@/lib/vatMode';
 
 // The backup section's anchor — the account-deletion section points the user
 // there to take a copy first.
@@ -60,7 +61,8 @@ export default function Settings() {
     ensureSettingsPulled().then((s) => {
       if (!alive) return;
       if (s.company_name) setCompanyName(s.company_name);
-      if (s.vat_rate) setVatRate(String(s.vat_rate));
+      // 0 % is a choice (v3 M4) — `if (s.vat_rate)` used to drop it back to 21.
+      if (parseVatRate(s.vat_rate) !== null) setVatRate(String(parseVatRate(s.vat_rate)));
       if (s.company_logo) setCompanyLogo(s.company_logo);
       if (s.imones_kodas) setImonesKodas(s.imones_kodas);
       if (s.pvm_kodas) setPvmKodas(s.pvm_kodas);
@@ -224,6 +226,7 @@ export default function Settings() {
                   <SelectItem value="0">0%</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[12px] text-muted-foreground mt-1">{t('settings.company.vatRateHint')}</p>
             </div>
 
             <div>

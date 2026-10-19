@@ -116,6 +116,7 @@ production module importing a test-only package.
   `cd backend && SAMATU_AUTH_DISABLED=0 ../venv/bin/uvicorn main:app --port 8001`
   (`load_dotenv(override=False)` won't clobber the shell var). Unauthenticated requests then return **401**.
 - **Guardrail:** the app hard-fails at startup if `SAMATU_AUTH_DISABLED=1` **and** `ENV=production`, so prod can't ship with the auth wall off.
+- **Email (v3 M2, 2026-10-18) — provider-agnostic, console by default.** `backend/email_sender.py`: no `SMTP_HOST`+`SMTP_FROM` → the console backend (dev logs the whole message, so the link is clickable from the backend log; `ENV=production` logs only recipient domain + subject, sends nothing). Any SMTP relay → set `SMTP_HOST/PORT/USER/PASSWORD/FROM` (3 attempts). Routes in `backend/api/auth_email.py`: forgot / reset password (1 h, single use, hashed, spends older links, logs every other device out), verify / resend (48 h), at most 3 links per account per hour, the same answer whether or not an account exists. Pages: `/pamirsau-slaptazodi`, `/slaptazodzio-keitimas?token=`, `/el-pasto-patvirtinimas?token=` (`pages/AuthEmailPages.jsx`); the login page shows the reset link only when `GET /api/auth/email-status` says a link can reach the person, else the old write-to-us link. **Gate:** `SAMATU_REQUIRE_EMAIL_VERIFIED=1` → register starts no session and password login answers 403 `email_not_verified` (after the password matched) until the link is opened; default 0 = today's behaviour. Always on, no mail needed: Google sign-in requires Google's `email_verified` and never merges into a password account whose inbox was never proven (audit -9); an address on `SAMATU_ADMIN_EMAIL` becomes admin only once verified — by our link or by Google (audit -6). Users that predate this have `email_verified_at` NULL. Tests: `tests/test_auth_email.py`.
 
 ## Tests — what "green" means
 
@@ -168,6 +169,19 @@ Ceilings are anchored to the eksplikacija total — or, when a drawing prints no
 
 **RULE: never change *billed quantities* without measuring against these.** Neither the formulas nor the reads are "solved": fed objektas_a's hand-entered room dimensions (`--use-gt-inputs`, the only project that has them, some back-derived from his sąmata — see ARCHITECTURE.md › Known fragilities), walls still read −7,4 % and combined paint −5,4 % (2026-10-05). An unverified formula "fix" is a regression risk.
 
+**Public accuracy claims (v3 W7-A M9, 2026-10-18).** A number about accuracy may appear on a public page only if it comes from the human-confirmed corpus (`scripts/build_ground_truth.py` — outlines a person corrected or drew, quantities a person typed over or verified) and says which kind it is: **in-sample** (projects the engine was developed against — every eval project today) or **out-of-sample** (a blind batch scored once, `docs/superpowers/plans/2026-10-05-blind-batch-protocol.md`). The eval harness figures above (22,60 % billed lines etc.) are measured against ONE contractor's sąmatos on in-sample projects — internal, not public. `frontend/src/lib/publicCopyClaims.test.js` fails on a percentage in a sentence about accuracy without that label. On 2026-10-18 `build_ground_truth.py` on the dev database gave 4 confirmed outlines and 9 confirmed quantities — not enough for any public number, and none is published. Public numbers found on that date and their basis:
+
+| Where | Claim | Basis | Verdict |
+|---|---|---|---|
+| `landing.hero.sub`, `Duk.jsx`, `KiekiaiIsBrezinio.jsx`, `public/llms.txt` | a read takes 15–35 min | v3 "Paid runs log" 25–28 min; audit measured 12–34 min | supported |
+| `SamatininkoKaina.jsx` table | „Su Pathon ~1 val. (peržiūra + kainos)" / „~15 min." | no measured time-to-finish (pilot telemetry is thin) | **flag — unsupported, and „~15 min" undercuts the 15–35 min read; founder to reword or drop** |
+| `ApvaRenovacijosKiekiai.jsx` table | „Laikas kiekiams … ~15 min. + peržiūra" | same | **flag — same** |
+| `KiekiaiIsBrezinio.jsx` | paint area 2,5–4 × floor area; a wrong scale drifts lengths 10–20 %; tile waste +10–15 % | CLAUDE.md §6 check 1, §3 waste table (estimating practice, not our measurement) | domain rule — fine as stated |
+| `ApvaRenovacijosKiekiai.jsx` | mesh 1,1 m² (10 %), facade net 15–25 % below gross, roofing +8 %, film ×1,10, class B ≈ 40 % savings | CLAUDE.md §2.1, §6 check 7, §3, Type 4 | domain rule — fine |
+| `landing.steps`, `landing.exportSec`, `Duk.jsx` | „21 % PVM eilutė" | the default; 9 % and 0 % are now choosable (M4) | true; founder may add „ar 9 / 0 %" |
+| pricing tiers | 0 € / 12 € / 49 € (10 projects) / 149 € (35) | `backend/billing/plans.py` | matches code; price points are the founder's |
+| `public/llms.txt` | „promises no accuracy percentage" | — | true |
+
 **Provenance is an accuracy invariant too (2026-09-02).** Any change to the builder must keep `backend/tests/test_contribution_ledger.py` green — it replays every row's `roll_up` over its `contributions` on all corpus fixtures and fails if the ledger stops reproducing `kiekis`. If you wire a new family into the ledger, add it there (and to the LT-string vocabulary guard). To eyeball Patikra locally: start `backend-dev` + `frontend-dev` from `.claude/launch.json` (restart the backend after backend edits — no `--reload`), open a local project, toggle anything in Prielaidos (the rebuilt list carries ids + ledger), then click a row → tree, and use the right-hand PATIKRA rail (card → „Pataisyti" → Prielaidos focus → recompute → „Perskaičiuota: N eilučių" → „Įsiminta"). The shipped demo snapshot carries no ledger on disk until it is recomputed.
 
 **To eyeball the contractor's own layout (2026-09-05):** the switch („Pathon" | „Kaip mano sąmatose") appears on the Sąmata step only when the dev account has a template. Seed one from the gitignored parsed sąmatas — never from anything that could carry a client name into a tracked file:
@@ -181,9 +195,46 @@ Then: Sąmata → switch → type into a blank cell (becomes an `rnk-` row in `d
 ## Deploy / billing (dev-relevant bits — full launch steps in `RUNBOOK.md`)
 
 - `BILLING_ENABLED` defaults `'0'` (dormant). Don't flip without the pre-flight: Stripe secret + webhook secret + price IDs present, webhook signature verified live, and `usage_events` logging confirmed (a silent-fail there could let a user drain the API budget uncharged).
+  - **The pre-flight is a script (2026-10-18):** `venv/bin/python scripts/billing_preflight.py` in the environment that is about to flip — read-only, no network; prints env NAMES (never values), the key's test/live mode, an offline signature self-test through `stripe_client.construct_event`, `usage_events` rows of the last 7 days (DB opened read-only), the spend guards (`SAMATU_USER_DAILY_SPEND_EUR` must be > 0) and which invoice VAT branch applies, then the manual checks (webhook subscriptions incl. `checkout.session.async_payment_succeeded/_failed`, delayed payment methods, accountant, prices). Exit 1 until every scripted check passes.
+  - **Money only when it arrived (audit backend-security-7):** a one-off credit and its PVM invoice are granted only for `payment_status == "paid"`; an "unpaid" session (SEPA, bank transfer) waits for `checkout.session.async_payment_succeeded`, `_failed` grants nothing. An unpaid subscription is stored as `plan_status = "incomplete"` and reads as the free tier (`billing/entitlements._plan`) until Stripe reports it active; a €0 `invoice.paid` (trial) emits no invoice. Tests: `tests/test_billing_payment_status.py`.
+  - **Tier gates:** `entitlements.require_feature(user, feature)` → 403 `feature_not_in_plan` with a plain message; wired on the F2/F3 routes (`f2f3_export`), after ownership. Quota / trial 402s say what is used, of how much, and when it renews (`quota_message`). All of it is a no-op while the flag is off.
+  - **Invoice VAT rule as coded (audit backend-security-8, NOT changed — accountant to confirm):** `billing/invoice.build_invoice_fields` → (1) buyer typed any `pvm_code` → reverse charge, no VAT line, note „Atvirkštinis PVM (PVMĮ 96 str.)" — applied even to an LT buyer and even when Pathon itself is not VAT-registered; (2) else Pathon has no `PATHON_COMPANY_PVM` → „Pardavėjas nėra PVM mokėtojas", no VAT; (3) else 21 %. The likely-correct rule (21 % for LT buyers once Pathon is registered; reverse charge only for other-EU VAT-registered buyers, format/VIES checked) is the accountant's call. Buyer fields are now escaped before reportlab lays them out.
 - Prod needs `R2_*` env vars (PDF + DB-backup storage); `.env` is gitignored → set on the host.
+- **Symbol-training crops (v3 M8, 2026-10-18)** live under `SAMATU_DATA_DIR/symbol_training` (unset → the legacy `data/symbol_training`), one folder per project; `DELETE /api/projects/{id}` and account deletion remove them (`training_data.purge_project`, also the pre-M8 root-level crops whose log line names the project). Account deletion also removes the per-owner architect legends (`project_purge.purge_account_files`, `<legends>/architect/<user id>/`). On 2026-10-18 the main checkout held 3 legacy crops; prod's are on the container disk and die with each deploy until `SAMATU_DATA_DIR` is set.
 - Nightly DB backups are checked (`PRAGMA integrity_check`) before upload, their outcome shows in the admin cockpit's health panel, and old ones are **never deleted** until `SAMATU_BACKUP_KEEP_DAYS` is set — a founder decision; `scripts/report_backup_retention.py --days N` shows what a value would delete. Details: `RUNBOOK.md` §2a.
 - All work is on `viewer-rebuild`; nothing auto-deploys.
+
+## Limits (v3 W7-A M7, 2026-10-18)
+
+What the app refuses or warns about, where it lives, and the measurement behind each number.
+
+| Limit | Value | Where | Basis |
+|---|---|---|---|
+| Uploaded PDF size | 200 MB | `main.MAX_PDF_SIZE_BYTES`, `_validate_pdf_upload` | magic bytes + size, before parsing |
+| Pages a paid read sends | 100 | `main.py` (MAX_PAGES note), Vision pipeline | Anthropic request limit |
+| Page dimensions | ≤ 4320 pt edge, ≤ 11,52 M pt² area | `_MAX_PAGE_DIM_PT`, `_MAX_PAGE_AREA_PT2` | ≈ 200 MP at 300 DPI; page 1 only (audit -19 open) |
+| Paid interior read time | 25–28 min typical (12–34 min in the 2026-09-29 audit) | `/extract-interior-stream`, no overall server timeout; 10 s keepalive, survives a dropped stream | programme "Paid runs log" |
+| Other extract routes | 900 s timeout | `/extract`, facade / roof / earthworks / concrete | `asyncio.timeout(900)` |
+| Paid reads per user per hour | 20 (`SAMATU_USER_HOURLY_EXTRACTS`; 0 = off) | `_check_user_spend_cap` | env; € daily cap `SAMATU_USER_DAILY_SPEND_EUR` defaults 0 = off |
+| Default per-client rate | 30 / min per bucket | `_check_rate_limit` | sliding 60 s window, keyed by `_client_key` |
+| `/recompute-interior` | 120 / min per client, ≤ 500 rooms per call | `RECOMPUTE_INTERIOR_PER_MIN` | measured below |
+| Emailed links | 3 per purpose per account per hour | `api/auth_email.MAX_LINKS_PER_HOUR` | on top of the per-IP bucket |
+| Telemetry session | ≤ 2000 gestures | `api/telemetry.MAX_GESTURES` | — |
+| Measurements on one sheet | warning at 1500 (never blocked) | `frontend/src/lib/measureLimits.js` | measured below |
+
+**Measurements per sheet** (headless Chromium 1440×900 on the dev Mac, demo-objektas_h sheet 1, a mix of areas / lines / perimeters / counts; open time, then 40 pans + 16 Ctrl-wheel zooms, rAF frame gaps and long tasks; script `m7_measure.mjs` in the W7-A scratchpad, numbers copied here):
+
+| Measurements | Drawing + overlay on screen | Slowest frame | p95 frame | Long tasks (longest) | JS heap |
+|---|---|---|---|---|---|
+| 0 | 1,1 s | 17 ms | 17 ms | 0 | ≈ 100–140 MB |
+| 1000 | 1,2 s | 50 ms | 17 ms | 0 | 131 MB |
+| 2000 | 1,3 s | 117 ms | 17 ms | 2 (74 ms) | 148 MB |
+| 4000 | 1,8 s | 250 ms | 17 ms | 4 (142 ms) | 177 MB |
+| 8000 | 2,7 s | 533 ms | 67 ms | 19 (317 ms) | 239 MB |
+
+The first stutter a person notices (a frame over 100 ms) appears between 1000 and 2000 here, sooner on a slower laptop: the warning fires once per sheet at 1500.
+
+**`/recompute-interior`** (local single uvicorn worker, auth off, `m7_recompute_timing.py`): 11 rooms (demo-objektas_h) p50 50 ms, ~20 calls/s max; 8 parallel callers → p50 485 ms each. 110 rooms p50 391 ms, 2,5 calls/s; 8 parallel → p50 3,6 s. It is CPU-only and every room edit calls it, and production runs one worker for everyone, so a loop from one client could stall everybody. Decision: its own bucket of 120/min per client (2/s, far above a person editing rooms); the 500-room cap bounds one call. Residual: a client sending 500-room payloads at 2/s could still keep a worker busy — a per-user CPU budget is the next step if that is ever seen.
 
 ## Housekeeping gotchas
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_GROUPING, GROUPINGS, OVERLAY_LAYERS, exportLinesWithParts, exportSheets, isGrouping,
+  DEFAULT_GROUPING, GROUPINGS, OVERLAY_LAYERS, exportLinesWithParts, exportSheets, groupingsFor, isGrouping,
   overlayPageChoices, overlayRequestBody, overlayScales, rowOrigin,
 } from './exportGrouping.js';
 import { exportLines } from './exportLines.js';
@@ -25,8 +25,16 @@ const project = (over = {}) => ({
 
 test('the grouping choices: today first, every value the server takes', () => {
   assert.equal(GROUPINGS[0].value, DEFAULT_GROUPING);
-  assert.deepEqual(GROUPINGS.map((g) => g.value), ['skyriai', 'patalpos', 'seimos', 'lapai', 'be_grupavimo']);
-  assert.ok(isGrouping('lapai') && !isGrouping('kita'));
+  assert.deepEqual(GROUPINGS.map((g) => g.value),
+    ['skyriai', 'patalpos', 'seimos', 'lapai', 'be_grupavimo', 'aukstai', 'butai']);
+  assert.ok(isGrouping('lapai') && isGrouping('aukstai') && !isGrouping('kita'));
+});
+
+test('„Butus" is offered only when some room carries a flat (v3 M5)', () => {
+  const values = (p) => groupingsFor(p).map((g) => g.value);
+  assert.ok(!values({ v8_rooms: [{ nr: '01' }] }).includes('butai'));
+  assert.ok(values({ v8_rooms: [{ nr: '01', butas: '3' }] }).includes('butai'));
+  assert.ok(values({}).includes('aukstai'));
 });
 
 test('exportLinesWithParts prints exactly exportLines, with room parts and origin attached', () => {

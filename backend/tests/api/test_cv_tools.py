@@ -149,8 +149,9 @@ def test_record_decision_writes_training_label(tmp_path, monkeypatch):
         "dpi": 100,
     })
     assert resp.status_code == 200, resp.text
-    assert (tmp_path / "rozete").exists()
-    assert len(list((tmp_path / "rozete").glob("*.png"))) == 1
+    # v3 M8: crops live in the project's own folder, so deleting the project purges them.
+    assert (tmp_path / "test-cv" / "rozete").exists()
+    assert len(list((tmp_path / "test-cv" / "rozete").glob("*.png"))) == 1
 
 
 def test_record_decision_rejects_unknown_decision(tmp_path, monkeypatch):
