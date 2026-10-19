@@ -39,7 +39,11 @@ export default function MeasuredChip({ row, onSetKaip = null, onUnlink = null, o
           iš matavimų{lines.length > 1 ? ` (${lines.length})` : ''}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0 text-ui" onClick={(e) => e.stopPropagation()} data-testid="measured-list">
+      <PopoverContent
+        align="end"
+        // keep clear of the bottom-right strip the (empty) toast viewport covers, so „Nuimti" stays clickable
+        collisionPadding={{ bottom: 48, top: 8 }}
+        className="w-80 p-0 text-ui" onClick={(e) => e.stopPropagation()} data-testid="measured-list">
         <div className="px-3 py-2 border-b border-border">
           <p className="font-medium text-foreground truncate" title={row.aprasymas}>{row.aprasymas}</p>
           <p className="text-muted-foreground">
