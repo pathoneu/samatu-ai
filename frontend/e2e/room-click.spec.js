@@ -147,6 +147,29 @@ test.describe('room click, room tool, Undo, scale chip', () => {
     expect(net.filter((l) => l.startsWith('REQ')), 'one request for the one click').toHaveLength(1);
   });
 
+  test('an outline read still on its way when he leaves the tool is dropped: R again shows no old proposal and saves nothing', async ({ page }) => {
+    let answered = 0;
+    // the server takes its time, so Esc lands while the outline is still being read
+    await page.route(/\/outline-at$/, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue(); });
+    page.on('response', (r) => { if (r.url().includes('/outline-at')) answered += 1; });
+    await openProject(page);
+    const start = (await roomsInBrowser(page))['06'];
+    await page.keyboard.press('r');
+    const [inside06] = await sheetPoints(page, 1, [ROOM_06_INSIDE]);
+    await clickAt(page, inside06);
+    await expect(page.getByTestId('mode-pill')).toContainText('Skaitomas kontūras');
+    await page.keyboard.press('Escape');                       // he leaves the tool while it reads
+    await expect(page.locator('[data-tool="room"]')).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => answered, { timeout: 30_000 }).toBe(1);
+    await page.waitForTimeout(500);
+    await page.keyboard.press('r');                            // back in the tool: nothing proposed
+    await expect(page.locator('[data-tool="room"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.waitForTimeout(500);
+    await expect(page.locator('[data-room-proposal]')).toHaveCount(0);
+    await expect(page.getByTestId('mode-pill')).not.toContainText('Siūlomas kontūras');
+    expect((await roomsInBrowser(page))['06'].polygon_pct).toEqual(start.polygon_pct);
+  });
+
   test('R inside 04, which no wall separates from its neighbours, says so and saves nothing', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, 0.6);
