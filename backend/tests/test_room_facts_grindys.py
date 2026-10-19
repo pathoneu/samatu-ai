@@ -104,3 +104,58 @@ def test_his_choice_that_agrees_with_the_drawing_is_just_his():
                                     "plotas_m2": 3.95, "rect_pct": [0.15, 0.5, 0.24, 0.55]}})
     assert f["sentence"] == "Grindų dangą šiai patalpai pasirinkote patys."
     assert f["source"]["page"] == 7 and f["source"]["rect_pct"] == [0.15, 0.5, 0.24, 0.55]
+
+
+# ── the floor sheet's key line beside the fact (Pathon v3 W5-D, D1) ─────────
+
+_KEY = {"_meta": {"grindu_legenda": [
+    {"tekstas": "Grindys - ąžuolas, eglutės raštas 98,37 m²", "klase": "minksta", "spalva": [0.55, 0.3, 0.1],
+     "page": 7, "rect_pct": [0.7, 0.1, 0.9, 0.12]},
+    {"tekstas": "60 x 60cm plytelė, matinė", "klase": "plyteles", "spalva": [0.1, 0.3, 0.9],
+     "page": 7, "rect_pct": [0.7, 0.13, 0.9, 0.15]}]}}
+
+
+def test_a_hatch_reading_shows_the_key_line_it_matched_with_its_colour_and_crop():
+    f = _grindys({"grindu_danga": "minksta", "grindu_danga_saltinis": "grindu_planas", "pvc_grindys_m2": 4.48,
+                  "_grindu_danga": {"page": 7, "irodymas": "rastas", "danga": "minksta",
+                                    "tekstas": "Grindys - ąžuolas, eglutės raštas 98,37 m²",
+                                    "plotas_m2": None, "rect_pct": [0.38, 0.39, 0.47, 0.46]}}, _KEY)
+    leg = f["legenda"]
+    assert leg["page"] == 7 and leg["rect_pct"] == [0.7, 0.1, 0.9, 0.12]
+    assert leg["spalvos_vardas"] == "ruda"
+    assert leg["sentence"] == "Legenda: parketas arba laminatas — ruda („Grindys - ąžuolas, eglutės raštas 98,37 m²“)."
+    # evidence only: the reading's own sentence and value are untouched
+    assert f["value"] == "parketas arba laminatas" and f["sentence"].startswith("Grindų plane (7 psl.)")
+
+
+def test_a_written_label_takes_the_only_key_line_of_its_kind_on_that_sheet():
+    f = _grindys({"grindu_danga": "plyteles", "grindu_danga_saltinis": "grindu_planas", "plyteles_grindys_m2": 4.48,
+                  "_grindu_danga": {"page": 7, "irodymas": "uzrasas", "danga": "plyteles", "tekstas": "plytelės 3.95 m²",
+                                    "plotas_m2": 3.95, "rect_pct": [0.15, 0.5, 0.24, 0.55]}}, _KEY)
+    assert f["legenda"]["sentence"].startswith("Legenda: plytelės — mėlyna")
+
+
+def test_no_key_line_no_legend_and_a_guess_never_gets_one():
+    plain = _grindys({"grindu_danga": "plyteles", "grindu_danga_saltinis": "grindu_planas",
+                      "_grindu_danga": {"page": 7, "irodymas": "uzrasas", "danga": "plyteles", "tekstas": "plytelės",
+                                        "rect_pct": [0.15, 0.5, 0.24, 0.55]}})
+    assert "legenda" not in plain
+    guessed = _grindys({"plyteles_grindys_m2": 4.48}, _KEY)
+    assert "legenda" not in guessed
+
+
+def test_the_key_line_gets_its_own_crop_url():
+    from extractor.room_facts import attach_crop_urls
+    f = _grindys({"grindu_danga": "minksta", "grindu_danga_saltinis": "grindu_planas",
+                  "_grindu_danga": {"page": 7, "irodymas": "rastas", "danga": "minksta",
+                                    "tekstas": "Grindys - ąžuolas, eglutės raštas 98,37 m²", "rect_pct": [0.3, 0.3, 0.4, 0.4]}}, _KEY)
+    attach_crop_urls({"facts": [f]}, "demo-x")
+    assert f["legenda"]["crop_url"] and "demo-x" in f["legenda"]["crop_url"]
+
+
+def test_colour_names_are_plain_words():
+    from extractor.room_facts import colour_name_lt
+    assert colour_name_lt([0.1, 0.3, 0.9]) == "mėlyna"
+    assert colour_name_lt([0.1, 0.7, 0.2]) == "žalia"
+    assert colour_name_lt([0.95, 0.55, 0.1]) == "oranžinė"
+    assert colour_name_lt([0.5, 0.5, 0.5]) is None and colour_name_lt(None) is None

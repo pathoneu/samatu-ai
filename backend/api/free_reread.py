@@ -132,6 +132,40 @@ def read_tables(pdf_bytes: bytes, project_id=None) -> dict:
         return {}
 
 
+FIGURES_FLAG = "SAMATU_REREAD_FIGURES"
+
+
+def read_figures_and_heights(parsed: dict, pdf_bytes: bytes, project_id=None) -> dict:
+    """Pathon v3 W5-D, D6 — behind SAMATU_REREAD_FIGURES (default off: returns {} and touches nothing). The paid
+    reading's step 2.44 for a stored project: one text-layer scan (plan_area_annotations.scan_text_layer) → the
+    designer's own figures (`_autoriaus_kiekiai`), the walls' and floors' anchors billed from them
+    (`_walls_anchor`, `_floor_anchors` — the same helpers the paid reading uses) and the heights the plan states
+    for ONE room, written on `parsed`'s rooms (`apply_height_statements`: only a room that carries our default).
+    These move billed quantities, so the flag stays off until the manager's measured OK. Never fails the read."""
+    import os
+    if os.environ.get(FIGURES_FLAG) != "1":
+        return {}
+    try:
+        from extractor.plan_area_annotations import apply_height_statements, scan_text_layer, text_pages_from_classification
+        from extractor.vision_call import _floor_anchors_from_figures, _walls_anchor_from_figures
+        pages = text_pages_from_classification(parsed.get("puslapiai") or [])
+        scan = scan_text_layer(pdf_bytes, pages=pages or None)
+        out: dict = {"_autoriaus_kiekiai": scan.get("figures") or []}
+        wa = _walls_anchor_from_figures(scan.get("figures"))
+        if wa:
+            out["_walls_anchor"] = wa
+        fa = _floor_anchors_from_figures(scan.get("figures"))
+        if fa:
+            out["_floor_anchors"] = fa
+        hs = apply_height_statements(parsed.get("patalpos") or [], scan.get("heights") or [])
+        parsed.setdefault("_meta", {})["plan_height_statement"] = (
+            {k: v for k, v in hs.items() if k != "rooms"} | {"rooms": len(hs.get("rooms") or [])})
+        return out
+    except Exception as exc:  # noqa: BLE001 — extra readings are never the reason a re-read fails
+        log.warning("free-reread figures / heights failed for %s: %r", project_id, exc)
+        return {}
+
+
 def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, the
     drawing's tables (the „lentelės" stage, read while the lane moves from the text to the plan), then the
@@ -189,6 +223,20 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         vector_symbols = scan_vector_symbols(pdf_bytes)
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
+    figures = read_figures_and_heights(parsed, pdf_bytes, project.get("id"))
+    # the wall and partition types the legends name (Pathon v3 W5-D, D9) — evidence beside the walls fact
+    from extractor.wall_types import read_wall_types
+    walls = read_wall_types(pdf_bytes)
+    if walls["eilutes"] or walls["neperskaityta"]:
+        parsed.setdefault("_meta", {})["sienu_tipai"] = walls
+    # the schedules' codes counted where the plan writes them (Pathon v3 W5-D, D10 — extractor/schedule_tags.py):
+    # evidence on the schedule record for the Patikra question `lentele_zymos`; no quantity reads it
+    from extractor.schedule_tags import count_schedule_tags
+    for rec in (schedule, tables.get("_langu_ziniarastis")):
+        if isinstance(rec, dict):
+            tags = count_schedule_tags(pdf_bytes, rec)
+            if tags is not None:
+                rec["zymos_plane"] = tags
     _store_zones(parsed, pdf_bytes, out, project.get("id"))
     if tables.get("meta") is not None:
         parsed.setdefault("_meta", {})["lenteles"] = tables["meta"]
@@ -200,6 +248,7 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         **({"_duru_ziniarastis": schedule} if schedule is not None else {}),
         **{k: tables[k] for k in ("_langu_ziniarastis", "_apdailos_lentele") if tables.get(k) is not None},
         **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
+        **figures,
         "santrauka": {
             "konturai": len(out.get("konturai") or []),
             "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),

@@ -48,6 +48,8 @@ import {
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
 import { syncLegendRows } from '@/lib/legendReview';
+import { legendCounts } from '@/lib/legendCounts';
+import { withZoneSheetTypes } from '@/lib/sheetRail';
 
 // Patikra's question list / room sheet (its own chunk, as when it was a separate route).
 const PatikraEntry = lazy(() => import('@/pages/PatikraEntry'));
@@ -499,6 +501,11 @@ export default function InteriorWorkspace({
   // onto the CURRENT stored project, so a render-captured `project` spread can
   // no longer revert concurrent writes (async polygon patches, panel price
   // edits, a second tab) that landed after this component last rendered.
+  // v3 W5-D D12: a sheet whose only zone is a legend is typed „Legenda" when the reading gave it no type
+  const pagesRead = project?.puslapiai || project?.v8_pages;
+  const zonesRead = project?._meta?.zonos;
+  const sheetPages = useMemo(() => withZoneSheetTypes(pagesRead || [], zonesRead), [pagesRead, zonesRead]);
+
   const handleMeasureDataChange = ({ measurements, measureScales, countTypes }) => {
     // v3 M7: a sheet crossing the measured limit gets one plain warning (never blocked).
     for (const hit of sheetsCrossingLimit(project?.measurements, measurements)) {
@@ -512,6 +519,8 @@ export default function InteriorWorkspace({
       pageScalesDurable: measureScales,
       ...(countTypes ? { countTypes } : {}),
       ...(synced !== rows ? { darbu_sarasas: synced } : {}),
+      // v3 W5-D: the legend counts by kind (backend fixture_rows_flag contract) follow the marks
+      _legendos_kiekiai: legendCounts({ measurements, countTypes: countTypes || project.countTypes || [] }),
     });
     if (updated) onProjectChange?.(updated);
   };
@@ -819,7 +828,7 @@ export default function InteriorWorkspace({
         onMeasureDataChange={handleMeasureDataChange}
         legendPanelSlot={legendSlot}
         onLegendPanelChange={setLegendOpen}
-        sheetPages={project?.puslapiai || project?.v8_pages || []}
+        sheetPages={sheetPages}
         sheetOverrides={project?.sheet_overrides || null}
         onSheetOverridesChange={handleSheetOverridesChange}
         sheetLinksVersion={sheetLinksVersion}

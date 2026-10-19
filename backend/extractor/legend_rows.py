@@ -236,6 +236,22 @@ def _row_glyphs(phrases: list[dict], clusters: list[dict], side: str) -> dict[in
     return got
 
 
+def _enclosing_cluster(ph: dict, clusters: list[dict], pad: float = 1.5) -> int | None:
+    """The glyph cluster a one- or two-letter phrase is written in or against (boxes overlap within `pad`), or
+    None — a letter standing on its own is a text glyph or a word, handled as before."""
+    best, best_d = None, None
+    for ci, c in enumerate(clusters):
+        if (c["x0"] - pad <= ph["x1"] and ph["x0"] <= c["x1"] + pad
+                and c["top"] - pad <= ph["bottom"] and ph["top"] <= c["bottom"] + pad):
+            # a cluster much bigger than a symbol (a swatch, a table cell) never takes the letter
+            if max(c["x1"] - c["x0"], c["bottom"] - c["top"]) > GLYPH_MAX_PT:
+                continue
+            d = abs((c["x0"] + c["x1"]) / 2 - (ph["x0"] + ph["x1"]) / 2) + abs((c["top"] + c["bottom"]) / 2 - (ph["top"] + ph["bottom"]) / 2)
+            if best_d is None or d < best_d:
+                best, best_d = ci, d
+    return best
+
+
 def _hex(rgb) -> str | None:
     if not rgb:
         return None
@@ -402,6 +418,19 @@ def _split(pdf_bytes: bytes, page: int, bbox_pct: list[float]) -> dict:
     clusters = _clusters([_moved(m, fr.to_work((m["x0"], m["top"], m["x1"], m["bottom"])))
                           for m in marks if _is_glyph_mark(m)])
 
+    # a letter written INSIDE a drawn symbol („V)", „A)", „I)", „U)" — objektas_a p5: one green arc, told apart
+    # by the letter in it) is part of that glyph, not a text on the row's line: as a phrase it walled the arc
+    # off from „Vartai", the row lost its glyph and its text ran on into „Rozetė" (Pathon v3 W5-D, (c))
+    lettered: dict[int, str] = {}
+    keep_texts = []
+    for ph in texts:
+        ci = _enclosing_cluster(ph, clusters) if len(ph["text"].strip()) <= 2 and ph["n_words"] == 1 else None
+        if ci is None:
+            keep_texts.append(ph)
+        else:
+            lettered[ci] = (lettered.get(ci, "") + ph["text"].strip())[:4]
+    texts = keep_texts
+
     best_side, best = "left", {}
     for side in ("left", "right"):
         got = _row_glyphs(texts, clusters, side)
@@ -416,7 +445,13 @@ def _split(pdf_bytes: bytes, page: int, bbox_pct: list[float]) -> dict:
             gm = [m for ci in best[pi] for m in clusters[ci]["marks"]]
             gbox = (min(m["x0"] for m in gm), min(m["top"] for m in gm), max(m["x1"] for m in gm), max(m["bottom"] for m in gm))
             kind, colour = _kind_and_colour(gm)
-            row = {"phrase": ph, "gbox": gbox, "kind": kind, "colour": colour, "glyph_text": None,
+            letters = "".join(lettered[ci] for ci in best[pi] if ci in lettered)
+            glyph_text = None
+            if letters:
+                # the letter is what tells this symbol from its neighbours (the same arc on four rows): it is
+                # counted by its letter standing alone on the plan, like a text glyph
+                kind, glyph_text = "tekstas", letters
+            row = {"phrase": ph, "gbox": gbox, "kind": kind, "colour": colour, "glyph_text": glyph_text,
                    "text": ph["text"], "tbox": (ph["x0"], ph["top"], ph["x1"], ph["bottom"]),
                    "countable": _countable(gbox, gm)}
             rows.append(row)

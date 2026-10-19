@@ -65,3 +65,37 @@ def test_legend_count_shape():
     assert fr.legend_count({fr.LEGEND_COUNTS_KEY: {"trapai": {"kiekis": "2"}}}, "trapai") == (2, "")
     assert fr.legend_count({fr.LEGEND_COUNTS_KEY: {"trapai": {"kiekis": 0}}}, "trapai") is None
     assert fr.legend_count({}, "trapai") is None
+
+
+# ── the writer (Pathon v3 W5-D, (a)): the browser sends _legendos_kiekiai in the recompute context ──────────
+
+class _Req:
+    class _Client:
+        host = "127.0.0.1"
+    client = _Client()
+
+
+def _recompute_with_context(monkeypatch, context):
+    import main
+    monkeypatch.setattr(main, "_billable_user", lambda request: {"id": "u1"})
+    room = {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
+            "lubu_aukstis_m": 2.7}
+    payload = main.RecomputePayload(patalpos=[room], bendras_plotas_m2=6.0, context=context)
+    return main.recompute_interior(payload=payload, request=_Req())
+
+
+def test_the_recompute_context_carries_the_legend_counts_to_the_row_and_back(monkeypatch):
+    # the shape lib/legendCounts.js builds (frontend/src/lib/legendCounts.test.js pins the same object)
+    sent = {"trapai": {"kiekis": 3, "tekstas": "Trapas; Linijinis trapas", "row_id": "p4-aa", "page": 4,
+                       "eilutes": ["Trapas", "Linijinis trapas"]}}
+    monkeypatch.setenv(fr.FLAG_ENV, "1")
+    out = _recompute_with_context(monkeypatch, {fr.LEGEND_COUNTS_KEY: sent})
+    rows = out.get("pozicijos") or []
+    row = next(p for p in rows if p.get("aprasymas") == fr.DRAIN_ROW)
+    assert row["kiekis"] == 3 and "Trapas; Linijinis trapas" in row["_confidence_reason"]
+    # the response is spread over the project: the counts land on it
+    assert out[fr.LEGEND_COUNTS_KEY] == sent
+    # flag off: the counts ride along, no row
+    monkeypatch.delenv(fr.FLAG_ENV, raising=False)
+    off = _recompute_with_context(monkeypatch, {fr.LEGEND_COUNTS_KEY: sent})
+    assert not any(p.get("aprasymas") == fr.DRAIN_ROW for p in off.get("pozicijos") or [])

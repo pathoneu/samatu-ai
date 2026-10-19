@@ -176,6 +176,40 @@ export default function FactRow({
         {sentence && (
           <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{sentence}</p>
         )}
+        {/* The floor sheet's key line this covering was read by (Pathon v3 W5-D, D1): its own crop — the swatch
+            and the words — beside the room's, so he sees which colour the reading matched. */}
+        {/* The wall and partition types the drawing's legends name (Pathon v3 W5-D, D9) — evidence, each with
+            its crop; which wall is which type the drawing shows, the sentence says so. */}
+        {Array.isArray(fact?.sienu_tipai) && fact.sienu_tipai.length > 0 && (
+          <ul className="mt-1.5 flex flex-col gap-1.5" data-testid="fact-wall-types">
+            {fact.sienu_tipai.map((ev, i) => (
+              <li key={`${ev.page}-${i}`} className="flex items-start gap-2">
+                {ev.crop_url && (
+                  <EvidenceCrop
+                    fact={{ crop_url: ev.crop_url, source: { page: ev.page, rect_pct: ev.rect_pct } }}
+                    alt={cleanUserText(ev.sentence || '')}
+                    className="w-[88px] shrink-0"
+                    imgClassName="h-[34px] object-contain"
+                    showCaption={false}
+                  />
+                )}
+                <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(ev.sentence || '')}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {fact?.legenda?.crop_url && (
+          <div className="mt-1.5 flex items-start gap-2" data-testid="fact-legend-line">
+            <EvidenceCrop
+              fact={{ crop_url: fact.legenda.crop_url, source: { page: fact.legenda.page, rect_pct: fact.legenda.rect_pct } }}
+              alt={cleanUserText(fact.legenda.sentence || '')}
+              className="w-[88px] shrink-0"
+              imgClassName="h-[34px] object-contain"
+              showCaption={false}
+            />
+            <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(fact.legenda.sentence || '')}</p>
+          </div>
+        )}
         {/* The sharp drawing is one click away from every number: the pane on the
             left jumps to the sheet and the place this fact was read from. */}
         {onShowOnDrawing && fact?.source?.page != null && (

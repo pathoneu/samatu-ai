@@ -1593,8 +1593,70 @@ def _floor_sheet_page(project: dict) -> int | None:
         return None
 
 
-def _fact_grindys(project: dict, room: dict,
-                  region: list[float] | None) -> dict:
+def colour_name_lt(rgb: Any) -> str | None:
+    """A plain Lithuanian name for a key colour (0–1 RGB) — „mėlyna", „ruda"… — or None for black, white
+    or grey (no colour key). Words a contractor says, never a code."""
+    import colorsys
+    try:
+        r, g, b = (float(v) for v in list(rgb)[:3])
+    except (TypeError, ValueError):
+        return None
+    h, l, sat = colorsys.rgb_to_hls(r, g, b)
+    if max(r, g, b) - min(r, g, b) < 0.15:
+        return None
+    deg = h * 360.0
+    if 15 <= deg < 50 and (l < 0.35 or sat < 0.5):
+        return "ruda"
+    for upto, name in ((15, "raudona"), (45, "oranžinė"), (70, "geltona"), (165, "žalia"), (200, "žydra"),
+                       (255, "mėlyna"), (290, "violetinė"), (330, "rožinė"), (361, "raudona")):
+        if deg < upto:
+            return name
+    return None
+
+
+def _floor_legend_line(project: dict, danga: str, ev: dict | None) -> dict | None:
+    """The floor sheet's key line that speaks for this covering (`_meta.grindu_legenda`, written by the geometry
+    lane — Pathon v3 W5-D, D1): the one whose words the room's hatch matched, else the only line of that kind on
+    the room's floor sheet. {tekstas, spalva, spalvos_vardas, page, rect_pct, sentence, crop_url} or None."""
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    lines = [ln for ln in (meta.get("grindu_legenda") or []) if isinstance(ln, dict) and ln.get("klase") == danga]
+    if not lines:
+        return None
+    page = int((ev or {}).get("page") or 0) or None
+    quote = str((ev or {}).get("tekstas") or "").strip()
+    pick = next((ln for ln in lines if quote and str(ln.get("tekstas") or "").strip() == quote
+                 and (page is None or int(ln.get("page") or 0) == page)), None)
+    if pick is None:
+        same_sheet = [ln for ln in lines if page is None or int(ln.get("page") or 0) == page]
+        if len(same_sheet) != 1:
+            return None
+        pick = same_sheet[0]
+    name = colour_name_lt(pick.get("spalva"))
+    words = _FLOOR_LT.get(danga, danga)
+    text = str(pick.get("tekstas") or "").strip()
+    sentence = f"Legenda: {words}" + (f" — {name}" if name else "") + (f" („{text}“)" if text else "") + "."
+    rect = pick.get("rect_pct") if isinstance(pick.get("rect_pct"), list) and len(pick["rect_pct"]) == 4 else None
+    return {"tekstas": text, "spalva": pick.get("spalva"), "spalvos_vardas": name,
+            "page": int(pick.get("page") or 0) or None, "rect_pct": _clamp_rect(rect),
+            "sentence": sentence, "crop_url": None}
+
+
+def _fact_grindys(project: dict, room: dict, region: list[float] | None) -> dict:
+    """The floor fact (`_fact_grindys_inner`) with the floor sheet's key line beside it when the covering came
+    from the floor plan — „Legenda: plytelės — mėlyna" with its own crop (Pathon v3 W5-D, D1). Evidence only:
+    the value, status and sentence stay what the reading says."""
+    fact = _fact_grindys_inner(project, room, region)
+    ev = room.get("_grindu_danga") if isinstance(room.get("_grindu_danga"), dict) else None
+    danga = str((ev or {}).get("danga") or room.get("grindu_danga") or "").strip().lower()
+    if ev and danga in _FLOOR_LT:
+        line = _floor_legend_line(project, danga, ev)
+        if line:
+            fact["legenda"] = line
+    return fact
+
+
+def _fact_grindys_inner(project: dict, room: dict,
+                        region: list[float] | None) -> dict:
     """Which floor covering this room gets — READ off the floor plan when the
     plan says it (extractor/floor_coverings.py: written in the room, or hatched
     in a legend line's colour), his own choice when he made one, otherwise the
@@ -1807,6 +1869,11 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
         fact["crop_url"] = evidence_url(project_id, page, rect, d)
         for ev in fact.get("lenteles") or []:
             ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
+        for ev in fact.get("sienu_tipai") or []:
+            ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
+        leg = fact.get("legenda")
+        if isinstance(leg, dict) and leg.get("page"):
+            leg["crop_url"] = evidence_url(project_id, leg.get("page"), leg.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
     return payload
 
 
@@ -1820,6 +1887,26 @@ def _table_entry(kind: str, page: Any, rect: Any, sentence: str) -> dict | None:
     if not p or not sentence:
         return None
     return {"kind": kind, "page": int(p), "rect_pct": box, "sentence": sentence, "crop_url": None}
+
+
+def wall_type_evidence(project: dict) -> list[dict]:
+    """`_meta.sienu_tipai` (extractor/wall_types.py, written by the free re-read) as evidence entries
+    {page, rect_pct, sentence, crop_url}: one per legend row naming a wall or partition type, and one per sheet
+    whose wall legend could not be read (a broken font) — never quoted, only pointed at."""
+    from .wall_types import wall_type_sentence
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    rec = meta.get("sienu_tipai") if isinstance(meta.get("sienu_tipai"), dict) else {}
+    out = []
+    for e in rec.get("eilutes") or []:
+        if isinstance(e, dict) and e.get("page") and e.get("tekstas"):
+            rect = e.get("rect_pct")
+            out.append({"page": int(e["page"]), "rect_pct": _clamp_rect(list(rect)) if isinstance(rect, list) and len(rect) == 4 else None,
+                        "sentence": wall_type_sentence(e), "crop_url": None})
+    for page in rec.get("neperskaityta") or []:
+        out.append({"page": int(page), "rect_pct": None, "crop_url": None,
+                    "sentence": f"Sienų tipų legenda ({int(page)} psl.) brėžinyje užrašyta šriftu, kurio perskaityti "
+                                "negaliu, — sienų tipus žiūrėkite brėžinyje."})
+    return out[:12]
 
 
 def table_evidence(project: dict, room: dict) -> dict[str, list[dict]]:
@@ -2024,6 +2111,12 @@ def build_room_facts(project: dict, room_nr: str) -> dict | None:
     for fact in facts:
         if tables.get(fact["key"]):
             fact["lenteles"] = tables[fact["key"]]
+    # the wall and partition types the drawing's legends name (Pathon v3 W5-D, D9) — evidence beside the
+    # partitions (or the walls) fact; which wall is which type is not decided here
+    walls = wall_type_evidence(project)
+    target = next((f for f in facts if f["key"] == "pertvaros"), None) or next((f for f in facts if f["key"] == "apdaila"), None)
+    if walls and target is not None:
+        target["sienu_tipai"] = walls
     quantities, excluded = room_quantities(project, room_nr)
     return {
         "room": {
