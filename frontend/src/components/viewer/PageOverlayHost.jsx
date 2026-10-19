@@ -29,6 +29,7 @@ import { LegendLayer } from './LegendTool';
 import OutlineToolLayer from './OutlineToolLayer';
 import CalloutLayer from './CalloutLayer';
 import RoomProposalLayer from './RoomProposalLayer';
+import SheetZoneLayer from './SheetZoneLayer';
 import { usePageGeometry } from '@/hooks/usePageGeometry';
 import { snapPolygonsFromGeometry } from '@/lib/drawingSnap';
 
@@ -130,6 +131,8 @@ export default function PageOverlayHost({
   revisionOverlay = null,
   // The room tool R's state (useRoomTool) while it is armed, else null — its proposal is drawn on its sheet.
   roomTool = null,
+  // „Rodyti sritis" (W5-B B2): every zone of the sheet outlined, not only the hovered one.
+  zonesShown = false,
 }) {
   // Room pct are ALREADY display-space: the extractor rasters pages via
   // pdf2image (poppler), which APPLIES /Rotate — verified 2026-07-11 against
@@ -206,6 +209,7 @@ export default function PageOverlayHost({
           the unrotated portrait TILE covered the correctly rotated base.
           Rotation-0 pages get a plain inset:0 wrapper — pixel-identical. */}
       <div
+        data-drawing-render
         style={rot === 0
           ? { position: 'absolute', inset: 0 }
           : {
@@ -242,6 +246,10 @@ export default function PageOverlayHost({
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <RevisionOverlayLayer projectId={projectId} page={layout.pageNumber} overlay={revisionOverlay} renderedSize={{ width, height }} pageSizePt={pageSizePt} pageRotation={pageRotation} />
         </div>
+      )}
+      {/* The sheet's zones (W5-B B2): outlined and named on hover, all of them with „Rodyti sritis"; pointer-transparent. */}
+      {!checkMode && projectId && (
+        <SheetZoneLayer projectId={projectId} page={layout.pageNumber} renderedSize={{ width, height }} shown={zonesShown} hoverable={!measureActive && !outlineEdit && !outlineTool} />
       )}
       {!checkMode && (
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>

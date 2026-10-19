@@ -100,8 +100,10 @@ test('overlay scales: his calibration over the drawing ratio over nothing', () =
 test('overlay request body: default layers, sorted pages, dry run', () => {
   const body = overlayRequestBody(project(), { pages: new Set([3, 1]), layers: { walls: true }, dryRun: true });
   assert.deepEqual(body.pages, [1, 3]);
-  assert.deepEqual(body.layers, { outlines: true, measurements: true, counts: true, walls: true });
+  assert.deepEqual(body.layers, { outlines: true, measurements: true, counts: true, walls: true, labels: true });
   assert.equal(body.dry_run, true);
   assert.equal(overlayRequestBody(project()).pages, 'all');
   assert.equal(OVERLAY_LAYERS.find((l) => l.key === 'walls').on, false);
+  assert.equal(OVERLAY_LAYERS.find((l) => l.key === 'labels').on, true);
+  assert.equal(overlayRequestBody(project()).layers.labels, true);
 });

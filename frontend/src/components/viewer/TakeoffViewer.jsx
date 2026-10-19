@@ -56,6 +56,10 @@ import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
 import SheetHeaderBadge from './SheetHeaderBadge';
 import ZoomCluster from './ZoomCluster';
+import ViewSettingsPopover, { CleanBgFilter, ViewCrosshair } from './ViewSettingsPopover';
+import { readViewSettings, viewCss, writeViewSettings } from '@/lib/viewSettings';
+import { cachedSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
+import { flashCursorHint } from '@/lib/cursorHints';
 import ModePill from './ModePill';
 import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
@@ -646,9 +650,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // A click at rest (or with „Žymėti") on the drawing: the room under it, else nothing (empty paper clears).
   const selectRoomAt = (pt) => {
     const where = displayPointOf(pt);
-    const hit = where ? roomAtPoint(rooms, where, {
+    let hit = where ? roomAtPoint(rooms, where, {
       renderedWidth: pt.renderedWidth, renderedHeight: pt.renderedHeight, hidden: hiddenRoomNrs,
     }) : null;
+    // W5-B B2: a click in the title block, a legend, a table or a notes block outside the plan selects no room
+    // (zones already read for this sheet; unknown zones never block) — the cursor says why.
+    const refused = hit && where && projectId ? noRoomZoneAt(cachedSheetZones(projectId, where.page), where.x_pct, where.y_pct) : null;
+    if (refused) { flashCursorHint(refused.sentence); hit = null; }
     applyRoomSelection(nextRoomSelection({ focused: focusedRoomNr, extra: extraRoomNrs }, hit?.nr ?? null, { shift: !!pt.shiftKey }));
   };
   // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
@@ -1422,6 +1430,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     navigate(`/project/${encodeURIComponent(projectId)}/patikra?kambarys=${encodeURIComponent(nr)}`);
   };
   const [renaming, setRenaming] = useState(null);     // { id, value } while „Pervadinti" is open
+  // „Rodinys" (W5-B B4): how the drawing is shown — view only, remembered per browser (lib/viewSettings).
+  const [viewSettings, setViewSettingsState] = useState(() => readViewSettings());
+  const setViewSettings = (next) => { writeViewSettings(next); setViewSettingsState(next); };
+  const viewRules = viewCss(viewSettings);
   const KIND_NAMES = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
   const oneMark = selectedMarks.length === 1 ? selectedMarks[0] : null;
   const barMarks = marksBarOn ? {
@@ -1536,6 +1548,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onRoomSubtract={onRoomSubtract}
           />}
           {panning && <style>{PAN_CURSOR_CSS}</style>}
+          {viewRules && <style>{viewRules}</style>}
+          {viewSettings.cleanBg > 0 && <CleanBgFilter t={viewSettings.cleanBg} />}
           <div className="relative flex flex-1 min-h-0">
             {sheetRail
               ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
@@ -1611,6 +1625,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
                       revisionOverlay={check ? null : revisionOverlay}
                       roomTool={roomToolArmed ? roomTool.state : null}
+                      zonesShown={!check && viewSettings.zones}
                     />
                   )}
                 />
@@ -1666,6 +1681,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 documentId={activeDocumentId}
                 pages={documentState?.document?.pages}
                 onAreaZoom={({ page, rect }) => { frameNonce.current += 1; setFrameFocus({ page, rect, nonce: `area-${frameNonce.current}` }); }}
+                viewSettings={<ViewSettingsPopover settings={viewSettings} onChange={setViewSettings} />}
               />
               {/* The active mode's pill, bottom centre right of the tool cards. */}
               {pill && (
@@ -1895,6 +1911,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
           )}
           <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
           <CursorHint rootRef={tvRootRef} resolve={resolveCursorHint} mode={hintMode} enabled={active && !check} />
+          <ViewCrosshair rootRef={tvRootRef} enabled={active && viewSettings.crosshair && !!chromeEl} />
         </div>
         );
       }}

@@ -199,6 +199,20 @@ def test_layers_and_pages_are_chosen(tmp_path, monkeypatch):
     assert bad.status_code == 400
 
 
+def test_labels_off_drops_the_room_and_measurement_texts_not_the_marks(tmp_path, monkeypatch):
+    """„Užrašai" (W5-B B4) — the viewer's „Rodinys" label switch: off, the sheet keeps its outlines, lines and
+    legend, without the „01 · 12,50 m²" and „Siena: 3,53 m" texts on the drawing."""
+    _isolate(tmp_path, monkeypatch)
+    _store(_sheet_pdf(0))
+    r = TestClient(app).post("/api/projects/p1/export-overlay-pdf", json={"layers": {"labels": False}})
+    assert r.status_code == 200, r.text
+    text = _text(r.content)
+    assert "01 · 12,50 m²" not in text and "Siena: 3,53 m" not in text
+    assert "pasiūlytas programos, patikrinkite (1)" in text      # the legend still names the outlines
+    on = _text(TestClient(app).post("/api/projects/p1/export-overlay-pdf", json={}).content)
+    assert "01 · 12,50 m²" in on and "Siena: 3,53 m" in on
+
+
 def test_walls_layer_draws_the_wall_solid(tmp_path, monkeypatch):
     from tests.synthetic_plan import build_plan, two_rooms
     _isolate(tmp_path, monkeypatch)
