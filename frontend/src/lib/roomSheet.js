@@ -42,6 +42,9 @@ export const FACT_LABEL_KEY = Object.freeze({
   angos: 'factAngos',
   grindys: 'factGrindys',
   pertvaros: 'factPertvaros',
+  baldu_zonos: 'factBalduZonos',          // v3 W5-E E1
+  plokstes_zonos: 'factPlokstesZonos',
+  nisos_gylis: 'factNisosGylis',          // v3 W5-E E3
 });
 
 /**
@@ -823,6 +826,9 @@ const FACT_OF_FIELD = {
   paskirtis: 'grindys',
   elementai: 'angos',
   n_partition_walls: 'pertvaros',
+  baldu_zonos_ivesta_m2: 'baldu_zonos',      // v3 W5-E E1
+  plokstes_zonos_ivesta_m2: 'plokstes_zonos',
+  nisos_gylis_m: 'nisos_gylis',               // v3 W5-E E3
 };
 
 /** The fact a saved field belongs to — where the fix's consequence is shown. */

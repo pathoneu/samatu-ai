@@ -680,6 +680,15 @@
       "showAll": "Show all ({{count}})",
       "collapse": "Collapse"
     },
+    "reminders": {
+      "title": "Anything forgotten? {{count}} {{word}}",
+      "sub": "These are not estimate rows — only what is worth checking before sending.",
+      "showAll": "Show all ({{count}})",
+      "collapse": "Collapse",
+      "reveal": "Show on the drawing (sheet {{page}})",
+      "addBlankRow": "Add an empty row",
+      "rowAdded": "Row “{{name}}” added — enter the quantity."
+    },
     "section": {
       "rows": "({{count}} rows)"
     },
@@ -1228,6 +1237,11 @@
       "introOrphans": "A few rows may keep their original values — we will say which ones separately.",
       "wallThicknessHint": "Partition thickness in metres — used for the reveals row",
       "wallThicknessRangeErr": "Wall thickness must be between {{min}} and {{max}} m.",
+      "packagingLabel": "Packaging",
+      "packagingNote": "How many kilograms a putty bag holds and how many litres a paint or primer bucket holds. The estimate shows how many bags or buckets are needed beside the quantity; the kilograms and litres themselves do not change.",
+      "packagingBag": "Putty bag",
+      "packagingBucket": "Paint, primer bucket",
+      "packagingRangeErr": "Enter a number from {{min}} to {{max}}.",
       "puttyLevelTitles": {
         "Q1": "Q1 — under heavy wallpaper, 0.8 kg/m² of filler per mm",
         "Q2": "Q2 — under matt paint, 1.0 kg/m² of filler per mm",
@@ -1724,6 +1738,9 @@
       "factPlotas": "Area",
       "factPerimetras": "Perimeter",
       "factPertvaros": "Partition walls in the open space",
+      "factNisosGylis": "Niche depth",
+      "factPlokstesZonos": "Panels on the walls",
+      "factBalduZonos": "Furniture against the walls",
       "factAukstis": "Height",
       "factApdaila": "Finishes",
       "factAngos": "Doors and windows",
@@ -1789,6 +1806,9 @@
       "editPlotas": "Area, m²",
       "editPerimetras": "Perimeter, m",
       "editPertvaros": "Partition walls, pcs",
+      "editNisosGylis": "Niche depth, m",
+      "editPlokstesZonos": "Panel area, m²",
+      "editBalduZonos": "Furniture area, m²",
       "wallsPainted": "Painted",
       "wallsRaw": "Not painted",
       "wallsConsequence": "Not painted: no wall skimming, painting or corners for this room in the estimate.",
