@@ -57,6 +57,8 @@ const BANNED = [
   ['kvitas', /\bkvit/i, '—'],
   ['pasenusi', /pasenus/i, 'senesnė eilutė'],
   ['pozicija', /pozicij/i, 'eilutė'],
+  // B2-B: the eksplikacija popover said „Šaltinis: pdfplumber lentelė" — the name of a library
+  ['pdfplumber', /pdfplumber/i, 'iš brėžinio patalpų lentelės'],
 ];
 
 /** Every [dotted key, string value] pair under the app's own namespaces. */

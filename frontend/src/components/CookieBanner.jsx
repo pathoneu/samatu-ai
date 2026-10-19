@@ -23,7 +23,8 @@
  *
  * Docked (B1-D, the project workspace /project/…): the floating card covered the drawing's bottom edge, so
  * there it is ONE bar laid over the step bar at the bottom of the window (the same three choices, the two
- * policy links) and never over the canvas; „Tvarkyti" opens the categories above the bar.
+ * policy links) and never over the canvas; „Tvarkyti" puts the three categories in the bar's own row (B2-B — they
+ * opened above the bar, over the drawing).
  *
  * Privacy-first: kol nėra sutikimo, jokios nebūtinosios kategorijos neįjungtos.
  * Būtinasis sesijos slapukas veikia nepriklausomai nuo šio pasirinkimo.
@@ -263,37 +264,34 @@ export default function CookieBanner() {
         data-testid="cookie-banner"
         data-docked="1"
       >
-        {manage && (
-          <div className="mx-auto max-w-[960px] px-4 pt-2">
-            <CategoryRow
-              title={t('cookie.catNecessaryTitle')}
-              badge={t('cookie.catNecessaryBadge')}
-              desc={t('cookie.catNecessaryDesc')}
-              checked
-              disabled
-              onChange={() => {}}
-            />
-            <CategoryRow
-              title={t('cookie.catAnalyticsTitle')}
-              desc={t('cookie.catAnalyticsDesc')}
-              checked={cats.analytics}
-              onChange={(v) => setCats((c) => ({ ...c, analytics: v }))}
-            />
-            <CategoryRow
-              title={t('cookie.catMarketingTitle')}
-              desc={t('cookie.catMarketingDesc')}
-              checked={cats.marketing}
-              onChange={(v) => setCats((c) => ({ ...c, marketing: v }))}
-            />
-          </div>
-        )}
+        {/* B2-B: „Tvarkyti" swaps the sentence for the three categories IN the bar's own row — it opened them
+            above the bar, over the drawing. What each category is: the policy link beside them. */}
         <div className="flex min-h-[64px] flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2">
-          <p className="min-w-[16rem] flex-1 text-ui leading-snug text-ink-2">
-            {t('cookie.bodyDocked')}{' '}
-            <Link to="/cookies" className="text-primary underline hover:no-underline">{t('cookie.dockedCookiesLink')}</Link>
-            {' · '}
-            <Link to="/privacy" className="text-primary underline hover:no-underline">{t('cookie.dockedPrivacyLink')}</Link>
-          </p>
+          {manage ? (
+            <div className="min-w-[16rem] flex-1 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-ui text-foreground" data-testid="cookie-categories">
+              <span className="inline-flex items-center gap-2">
+                <Toggle checked disabled onChange={() => {}} label={t('cookie.catNecessaryTitle')} />
+                {t('cookie.catNecessaryTitle')}
+                <span className="text-muted-foreground">({t('cookie.catNecessaryBadge').toLowerCase()})</span>
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Toggle checked={cats.analytics} onChange={(v) => setCats((c) => ({ ...c, analytics: v }))} label={t('cookie.catAnalyticsTitle')} />
+                {t('cookie.catAnalyticsTitle')}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Toggle checked={cats.marketing} onChange={(v) => setCats((c) => ({ ...c, marketing: v }))} label={t('cookie.catMarketingTitle')} />
+                {t('cookie.catMarketingTitle')}
+              </span>
+              <Link to="/cookies" className="text-primary underline hover:no-underline">{t('cookie.dockedCookiesLink')}</Link>
+            </div>
+          ) : (
+            <p className="min-w-[16rem] flex-1 text-ui leading-snug text-ink-2">
+              {t('cookie.bodyDocked')}{' '}
+              <Link to="/cookies" className="text-primary underline hover:no-underline">{t('cookie.dockedCookiesLink')}</Link>
+              {' · '}
+              <Link to="/privacy" className="text-primary underline hover:no-underline">{t('cookie.dockedPrivacyLink')}</Link>
+            </p>
+          )}
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {manage ? (
               <button onClick={saveSelection} className="btn-primary justify-center px-4 py-2 text-ui">

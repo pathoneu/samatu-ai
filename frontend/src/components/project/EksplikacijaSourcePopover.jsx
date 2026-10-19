@@ -15,6 +15,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useTranslation } from '@/i18n/react';
+import { areaSourceSentence } from '@/lib/areaConfidence';
 
 export default function EksplikacijaSourcePopover({ room, anchorRect, onClose }) {
   const { t } = useTranslation();
@@ -35,6 +36,7 @@ export default function EksplikacijaSourcePopover({ room, anchorRect, onClose })
   }, [room, onClose]);
 
   if (!room || !anchorRect) return null;
+  const source = areaSourceSentence(room);
 
   // Anchor below the chip; clip to viewport.
   const top = Math.min(anchorRect.bottom + 4, window.innerHeight - 200);
@@ -76,8 +78,7 @@ export default function EksplikacijaSourcePopover({ room, anchorRect, onClose })
         </div>
       )}
       <div className="border-t border-border/60 mt-2 pt-2 text-[10px] text-muted-foreground">
-        {t('project.eksplikacijaPopover.sourcePrefix', { page: room.eksplikacija_source_page ?? room.page_nr ?? '?' })}
-        {t('project.eksplikacijaPopover.sourceSuffix')}
+        {t(`project.eksplikacijaPopover.source.${source.id}`, { page: source.page })}
       </div>
     </div>
   );

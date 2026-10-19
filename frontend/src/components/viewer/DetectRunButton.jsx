@@ -20,7 +20,7 @@ import {
   FEATURES, FEATURE_HINTS, FEATURE_LABELS, allFeatures, buttonLabel, canStart, toggleFeature,
 } from '@/lib/detectRun';
 
-export default function DetectRunButton({ project, currentPage, totalPages, busy = false, onStart, scaleGate = null, onSetScale = null }) {
+export default function DetectRunButton({ project, currentPage, totalPages, busy = false, onStart, scaleGate = null, onSetScale = null, compact = false }) {
   const [open, setOpen] = useState(false);
   const [features, setFeatures] = useState(allFeatures);
   const label = buttonLabel(project, currentPage);
@@ -39,7 +39,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
         title={`Lapas ${currentPage}: ${scaleGate.reason}. Spustelėkite — patvirtinti arba nustatyti mastelį.`}
         data-testid="detect-run-set-scale"
       >
-        <Scaling className="h-3.5 w-3.5" aria-hidden="true" />Nustatyti mastelį
+        <Scaling className="h-3.5 w-3.5" aria-hidden="true" /><span className={compact ? "sr-only" : undefined}>Nustatyti mastelį</span>
       </button>
     )}
     <Popover open={open} onOpenChange={(v) => setOpen(busy ? false : v)}>
@@ -54,7 +54,7 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
           data-testid="detect-run-button"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ScanLine className="h-3.5 w-3.5" aria-hidden="true" />}
-          <span>{busy ? 'Skaitoma…' : label}</span>
+          <span className={compact ? 'sr-only' : undefined}>{busy ? 'Skaitoma…' : label}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 rounded-[2px] p-3" data-testid="detect-run-picker">

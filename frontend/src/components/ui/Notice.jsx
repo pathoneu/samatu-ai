@@ -5,6 +5,8 @@
  *
  *   tone    'info' (evergreen) · 'warning' (amber) · 'error' (red — an error, nothing else)
  *   compact one line, sized to its content (the re-read chip, founder decision 6); otherwise a block
+ *   oneLine with compact: never wraps (short words + an action that fit the 340 px panel, B2-B); icon={false}
+ *           drops the leading icon when the action carries one
  *   title   the first line, semibold ink; children follow at the 14 px interface size
  *   action  buttons/links at the right; onDismiss adds the ✕ with `dismissLabel` (named, never hover-only)
  *
@@ -23,10 +25,10 @@ export const NOTICE_TONES = Object.keys(TONES);
 
 export default function Notice({
   tone = 'info', icon = null, title = null, children = null, action = null,
-  onDismiss = null, dismissLabel = 'Uždaryti', compact = false, className = '', ...rest
+  onDismiss = null, dismissLabel = 'Uždaryti', compact = false, oneLine = false, className = '', ...rest
 }) {
   const t = TONES[tone] || TONES.info;
-  const Icon = icon || t.Icon;
+  const Icon = icon === false ? null : (icon || t.Icon);
   const colour = (a) => (a == null ? `hsl(var(${t.token}))` : `hsl(var(${t.token}) / ${a})`);
   const frame = {
     borderColor: colour(0.35),
@@ -38,14 +40,14 @@ export default function Notice({
       <div
         role={t.role}
         data-notice={tone}
-        className={`inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-panel border border-l-[3px] px-3 py-1.5 text-ui text-foreground ${className}`}
+        className={`inline-flex max-w-full ${oneLine ? "flex-nowrap" : "flex-wrap"} items-center gap-x-2 gap-y-1 rounded-panel border border-l-[3px] px-3 py-1.5 text-ui text-foreground ${className}`}
         style={frame}
         {...rest}
       >
-        <Icon className="h-4 w-4 shrink-0 self-start mt-0.5" style={{ color: colour() }} aria-hidden="true" />
+        {Icon && <Icon className="h-4 w-4 shrink-0 self-start mt-0.5" style={{ color: colour() }} aria-hidden="true" />}
         {/* wraps, never truncates — in the 340 px panel the counts are the point of the line; an action that does
             not fit beside the words goes under them (B1-D), never squeezes them to a word a line */}
-        <span className="min-w-[12rem] flex-1 leading-snug">
+        <span className={oneLine ? "min-w-0 flex-1 leading-snug whitespace-nowrap overflow-hidden text-ellipsis" : "min-w-[12rem] flex-1 leading-snug"}>
           {title && <span className="font-semibold">{title}</span>}
           {title && children ? <span className="text-muted-foreground" aria-hidden="true"> · </span> : null}
           {children}
@@ -73,7 +75,7 @@ export default function Notice({
       style={frame}
       {...rest}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: colour() }} aria-hidden="true" />
+      {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: colour() }} aria-hidden="true" />}
       {/* the actions wrap under the words when the notice is narrow (the 340 px panel) */}
       <div className="min-w-[14rem] flex-1 space-y-1.5">
         {title && <p className="font-semibold leading-snug">{title}</p>}

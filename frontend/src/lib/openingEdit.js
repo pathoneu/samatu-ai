@@ -22,6 +22,13 @@ export const OPENING_KINDS = Object.freeze([
 
 const TIPAS = { langas: 'langas', durys: 'duris' };
 
+/** The pop-up's kind an entry's `tipas` belongs to: every door subtype (paslėptos, stumdomos) is „durys". */
+function kindOfTipas(tipas) {
+  const t = String(tipas || '').toLowerCase();
+  if (t === 'langas') return 'langas';
+  return t.includes('duris') ? 'durys' : null;
+}
+
 /** Every opening mark on `page`: {nr, k, i, line: [[x,y],[x,y]], plotisM, nupiesta}. */
 export function openingsOnPage(rooms, page) {
   const out = [];
@@ -88,15 +95,20 @@ export function applyOpeningEdit(elementai, o, { kind, plotisMm }) {
   const idx = linkedEntry(list, o.k);
   const w = Math.round(Number(plotisMm));
   if (kind !== 'praejimas' && !(w > 0)) return null;
-  const fresh = (base = null) => ({
-    tipas: TIPAS[kind],
-    kiekis: 1,
-    plotis_mm: w,
-    aukstis_mm: base && base.tipas === TIPAS[kind] && Number(base.aukstis_mm) > 0 ? Number(base.aukstis_mm) : STANDARD_OPENINGS[TIPAS[kind]].aukstis_mm,
-    _anga_ks: [o.k],
-    ...(o.i ? { _is_sienu_angos: o.i } : {}),
-    _dydis_user: true,
-  });
+  // an entry of the same kind keeps its subtype (a hidden door stays hidden) and its height: a width-only
+  // edit changes only the width
+  const fresh = (base = null) => {
+    const sameKind = !!base && kindOfTipas(base.tipas) === kind;
+    return {
+      tipas: sameKind ? base.tipas : TIPAS[kind],
+      kiekis: 1,
+      plotis_mm: w,
+      aukstis_mm: sameKind && Number(base.aukstis_mm) > 0 ? Number(base.aukstis_mm) : STANDARD_OPENINGS[TIPAS[kind]].aukstis_mm,
+      _anga_ks: [o.k],
+      ...(o.i ? { _is_sienu_angos: o.i } : {}),
+      _dydis_user: true,
+    };
+  };
   if (idx < 0) {
     if (kind === 'praejimas') return null;
     return [...list, fresh()];
@@ -106,7 +118,7 @@ export function applyOpeningEdit(elementai, o, { kind, plotisMm }) {
   const shared = ks.length > 1 || (Number(el.kiekis) || 1) > 1;
   if (!shared) {
     if (kind === 'praejimas') return list.filter((_, n) => n !== idx);
-    const same = el.tipas === TIPAS[kind] && Math.round(Number(el.plotis_mm)) === w;
+    const same = kindOfTipas(el.tipas) === kind && Math.round(Number(el.plotis_mm)) === w;
     if (same) return null;
     return list.map((x, n) => (n === idx ? { ...x, ...fresh(x), kiekis: Number(x.kiekis) || 1, _anga_ks: x._anga_ks, _schedule_anchored: false } : x));
   }
