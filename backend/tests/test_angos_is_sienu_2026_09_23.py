@@ -130,8 +130,8 @@ def test_the_question_names_the_room_whose_door_the_walls_do_not_back():
     assert q["items"] == [] and q["manual"][0]["room_nr"] == "01"
     # 2026-10-06: what does not match comes first, in two short sentences; the room sheet's full account
     # stays beside it for a second look
-    assert q["manual"][0]["sentence"] == ("Sąraše 2 durys, o sienose — tik 1 anga durims: 1 durų sienose neradau. "
-                                          "Atidarykite patalpą ir patikrinkite durų skaičių.")
+    assert q["manual"][0]["sentence"] == "Sąraše 2 durys, o sienose — tik 1 anga durims: 1 durų sienose neradau."
+    assert q["manual"][0]["durys"] == {"sarase": 2, "sienose": 1, "laisvos": []}
     assert "angos sienose nematau" in q["manual"][0]["details"]
 
 
