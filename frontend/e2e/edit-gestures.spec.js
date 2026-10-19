@@ -246,6 +246,43 @@ test.describe('W5-A editing gestures', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('A7: the type picker beside the pointer — a new type with its own shape; n counts in n+1; a double-click marks once', async ({ page }) => {
+    await openProject(page);
+    await bringIntoView(page, 0.6, 0.5);
+    await page.mouse.move(...Object.values(await at(page, 0.6, 0.5)));
+    await page.keyboard.press('6');
+    const picker = page.getByTestId('count-type-picker');
+    await expect(picker).toBeVisible();
+    await page.getByTestId('count-type-new-name').fill('Jungikliai W5');
+    await page.getByTestId('count-type-shape-diamond').click();
+    await page.getByTestId('count-type-new-name').press('Enter');
+    await expect(picker).toHaveCount(0);
+    await expect(page.getByTestId('mode-pill')).toContainText('Jungikliai W5: 0 vnt.');
+    await shot(page, 'w5a-a7-after-pick');
+    // n = 3 counts: the tool is armed with the type (one key), then one click each
+    const k = counter();
+    await page.keyboard.press('Escape');
+    await k.key(page, '6');
+    // the picker opens again beside the pointer; the first click on the drawing closes it AND places the mark
+    await expect(picker).toBeVisible();
+    for (const [fx, fy] of [[0.52, 0.48], [0.56, 0.48], [0.60, 0.48]]) await k.click(page, await at(page, fx, fy));
+    await expect(picker).toHaveCount(0);
+    await expect(page.getByTestId('mode-pill')).toContainText('Jungikliai W5: 3 vnt.');
+    // a double-click on a fresh spot marks once: the second press lands on the mark just made and is ignored
+    await page.mouse.dblclick(...Object.values(await at(page, 0.64, 0.48)));
+    await expect(page.getByTestId('mode-pill')).toContainText('Jungikliai W5: 4 vnt.');
+    note(`T1 pridėti n = 3 kiekius (tipas jau pasirinktas): ${k.text()} (tikslas n+1 = 4)`);
+    const { countTypes } = await stored(page).then(async (s) => (s.countTypes.length ? s : (await page.waitForTimeout(1200), stored(page))));
+    const made = countTypes.find((t) => t.label === 'Jungikliai W5');
+    expect(made?.shape).toBe('diamond');
+    expect(String(made?.color).toLowerCase()).not.toMatch(/^#(dc2626|ef4444|b91c1c|f00|ff0000)$/);
+    // right-click while counting: the picker at the pointer
+    await page.mouse.click(...Object.values(await at(page, 0.58, 0.55)), { button: 'right' });
+    await expect(picker).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+  });
+
   test('A4: „Atimti" + one click on a drawn figure proposes it as the hole, Enter saves it — T1 „subtract a column"', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, ...ROOM_06);

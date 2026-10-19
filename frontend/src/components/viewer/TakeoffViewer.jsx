@@ -70,6 +70,7 @@ import useOutlineTool, { roomHoles } from './useOutlineTool';
 import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
 import VertexPopover from './VertexPopover';
+import CountTypePicker from './CountTypePicker';
 import { pointsToPct, pctToPoints, minPointsOf, deleteVertices, nudgeVertices, insertVertex, pathPositionM, cutGap, roomsInBox, similarRooms } from '@/lib/editGestures';
 import { openingForEdge, addEdgeOpening, openingText } from '@/lib/openingEdit';
 import { matchViewerHotkey, withKey, keyText, isMacPlatform } from '@/lib/viewerShortcuts';
@@ -996,10 +997,25 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     dispatchMeasureHist({ type: 'redo' });
     toast(`Grąžinta: ${next.label}`);
   };
-  const addCountType = (label) => {
-    const t = makeCountType(label, countTypes);
+  const addCountType = (label, shape = null) => {
+    const t = makeCountType(label, countTypes, shape ? { shape } : {});
     setCountTypes((prev) => [...prev, t]);
     setActiveCountTypeId(t.id);
+  };
+  // The count-type picker beside the pointer (W5-A A7): {x, y} | null — opens when the count tool is armed and on
+  // a right-click while it is; the last pointer position inside the viewer says where.
+  const [countPicker, setCountPicker] = useState(null);
+  const lastPointerRef = useRef(null);
+  useEffect(() => {
+    const el = tvRootRef.current;
+    if (!el) return undefined;
+    const onMove = (e) => { lastPointerRef.current = { x: e.clientX, y: e.clientY }; };
+    el.addEventListener('pointermove', onMove, { passive: true });
+    return () => el.removeEventListener('pointermove', onMove);
+  });
+  const openCountPicker = () => {
+    const r = tvRootRef.current?.getBoundingClientRect();
+    setCountPicker(lastPointerRef.current || (r ? { x: r.left + r.width / 2, y: r.top + r.height / 3 } : { x: 400, y: 300 }));
   };
   const removeCountType = (typeId) => {
     setCountTypes((prev) => prev.filter((t) => t.id !== typeId));
@@ -1118,6 +1134,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     // do nothing without an active type) — make the "Sukurkite tipą" hint
     // visible even if the legend was left collapsed.
     if (tool === 'count' && countTypes.length === 0) setCountLegendCollapsed(false);
+    if (tool === 'count' && measureTool !== 'count') openCountPicker();
+    else setCountPicker(null);
     setMeasureTool((cur) => {
       const next = cur === tool ? null : tool;
       if (next == null) setSelectedMeasureId(null);
@@ -1860,6 +1878,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       onMeasureSelect={setSelectedMeasureId}
                       onMeasureBoxSelect={handleBoxSelect}
                       onMeasureSnapChange={setSnapKind}
+                      onCountTypeMenu={measureTool === 'count' ? setCountPicker : null}
                       onMeasureDelete={deleteMeasurement}
                       onMeasureContextMenu={check ? null : setMeasureMenu}
                       measureDraft={draftSlot.pageNr === layout.pageNumber ? draftSlot.draft : EMPTY_DRAFT}
@@ -2125,6 +2144,15 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onClose={() => setCalibRequest(null)}
           />
           <ShortcutsGuide open={guideOpen} onOpenChange={setGuideOpen} />
+          <CountTypePicker
+            at={measureTool === 'count' ? countPicker : null}
+            countTypes={countTypes}
+            activeId={activeCountTypeId}
+            tallies={countTallies}
+            onPick={(id) => { setActiveCountTypeId(id); setCountPicker(null); }}
+            onCreate={(label, shape) => { addCountType(label, shape); setCountPicker(null); }}
+            onClose={() => setCountPicker(null)}
+          />
           <VertexPopover menu={outlineEdit ? vertexMenu : null} actions={vertexMenuActions || {}} onClose={() => setVertexMenu(null)} />
           <RenameDialog
             state={renaming}

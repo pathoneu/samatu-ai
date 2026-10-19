@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 
-function Glyph({ shape, color }) {
+export function Glyph({ shape, color }) {
   const size = 14;
   const half = size / 2;
   switch (shape) {

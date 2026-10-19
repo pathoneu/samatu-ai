@@ -36,6 +36,8 @@ const POLY_TOOLS = new Set(['distance', 'perimeter', 'area']);
 const SNAP_TOL_PX = 8;
 // Ctrl (⌘) held: the pointer jumps to the nearest snap target this far away (W5-A A6 [#106]).
 const JUMP_TOL_PX = 48;
+// A count click on a mark placed less than this long ago is the same click twice, not a removal (A7 [#114]).
+const SECOND_CLICK_MS = 700;
 // An alignment guide catches within this many screen px of a vertex's x or y (A6 [#56]).
 const ALIGN_TOL_PX = 5;
 
@@ -87,6 +89,8 @@ export default function MeasureLayer({
   onBoxSelect = null,
   // The snap under the pointer changed (A6): (kind | null) — the status line names it.
   onSnapChange = null,
+  // Count tool, right-click (W5-A A7): ({x, y} screen px) — the type picker opens there.
+  onTypeMenu = null,
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -294,7 +298,13 @@ export default function MeasureLayer({
         pageNr,
         SNAP_TOL_PX / adapter.scale,
       );
-      if (hitId) { onDelete?.(hitId); toast.info('Žymė pašalinta'); return; }
+      if (hitId) {
+        // a second click on the spot he JUST marked (a double-click, a twitch) is ignored — never place-then-remove (A7)
+        const hit = measurements.find((m) => m.id === hitId);
+        const age = hit?.created_at ? Date.now() - Date.parse(hit.created_at) : Infinity;
+        if (age < SECOND_CLICK_MS) { flashCursorHint('Čia jau pažymėta'); return; }
+        onDelete?.(hitId); toast.info('Žymė pašalinta'); return;
+      }
       const type = countTypes.find((t) => t.id === activeCountTypeId) || {};
       onCommit?.(makeMeasurement('count', pageNr, [point], {
         typeId: activeCountTypeId,
@@ -372,11 +382,17 @@ export default function MeasureLayer({
   // Right-click while drawing → „Baigti" / „Atšaukti" at the pointer. Off a draft the right-click stays the
   // measurement menu (PageOverlayHost) — this handler lets it through.
   const handleContextMenu = useCallback((e) => {
+    if (tool === 'count' && onTypeMenu) {
+      e.preventDefault();
+      e.stopPropagation();
+      onTypeMenu({ x: e.clientX, y: e.clientY });
+      return;
+    }
     if (!drafting) return;
     e.preventDefault();
     e.stopPropagation();
     setFinishMenu(localPx(e));
-  }, [drafting, localPx]);
+  }, [drafting, localPx, tool, onTypeMenu]);
   // The pop-up closes with the draft (finished, cancelled, stepped back to nothing, tool changed).
   useEffect(() => { if (!drafting) setFinishMenu(null); }, [drafting]);
   // Esc closes the pop-up only — the draft keeps its points (the viewer's Esc step never sees this press).

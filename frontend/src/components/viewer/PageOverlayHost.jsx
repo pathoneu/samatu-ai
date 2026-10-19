@@ -117,6 +117,8 @@ export default function PageOverlayHost({
   onMeasureBoxSelect = null,
   // The snap under the pointer (W5-A A6) → the status line.
   onMeasureSnapChange = null,
+  // Count tool right-click → the type picker (W5-A A7).
+  onCountTypeMenu = null,
   onMeasureDelete = null,
   // Right-click on a committed measurement or count mark → ({ id, clientX, clientY }) (2026-10-16).
   onMeasureContextMenu = null,
@@ -325,6 +327,7 @@ export default function PageOverlayHost({
             onSelect={onMeasureSelect}
             onBoxSelect={onMeasureBoxSelect}
             onSnapChange={onMeasureSnapChange}
+            onTypeMenu={onCountTypeMenu}
             onDelete={onMeasureDelete}
             selectedIds={selectedMeasureIds}
             draft={measureDraft}
