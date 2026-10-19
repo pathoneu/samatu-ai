@@ -267,3 +267,11 @@ test('carryUserFacts keeps the partition count he typed against a fresh read', (
   // a count the program gave (no user source) is the fresh read's
   assert.equal(carryUserFacts({ nr: '04', n_partition_walls: 3 }, fresh).room.n_partition_walls, 5);
 });
+
+test('a door count answered on the question card stays answered through a re-read', () => {
+  const old = { ...oldRooms()[2], _angos_patikrinta_at: T };
+  const { room } = carryUserFacts(old, newRooms()[2]);
+  assert.equal(room._angos_patikrinta_at, T);
+  assert.deepEqual(room.elementai, old.elementai);
+  assert.equal(carryUserFacts(oldRooms()[3], newRooms()[3]).room._angos_patikrinta_at, undefined);
+});
