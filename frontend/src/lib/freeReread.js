@@ -59,6 +59,8 @@ export function mergeReadMeta(storedMeta, readMeta) {
   const out = { ...base };
   if (readMeta.geometrija !== undefined) out.geometrija = readMeta.geometrija;
   if (isObj(readMeta.lenteles)) out.lenteles = readMeta.lenteles;
+  // the floor sheet's key lines (Pathon v3 W5-D, D1) — a record of the floor sheet, taken whole
+  if (Array.isArray(readMeta.grindu_legenda)) out.grindu_legenda = readMeta.grindu_legenda;
   const zonos = mergeZones(base.zonos, readMeta.zonos);
   if (zonos !== undefined) out.zonos = zonos;
   return out;

@@ -1593,8 +1593,70 @@ def _floor_sheet_page(project: dict) -> int | None:
         return None
 
 
-def _fact_grindys(project: dict, room: dict,
-                  region: list[float] | None) -> dict:
+def colour_name_lt(rgb: Any) -> str | None:
+    """A plain Lithuanian name for a key colour (0–1 RGB) — „mėlyna", „ruda"… — or None for black, white
+    or grey (no colour key). Words a contractor says, never a code."""
+    import colorsys
+    try:
+        r, g, b = (float(v) for v in list(rgb)[:3])
+    except (TypeError, ValueError):
+        return None
+    h, l, sat = colorsys.rgb_to_hls(r, g, b)
+    if max(r, g, b) - min(r, g, b) < 0.15:
+        return None
+    deg = h * 360.0
+    if 15 <= deg < 50 and (l < 0.35 or sat < 0.5):
+        return "ruda"
+    for upto, name in ((15, "raudona"), (45, "oranžinė"), (70, "geltona"), (165, "žalia"), (200, "žydra"),
+                       (255, "mėlyna"), (290, "violetinė"), (330, "rožinė"), (361, "raudona")):
+        if deg < upto:
+            return name
+    return None
+
+
+def _floor_legend_line(project: dict, danga: str, ev: dict | None) -> dict | None:
+    """The floor sheet's key line that speaks for this covering (`_meta.grindu_legenda`, written by the geometry
+    lane — Pathon v3 W5-D, D1): the one whose words the room's hatch matched, else the only line of that kind on
+    the room's floor sheet. {tekstas, spalva, spalvos_vardas, page, rect_pct, sentence, crop_url} or None."""
+    meta = project.get("_meta") if isinstance(project.get("_meta"), dict) else {}
+    lines = [ln for ln in (meta.get("grindu_legenda") or []) if isinstance(ln, dict) and ln.get("klase") == danga]
+    if not lines:
+        return None
+    page = int((ev or {}).get("page") or 0) or None
+    quote = str((ev or {}).get("tekstas") or "").strip()
+    pick = next((ln for ln in lines if quote and str(ln.get("tekstas") or "").strip() == quote
+                 and (page is None or int(ln.get("page") or 0) == page)), None)
+    if pick is None:
+        same_sheet = [ln for ln in lines if page is None or int(ln.get("page") or 0) == page]
+        if len(same_sheet) != 1:
+            return None
+        pick = same_sheet[0]
+    name = colour_name_lt(pick.get("spalva"))
+    words = _FLOOR_LT.get(danga, danga)
+    text = str(pick.get("tekstas") or "").strip()
+    sentence = f"Legenda: {words}" + (f" — {name}" if name else "") + (f" („{text}“)" if text else "") + "."
+    rect = pick.get("rect_pct") if isinstance(pick.get("rect_pct"), list) and len(pick["rect_pct"]) == 4 else None
+    return {"tekstas": text, "spalva": pick.get("spalva"), "spalvos_vardas": name,
+            "page": int(pick.get("page") or 0) or None, "rect_pct": _clamp_rect(rect),
+            "sentence": sentence, "crop_url": None}
+
+
+def _fact_grindys(project: dict, room: dict, region: list[float] | None) -> dict:
+    """The floor fact (`_fact_grindys_inner`) with the floor sheet's key line beside it when the covering came
+    from the floor plan — „Legenda: plytelės — mėlyna" with its own crop (Pathon v3 W5-D, D1). Evidence only:
+    the value, status and sentence stay what the reading says."""
+    fact = _fact_grindys_inner(project, room, region)
+    ev = room.get("_grindu_danga") if isinstance(room.get("_grindu_danga"), dict) else None
+    danga = str((ev or {}).get("danga") or room.get("grindu_danga") or "").strip().lower()
+    if ev and danga in _FLOOR_LT:
+        line = _floor_legend_line(project, danga, ev)
+        if line:
+            fact["legenda"] = line
+    return fact
+
+
+def _fact_grindys_inner(project: dict, room: dict,
+                        region: list[float] | None) -> dict:
     """Which floor covering this room gets — READ off the floor plan when the
     plan says it (extractor/floor_coverings.py: written in the room, or hatched
     in a legend line's colour), his own choice when he made one, otherwise the
@@ -1807,6 +1869,9 @@ def attach_crop_urls(payload: dict, project_id: str, dpi: int | None = None) -> 
         fact["crop_url"] = evidence_url(project_id, page, rect, d)
         for ev in fact.get("lenteles") or []:
             ev["crop_url"] = evidence_url(project_id, ev.get("page"), ev.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
+        leg = fact.get("legenda")
+        if isinstance(leg, dict) and leg.get("page"):
+            leg["crop_url"] = evidence_url(project_id, leg.get("page"), leg.get("rect_pct") or [0.0, 0.0, 1.0, 1.0], d)
     return payload
 
 

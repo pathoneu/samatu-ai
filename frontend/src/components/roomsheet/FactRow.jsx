@@ -159,6 +159,20 @@ export default function FactRow({
         {sentence && (
           <p className="mt-0.5 text-[14px] leading-snug text-[hsl(var(--ink-2))]">{sentence}</p>
         )}
+        {/* The floor sheet's key line this covering was read by (Pathon v3 W5-D, D1): its own crop — the swatch
+            and the words — beside the room's, so he sees which colour the reading matched. */}
+        {fact?.legenda?.crop_url && (
+          <div className="mt-1.5 flex items-start gap-2" data-testid="fact-legend-line">
+            <EvidenceCrop
+              fact={{ crop_url: fact.legenda.crop_url, source: { page: fact.legenda.page, rect_pct: fact.legenda.rect_pct } }}
+              alt={cleanUserText(fact.legenda.sentence || '')}
+              className="w-[88px] shrink-0"
+              imgClassName="h-[34px] object-contain"
+              showCaption={false}
+            />
+            <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{cleanUserText(fact.legenda.sentence || '')}</p>
+          </div>
+        )}
         {/* The sharp drawing is one click away from every number: the pane on the
             left jumps to the sheet and the place this fact was read from. */}
         {onShowOnDrawing && fact?.source?.page != null && (
