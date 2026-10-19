@@ -343,18 +343,30 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveText('sujungta į 04');
   await expectKiekiai(page, [['Dažymo kampų montavimas', '489,76 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
   note('merge: 04 = 26,31 + 35,50 = 61,81 m² · lubos 143,27 · kampai 475,66 → 489,76');
-  // Recorded, not asserted (reported to the manager as an app bug): after the merge the room list's header and
-  // the server's floor-ratio checks add the absorbed 05 (35,50 m²) on top of 04's 61,81 m² — 178,77 m² of
-  // floor against 143,27 m² of ceiling, hence a false „Lubų plotas 0,80× grindų ploto".
-  const header = (await page.getByRole('button', { name: /^Patalpos 11 / }).innerText()).replace(/\s+/g, ' ');
-  const ratios = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
-  note(`[bug, recorded] after merge: „${header}" · ${ratios.join(' · ')}`);
+  // W1-F F1 (was recorded as a bug by W0-A): the totals outside the billed lines count 05's 35,50 m² once —
+  // inside 04 — so the room list's header stays 143,27 m² (not 178,77) and the server's floor-ratio checks
+  // say what they said before the merge (no false „Lubų plotas 0,80× grindų ploto", no „…sienų plotas 1,72×").
+  await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
+  const floorRatios = (p) => (p.lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
+  await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 }).toEqual(floorRatios(project));
+  note(`after merge: „Patalpos 11 143,27 m²" · checks as before the merge: ${floorRatios(project).join(' · ') || '—'}`);
+  // W1-F F2: 04 keeps the floor covering the floor plan gives it (it went to „—" and Patikra asked again)
+  expect(roomsByNr(await getProject())['04']).toMatchObject({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' });
+  const { questions } = await api(`/api/projects/${PROJECT}/questions`);
+  const floorAsked = questions.filter((q) => q.kind === 'grindys').flatMap((q) => q.items.map((i) => i.room_nr));
+  expect(floorAsked, 'Patikra does not ask 04\'s floor again').not.toContain('04');
+  note(`04 grindys: plytelės (iš grindų plano) · Patikra klausia grindų: ${floorAsked.join(', ') || '—'}`);
 
   // „Atimti" (saved): a 2,06 m² column, „Kas atimama?" = kolona → 4 corners × 2,82 m
   await subtractColumn(page, await getProject());
   await expectKiekiai(page, [['Dažymo kampų montavimas', '501,04 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
   note('subtract 2,06 m² kolona: kampai 489,76 → 501,04 · lubos 143,27');
   await shot(page, '05-room-tools');
+  // W1-F F1: „Patalpų suvestinė" (Sąmata) adds the rooms the same way — 05 inside 04, once
+  await page.getByTestId('step-samata').click();
+  await page.getByTestId('samata-expand').click();
+  await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
+  note('Sąmata „Patalpų suvestinė": 11 patalpų · 143,27 m²');
 });
 
 test('6 measure tools snap to walls; lasso batch delete; Istorija undo', async ({ page }) => {
@@ -598,8 +610,22 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await loadGeometry(page, 1);
   await mergeRooms(page, await getProject());
   await subtractColumn(page, await getProject());
+  // W1-F F5 (merge-then-totals): after „Sujungti" the room list's header and the Sąmata „Patalpų suvestinė"
+  // equal the billed lubos — 05's 35,50 m² once, inside 04 — and neither false floor-ratio check fires.
+  await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
+  const falseChecks = /^(Lubų plotas 0,80×|Dažomas sienų plotas 1,72×) grindų ploto$/;
+  const sanity = ((await getProject()).lt_sanity?.warnings || []).map((w) => w.message || '');
+  expect(sanity.filter((m) => falseChecks.test(m)), 'no false floor-ratio check after the merge').toEqual([]);
+  await page.getByTestId('step-samata').click();
+  await page.getByTestId('samata-expand').click();
+  await expect(page.getByRole('button', { name: /^Patalpų suvestinė/ })).toContainText('11 patalpų · 143,27 m²');
+  await expect(page.getByText(/Lubų plotas 0,80×|Dažomas sienų plotas 1,72×/)).toHaveCount(0);
+  note('after 04 + 05: „Patalpos 11 143,27 m²" · „Patalpų suvestinė" 143,27 m² · no 0,80× / 1,72× check');
   await page.goto(`/project/${PROJECT}/patikra?kambarys=04`);
   await expect(page.getByRole('heading', { level: 1, name: /^04 / })).toBeVisible({ timeout: 60_000 });
+  // W1-F F2: the merged 04 still says what the floor plan draws in it — not „dvi dangos", not a question
+  await expect(page.getByText(/^Grindų plane \(7 psl\.\) ši patalpa nubraižyta tuo pačiu raštu/)).toBeVisible();
+  await expect(page.getByText(/parašytos dvi dangos/)).toHaveCount(0);
   const learnedBefore = await learnedCount(page);
   const fact = page.locator('div')
     .filter({ has: page.getByRole('img', { name: /^Pertvarų sienos atviroje erdvėje/ }) })
@@ -623,6 +649,50 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await expect(page.getByTestId('learning-csv')).toBeVisible();
   note(`2 + 3 = 5 → 3 jūsų · kampai 501,04 → 495,40 (−5,64) · Įsiminta ${learnedBefore} → ${learnedBefore + 1}`);
   await shot(page, '10-patikra-partitions');
+});
+
+/** demo-objektas_h as this browser's cache holds it (the write-through copy in localStorage). */
+async function cachedProject(page) {
+  return page.evaluate((id) => {
+    try { return (JSON.parse(localStorage.getItem('samatu_projects') || '[]')).find((p) => p?.id === id) || {}; } catch { return {}; }
+  }, PROJECT);
+}
+
+/**
+ * W1-F F4: merge 04 + 05 in this browser, restore the start version ELSEWHERE (the Versijos route, as another
+ * tab or device would), reload: the screen shows the server's copy, never this browser's newer cached one.
+ */
+async function restoredElsewhereThenReload(page) {
+  await openProject(page);
+  await loadGeometry(page, 1);
+  await mergeRooms(page, await getProject());
+  await expect.poll(async () => roomsByNr(await cachedProject(page))['05']?._sujungta_i || null, { timeout: 15_000 }).toBe('04');
+  const start = readJson(START_JSON);
+  // The server stamps a save to the SECOND: a restore in the same second as this browser's save would carry
+  // the very stamp this browser last saw. Another tab or device takes longer than that.
+  const saved = (await getProject()).updated_at;
+  await expect.poll(() => new Date().toISOString().slice(0, 19) + 'Z', { timeout: 5_000 }).not.toBe(saved);
+  await api(`/api/projects/${PROJECT}/versions/${start.version}/restore`, { method: 'POST' });
+  expect(fingerprint(await getProject())).toMatchObject({ a04: 26.31, merged05: null, kampai: 475.66 });
+  await page.reload();
+  await viewerReady(page);
+  await expect(roomRow(page, '04')).toContainText('26,31');
+  await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveCount(0);
+  await expect.poll(async () => roomsByNr(await cachedProject(page))['04']?.plotas_m2, { timeout: 15_000 }).toBe(26.31);
+  await expect(page.getByTestId('server-refresh-notice')).toContainText('Atnaujinta iš serverio');
+}
+
+test('Versijos: a version restored elsewhere is what this browser shows after a reload', async ({ page }) => {
+  await restoredElsewhereThenReload(page);
+  note('merged here → restored elsewhere → reload: 04 26,31 · „Atnaujinta iš serverio"');
+});
+
+test('Versijos: … also when this browser\'s clock runs 10 min ahead of the server\'s', async ({ page }) => {
+  // The cached copy carries the time of this browser's last edit, the server's copy the server's time: with the
+  // PC clock 10 min fast the cached copy looked newer than the restore and stayed on screen (the stale sighting).
+  await page.clock.install({ time: new Date(Date.now() + 10 * 60_000) });
+  await restoredElsewhereThenReload(page);
+  note('browser clock +10 min: merged here → restored elsewhere → reload: 04 26,31 · „Atnaujinta iš serverio"');
 });
 
 test('Top bar: Versijos — compare with current, restore keeps „Prieš grąžinant"', async ({ page }) => {

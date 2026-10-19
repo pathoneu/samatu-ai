@@ -6,6 +6,7 @@ import {
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
   pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
   consumePriceFillPending, refreshProjectFromBackend, noteServerVersion, adoptServerProject,
+  hasServerRefreshNotice, dismissServerRefreshNotice,
 } from './projectStore.js';
 
 // Minimal localStorage double — the store only needs get/set/removeItem.
@@ -544,6 +545,66 @@ test('refreshProjectFromBackend: an unsaved local edit is not swapped away, and 
   const same = await refreshProjectFromBackend('p9');
   assert.equal(same.name, 'Redaguota');
   assert.equal(await refreshProjectFromBackend(null), null);
+});
+
+// ── The server moved on since this browser last saw it (Pathon v3 W1-F F4) ────
+//
+// The cached copy's `updated_at` is THIS BROWSER's clock (updateProject stamps it), the server's is the
+// server's: comparing the two let a cache stamped „later" — a PC clock a few minutes fast, a database put
+// back from a backup — stay on screen after a version was restored elsewhere. The like-for-like marker is
+// the server's own stamp this browser last saw (samatu_server_versions).
+
+const MERGED = [{ nr: '04', plotas_m2: 61.81 }, { nr: '05', plotas_m2: 35.5, _sujungta_i: '04' }];
+const RESTORED = [{ nr: '04', plotas_m2: 26.31 }, { nr: '05', plotas_m2: 35.5 }];
+
+function cacheAndSeen(cachedStamp, seen, patalpos = MERGED) {
+  _resetSaveState();
+  installLocalStorage({
+    samatu_projects: JSON.stringify([{ id: 'p9', name: 'H', updated_at: cachedStamp, patalpos }]),
+  });
+  noteServerVersion('p9', seen);   // what samatu_server_versions holds after a reload
+}
+
+test('refreshProjectFromBackend: a server copy restored elsewhere wins over a cache stamped later, and says so once', async () => {
+  // this browser merged at 20:20 by ITS clock (10 min fast); the server stored that save at 20:10:04 and a
+  // version was restored elsewhere at 20:11
+  cacheAndSeen('2026-10-18T20:20:03.120Z', '2026-10-18T20:10:04Z');
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'H', updated_at: '2026-10-18T20:11:00Z', patalpos: RESTORED }) });
+  const got = await refreshProjectFromBackend('p9');
+  assert.deepEqual(got.patalpos, RESTORED);
+  assert.deepEqual(getProject('p9').patalpos, RESTORED, 'the cache holds the server copy');
+  assert.equal(_getServerVersion('p9'), '2026-10-18T20:11:00Z', 'and the next save is based on it');
+  assert.equal(hasServerRefreshNotice('p9'), true);
+  dismissServerRefreshNotice('p9');
+  assert.equal(hasServerRefreshNotice('p9'), false);
+});
+
+test('refreshProjectFromBackend: a database put back with an OLDER stamp is still the server moving on', async () => {
+  cacheAndSeen('2026-10-18T20:10:03.900Z', '2026-10-18T20:10:04Z');
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'H', updated_at: '2026-10-18T17:54:51Z', patalpos: RESTORED }) });
+  assert.deepEqual((await refreshProjectFromBackend('p9')).patalpos, RESTORED);
+  assert.equal(hasServerRefreshNotice('p9'), true);
+});
+
+test('refreshProjectFromBackend: the server unchanged since this browser saw it — the cache stays, nothing said', async () => {
+  cacheAndSeen('2026-10-18T20:20:03.120Z', '2026-10-18T20:10:04Z');
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'H', updated_at: '2026-10-18T20:10:04Z', patalpos: RESTORED }) });
+  assert.deepEqual((await refreshProjectFromBackend('p9')).patalpos, MERGED);
+  assert.equal(hasServerRefreshNotice('p9'), false);
+});
+
+test('refreshProjectFromBackend: its own save whose answer never came back is taken silently (same content)', async () => {
+  // the tab closed with a PUT on the wire: the server holds this browser's last edit under a stamp it never saw
+  cacheAndSeen('2026-10-18T20:10:03.900Z', '2026-10-18T20:09:00Z');
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ id: 'p9', name: 'H', updated_at: '2026-10-18T20:10:04Z', patalpos: MERGED,
+      user_id: 'u1', status: 'ready', vat_rate: 21, created_at: '2026-10-01T08:00:00Z' }) });
+  assert.deepEqual((await refreshProjectFromBackend('p9')).patalpos, MERGED);
+  assert.equal(_getServerVersion('p9'), '2026-10-18T20:10:04Z');
+  assert.equal(hasServerRefreshNotice('p9'), false, 'nothing changed for him — nothing to say');
 });
 
 // ── One PUT in flight per project, never aborted (2026-09-29 audit) ──────────

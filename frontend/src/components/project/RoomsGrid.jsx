@@ -16,6 +16,7 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import RoomCard from './RoomCard';
+import { isMergedAway } from '@/lib/floorArea';
 import {
   backendKampaiM, kampaiInputsChanged, withoutBackendKampai, kampaiTotalM,
 } from '@/lib/roomKampai';
@@ -104,7 +105,7 @@ export default function RoomsGrid({ initialRooms = [], onChange, onShowOnPdf, pr
       hidroizoliacijos_vnt: 0,
     };
     rooms.forEach(r => {
-      t.bendras_plotas_m2 += r.plotas_m2 || 0;
+      if (!isMergedAway(r)) t.bendras_plotas_m2 += r.plotas_m2 || 0;   // inside the room it joined
       t.dazymo_plotas_m2 += r.dazymo_plotas_m2 || 0;
       t.gkp_lubu_standart_m2 += r.gkp_lubu_standart_m2 || 0;
       t.gkp_lubu_virs_3m_m2 += r.gkp_lubu_virs_3m_m2 || 0;

@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, asdict
 
+from .scope import is_absorbed
 from .universal_rules import gkp_ceiling_areas_m2, gkp_sheet_count
 
 
@@ -69,8 +70,16 @@ class Warning:
         return {**asdict(self), "source": SOURCE}
 
 
+def _counted(rooms):
+    """The rooms whose own figures a project total adds. A room merged into another („Sujungti",
+    `scope.is_absorbed`) keeps its table row, but the room it was merged into already carries its area
+    (`plotas_m2 = a + b`) and its walls — adding it again doubled the floor and gave a false
+    „Lubų plotas 0,80× grindų ploto" (Pathon v3 W1-F)."""
+    return [r for r in rooms if not is_absorbed(r)]
+
+
 def _sum_field(rooms, field):
-    return sum(float(r.get(field) or 0) for r in rooms)
+    return sum(float(r.get(field) or 0) for r in _counted(rooms))
 
 
 def _lt(value, digits: int = 2) -> str:
@@ -142,7 +151,7 @@ def check_baseboard_perimeter(rooms):
     total_grind = 0.0
     total_perim = 0.0
     door_count = 0
-    for r in rooms:
+    for r in _counted(rooms):
         derived = r.get("derived") or r
         grind = float(derived.get("grindjuostes_m") or derived.get("grindjuosciu_m") or 0)
         total_grind += grind

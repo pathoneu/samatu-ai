@@ -642,6 +642,20 @@ def test_shared_rooms_and_rows_are_field_reduced(tmp_path, monkeypatch):
     assert "savikaina" not in row and "_internal_note" not in row
 
 
+def test_a_merged_away_room_says_so_on_the_shared_page(tmp_path, monkeypatch):
+    """„Sujungti": the kept room carries both areas, so SharedProject.jsx's floor total skips the room
+    merged into it — it needs `_sujungta_i` for that, and nothing else of the merge (Pathon v3 W1-F)."""
+    blob = dict(_SHARE_BLOB)
+    blob["patalpos"] = [
+        {"nr": "04", "plotas_m2": 61.81, "plotas_saltinis": "eksplikacija_sujungta", "_sujungimas": {"su": ["05"]}},
+        {"nr": "05", "plotas_m2": 35.5, "_sujungta_i": "04", "_elementai_pries_sujungima": [{"tipas": "langas"}]},
+    ]
+    db.upsert_project("p-share", blob, user_id=auth._DEV_USER_ID)
+    db.set_share_token("p-share", "share-token-merge-w1f")
+    rooms = client.get("/api/share/share-token-merge-w1f").json()["data"]["patalpos"]
+    assert rooms == [{"nr": "04", "plotas_m2": 61.81}, {"nr": "05", "plotas_m2": 35.5, "_sujungta_i": "04"}]
+
+
 def test_shared_payload_keeps_everything_SharedProject_jsx_renders(
         tmp_path, monkeypatch):
     """Field-coverage assertion against frontend/src/pages/SharedProject.jsx."""

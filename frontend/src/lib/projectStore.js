@@ -492,6 +492,7 @@ export function resetPullCache() {
   _queued.clear();
   _serverVersions.clear();
   _saveVersions();
+  _refreshedFromServer.clear();
   // Price lists are user-scoped and backend-backed since 2026-09-02 — releasing
   // their once-per-session guard here is what makes the NEXT user's first
   // Kainynai visit fetch his own lists instead of reusing the previous pull.
@@ -657,7 +658,14 @@ export async function refreshProjectFromBackend(id) {
   const raw = _readProjectsRaw();
   const projects = Array.isArray(raw) ? raw : [];
   const cached = projects.find(p => p?.id === id) || null;
-  const newer = !cached || !cached.updated_at
+  // The server MOVED ON since this browser last saw it (Pathon v3 W1-F F4): its stamp is not the one this
+  // browser last saved or loaded — another tab or device saved, a version was restored elsewhere, a database
+  // was put back. Compared server stamp to server stamp: `cached.updated_at` is THIS browser's clock
+  // (updateProject stamps it), so a PC clock a few minutes fast — or a restore that put an older stamp
+  // back — kept the stale cached copy on screen. The next save would only have 409'd against it anyway.
+  const seen = _serverVersions.get(id);
+  const moved = !!cached && !!seen && !!fresh.updated_at && fresh.updated_at !== seen;
+  const newer = !cached || !cached.updated_at || moved
     || (!!fresh.updated_at && fresh.updated_at > cached.updated_at);
   if (!newer) return getProject(id);   // a conflicted local copy keeps its old base → the next save 409s again
   if (fresh.updated_at) _setServerVersion(id, fresh.updated_at);
@@ -665,7 +673,43 @@ export async function refreshProjectFromBackend(id) {
   _memProjects = next;
   // a refused localStorage write leaves the flag set, so the next flush retries it
   _lsDirty = !_persist(PROJECTS_KEY, JSON.stringify(next));
+  // What he sees changed under him: the workspace says „Atnaujinta iš serverio" once. Its own save whose
+  // answer never came back (a tab closed with the PUT on the wire) holds the same content — nothing to say.
+  if (moved && !_sameContent(cached, fresh)) {
+    _refreshedFromServer.add(id);
+    try { globalThis.dispatchEvent?.(new CustomEvent(SERVER_REFRESH_EVENT, { detail: { id } })); } catch { /* no DOM */ }
+  }
   return getProject(id);
+}
+
+// ── „Atnaujinta iš serverio" (Pathon v3 W1-F F4) ─────────────────────────────
+// Projects whose cached copy a load replaced because the server moved on and the content differs. The
+// workspace shows one notice per project until it is dismissed (components/project/ServerRefreshNotice).
+export const SERVER_REFRESH_EVENT = 'samatu:project-refreshed-from-server';
+const _refreshedFromServer = new Set();
+export function hasServerRefreshNotice(id) { return _refreshedFromServer.has(id); }
+export function dismissServerRefreshNotice(id) { _refreshedFromServer.delete(id); }
+
+// Keys the server sets on the row (db.get_project lays them over the blob) or a save adds as protocol —
+// never what he changed.
+const _ROW_KEYS = new Set([
+  'updated_at', 'created_at', 'user_id', 'share_token', 'share_expires_at', 'share_view_count',
+  'share_last_viewed_at', 'status', 'vat_rate', 'tipas', 'archetipas', 'bendras_plotas_m2',
+  'base_updated_at', '_versija_saltinis', '_archived', '_archived_at',
+]);
+function _canon(v) {
+  if (Array.isArray(v)) return `[${v.map(_canon).join(',')}]`;
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v).filter((k) => v[k] !== undefined).sort()
+      .map((k) => `${JSON.stringify(k)}:${_canon(v[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+function _sameContent(a, b) {
+  for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+    if (!_ROW_KEYS.has(k) && _canon(a?.[k]) !== _canon(b?.[k])) return false;
+  }
+  return true;
 }
 
 export function getProjects() {
