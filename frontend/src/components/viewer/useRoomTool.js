@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { flashCursorHint } from '@/lib/cursorHints';
 import { useTranslation } from 'react-i18next';
 import { displayPointOf, outlineFailureKey } from '@/lib/roomOutline';
 import { roomForToolClick, pickCandidates, commitBody, insideProposal, readOutlineProposal } from '@/lib/roomTool';
@@ -111,7 +112,8 @@ export default function useRoomTool({
     if (projectId) {
       const zones = await fetchSheetZones(projectId, where.page).catch(() => null);
       const refused = zones ? noRoomZoneAt(zones, where.x_pct, where.y_pct) : null;
-      if (refused) { toast.info(refused.sentence); setState(IDLE); return; }
+      // the sentence at the cursor, where he clicked (W5-B B2 — instructions at the cursor, not in a toast)
+      if (refused) { flashCursorHint(refused.sentence); setState(IDLE); return; }
     }
     const hit = roomForToolClick(roomsRef.current, where, { sutapdinimas });
     if (!hit) {

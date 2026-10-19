@@ -104,6 +104,8 @@ export const OVERLAY_LAYERS = Object.freeze([
   { key: 'measurements', label: 'Matavimai', desc: 'ilgiai ir plotai pagal lapo mastelį', on: true },
   { key: 'counts', label: 'Skaičiavimai', desc: 'pažymėti simboliai jų tipo spalva', on: true },
   { key: 'walls', label: 'Sienos', desc: 'kurias programa perskaitė iš brėžinio linijų', on: false },
+  // W5-B B4: the viewer's „Rodinys“ label switch — the dialog starts from what he chose there
+  { key: 'labels', label: 'Užrašai', desc: 'patalpų numeriai su plotais, matavimų ilgiai ir plotai', on: true },
 ]);
 
 /**

@@ -144,6 +144,10 @@ test.describe('click model and chrome', () => {
   test('Shift+F frames the selected room in the window', async ({ page }) => {
     await openProject(page);
     await focusRoom(page, '04');
+    // W5-B B7: focusing from the list already frames the room — fit the sheet first, then Shift+F frames it again
+    await page.waitForTimeout(800);
+    await page.keyboard.press('0');
+    await page.waitForTimeout(800);
     const pg = page.locator('div[data-page-number="1"]');
     const w0 = (await box(pg)).w;
     await page.keyboard.press('Shift+F');

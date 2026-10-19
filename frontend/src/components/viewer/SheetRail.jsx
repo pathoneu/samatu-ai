@@ -12,12 +12,17 @@
  * under each, groups kept apart by a rule; a sheet's name and group show beside the strip when its
  * thumbnail is focused or clicked (never on hover alone). „Lapai" at the top (or T) opens the full rail.
  *
+ * Pathon v3 W5-B B9 (coverage #1): „Neskaityti šio lapo" — the sheet on screen carries a visible button on its row
+ * of the full rail (and in the rename editor); a skipped sheet is dimmed and tagged „neskaitomas" in both widths.
+ * The free re-read and the detection run read it as a blank page (backend api/skip_sheets.py); it stays in the
+ * PDF. Persistence and the toast's „Atšaukti" belong to the owner (TakeoffViewer → project.neskaitomi_lapai).
+ *
  * Thumbnails are not virtualized like the old ThumbnailsPane (groups break its fixed-row
  * windowing); instead each row mounts its ThumbImg only once it scrolls near the rail's viewport.
  * Sheet sets are tens of pages, not thousands.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Pencil, RotateCcw, Check, X, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, RotateCcw, Check, X, PanelLeftOpen, EyeOff, Eye } from 'lucide-react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { ThumbImg } from '@embedpdf/plugin-thumbnail/react';
@@ -53,7 +58,7 @@ function useNearViewport(rootRef) {
 
 const selectCls = 'w-full h-7 rounded-[2px] border border-[hsl(var(--viewer-chrome-border))] bg-[hsl(var(--viewer-chrome-muted))] px-1.5 text-meta text-[hsl(var(--viewer-chrome-foreground))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--viewer-chrome-active))]';
 
-function SheetEditor({ sheet, onSave, onCancel, onReset }) {
+function SheetEditor({ sheet, onSave, onCancel, onReset, skipped = false, onToggleSkip = null }) {
   const [name, setName] = useState(sheet.fullName);
   const [type, setType] = useState(sheet.tipas);
   const [group, setGroup] = useState(sheet.discipline);
@@ -100,11 +105,30 @@ function SheetEditor({ sheet, onSave, onCancel, onReset }) {
           <RotateCcw className="w-3 h-3" />Atkurti automatinį
         </button>
       )}
+      {onToggleSkip && <SkipButton skipped={skipped} onClick={onToggleSkip} />}
     </div>
   );
 }
 
-function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRef, onOpen, onEdit, onSave, onCancel, onReset, rowRef }) {
+/** „Neskaityti šio lapo" / „Skaityti šį lapą" — one visible button, words and icon (never hover-only). */
+function SkipButton({ skipped, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="inline-flex items-center gap-1 text-meta text-[hsl(var(--viewer-chrome-foreground))] hover:text-[hsl(var(--viewer-chrome-active))] hover:underline"
+      title={skipped
+        ? 'Programa vėl skaitys šį lapą, kai perskaitysite brėžinį iš naujo'
+        : 'Lapas lieka PDF ir brėžinyje, bet programa jo neskaitys (perskaitant iš naujo ir „Perskaityti lapą“) — pvz. viršelis ar kitas objektas'}
+      data-testid={skipped ? 'sheet-skip-undo' : 'sheet-skip'}
+    >
+      {skipped ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+      {skipped ? 'Skaityti šį lapą' : 'Neskaityti šio lapo'}
+    </button>
+  );
+}
+
+function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRef, onOpen, onEdit, onSave, onCancel, onReset, rowRef, skipped = false, onToggleSkip = null }) {
   const [nearRef, near] = useNearViewport(rootRef);
   const setRefs = (el) => { nearRef.current = el; rowRef(el); };
   const numberTitle = sheet.number && sheet.number !== sheet.shortNumber ? sheet.number : undefined;
@@ -114,9 +138,10 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
       data-sheet-page={sheet.page}
       aria-current={current ? 'page' : undefined}
       className={`group relative px-2 py-1.5 border-l-2 ${current ? 'border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-muted))]' : 'border-transparent hover:bg-[hsl(var(--viewer-chrome-hover))]'}`}
+      data-skipped={skipped ? '1' : undefined}
     >
       <button type="button" onClick={onOpen} onDoubleClick={onEdit} className="flex w-full items-start gap-2 text-left focus:outline-none" title={`Lapas ${sheet.page}: ${sheet.fullName}`}>
-        <span className={`shrink-0 w-[60px] min-h-[42px] flex items-start justify-center bg-white rounded-[2px] overflow-hidden ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
+        <span className={`shrink-0 w-[60px] min-h-[42px] flex items-start justify-center bg-white rounded-[2px] overflow-hidden ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
           {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 60, height: 'auto', display: 'block' }} />}
         </span>
         <span className="min-w-0 flex-1">
@@ -147,9 +172,15 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
             {!sheet.classified && !sheet.overridden && (
               <span className="text-meta text-[hsl(var(--viewer-chrome-foreground)/0.75)]" title="Šio lapo programa neklasifikavo — pavadinkite jį patys">neklasifikuotas</span>
             )}
+            {skipped && (
+              <span className="text-meta font-semibold text-[hsl(var(--viewer-chrome-foreground))]" data-testid="sheet-skipped-tag" title="Programa šio lapo neskaito — jis lieka PDF ir brėžinyje">neskaitomas</span>
+            )}
           </span>
         </span>
       </button>
+      {onToggleSkip && !editing && (current || skipped) && (
+        <div className="mt-1 pl-[68px]"><SkipButton skipped={skipped} onClick={onToggleSkip} /></div>
+      )}
       {!editing && onEdit && (
         <button
           type="button"
@@ -161,7 +192,7 @@ function SheetRow({ documentId, sheet, current, hits, searching, editing, rootRe
           <Pencil className="w-3 h-3" />
         </button>
       )}
-      {editing && <SheetEditor sheet={sheet} onSave={onSave} onCancel={onCancel} onReset={onReset} />}
+      {editing && <SheetEditor sheet={sheet} onSave={onSave} onCancel={onCancel} onReset={onReset} skipped={skipped} onToggleSkip={onToggleSkip} />}
     </li>
   );
 }
@@ -175,7 +206,7 @@ export default function SheetRail({ mode = 'full', ...props }) {
   return mode === 'strip' ? <SheetStrip {...props} /> : <SheetRailFull {...props} />;
 }
 
-function SheetStripRow({ documentId, sheet, current, hits, searching, label, rootRef, rowRef, onOpen, onShowLabel, onHideLabel }) {
+function SheetStripRow({ documentId, sheet, current, hits, searching, label, rootRef, rowRef, onOpen, onShowLabel, onHideLabel, skipped = false }) {
   const [nearRef, near] = useNearViewport(rootRef);
   const setRefs = (el) => { nearRef.current = el; rowRef(el); };
   return (
@@ -190,7 +221,7 @@ function SheetStripRow({ documentId, sheet, current, hits, searching, label, roo
           ? 'border-[hsl(var(--viewer-chrome-active))] bg-[hsl(var(--viewer-chrome-muted))]'
           : 'border-transparent hover:bg-[hsl(var(--viewer-chrome-hover))]'}`}
       >
-        <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
+        <span className={`flex min-h-[28px] w-10 items-start justify-center overflow-hidden rounded-[2px] bg-white ${skipped ? 'opacity-40' : ''} ${current ? 'ring-2 ring-[hsl(var(--viewer-chrome-active))]' : 'ring-1 ring-[hsl(var(--viewer-chrome-border))]'}`}>
           {near && <ThumbImg documentId={documentId} meta={{ pageIndex: sheet.page - 1 }} style={{ width: 40, height: 'auto', display: 'block' }} />}
         </span>
         <span className={`mono tabular text-meta leading-tight ${current ? 'font-semibold text-[hsl(var(--viewer-chrome-active))]' : 'text-[hsl(var(--viewer-chrome-foreground)/0.75)]'}`}>
@@ -207,7 +238,7 @@ function SheetStripRow({ documentId, sheet, current, hits, searching, label, roo
   );
 }
 
-function SheetStrip({ documentId, rail, currentPageOf, onExpand = null }) {
+function SheetStrip({ documentId, rail, currentPageOf, onExpand = null, skipped = null }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { state: search } = useSearch(documentId);
   const cur = currentPageOf ? currentPageOf(scroll) : (scroll?.currentPage ?? 1);
@@ -287,7 +318,8 @@ function SheetStrip({ documentId, rail, currentPageOf, onExpand = null }) {
                 current={s.page === cur}
                 hits={hits[s.page] || 0}
                 searching={searching}
-                label={stripLabel(s, g.label)}
+                label={`${stripLabel(s, g.label)}${skipped?.has(s.page) ? ' — neskaitomas' : ''}`}
+                skipped={!!skipped?.has(s.page)}
                 rootRef={rootRef}
                 rowRef={(el) => { if (el) rows.current.set(s.page, el); else rows.current.delete(s.page); }}
                 onOpen={() => open(s.page)}
@@ -305,14 +337,14 @@ function SheetStrip({ documentId, rail, currentPageOf, onExpand = null }) {
           className="pointer-events-none fixed z-40 max-w-[320px] -translate-y-1/2 rounded-[2px] border border-border bg-card px-2.5 py-1.5 text-[14px] leading-snug text-foreground shadow-md"
           style={{ top: label.top, left: label.left }}
         >
-          {stripLabel(labelSheet, groupLabelOf.get(labelSheet.page))}
+          {stripLabel(labelSheet, groupLabelOf.get(labelSheet.page))}{skipped?.has(labelSheet.page) ? ' — neskaitomas' : ''}
         </div>
       )}
     </aside>
   );
 }
 
-function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onReset = null }) {
+function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onReset = null, skipped = null, onToggleSkip = null }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const { state: search } = useSearch(documentId);
   const cur = currentPageOf ? currentPageOf(scroll) : (scroll?.currentPage ?? 1);
@@ -382,6 +414,8 @@ function SheetRailFull({ documentId, rail, currentPageOf, onRename = null, onRes
                     onSave={(patch) => { setEditingPage(null); onRename?.(s, patch); }}
                     onCancel={() => setEditingPage(null)}
                     onReset={() => { setEditingPage(null); onReset?.(s); }}
+                    skipped={!!skipped?.has(s.page)}
+                    onToggleSkip={onToggleSkip ? () => onToggleSkip(s) : null}
                   />
                 ))}
               </ul>

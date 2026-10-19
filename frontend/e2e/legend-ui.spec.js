@@ -37,7 +37,7 @@ test.describe('legend marking (W2-B)', () => {
     // the lighting plan — sheet 3 carries the switch and luminaire legend
     await page.keyboard.press(']');
     await page.keyboard.press(']');
-    await expect(page.locator('[data-nav-cluster]')).toContainText('3 / 8');
+    await expect(page.locator('[data-nav-cluster]')).toContainText('3 iš 8');
 
     // B1: the tool card and the key
     await expect(page.getByTestId('viewer-legend-tool')).toBeVisible();

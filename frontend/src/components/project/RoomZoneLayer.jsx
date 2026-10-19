@@ -203,7 +203,7 @@ export default function RoomZoneLayer({
                 strokeWidth={isFocused ? SELECTED_STROKE_PX : 1.5}
                 opacity={isFocused ? 1 : 0.6} />
               {isFocused && (
-                <OverlayLabel x={0} y={-ringR - 24} text={chipLabelFor(z.label)} sub={chipSubFor(z)} border={INK} data-room-label={z.nr} />
+                <OverlayLabel x={0} y={-ringR - 24} text={chipLabelFor(z.label)} sub={chipSubFor(z)} border={INK} data-room-label={z.nr} data-ov-label="name" />
               )}
             </g>
           );
@@ -319,6 +319,7 @@ export default function RoomZoneLayer({
           <OverlayLabel
             key={`chip-${z.nr}`}
             data-room-label={isFocused ? z.nr : undefined}
+            data-ov-label="name"
             x={cx} y={cy}
             text={chipLabelFor(z.label)}
             sub={[chipSubFor(z), outlineNote(z)].filter(Boolean).join(' · ')}
