@@ -292,13 +292,13 @@ test.describe('click model and chrome', () => {
     await expect(page.locator('[data-tool="distance"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('the first-run coach card stands beside its tool card', async ({ page }) => {
+  test('the first-run coach card stands beside the element it explains (the sheet strip)', async ({ page }) => {
     await openProject(page, { coach: true });
     const card = page.getByTestId('viewer-coach-mark');
     await expect(card).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(600);
     const c = await box(card);
-    const tile = await box(page.locator('[data-coach="calibrate"]'));
+    const tile = await box(page.locator('[data-testid="sheet-rail"]'));
     expect(c.x).toBeGreaterThanOrEqual(tile.x + tile.w);
     expect(c.y).toBeLessThan(tile.y + tile.h);
     expect(c.y + c.h).toBeGreaterThan(tile.y);
