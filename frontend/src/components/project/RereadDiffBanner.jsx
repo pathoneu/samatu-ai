@@ -166,12 +166,13 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
           tone={tone}
           icon={RefreshCw}
           title={t('project.reread.changeTitle')}
-          action={actions}
           onDismiss={dismiss}
           dismissLabel={t('project.reread.dismiss')}
           data-testid="reread-diff-banner"
         >
           {summary}
+          {/* the two buttons on their own row: beside the text they squeezed it to one word a line in the 340 px panel */}
+          <span className="mt-1 flex flex-wrap items-center gap-x-3">{actions}</span>
         </Notice>
       </div>
     );

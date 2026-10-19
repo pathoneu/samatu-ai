@@ -180,6 +180,7 @@ test('„Kas pasikeitė" after Perskaityti iš naujo — Atšaukti puts the proj
   await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 30_000 }).toBe(true);
   const read = await getProject();
   expect(read._reread_diff.eilutes).toBeTruthy();
+  await shot(page, 'w4a-03a-kas-pasikeite-eilute');
   await page.getByTestId('reread-diff-toggle').click();
   await shot(page, 'w4a-03-kas-pasikeite');
   await page.getByTestId('reread-diff-undo').click();
