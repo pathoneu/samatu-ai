@@ -150,6 +150,8 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
         disabled={busy}
         className={linkBtn}
         title={t('project.reread.undoTitle')}
+        // its own name („Atšaukti perskaitymą"): a dialog's or a preview's plain „Atšaukti" stays the only one
+        aria-label={t('project.reread.undoAria')}
         data-testid="reread-diff-undo"
       >
         <Undo2 className="h-4 w-4" aria-hidden />

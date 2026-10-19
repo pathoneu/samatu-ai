@@ -971,6 +971,7 @@
       "changeTitle": "Kas pasikeitė",
       "review": "Peržiūrėti",
       "undo": "Atšaukti",
+      "undoAria": "Atšaukti perskaitymą",
       "undoTitle": "Grąžinti projektą, koks buvo prieš šį perskaitymą",
       "chipRows_one": "{{count}} eilutė",
       "chipRows_few": "{{count}} eilutės",

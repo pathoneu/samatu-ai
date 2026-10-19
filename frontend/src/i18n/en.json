@@ -955,6 +955,7 @@
       "changeTitle": "What changed",
       "review": "Review",
       "undo": "Undo",
+      "undoAria": "Undo the read",
       "undoTitle": "Put the project back as it was before this read",
       "chipRows_one": "{{count}} line",
       "chipRows_other": "{{count}} lines",
