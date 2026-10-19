@@ -237,9 +237,9 @@ export function decisionsFor({ rows, counts, review, removed = new Set(), pages 
   return [...rejects, ...accepts].slice(0, MAX_DECISIONS);
 }
 
-/** One corrections-journal row per reviewed legend row (source „legenda"). */
+/** One corrections-journal row per reviewed legend row (source „legenda"); a material sample was never a choice. */
 export function journalRows({ rows, counts, review, removed = new Set() }) {
-  return (rows || []).map((row) => {
+  return (rows || []).filter((row) => row.countable !== false).map((row) => {
     const c = counts?.[row.row_id];
     const keep = row.countable !== false && !!review?.[row.row_id]?.keep;
     const kept = keptInstances(c, removed).length;

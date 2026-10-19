@@ -116,12 +116,13 @@ test('decisions: removed marks reject, kept marks of kept rows accept (capped), 
 
 test('journal: one row per legend row, source legenda, what was kept and removed', () => {
   const rows = journalRows({ rows: [rowA, rowS], counts, review: { 'p3-a': { keep: true, name: 'Rozetės' }, 'p3-s': { keep: true } }, removed: new Set(['p3-a#2']) });
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 1);   // the material sample is not journalled
   assert.deepEqual(rows[0], {
     field_path: 'legenda.3.p3-a', old_value: { eilute: 'Rozetė', rasta: 3 },
     new_value: { sprendimas: 'accept', pavadinimas: 'Rozetės', kiekis: 2, pasalinta: 1 }, source: 'legenda', note: 'vektoriai',
   });
-  assert.equal(rows[1].new_value.sprendimas, 'reject');
+  const dropped = journalRows({ rows: [rowB], counts, review: { 'p3-b': { keep: false } } });
+  assert.equal(dropped[0].new_value.sprendimas, 'reject');
 });
 
 test('the saved legend carries only kept countable rows with his names', () => {

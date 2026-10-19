@@ -402,6 +402,10 @@ def record_decision(
     )
     # The learning journal (togal-v2 W11): the same decision is one `corrections` row too, so „Įsiminta" and the
     # per-project journal count it. The crop above is the training sample; this row is what the person did.
+    # A legend review (Pathon v3 W2-B, source „legenda") writes ONE journal row per legend row itself — its marks
+    # are training samples only, or a 40-mark legend would put 40 „rastą simbolį" lines in his journal.
+    if body.source == "legenda":
+        return {"status": "ok"}
     try:
         _db.log_correction_once(
             project_id=body.project_id, field_path=f"simbolis.{body.page_idx + 1}.{body.klass}",
