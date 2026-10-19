@@ -119,6 +119,24 @@ export async function getPdfUrl(projectId) {
   return URL.createObjectURL(blob);
 }
 
+/**
+ * Every cached drawing in this browser — on logout and on a user switch
+ * (audit backend-security-15): the previous person's PDFs must not stay
+ * readable to the next one. Clears the store rather than deleting the
+ * database, which another open tab would block.
+ */
+export async function clearAllPdfs() {
+  if (typeof indexedDB === 'undefined') return;
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
 export async function deletePdf(projectId) {
   const db = await openDb();
   return new Promise((resolve, reject) => {

@@ -31,6 +31,7 @@ import MobileViewOnlyBanner from './MobileViewOnlyBanner';
 import RightPanelHost from './RightPanelHost';
 import { WorkspaceHostContext } from './workspaceHost';
 import { toast } from 'sonner';
+import { sheetsCrossingLimit, sheetLimitMessage } from '@/lib/measureLimits';
 import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfStore';
 import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject, flushProjectSaves } from '@/lib/projectStore';
@@ -495,6 +496,10 @@ export default function InteriorWorkspace({
   // no longer revert concurrent writes (async polygon patches, panel price
   // edits, a second tab) that landed after this component last rendered.
   const handleMeasureDataChange = ({ measurements, measureScales, countTypes }) => {
+    // v3 M7: a sheet crossing the measured limit gets one plain warning (never blocked).
+    for (const hit of sheetsCrossingLimit(project?.measurements, measurements)) {
+      toast.warning(sheetLimitMessage(hit), { id: `measure-limit-${hit.page}`, duration: 12000 });
+    }
     const updated = updateProject(project.id, {
       measurements,
       pageScalesDurable: measureScales,

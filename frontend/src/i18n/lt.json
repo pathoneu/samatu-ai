@@ -338,7 +338,11 @@
     "brandHeadlineB": ", ne per dienas.",
     "brandSub": "Interjero apdailos kiekiai iš projekto PDF — sienos, lubos, grindys, angos.",
     "forgotPassword": "Pamiršote slaptažodį? Susisiekite su mumis",
+    "forgotPasswordLink": "Pamiršote slaptažodį?",
+    "resendVerification": "Siųsti patvirtinimo nuorodą dar kartą",
     "oauthErr": {
+      "emailUnverified": "Google nepatvirtino šio el. pašto adreso. Prisijunkite el. paštu ir slaptažodžiu arba patvirtinkite adresą Google paskyroje.",
+      "linkNeedsPassword": "Šiuo el. pašto adresu jau sukurta paskyra su slaptažodžiu. Prisijunkite slaptažodžiu ir patvirtinkite el. paštą (arba pasikeiskite slaptažodį per „Pamiršote slaptažodį?“) — tada galėsite jungtis ir per Google.",
       "invalidState": "Prisijungimo sesija nebegalioja. Pradėkite prisijungimą per Google iš naujo.",
       "missingCode": "Google negrąžino patvirtinimo kodo. Bandykite prisijungti dar kartą.",
       "tokenExchangeFailed": "Nepavyko susisiekti su Google. Pabandykite po kelių minučių arba prisijunkite el. paštu.",
@@ -347,6 +351,27 @@
       "accessDenied": "Prisijungimas per Google atšauktas.",
       "generic": "Prisijungti per Google nepavyko. Bandykite dar kartą."
     }
+  },
+  "authEmail": {
+    "forgotTitle": "Slaptažodžio keitimas",
+    "forgotSub": "Įrašykite paskyros el. pašto adresą — atsiųsime nuorodą naujam slaptažodžiui nustatyti.",
+    "forgotSubmit": "Siųsti nuorodą",
+    "forgotUnavailable": "Laiškų siuntimas dar neįjungtas. Parašykite mums — slaptažodį pakeisime rankiniu būdu:",
+    "backToLogin": "Grįžti į prisijungimą",
+    "resetTitle": "Naujas slaptažodis",
+    "resetSub": "Nustatykite naują slaptažodį. Pakeitus jį, kituose įrenginiuose iš paskyros būsite atjungti.",
+    "newPassword": "Naujas slaptažodis",
+    "newPassword2": "Pakartokite slaptažodį",
+    "resetSubmit": "Išsaugoti slaptažodį",
+    "errMismatch": "Slaptažodžiai nesutampa.",
+    "errShort": "Slaptažodis turi būti bent 8 simbolių.",
+    "noToken": "Nuorodoje nėra kodo. Atidarykite visą nuorodą iš laiško arba paprašykite naujos.",
+    "askNewLink": "Paprašyti naujos nuorodos",
+    "verifyTitle": "El. pašto patvirtinimas",
+    "verifying": "Tikriname nuorodą…",
+    "toLogin": "Prisijungti",
+    "registeredCheckEmail": "Patikrinkite el. paštą",
+    "genericError": "Nepavyko. Patikrinkite interneto ryšį ir bandykite dar kartą."
   },
   "register": {
     "backHome": "Į pradžią",
@@ -412,6 +437,7 @@
       "noActiveProject": "Aktyvaus projekto nėra — pirmiausia atidarykite projektą",
       "signedInAs": "Prisijungta: {{email}}",
       "nustatymai": "Nustatymai",
+      "pagalba": "Pagalba",
       "atsijungti": "Atsijungti"
     }
   },
@@ -497,6 +523,7 @@
       "representativeHint": "Rodoma po įmonės pavadinimu pasiūlyme.",
       "vatRate": "PVM tarifas",
       "vatRateTitle": "Numatytasis PVM naujiems projektams. Standartinis — 21%; renovacijai taikomas atvirkštinis PVM.",
+      "vatRateHint": "Taikoma naujiems projektams. Esamo projekto tarifą parinksite eksportuodami.",
       "removeLogoTitle": "Pašalinti logotipą — eksportuojamuose PDF jo nebeliks",
       "logo": "Logotipas",
       "logoAlt": "Logotipas",
@@ -1530,8 +1557,9 @@
     },
     "vatChoice": {
       "title": "PVM dokumente",
-      "standard": "Pridėti 21 % PVM",
-      "standardDesc": "Prie sumos pridedama 21 % PVM eilutė — įprastas atvejis.",
+      "standard": "Pridėti {{rate}} % PVM",
+      "rateTitle": "Tarifas:",
+      "standardDesc": "Prie sumos pridedama {{rate}} % PVM eilutė — įprastas atvejis. Tarifas išsaugomas šiam projektui.",
       "reverse": "Atvirkštinis PVM",
       "reverseDesc": "Užsakovas — PVM mokėtojas ir PVM apskaičiuoja pats (PVMĮ 96 str.). PVM eilutė dokumente nespausdinama.",
       "fromLabel": "Atvirkštinį PVM parinko programa, nes projektas atpažintas kaip renovacija. Patikrinkite ir pasirinkite patys."
@@ -1556,7 +1584,7 @@
     },
     "exportInternal": {
       "label": "Vidinė kopija su pastabomis",
-      "desc": "Prideda lapą su programos pastabomis jums ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
+      "desc": "Prideda lapą su programos pastabomis jums, lapą „Pakeitimų žurnalas“ (ką ir kada keitėte) ir, jei kainos išskaidytos, darbo ir medžiagų kainų stulpelius. Klientui siųskite failą be jų."
     },
     "samataTemplate": {
       "layoutLabel": "Išdėstymas",

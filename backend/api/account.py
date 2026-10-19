@@ -141,6 +141,8 @@ def api_delete_account(request: Request,
         deleted += _delete_projects_of(uid)
     except Exception:  # noqa: BLE001
         log.exception("account deletion: project sweep failed for user=%s", uid)
+    # v3 M8: what is keyed by the account itself (per-owner architect legends).
+    project_purge.purge_account_files(uid)
     # The session cookie is cleared in this response; every other session of
     # his died with the session_version bump in db.delete_account.
     request.session.clear()

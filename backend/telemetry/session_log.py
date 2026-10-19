@@ -33,7 +33,16 @@ class SessionRecord:
 
 
 def _log_path() -> Path:
-    return Path(os.environ.get("TELEMETRY_LOG_PATH", _DEFAULT_PATH))
+    """TELEMETRY_LOG_PATH wins; else SAMATU_DATA_DIR/telemetry/session_log.jsonl
+    (the persistent disk — audit backend-security-11: on Railway the old
+    relative path was wiped by every deploy); else the legacy relative path."""
+    explicit = os.environ.get("TELEMETRY_LOG_PATH")
+    if explicit:
+        return Path(explicit)
+    base = os.environ.get("SAMATU_DATA_DIR")
+    if base:
+        return Path(base) / "telemetry" / "session_log.jsonl"
+    return _DEFAULT_PATH
 
 
 def append_session(record: SessionRecord) -> None:
