@@ -96,7 +96,7 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
             type="button"
             disabled={busy}
             onClick={run}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-body font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-[2px] bg-accent-2 px-4 text-body font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {busy ? t('project.freeReread.running') : t('project.freeReread.cta')}
@@ -115,7 +115,7 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
         </>
       )}
     >
-      <p className="max-w-[80ch] leading-snug text-[hsl(var(--ink-2))]">{t('project.freeReread.body')}</p>
+      <p className="max-w-[80ch] leading-snug text-ink-2">{t('project.freeReread.body')}</p>
     </Notice>
   );
 }

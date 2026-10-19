@@ -145,10 +145,10 @@ function BackupPanel({ backup, storageBackend }) {
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${
             bad
               ? 'border-destructive/30 bg-destructive/10 text-destructive'
-              : 'border-[hsl(var(--accent-2)/0.35)] bg-[hsl(var(--accent-2)/0.08)] text-[hsl(var(--accent-2))]'
+              : 'border-accent-2/35 bg-accent-2/[0.08] text-accent-2'
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${bad ? 'bg-destructive' : 'bg-[hsl(var(--accent-2))]'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full ${bad ? 'bg-destructive' : 'bg-accent-2'}`} />
           {bad ? t('admin.health.backup.statusBad') : t('admin.health.backup.statusOk')}
         </span>
       </div>

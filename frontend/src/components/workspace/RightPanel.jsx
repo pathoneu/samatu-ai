@@ -1,6 +1,6 @@
 // frontend/src/components/workspace/RightPanel.jsx
 /**
- * Sprint 3-B simplification: dropped the 3-tab strip (✨ AI / 📋 Kiekiai
+ * Sprint 3-B simplification: dropped the 3-tab strip (AI / 📋 Kiekiai
  * / 📊 Suvestinė) in favour of a single Kiekiai panel. AiPanel and
  * SuvestinePanel files retained — Sprint 4 may resurrect the tabs once
  * those views actually carry their weight.

@@ -67,9 +67,9 @@ function ConfidenceDot({ level }) {
   const { t } = useTranslation();
   if (!level) return null;
   const map = {
-    high:   { color: 'bg-green-500',  emoji: '🟢', title: t('project.interior.confHigh') },
-    medium: { color: 'bg-yellow-400', emoji: '🟡', title: t('project.interior.confMedium') },
-    low:    { color: 'bg-red-500',    emoji: '🔴', title: t('project.interior.confLow') },
+    high:   { color: 'bg-conf-high',  emoji: '🟢', title: t('project.interior.confHigh') },
+    medium: { color: 'bg-conf-med',  emoji: '🟡', title: t('project.interior.confMedium') },
+    low:    { color: 'bg-conf-low',   emoji: '🔴', title: t('project.interior.confLow') },
   };
   const c = map[level];
   if (!c) return null;
@@ -651,8 +651,8 @@ function DarbuSarasas({ items }) {
                               onClick={() => markFeedback(it.kategorija, 'ok')}
                               className={`p-1 rounded border text-xs transition-colors ${
                                 fb === 'ok'
-                                  ? 'bg-green-500/20 border-green-500 text-green-600 dark:text-green-400'
-                                  : 'border-border text-muted-foreground hover:border-green-500/50 hover:text-green-600'
+                                  ? 'bg-conf-high/20 border-conf-high text-conf-high'
+                                  : 'border-border text-muted-foreground hover:border-conf-high/50 hover:text-conf-high'
                               }`}
                               title={t('project.interior.feedbackOk')}
                             >
@@ -662,8 +662,8 @@ function DarbuSarasas({ items }) {
                               onClick={() => markFeedback(it.kategorija, 'bad')}
                               className={`p-1 rounded border text-xs transition-colors ${
                                 fb === 'bad'
-                                  ? 'bg-red-500/20 border-red-500 text-red-600 dark:text-red-400'
-                                  : 'border-border text-muted-foreground hover:border-red-500/50 hover:text-red-600'
+                                  ? 'bg-destructive/20 border-destructive text-destructive'
+                                  : 'border-border text-muted-foreground hover:border-destructive/50 hover:text-destructive'
                               }`}
                               title={t('project.interior.feedbackBad')}
                             >
@@ -1336,7 +1336,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
           {/* Low-confidence banner */}
           {project.confidence === 'low' && (
-            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
+            <div className="flex items-center gap-2 p-3 bg-conf-med/10 border border-conf-med/30 rounded-lg text-sm text-foreground">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>
                 {t('project.interior.lowConf')}
@@ -1347,7 +1347,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
           {/* Window fallback warning */}
           {prielaidos.langai_fallback && (
-            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-300">
+            <div className="flex items-start gap-2 p-3 bg-conf-med/10 border border-conf-med/30 rounded-lg text-sm text-foreground">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">{t('project.interior.windowsNotFound')}</p>
@@ -1365,10 +1365,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                 const text = typeof n === 'string' ? n : (n?.message || JSON.stringify(n));
                 const level = typeof n === 'object' ? (n?.level || 'INFO') : 'INFO';
                 const colorClass = level === 'ERROR'
-                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                  ? 'bg-conf-low/10 border-conf-low/30 text-foreground'
                   : level === 'WARNING'
-                    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
-                    : 'bg-blue-500/10 border-blue-500/30 text-blue-300';
+                    ? 'bg-conf-med/10 border-conf-med/30 text-foreground'
+                    : 'bg-ov-proposed/10 border-ov-proposed/30 text-foreground';
                 return (
                   <div key={i} className={`flex items-center gap-2 p-2.5 border rounded-lg text-xs ${colorClass}`}>
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1553,7 +1553,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               </span>
             </div>
             {(!project.v8_rooms || project.v8_rooms.length === 0) && (
-              <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg text-xs text-amber-900 dark:text-amber-200">
+              <div className="mb-3 p-3 bg-conf-med/5 border border-conf-med/30 rounded-lg text-xs text-foreground">
                 {t('project.interior.noRooms')}
               </div>
             )}
@@ -1762,10 +1762,10 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
 
           {/* ── Task 6: Forgotten items warnings ───────────────────────────── */}
           {perspejimani.filter(w => !dismissedWarnings.has(w.id)).length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-xl p-4">
+            <div className="border border-conf-med/30 bg-conf-med/5 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
-                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t('project.interior.checkReminder')}</span>
+                <ShieldAlert className="w-4 h-4 text-conf-med shrink-0" />
+                <span className="text-sm font-semibold text-foreground">{t('project.interior.checkReminder')}</span>
               </div>
               <div className="space-y-2">
                 {perspejimani
@@ -1774,13 +1774,13 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                     <div key={w.id} className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
                         <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
-                          w.kategorija === 'kritiška' ? 'bg-red-500' :
-                          w.kategorija === 'techninė' ? 'bg-blue-500' : 'bg-amber-500'
+                          w.kategorija === 'kritiška' ? 'bg-conf-low' :
+                          w.kategorija === 'techninė' ? 'bg-ov-proposed' : 'bg-conf-med'
                         }`} />
                         <div>
-                          <p className="text-xs text-amber-800 dark:text-amber-300">{w.tekstas}</p>
+                          <p className="text-xs text-foreground">{w.tekstas}</p>
                           {(w.patalpos || []).length > 0 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                            <p className="text-xs text-conf-med mt-0.5">
                               {w.patalpos.join(', ')}
                             </p>
                           )}
@@ -1788,7 +1788,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
                       </div>
                       <button
                         onClick={() => setDismissedWarnings(prev => new Set([...prev, w.id]))}
-                        className="shrink-0 text-amber-400 hover:text-amber-600 dark:hover:text-amber-200"
+                        className="shrink-0 text-conf-med/70 hover:text-conf-med"
                         title={t('project.interior.close')}
                       >
                         <X className="w-3.5 h-3.5" />

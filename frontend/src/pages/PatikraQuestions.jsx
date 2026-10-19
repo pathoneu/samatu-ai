@@ -46,6 +46,7 @@ import { PANEL_TWO_COLUMNS_MIN, useWorkspaceHost } from '@/components/project/wo
 import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ReadRating from '@/components/project/ReadRating';
 import RemindersNotice from '@/components/project/RemindersNotice';
+import NoticeFold from '@/components/project/NoticeFold';
 import RoomDrawingPane from '@/components/roomsheet/RoomDrawingPane';
 import FixConsequence from '@/components/roomsheet/FixConsequence';
 import {
@@ -488,7 +489,7 @@ export default function PatikraQuestions() {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-[hsl(var(--primary))] px-4 py-3 text-white">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-primary px-4 py-3 text-white">
         <div className="min-w-0 flex-1">
           <h1 className="text-[18px] font-semibold leading-snug">
             {loadState !== 'ready'
@@ -510,11 +511,15 @@ export default function PatikraQuestions() {
         )}
       </div>
 
-      <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
-      {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
-      <ReadRating project={project} className="mx-4 mt-3" />
-      {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
-      <RemindersNotice projectId={id} where="patikra" reloadKey={project?.updated_at || 0} className="mx-4 mt-3" />
+      {/* two or more of these fold into one „Pranešimai (N)" line that names them (v3 W6-A: at 1280×720
+          they pushed the first question below the panel); what the last answer moved stays outside */}
+      <NoticeFold className="mx-4 mt-3">
+        <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
+        {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
+        <ReadRating project={project} className="mx-4 mt-3" />
+        {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
+        <RemindersNotice projectId={id} where="patikra" reloadKey={project?.updated_at || 0} className="mx-4 mt-3" />
+      </NoticeFold>
 
       {/* what the LAST answer moved — above the next question, with the way back */}
       {lastFix && (
@@ -538,12 +543,12 @@ export default function PatikraQuestions() {
                     onClick={() => setCurrentId(q.id)}
                     aria-current={isCurrent ? 'step' : undefined}
                     className={`flex w-full items-start gap-2 rounded-[2px] border px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                      ${isCurrent ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2)/0.08)]' : 'border-border bg-card hover:bg-muted'}`}
+                      ${isCurrent ? 'border-accent-2 bg-accent-2/[0.08]' : 'border-border bg-card hover:bg-muted'}`}
                     data-testid={`question-rail-${q.id}`}
                   >
                     {isSkipped
                       ? <MinusCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      : <CircleHelp className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--conf-med))]" aria-hidden="true" />}
+                      : <CircleHelp className="mt-0.5 h-5 w-5 shrink-0 text-conf-med" aria-hidden="true" />}
                     <span className="min-w-0">
                       <span className="block text-[12px] font-mono text-muted-foreground">
                         {t('project.questions.step', { index: i + 1, total: questions.length })}
@@ -557,8 +562,8 @@ export default function PatikraQuestions() {
             })}
           </ol>
           {loadState === 'ready' && data && (
-            <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-[hsl(var(--ink-2))]">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--accent-2))]" aria-hidden="true" />
+            <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-ink-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent-2" aria-hidden="true" />
               {t('project.questions.readNote', { read: data.read, total: data.read + data.asked, count: data.rooms })}
             </p>
           )}
@@ -586,7 +591,7 @@ export default function PatikraQuestions() {
               <h2 className="text-[20px] font-semibold">
                 {t(questions.length === 0 ? 'project.questions.doneTitle' : 'project.questions.doneSkippedTitle')}
               </h2>
-              <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-[hsl(var(--ink-2))]">
+              <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink-2">
                 {questions.length === 0 ? t('project.questions.doneBody') : t('project.questions.doneSkipped', { count: progress.skipped })}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -607,7 +612,7 @@ export default function PatikraQuestions() {
                 data-testid={`question-card-${current.id}`}
               >
                 <h2 className="text-[20px] font-semibold leading-snug">{cleanUserText(current.title)}</h2>
-                <p className="mt-1 text-[15px] leading-relaxed text-[hsl(var(--ink-2))]">{cleanUserText(current.why)}</p>
+                <p className="mt-1 text-[15px] leading-relaxed text-ink-2">{cleanUserText(current.why)}</p>
 
                 <div className="mt-4">
                   {current.answer === 'number_all' && <NumberAllBody question={current} busy={busy} onAnswer={onBodyAnswer} />}
@@ -625,7 +630,7 @@ export default function PatikraQuestions() {
                       <p className="text-[15px] font-semibold">
                         <span className="font-mono text-muted-foreground">{outlineItem.room_nr}</span> {outlineItem.room_name}
                       </p>
-                      <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+                      <p className="text-[14px] leading-snug text-ink-2">
                         {t('project.questions.outlineSharedWith', {
                           nr: outlineItem.room_nr, su: join.su,
                           a: ltNumber(Number(join.rooms?.[outlineItem.room_nr]?.plotas_m2), 2), tableA: ltNumber(Number(join.rooms?.[outlineItem.room_nr]?.plotas_uzrasas_m2), 2),
@@ -647,7 +652,7 @@ export default function PatikraQuestions() {
                           </button>
                         </div>
                       ) : (
-                        <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">{t('project.questions.splitDrawing')}</p>
+                        <p className="text-[14px] leading-snug text-ink-2">{t('project.questions.splitDrawing')}</p>
                       )}
                     </div>
                   )}
@@ -668,14 +673,14 @@ export default function PatikraQuestions() {
                               return (
                                 <li key={item.room_nr} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-border px-3 py-2 first:border-t-0">
                                   <span className="text-[15px] font-semibold"><span className="font-mono text-muted-foreground">{item.room_nr}</span> {item.room_name}</span>
-                                  <span className="font-mono text-[14px] text-[hsl(var(--ink-2))]">
+                                  <span className="font-mono text-[14px] text-ink-2">
                                     {t('project.questions.splitArea', { area: ltNumber(k.plotas_m2, 2), table: ltNumber(k.plotas_uzrasas_m2, 2) })}
                                   </span>
                                 </li>
                               );
                             })}
                           </ul>
-                          <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+                          <p className="text-[14px] leading-snug text-ink-2">
                             {t(proposed.pagal === 'kampas' ? 'project.questions.splitByCorner' : 'project.questions.splitByAreas')}
                           </p>
                           <div className="flex flex-wrap gap-2">
@@ -691,7 +696,7 @@ export default function PatikraQuestions() {
                         </>
                       )}
                       {drawing && (
-                        <p className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+                        <p className="text-[14px] leading-snug text-ink-2">
                           {proposed ? t('project.questions.splitDrawing') : t('project.questions.splitNoProposal')}
                         </p>
                       )}

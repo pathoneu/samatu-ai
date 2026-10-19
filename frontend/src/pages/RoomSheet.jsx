@@ -71,7 +71,7 @@ import { roomPickerItems, typedDigit } from '@/lib/roomSheetNav';
 import { openLayerInDocument } from '@/lib/escOrder';
 
 const BIG = 'inline-flex min-h-[52px] w-full items-center justify-center gap-2 '
-  + 'rounded-[2px] bg-[hsl(var(--accent-2))] px-4 text-[16px] font-semibold '
+  + 'rounded-[2px] bg-accent-2 px-4 text-[16px] font-semibold '
   + 'text-white hover:opacity-95 disabled:opacity-50 focus-visible:outline-none '
   + 'focus-visible:ring-2 focus-visible:ring-ring';
 
@@ -475,12 +475,12 @@ export default function RoomSheet() {
             />
           </div>
           {ripple && (
-            <p className="mt-3 rounded-[2px] bg-[hsl(var(--surface-2))] px-3 py-2 text-[14px]">
+            <p className="mt-3 rounded-[2px] bg-surface-2 px-3 py-2 text-[14px]">
               {ripple}
             </p>
           )}
           <div className="mt-4">
-            <p className="mb-2 text-[15px] text-[hsl(var(--ink-2))]">
+            <p className="mb-2 text-[15px] text-ink-2">
               {t('project.roomSheet.finishBody', {
                 verified: progress.verified, total: progress.total,
               })}
@@ -530,7 +530,7 @@ export default function RoomSheet() {
       />
       {/* What THIS room puts into the sąmata — before any row is opened. */}
       {totals.length > 0 && (
-        <div className="mx-4 mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-[hsl(var(--ink-2))]" data-testid="room-totals">
+        <div className="mx-4 mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-ink-2" data-testid="room-totals">
           <span className="font-semibold uppercase tracking-wide text-muted-foreground">{t('project.roomSheet.totalsTitle')}</span>
           {totals.map((x) => (
             <span key={x.key}>
@@ -664,7 +664,7 @@ export default function RoomSheet() {
 
               {facts?.ledger_available !== false && quantities.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3">
-                  <p className="max-w-[46ch] text-[15px] leading-snug text-[hsl(var(--ink-2))]">
+                  <p className="max-w-[46ch] text-[15px] leading-snug text-ink-2">
                     {t('project.roomSheet.quantitiesSummary', {
                       facts: `${factList.length} ${ltPlural(factList.length,
                         t('project.roomSheet.factNounOne'), t('project.roomSheet.factNounFew'),
@@ -687,7 +687,7 @@ export default function RoomSheet() {
 
               {facts?.ledger_available === false ? (
                 <div className="px-4 pb-3">
-                  <p className="text-[15px] leading-snug text-[hsl(var(--ink-2))]">
+                  <p className="text-[15px] leading-snug text-ink-2">
                     {t('project.roomSheet.noLedger')}
                   </p>
                   <button
@@ -723,7 +723,7 @@ export default function RoomSheet() {
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {excluded.map((e) => (
-                      <li key={e.row_id} className="text-[14px] leading-snug text-[hsl(var(--ink-2))]">
+                      <li key={e.row_id} className="text-[14px] leading-snug text-ink-2">
                         {t('project.roomSheet.excludedRow', {
                           name: e.aprasymas, reason: e.reason,
                         })}
@@ -734,7 +734,7 @@ export default function RoomSheet() {
               )}
 
               {ripple && (
-                <p className="mx-4 my-3 rounded-[2px] bg-[hsl(var(--surface-2))] px-3 py-2 text-[14px]">
+                <p className="mx-4 my-3 rounded-[2px] bg-surface-2 px-3 py-2 text-[14px]">
                   {ripple}
                 </p>
               )}
@@ -757,7 +757,7 @@ export default function RoomSheet() {
                   <button
                     type="button"
                     onClick={advance}
-                    className="min-h-[44px] px-2 text-[14px] font-semibold text-[hsl(var(--accent-2))] underline-offset-2 hover:underline"
+                    className="min-h-[44px] px-2 text-[14px] font-semibold text-accent-2 underline-offset-2 hover:underline"
                   >
                     {t('project.roomSheet.later')}
                   </button>

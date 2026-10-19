@@ -2000,10 +2000,10 @@
   },
   "workspace": {
     "search": "🔍 Search",
-    "aiRun": "✨ Pathon",
+    "aiRun": "Pathon",
     "ai": {
       "running": "⏳ Reading…",
-      "run": "✨ Run Pathon",
+      "run": "Run Pathon",
       "desc": "Every page will be looked at and the KŽ rows filled in. Rows you 🔒 locked stay untouched.",
       "recentRuns": "Recent runs",
       "noRuns": "No runs yet.",

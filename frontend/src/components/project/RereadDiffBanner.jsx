@@ -132,7 +132,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
     reads.length > 0 && t('project.reread.chipReads', { list: reads.join(', ') }),
   ].filter(Boolean).join(' · ');
   const tone = empty ? 'info' : 'warning';
-  const linkBtn = 'shrink-0 inline-flex min-h-[32px] items-center gap-1 rounded px-1 font-medium text-[hsl(var(--accent-2))] underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60';
+  const linkBtn = 'shrink-0 inline-flex min-h-[32px] items-center gap-1 rounded px-1 font-medium text-accent-2 underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60';
   const actions = (
     <>
       <button

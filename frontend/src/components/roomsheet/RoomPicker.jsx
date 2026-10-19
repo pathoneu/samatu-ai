@@ -45,7 +45,7 @@ export default function RoomPicker({ items, index, total, onPick, className = ''
               data-testid={`room-picker-${it.nr}`}
               data-state-word={it.state}
             >
-              <Icon className={`mt-1 h-3.5 w-3.5 shrink-0 ${it.state === 'checked' ? 'text-[hsl(var(--accent-2))]' : 'text-muted-foreground'}`} aria-hidden="true" />
+              <Icon className={`mt-1 h-3.5 w-3.5 shrink-0 ${it.state === 'checked' ? 'text-accent-2' : 'text-muted-foreground'}`} aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="font-mono text-muted-foreground">{it.nr}</span> {it.name}
                 <span className="block text-[14px] font-normal text-muted-foreground">

@@ -258,7 +258,7 @@ export function SheetViewer({ cropUrl, alt, rect }) {
               <span
                 aria-hidden="true"
                 data-testid="sheet-outline"
-                className="pointer-events-none absolute rounded-[2px] border-2 border-[hsl(var(--accent-2))]"
+                className="pointer-events-none absolute rounded-[2px] border-2 border-accent-2"
                 style={{
                   left: `${rect[0] * 100}%`, top: `${rect[1] * 100}%`,
                   width: `${(rect[2] - rect[0]) * 100}%`, height: `${(rect[3] - rect[1]) * 100}%`,
@@ -329,7 +329,7 @@ export default function EvidenceCrop({
           onClick={() => setOpen(true)}
           aria-label={t('project.roomSheet.cropEnlarge', { page: page ?? '' })}
           title={t('project.roomSheet.cropEnlarge', { page: page ?? '' })}
-          className="group relative block w-full overflow-hidden rounded-[2px] border border-border bg-card text-left hover:border-[hsl(var(--accent-2))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-2))]"
+          className="group relative block w-full overflow-hidden rounded-[2px] border border-border bg-card text-left hover:border-accent-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-2"
         >
           {!loaded && (
             <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
@@ -337,7 +337,7 @@ export default function EvidenceCrop({
           {image}
           <span
             aria-hidden="true"
-            className="absolute bottom-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-[2px] border border-border bg-card/90 text-[hsl(var(--ink-2))] opacity-80 group-hover:opacity-100"
+            className="absolute bottom-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-[2px] border border-border bg-card/90 text-ink-2 opacity-80 group-hover:opacity-100"
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </span>

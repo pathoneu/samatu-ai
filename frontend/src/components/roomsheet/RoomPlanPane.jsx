@@ -117,7 +117,7 @@ export default function RoomPlanPane({
               onClick={() => setOpen(true)}
               aria-label={t('project.roomSheet.planEnlarge')}
               title={t('project.roomSheet.planEnlarge')}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[2px] border border-border bg-card text-[hsl(var(--ink-2))] hover:bg-muted"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-[2px] border border-border bg-card text-ink-2 hover:bg-muted"
             >
               <Maximize2 className="h-4 w-4" />
             </button>
@@ -175,7 +175,7 @@ export default function RoomPlanPane({
           <span
             key={`lbl-${m.key}`}
             className={`pointer-events-none absolute -translate-y-full rounded-[2px] px-1 font-mono text-meta uppercase leading-tight tracking-wide
-              ${m.key === activeFactKey ? 'bg-[hsl(var(--destructive))] text-white' : 'bg-card/90 text-[hsl(var(--destructive))]'}`}
+              ${m.key === activeFactKey ? 'bg-destructive text-white' : 'bg-card/90 text-destructive'}`}
             style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}
           >
             {t(`project.roomSheet.${FACT_LABEL_KEY[m.key] || 'factPlotas'}`)}

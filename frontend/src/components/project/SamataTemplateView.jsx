@@ -193,7 +193,7 @@ function Row({ row, darbai, onDarbaiChange, onOpenLedger }) {
             type="button"
             onClick={accept}
             title={t('project.samataTemplate.acceptTitle')}
-            className={`${SMALL_BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white hover:opacity-95 mr-1`}
+            className={`${SMALL_BTN} border-accent-2 bg-accent-2 text-white hover:opacity-95 mr-1`}
             style={{ minHeight: 44, fontSize: 14 }}
           >
             <Check className="w-4 h-4" />

@@ -35,7 +35,7 @@ export default function RoomScopeSwitch({ included, familiesOff = [], busy = fal
       onClick={() => onChange?.(on)}
       className={`inline-flex min-h-[44px] items-center rounded-[2px] border px-4 text-[15px] font-semibold ${
         active
-          ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white'
+          ? 'border-accent-2 bg-accent-2 text-white'
           : 'border-border bg-card hover:bg-muted disabled:opacity-60'
       }`}
     >
@@ -70,11 +70,11 @@ export default function RoomScopeSwitch({ included, familiesOff = [], busy = fal
                   disabled={busy}
                   onClick={() => onFamily(fam, !on)}
                   className={`inline-flex min-h-[40px] items-center gap-2 rounded-[2px] border px-3 text-[14px] ${
-                    on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))]/10 font-semibold' : 'border-border bg-card text-muted-foreground'
+                    on ? 'border-accent-2 bg-accent-2/10 font-semibold' : 'border-border bg-card text-muted-foreground'
                   }`}
                 >
                   <span aria-hidden className={`inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm border text-meta ${
-                    on ? 'border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white' : 'border-border'}`}>
+                    on ? 'border-accent-2 bg-accent-2 text-white' : 'border-border'}`}>
                     {on ? '✓' : ''}
                   </span>
                   {t(`newProject.q.family.${fam}`)}

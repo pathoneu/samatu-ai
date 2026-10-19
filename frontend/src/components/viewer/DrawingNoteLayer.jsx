@@ -55,7 +55,7 @@ function NoteEditor({ initial = '', onSave, onCancel }) {
       />
       <p className="mt-1 text-[14px] text-muted-foreground">Enter — išsaugoti · Esc — atšaukti</p>
       <div className="mt-1.5 flex gap-1.5">
-        <button type="submit" className={`${BTN} border-[hsl(var(--accent-2))] bg-[hsl(var(--accent-2))] text-white`} disabled={!text.trim()} data-testid="note-save">Išsaugoti</button>
+        <button type="submit" className={`${BTN} border-accent-2 bg-accent-2 text-white`} disabled={!text.trim()} data-testid="note-save">Išsaugoti</button>
         <button type="button" className={BTN} onClick={onCancel}>Atšaukti</button>
       </div>
     </form>
@@ -146,7 +146,7 @@ export default function DrawingNoteLayer({ page, measurements = [], adapter, onC
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); setOpenId(open ? null : n.id); setEditing(false); }}
-              className="-translate-x-1/2 -translate-y-full inline-flex items-center gap-1 rounded-[2px] border border-[hsl(var(--ink-2))] bg-card px-1.5 py-0.5 text-[14px] font-semibold text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="-translate-x-1/2 -translate-y-full inline-flex items-center gap-1 rounded-[2px] border border-ink-2 bg-card px-1.5 py-0.5 text-[14px] font-semibold text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-expanded={open}
               aria-label={`Pastaba ${numbers.get(n.id) || ''}: ${n.text}`}
             >
@@ -182,7 +182,7 @@ export default function DrawingNoteLayer({ page, measurements = [], adapter, onC
         const p = at(draft);
         return (
           <div style={{ position: 'absolute', left: p.x, top: p.y, pointerEvents: 'auto' }}>
-            <span className="-translate-x-1/2 -translate-y-full absolute inline-flex items-center rounded-[2px] border border-dashed border-[hsl(var(--ink-2))] bg-card px-1.5 py-0.5" aria-hidden="true">
+            <span className="-translate-x-1/2 -translate-y-full absolute inline-flex items-center rounded-[2px] border border-dashed border-ink-2 bg-card px-1.5 py-0.5" aria-hidden="true">
               <StickyNote className="h-4 w-4" />
             </span>
             <div className="absolute left-0 top-1 z-10">

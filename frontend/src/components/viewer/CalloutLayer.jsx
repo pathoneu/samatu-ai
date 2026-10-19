@@ -76,7 +76,7 @@ export default function CalloutLayer({ documentId, projectId, page, version = ''
                 vocabulary) — visible on a busy plan, quiet on a clean one */}
             <span
               style={{ position: 'absolute', left: (w - textW) / 2, width: textW, top: (hitH - textH) / 2, height: textH + 1 }}
-              className={`block rounded-[1px] border-b-2 ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} ${c.confidence === 'low' ? 'border-[hsl(var(--ov-estimated))]' : 'border-[hsl(var(--ov-read))]'} bg-[hsl(var(--ov-read)/0.10)] group-hover/callout:bg-[hsl(var(--ov-read)/0.22)] group-focus-visible/callout:bg-[hsl(var(--ov-read)/0.22)]`}
+              className={`block rounded-[1px] border-b-2 ${c.confidence === 'low' ? 'border-dashed' : 'border-solid'} ${c.confidence === 'low' ? 'border-ov-estimated' : 'border-ov-read'} bg-ov-read/10 group-hover/callout:bg-ov-read/[0.22] group-focus-visible/callout:bg-ov-read/[0.22]`}
             />
             {hover === i && (
               <span

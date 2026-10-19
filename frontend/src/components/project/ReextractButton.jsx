@@ -281,14 +281,14 @@ export default function ReextractButton({ project, onComplete }) {
   }
 
   return (
-    <div className="border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/40 rounded-lg p-3 max-w-md">
+    <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 max-w-md">
       <div className="flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+          <p className="text-sm font-medium text-amber-900">
             {t('project.reextract.confirmTitle')}
           </p>
-          <ul className="text-xs text-amber-800 dark:text-amber-300/80 mt-1 mb-3 space-y-0.5 list-disc pl-4">
+          <ul className="text-xs text-amber-800 mt-1 mb-3 space-y-0.5 list-disc pl-4">
             <li>{durationLine}</li>
             <li>{t('project.reextract.bullet2')}</li>
             <li>{t('project.reextract.bullet3')}</li>

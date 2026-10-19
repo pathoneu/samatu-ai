@@ -29,7 +29,7 @@ export default function ProjectRow({ project }) {
         {r.company && <span className="block truncate text-ui text-muted-foreground">{r.company}</span>}
       </span>
       <span className="flex items-center gap-1.5 text-ui text-foreground" data-testid="project-row-state">
-        {r.state === 'processing' && <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--accent-2))]" aria-hidden="true" />}
+        {r.state === 'processing' && <Loader2 className="h-4 w-4 animate-spin text-accent-2" aria-hidden="true" />}
         {stateText}
       </span>
       <span className="text-ui tabular-nums text-muted-foreground" title={t('dashboard.row.lastChangeTitle')}>{when(r.lastChange)}</span>
