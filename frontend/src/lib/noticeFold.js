@@ -30,3 +30,17 @@ export function foldLabel(testIds) {
   const names = testIds.map((id) => NOTICE_NAMES[id] || null).filter(Boolean);
   return { title: `Pranešimai (${testIds.length})`, names: names.join(' · ') };
 }
+
+// A notice that answers what he just did (the re-read's „Kas pasikeitė" with its „Atšaukti") opens the fold
+// when it ARRIVES or carries a NEW stamp (a later re-read: `data-notice-stamp`, the diff's time) — never on a page
+// load where it was already there — so the Undo of his action is on screen.
+export const OPENS_ON_ARRIVAL = new Set(['reread-diff-banner']);
+
+/**
+ * True when `next` holds an opens-on-arrival notice that `prev` did not. Entries are a notice's id, or
+ * `id@stamp` when it carries a stamp. prev null = the first look: false.
+ */
+export function opensOnArrival(prev, next) {
+  if (!Array.isArray(prev)) return false;
+  return (next || []).some((key) => OPENS_ON_ARRIVAL.has(String(key).split('@')[0]) && !prev.includes(key));
+}

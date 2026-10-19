@@ -171,6 +171,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
           onDismiss={dismiss}
           dismissLabel={t('project.reread.dismiss')}
           data-testid="reread-diff-banner"
+          data-notice-stamp={diff.at || undefined}
         >
           {summary}
           {/* the two buttons on their own row: beside the text they squeezed it to one word a line in the 340 px panel */}
@@ -195,6 +196,7 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
       onDismiss={dismiss}
       dismissLabel={t('project.reread.dismiss')}
       data-testid="reread-diff-banner"
+      data-notice-stamp={diff.at || undefined}
     >
       {empty && <p>{t('project.reread.nothing')}</p>}
 

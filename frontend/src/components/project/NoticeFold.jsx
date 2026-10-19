@@ -8,7 +8,7 @@
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { foldLabel, shouldFold } from '@/lib/noticeFold';
+import { foldLabel, opensOnArrival, shouldFold } from '@/lib/noticeFold';
 
 // A notice may sit in a spacing wrapper (ServerRefreshNotice, RereadDiffBanner's chip): its name is the first
 // test id inside it.
@@ -23,13 +23,20 @@ export default function NoticeFold({ children, className = '' }) {
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
+    let seen = null;   // null until the first look: what is there on load never opens the fold
     const sync = () => {
       const next = presentIds(el);
+      const stamped = [...el.children].map((c, i) => {
+        const stamp = c.getAttribute('data-notice-stamp') || c.querySelector('[data-notice-stamp]')?.getAttribute('data-notice-stamp');
+        return stamp ? `${next[i]}@${stamp}` : next[i];
+      });
+      if (opensOnArrival(seen, stamped)) setOpen(true);
+      seen = stamped;
       setIds((prev) => (prev.join('|') === next.join('|') ? prev : next));
     };
     sync();
     const mo = new MutationObserver(sync);
-    mo.observe(el, { childList: true });
+    mo.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-notice-stamp'] });
     return () => mo.disconnect();
   }, []);
 
