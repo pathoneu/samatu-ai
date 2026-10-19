@@ -63,6 +63,7 @@ import { flashCursorHint } from '@/lib/cursorHints';
 import { scaleGateFromScale } from '@/lib/scaleGate';
 import { pageScaleIn } from '@/lib/pageScales';
 import { focusFrameForRoom } from '@/lib/focusFrame';
+import { isNotNeeded, notNeededEntry, scaleForRatio } from '@/lib/scaleEntry';
 import ModePill from './ModePill';
 import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
@@ -817,6 +818,23 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [scaleCheck, setScaleCheck] = useState(null);
   // „Nustatyti mastelį“ next to the detection button (W5-B B7, #25): the scale chip's card opens (a nonce per click).
   const [scaleChipOpen, setScaleChipOpen] = useState(0);
+  // W5-B B8: a typed or picked 1:N becomes his scale for the sheet; „nereikia" marks a schedule or specification.
+  // Both are one undoable change (the toast's „Atšaukti" puts the sheet's previous entry back).
+  const putSheetScale = (page, entry, message) => {
+    const before = measureScales[page] ?? measureScales[String(page)] ?? null;
+    const set = (value) => setMeasureScales((prev) => {
+      const next = { ...prev };
+      delete next[String(page)];
+      if (value) next[page] = value; else delete next[page];
+      return next;
+    });
+    set(entry);
+    toast.success(message, { duration: 10_000, action: { label: 'Atšaukti', onClick: () => set(before) } });
+  };
+  const setSheetRatio = (page, ratio) => putSheetScale(page, scaleForRatio(ratio), `Lapo ${page} mastelis 1:${String(ratio).replace('.', ',')} — jūsų`);
+  const setSheetNotNeeded = (page, on) => putSheetScale(page, on ? notNeededEntry() : null,
+    on ? `Lapui ${page} mastelio nereikia — programa jo nebeklaus` : `Lapui ${page} mastelis vėl reikalingas`);
+  const sheetNotNeeded = (page) => isNotNeeded(measureScales[page] ?? measureScales[String(page)]);
   const confirmScales = (pages) => {
     setMeasureScales((prev) => confirmLaneScales(prev, pages, laneScales || {}));
     toast.success(pages.length > 1 ? `Patvirtinta ${pages.length} lapų mastelis` : `Patvirtintas ${pages[0]} lapo mastelis`, {
@@ -1709,7 +1727,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   documentId={activeDocumentId}
                   totalPages={totalPages}
                   addon={check ? null : renderToolbarAddon}
-                  addonContext={project ? (page) => ({ scaleGate: scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
+                  addonContext={project ? (page) => ({ scaleGate: sheetNotNeeded(page) ? { ok: true, state: 'nereikia', reason: null } : scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
                   searchOpen={searchOpen}
                   onToggleSearch={() => setSearchOpen((v) => !v)}
                   onCloseSearch={() => setSearchOpen(false)}
@@ -1804,6 +1822,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
                 onOverview={() => setScalesOpen(true)}
                 openNonce={scaleChipOpen}
+                pageSizeOf={(page) => documentState?.document?.pages?.[page - 1]?.size || null}
+                isNotNeeded={sheetNotNeeded}
+                onSetRatio={setSheetRatio}
+                onNotNeeded={setSheetNotNeeded}
               />
             )}
             {(scalesOpen || scaleCheck) && !check && project && (
