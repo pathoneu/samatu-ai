@@ -10,11 +10,13 @@
  * is then shown by RereadDiffBanner / RereadRoomNote, as after any re-read.
  *
  * v3 W1-C: drawn by the one Notice (info tone) like every other notice of the workspace.
+ * B1-D: one line with one button — the five-line paragraph pushed the Sąmata rows and the room list below the
+ * fold; what stays of it is the promise that his corrections and prices are kept.
  */
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, ScanLine, X } from 'lucide-react';
+import { Loader2, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 import Notice from '@/components/ui/Notice';
@@ -85,37 +87,27 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
 
   return (
     <Notice
+      compact
       tone="info"
       icon={ScanLine}
-      className={className}
-      title={t('project.freeReread.title')}
+      className={`w-full ${className}`}
+      title={t('project.freeReread.titleShort')}
+      onDismiss={busy ? null : later}
+      dismissLabel={t('project.freeReread.later')}
       data-testid="free-reread-banner"
       action={(
-        <>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={run}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-[2px] bg-accent-2 px-4 text-body font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {busy ? t('project.freeReread.running') : t('project.freeReread.cta')}
-          </button>
-          {!busy && (
-            <button
-              type="button"
-              onClick={later}
-              aria-label={t('project.freeReread.later')}
-              title={t('project.freeReread.later')}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-[2px] text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
-        </>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={run}
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-[2px] bg-accent-2 px-3 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {busy ? t('project.freeReread.running') : t('project.freeReread.cta')}
+        </button>
       )}
     >
-      <p className="max-w-[80ch] leading-snug text-ink-2">{t('project.freeReread.body')}</p>
+      {t('project.freeReread.bodyShort')}
     </Notice>
   );
 }

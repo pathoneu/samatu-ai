@@ -38,13 +38,14 @@ export default function Notice({
       <div
         role={t.role}
         data-notice={tone}
-        className={`inline-flex max-w-full items-center gap-2 rounded-panel border border-l-[3px] px-3 py-1.5 text-ui text-foreground ${className}`}
+        className={`inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-panel border border-l-[3px] px-3 py-1.5 text-ui text-foreground ${className}`}
         style={frame}
         {...rest}
       >
         <Icon className="h-4 w-4 shrink-0 self-start mt-0.5" style={{ color: colour() }} aria-hidden="true" />
-        {/* wraps, never truncates — in the 340 px panel the counts are the point of the line */}
-        <span className="min-w-0 flex-1 leading-snug">
+        {/* wraps, never truncates — in the 340 px panel the counts are the point of the line; an action that does
+            not fit beside the words goes under them (B1-D), never squeezes them to a word a line */}
+        <span className="min-w-[12rem] flex-1 leading-snug">
           {title && <span className="font-semibold">{title}</span>}
           {title && children ? <span className="text-muted-foreground" aria-hidden="true"> · </span> : null}
           {children}
