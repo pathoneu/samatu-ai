@@ -144,6 +144,21 @@ export function inferPlotasSource(room) {
   return 'eksplikacija';
 }
 
+const AREA_SOURCE_IDS = new Set(['eksplikacija', 'plano_uzrasas', 'manual_polygon', 'vision', 'dimension']);
+
+/**
+ * Where a room's area comes from, as the sentence the eksplikacija popover says it by (B2-B): the i18n id under
+ * `project.eksplikacijaPopover.source` and the sheet it was read on. Every source id goes through here — no
+ * screen prints the raw id („pdfplumber lentelė" was one). An id this does not know is „other"; no page → the
+ * `…NoPage` sentence.
+ */
+export function areaSourceSentence(room) {
+  const src = inferPlotasSource(room);
+  const id = AREA_SOURCE_IDS.has(src) ? src : 'other';
+  const page = Number(room?.eksplikacija_source_page ?? room?.page_nr ?? room?.puslapio_nr) || null;
+  return { id: page && id !== 'other' && id !== 'manual_polygon' ? id : `${id}NoPage`, page };
+}
+
 function collectSources(room) {
   const out = [];
   // 2026-05-06: plotas_saltinis (LT, set by deterministic eksplikacija reader)

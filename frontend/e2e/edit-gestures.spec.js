@@ -360,6 +360,53 @@ test.describe('W5-A editing gestures', () => {
     await expect.poll(async () => (await entry())?.plotis_mm).toBe(pick.el.plotis_mm);
   });
 
+  test('A9: a hidden door saved as „Durys" with only its width changed stays hidden and keeps its height (B2-B)', async ({ page }) => {
+    await openProject(page);
+    const { rooms } = await stored(page);
+    let pick = null;
+    for (const r of Object.values(rooms)) {
+      const angos = r._angos_sienose?.page === 1 ? r._angos_sienose.angos || [] : [];
+      angos.forEach((g, k) => {
+        if (pick || !Array.isArray(g.line_pct)) return;
+        const el = (r.elementai || []).find((e) => Array.isArray(e._anga_ks) && e._anga_ks.length === 1 && Number(e._anga_ks[0]) === k
+          && e.tipas === 'pasleptos_duris' && (Number(e.kiekis) || 1) === 1);
+        if (el) pick = { nr: String(r.nr), k, g, el };
+      });
+    }
+    test.skip(!pick, 'no hidden door standing alone in a wall opening on sheet 1');
+    const frameless = () => page.evaluate((id) => {
+      const raw = JSON.parse(localStorage.getItem('samatu_projects') || '[]');
+      const p = (Array.isArray(raw) ? raw : Object.values(raw)).find((x) => x.id === id);
+      const row = (p?.darbu_sarasas || []).find((r) => /beapvad/i.test(r.aprasymas || r.pavadinimas || ''));
+      return row ? Number(row.kiekis) : null;
+    }, PROJECT);
+    const rowBefore = await frameless();
+    const [[ax, ay], [bx, by]] = pick.g.line_pct;
+    const mx = (ax + bx) / 2; const my = (ay + by) / 2;
+    await bringIntoView(page, mx, my);
+    await page.keyboard.press('s');
+    await page.waitForTimeout(400);
+    await page.mouse.click(...Object.values(await at(page, mx, my)));
+    await expect(page.getByTestId('opening-popover')).toBeVisible();
+    await expect(page.getByTestId('opening-kind-durys')).toBeChecked();
+    const w = (pick.el.plotis_mm - 70) / 1000;
+    await page.getByTestId('opening-width').fill(w.toFixed(2).replace('.', ','));
+    await page.getByTestId('opening-width').press('Enter');
+    const entry = async () => ((await stored(page)).rooms[pick.nr].elementai || [])
+      .find((e) => Array.isArray(e._anga_ks) && e._anga_ks.map(Number).includes(pick.k));
+    await expect.poll(async () => (await entry())?.plotis_mm, { timeout: 20_000 }).toBe(pick.el.plotis_mm - 70);
+    const after = await entry();
+    expect(after.tipas).toBe('pasleptos_duris');
+    expect(after.aukstis_mm).toBe(pick.el.aukstis_mm);
+    if (rowBefore != null) {
+      // only the width moved: the frameless-door row loses exactly 0,07 m (w + 2h per door), not the height too
+      await expect.poll(frameless, { timeout: 20_000 }).toBeCloseTo(rowBefore - 0.07, 2);
+    }
+    note(`A9 paslėptos durys ${pick.nr}: plotis ${pick.el.plotis_mm} → ${after.plotis_mm} mm, aukštis ${after.aukstis_mm} mm, tipas ${after.tipas}; beapvadinėms ${rowBefore} → ${await frameless()} m`);
+    await toast(page, 'durys').getByRole('button', { name: 'Atšaukti' }).first().click();
+    await expect.poll(async () => (await entry())?.plotis_mm).toBe(pick.el.plotis_mm);
+  });
+
   test('A11: a rectangle in two clicks, an arc segment, a typed length; Ctrl+C / Ctrl+D / Ctrl+V', async ({ page }) => {
     await openProject(page);
     await bringIntoView(page, 0.6, 0.55);

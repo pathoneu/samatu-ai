@@ -89,7 +89,7 @@ def test_his_plus_on_a_window_that_stands_survives_two_recomputes():
         assert _pieces(room, "langas") == [(1, 1350, (), False), (2, 1350, (1, 0), False)]
     f = _angos(room)
     assert f["value"] == 4 and f["status"] == "assumed"                # 3 windows and the door
-    assert "1 langas sąraše, kuriam angos sienose nematau — patikrinkite patalpoje." in f["sentence"]
+    assert "1 langas sąraše, kuriam angos sienose nematau — jei jo nėra, sumažinkite langų skaičių." in f["sentence"]
     assert "tiek pat angų" not in f["sentence"]
 
 
@@ -126,7 +126,7 @@ def test_his_plus_on_a_door_he_added_from_an_opening_stays_as_a_door_no_opening_
         ur.reconcile_openings_with_walls([room])
         assert _units(room, "duris") == 2
         assert _pieces(room, "duris") == [(1, 800, (), True), (1, 800, (0,), False)]
-    assert "1 durys sąraše, kurioms angos sienose nematau — patikrinkite patalpoje." in _angos(room)["sentence"]
+    assert "1 durys sąraše, kurioms angos sienose nematau — jei jų nėra, sumažinkite durų skaičių." in _angos(room)["sentence"]
 
 
 def test_his_removal_still_holds_and_a_plus_still_releases_it():

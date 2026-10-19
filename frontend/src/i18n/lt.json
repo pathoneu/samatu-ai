@@ -784,7 +784,8 @@
       "planoUzrasasTitle": "Plotas užrašytas brėžinyje prie pačios patalpos ir perskaitytas iš PDF teksto. Spauskite → matysite užrašą.",
       "dimensionLabel": "iš dimensijos",
       "dimensionTitle": "Skaičius iš brėžinio dimensijos.",
-      "listHeaderHint": "spustelėkite plotą — matysite, iš kur jis",
+      "listHeaderHint": "Spustelėkite patalpos plotą — matysite, iš kurios lentelės eilutės ar plano užrašo jis paimtas.",
+      "listHeaderHelp": "Iš kur plotai",
       "areaButtonTitle": "Iš kur šis plotas — spustelėkite",
       "listHeader": {"eksplikacija": "Plotai iš eksplikacijos", "plano_uzrasas": "Plotai užrašyti plane", "manual_polygon": "Plotai iš jūsų kontūrų", "vision": "Plotai perskaityti iš brėžinio", "dimension": "Plotai iš matmenų"}
     },
@@ -1053,9 +1054,9 @@
     "freeReread": {
       "title": "Šį brėžinį galima perskaityti tiksliau — nemokamai",
       "body": "Nuo tada, kai projektas buvo nuskaitytas, programa išmoko iš paties brėžinio paimti sienų ilgius (sudeda plane užrašytus matmenis), tikslius patalpų kontūrus ir grindų dangas. Naujo nuskaitymo nereikia ir tai nieko nekainuoja. Jūsų pataisymai, kainos ir patikrintos patalpos lieka kaip yra.",
-      "titleShort": "Galima perskaityti tiksliau — nemokamai",
-      "bodyShort": "pataisymai ir kainos lieka",
-      "cta": "Perskaityti nemokamai",
+      "titleLine": "Tiksliau, nemokamai",
+      "ctaShort": "Perskaityti",
+      "ctaTitle": "Perskaityti brėžinį dar kartą — nemokamai; jūsų pataisymai, kainos ir patikrintos patalpos lieka",
       "running": "Skaitau brėžinį…",
       "later": "Ne dabar",
       "done_one": "Brėžinys perskaitytas. Iš {{count}} patalpos: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
@@ -1555,8 +1556,18 @@
       "nr": "nr {{nr}}",
       "area": "Plotas",
       "purpose": "Paskirtis",
-      "sourcePrefix": "Šaltinis: pdfplumber lentelė, psl. {{page}}",
-      "sourceSuffix": " · perskaityta iš lentelės"
+      "source": {
+        "eksplikacija": "Plotas perskaitytas iš brėžinio patalpų lentelės, {{page}} lapas.",
+        "eksplikacijaNoPage": "Plotas perskaitytas iš brėžinio patalpų lentelės.",
+        "plano_uzrasas": "Plotas užrašytas plane, {{page}} lapas.",
+        "plano_uzrasasNoPage": "Plotas užrašytas plane.",
+        "manual_polygonNoPage": "Plotas apskaičiuotas iš jūsų apvesto kontūro.",
+        "vision": "Plotas perskaitytas iš brėžinio, {{page}} lapas.",
+        "visionNoPage": "Plotas perskaitytas iš brėžinio.",
+        "dimension": "Plotas apskaičiuotas iš matmenų, {{page}} lapas.",
+        "dimensionNoPage": "Plotas apskaičiuotas iš matmenų.",
+        "otherNoPage": "Iš kur paimtas šis plotas, neužrašyta."
+      }
     },
     "workspace": {
       "measExportLabel": "Eksportuoti matavimus"

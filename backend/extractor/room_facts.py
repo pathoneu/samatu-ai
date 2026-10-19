@@ -1312,13 +1312,13 @@ def _held_back(tipas: str, listed: list[dict], openings: list[dict]) -> dict:
             same = "tai vienas iš tų langų" if n_open == 1 else "tai keli iš tų langų"
         else:
             same = "tai tas pats langas" if units == 1 else "tai tie patys langai"
-        fix = "jei langas kitas — pataisykite jo plotį patalpos lape."
+        fix = "jei langas kitas — spustelėkite jo angą brėžinyje ir įrašykite plotį."
     else:
         what = f"durys {sizes} neįstatytos į {'angą' if units == 1 else 'angas'}"
         left += _and_list([f"{_leads_to(o['i'])} ({lt_num(o['plotis_m'])} m)" for o in openings])
         same = ("tai tos pačios durys" if n_open <= units
                 else "viena iš jų ir yra tos durys" if units == 1 else "kai kurios iš jų ir yra tos durys")
-        fix = "jei durys kitos — pataisykite jų plotį patalpos lape."
+        fix = "jei durys kitos — spustelėkite jų angą brėžinyje ir įrašykite plotį."
     return {"tipas": tipas,
             "sentence": (f"Sąraše {what}, o sienose liko {left} — tikriausiai {same}, tik kito pločio. "
                          f"Patikrinkite brėžinyje; {fix}"),
@@ -1391,13 +1391,15 @@ def _against_the_walls_stood(openings: list[dict], listed_beyond: set[int], stoo
     # a held-back door sentence names the doors no opening backs itself — it takes the plain count's place
     parts += [w["sentence"] for w in withheld]
     if unbacked and not held_doors:
-        parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — patikrinkite patalpoje.")
+        parts.append(f"{unbacked} {'durys sąraše, kurioms' if unbacked == 1 else 'durys sąraše, kurioms'} angos sienose nematau — jei jų nėra, sumažinkite durų skaičių.")
     # …and the listed windows no opening took, with no opening left to name beside them (2026-10-06: a window
     # he added with „+" where the walls have no free opening is kept, not cut — and said, not „tiek pat")
     loose = _loose_windows(unplaced_windows) if not held_windows else 0
     if loose:
         which = "kuriam" if element_label("langas", loose) == "langas" else "kuriems"
-        parts.append(f"{loose} {element_label('langas', loose)} sąraše, {which} angos sienose nematau — patikrinkite patalpoje.")
+        it = "jo" if which == "kuriam" else "jų"
+        parts.append(f"{loose} {element_label('langas', loose)} sąraše, {which} angos sienose nematau — "
+                     f"jei {it} nėra, sumažinkite langų skaičių.")
     if not suggestions and not unbacked and not loose and not named and not withheld and not stood.get("removed"):
         parts = [f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje."]
     return (" ".join(parts) + _drawn_said(stood) + tail_beyond, bool(suggestions or unbacked or withheld or loose),
@@ -1436,7 +1438,7 @@ def _against_the_walls(per_type: dict[str, int], openings: list[dict], listed_be
         return f"Sienose tiek pat angų: {listed} — pažymėtos brėžinyje.{tail_beyond}", False, []
     if n < counted:
         return (f"Sienose matyti {n} {_anga_word(n)}: {listed}; kitų angų sienos nerodo — "
-                f"patikrinkite patalpoje.{tail_beyond}"), False, []
+                f"jei jų tikrai nėra, sumažinkite skaičių.{tail_beyond}"), False, []
     suggestions = []
     gaps = []
     if doors == 0 and inside:
@@ -1544,8 +1546,8 @@ def _fact_angos(project: dict, room: dict, region: list[float] | None) -> dict:
         kind = "duru_zinynas"
     else:
         sentence = ("Durys ir langai suskaičiuoti plane. Brėžinys jų vietos "
-                    "nenurodo, todėl pažymėti negaliu — perskaičiuokite "
-                    "patalpoje.")
+                    "nenurodo, todėl pažymėti negaliu — jei skaičius kitas, "
+                    "įrašykite jį čia.")
         kind = "planas"
     # Deliberately the ROOM's page and region, not the žiniaraštis: the count
     # is what he checks, and he checks it on his own room.

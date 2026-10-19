@@ -12,6 +12,7 @@
  * v3 W1-C: drawn by the one Notice (info tone) like every other notice of the workspace.
  * B1-D: one line with one button — the five-line paragraph pushed the Sąmata rows and the room list below the
  * fold; what stays of it is the promise that his corrections and prices are kept.
+ * B2-B: one line at 340 px — „Tiksliau, nemokamai" + [icon] „Perskaityti" + ✕; the promise is the button's title.
  */
 
 import { useEffect, useState } from 'react';
@@ -88,10 +89,11 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
   return (
     <Notice
       compact
+      oneLine
       tone="info"
-      icon={ScanLine}
+      icon={false}
       className={`w-full ${className}`}
-      title={t('project.freeReread.titleShort')}
+      title={t('project.freeReread.titleLine')}
       onDismiss={busy ? null : later}
       dismissLabel={t('project.freeReread.later')}
       data-testid="free-reread-banner"
@@ -100,14 +102,13 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
           type="button"
           disabled={busy}
           onClick={run}
-          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-[2px] bg-accent-2 px-3 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title={t('project.freeReread.ctaTitle')}
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-[2px] bg-accent-2 px-2 text-ui font-semibold text-white hover:opacity-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {busy ? t('project.freeReread.running') : t('project.freeReread.cta')}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ScanLine className="h-4 w-4" aria-hidden="true" />}
+          {busy ? t('project.freeReread.running') : t('project.freeReread.ctaShort')}
         </button>
       )}
-    >
-      {t('project.freeReread.bodyShort')}
-    </Notice>
+    />
   );
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT, inferPlotasSource, dominantAreaSource,
+  computeAreaConfidence, AREA_AGREEMENT_TOLERANCE_PCT, inferPlotasSource, dominantAreaSource, areaSourceSentence,
 } from './areaConfidence.js';
 
 test('computeAreaConfidence: room with eksplikacija + agreeing manual polygon → high', () => {
@@ -126,4 +126,27 @@ test('dominantAreaSource: the source most rooms share, said once in the list hea
   assert.equal(dominantAreaSource([plan, eks]), 'plano_uzrasas', 'a tie goes to the source met first');
   assert.equal(dominantAreaSource([{ plotas_m2: null }, {}]), null);
   assert.equal(dominantAreaSource(null), null);
+});
+
+test('areaSourceSentence: every area source is said in words with its sheet, never the raw id (B2-B)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const lt = JSON.parse(readFileSync(new URL('../i18n/lt.json', import.meta.url), 'utf8'));
+  const words = lt.project.eksplikacijaPopover.source;
+  const cases = [
+    [{ plotas_m2: 12, plotas_saltinis: 'eksplikacija', eksplikacija_source_page: 2 }, 'eksplikacija', 2],
+    [{ plotas_m2: 12, plotas_saltinis: 'eksplikacija' }, 'eksplikacijaNoPage', null],
+    [{ plotas_m2: 12, plotas_saltinis: 'plano_uzrasas', puslapio_nr: 3 }, 'plano_uzrasas', 3],
+    [{ plotas_m2: 12, plotas_source: 'manual_polygon', page_nr: 1 }, 'manual_polygonNoPage', 1],
+    [{ plotas_m2: 12, plotas_source: 'vision', page_nr: 4 }, 'vision', 4],
+    [{ plotas_m2: 12, plotas_source: 'dimension' }, 'dimensionNoPage', null],
+    [{ plotas_m2: 12, plotas_source: 'something_new', page_nr: 1 }, 'otherNoPage', 1],
+  ];
+  for (const [room, id, page] of cases) {
+    const s = areaSourceSentence(room);
+    assert.equal(s.id, id);
+    assert.equal(s.page, page);
+    assert.equal(typeof words[s.id], 'string', `lt.json has no sentence for ${s.id}`);
+    assert.doesNotMatch(words[s.id], /pdfplumber|Šaltinis|vision|eksplikacij/i);
+  }
+  assert.equal(words.eksplikacija.replace('{{page}}', '2'), 'Plotas perskaitytas iš brėžinio patalpų lentelės, 2 lapas.');
 });
