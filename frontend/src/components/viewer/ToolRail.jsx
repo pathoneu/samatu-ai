@@ -44,7 +44,7 @@ const TEST_IDS = { findSimilar: 'viewer-symbol-search', walls: 'viewer-walls-lay
 
 // Tile and card geometry — RAIL_HEIGHT is what the labelled rail needs; below it the rail goes compact.
 export const RAIL_WIDTH = 72;            // card (64 px tiles + padding + border)
-const TILE_H = 34;
+const TILE_H = 32;                       // icon 16 + 1 + label line 14 (v3 W2-B: 34 → 32 so the legend card fits labelled at 1280×720)
 const COMPACT_TILE_H = 28;
 const SEPARATOR_H = 7;
 const CARD_CHROME_H = 10;                // padding + border per card
@@ -74,7 +74,7 @@ function Tile({ id, pressed = false, disabled = false, disabledReason = null, co
           data-coach={id}
           data-tool={id}
           data-testid={TEST_IDS[id] || `tool-${id}`}
-          className={`w-16 ${compact ? 'h-7' : 'h-[34px]'} shrink-0 rounded flex flex-col items-center justify-center gap-px px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pressed
+          className={`w-16 ${compact ? 'h-7' : 'h-8'} shrink-0 rounded flex flex-col items-center justify-center gap-px px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pressed
             ? 'bg-viewer-chrome-active/15 text-viewer-chrome-active'
             : 'text-viewer-chrome-foreground hover:bg-viewer-chrome-hover'} disabled:opacity-40 disabled:hover:bg-transparent`}
           {...extra}
@@ -148,7 +148,7 @@ export default function ToolRail({
                   type="button"
                   aria-label="Daugiau"
                   data-testid="viewer-more"
-                  className={`w-16 ${compact ? 'h-7' : 'h-[34px]'} shrink-0 rounded flex flex-col items-center justify-center gap-px text-viewer-chrome-foreground hover:bg-viewer-chrome-hover data-[state=open]:bg-viewer-chrome-active/15 data-[state=open]:text-viewer-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                  className={`w-16 ${compact ? 'h-7' : 'h-8'} shrink-0 rounded flex flex-col items-center justify-center gap-px text-viewer-chrome-foreground hover:bg-viewer-chrome-hover data-[state=open]:bg-viewer-chrome-active/15 data-[state=open]:text-viewer-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                 >
                   <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
                   {!compact && <span className="text-meta leading-[14px]">Daugiau</span>}
