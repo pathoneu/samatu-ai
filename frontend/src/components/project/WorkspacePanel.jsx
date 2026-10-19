@@ -33,6 +33,14 @@ import ProvenanceChip from './ProvenanceChip';
 import EksplikacijaSourcePopover from './EksplikacijaSourcePopover';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { inferPlotasSource } from '@/lib/areaConfidence';
+import { manualRowId } from '@/lib/darbuRows';
+import { linkKey, linkStatus } from '@/lib/measuredRows';
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import { measureDragProps, useMeasureRows } from './measure/useMeasureRows';
+import MeasureRowPicker from './measure/MeasureRowPicker';
+import MeasuredChip from './measure/MeasuredChip';
 import { floorAreaTotal } from '@/lib/floorArea';
 import { roomAreaText } from '@/lib/roomZones';
 import { cleanUserText } from '@/lib/userText';
@@ -124,6 +132,9 @@ export default function WorkspacePanel({
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [takeoff, setTakeoff] = useTakeoff(project.id);
+  // Pathon v3 W4-A: measurements onto sąmata rows — a drop on a Kiekiai row, „Į eilutę…", the chip.
+  const measure = useMeasureRows(project, onProjectChange);
+  const [pickerKey, setPickerKey] = useState(null);
   const [filter, setFilter] = useState('');
   // Provenance dots OFF by default — too noisy when most rows are computed.
   // User can toggle via eye icon to inspect data sources when needed.
@@ -257,23 +268,31 @@ export default function WorkspacePanel({
           display = m.kind === 'area' ? `${fmt(value, 2)} m²` : `${fmt(value, 2)} m`;
         }
         // A name given in the viewer (right-click „Pervadinti", 2026-10-16) leads; the kind follows.
-        return { id: m.id, label: m.name ? `${m.name} · ${KIND_LT[m.kind]}` : KIND_LT[m.kind], page: m.page, display };
+        return { id: m.id, key: linkKey({ kind: 'measurement', id: m.id }), label: m.name ? `${m.name} · ${KIND_LT[m.kind]}` : KIND_LT[m.kind], page: m.page, display };
       });
   }, [projMeasurements, project]);
 
-  // Push a counted type into the estimate as a position row (kiekis = count,
-  // price left for the user). Re-running updates the existing measurement row
-  // instead of duplicating it. Field-scoped save — merges onto the CURRENT
-  // stored project (same P0-2 contract as measurement saves).
+  // Push a counted type into the estimate as a position row (price left for the user). Pathon v3 W4-A: the
+  // row is LINKED to the count type (lib/measuredRows, kaip 'kiekis') — a mark added or removed later moves
+  // its kiekis by itself, no second „Į sąmatą". A row made before the link existed is linked on the next click
+  // instead of duplicated. Field-scoped save onto the CURRENT stored project (the P0-2 contract).
   const addCountToEstimate = useCallback((row) => {
+    const key = linkKey({ kind: 'countType', id: row.typeId });
+    const linked = linkStatus(project, key);
+    if (linked?.row) {
+      toast(`„${row.label}“ jau sąmatoje — eilutė „${linked.row.aprasymas}“ seka žymes`);
+      return;
+    }
     const list = [...(project.darbu_sarasas || [])];
-    const idx = list.findIndex((p) => p.measure_type_id === row.typeId
-      && p.quantity_source === 'measurement_count');
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], kiekis: row.count };
-    } else {
-      list.push({
-        eil_nr: list.length + 1,
+    let target = list.find((p) => p.measure_type_id === row.typeId && p.quantity_source === 'measurement_count');
+    if (target && !target.id) {
+      target = { ...target, id: manualRowId() };
+      list[list.findIndex((p) => p.measure_type_id === row.typeId && p.quantity_source === 'measurement_count')] = target;
+    }
+    if (!target) {
+      target = {
+        id: manualRowId(),
+        eil_nr: list.reduce((m, d) => Math.max(m, Number(d.eil_nr) || 0), 0) + 1,
         aprasymas: `${row.label} (suskaičiuota brėžinyje)`,
         mato_vnt: 'vnt.',
         kiekis: row.count,
@@ -282,11 +301,35 @@ export default function WorkspacePanel({
         confidence: row.ai ? 'medium' : 'high',
         quantity_source: 'measurement_count',
         measure_type_id: row.typeId,
-      });
+      };
+      list.push(target);
     }
-    const updated = updateProject(project.id, { darbu_sarasas: list });
-    if (updated) onProjectChange?.(updated);
-  }, [project.id, project.darbu_sarasas, onProjectChange]);
+    const before = project.darbu_sarasas || [];
+    const added = updateProject(project.id, { darbu_sarasas: list });
+    if (!added) return;
+    onProjectChange?.(added);
+    // the link (and the row following it) through the same path every surface uses; ONE toast, whose
+    // Atšaukti takes both the link and the new row away
+    if (!measure.link(key, target, 'kiekis', { quiet: true })) return;
+    toast.success(`„${row.label}“ įtraukta į sąmatą — kiekis seks žymes brėžinyje`, {
+      duration: 8000,
+      action: {
+        label: 'Atšaukti',
+        onClick: () => {
+          measure.unlink(key, { quiet: true });
+          const back = updateProject(project.id, { darbu_sarasas: before });
+          if (back) onProjectChange?.(back);
+        },
+      },
+    });
+  }, [project, onProjectChange, measure]);
+
+  // „Į eilutę…" from the viewer's right-click menu (MeasureContextMenu): the picker for that measurement.
+  useEffect(() => {
+    const onPick = (e) => { if (e?.detail?.key) setPickerKey(e.detail.key); };
+    window.addEventListener('samatu:measure-to-row', onPick);
+    return () => window.removeEventListener('samatu:measure-to-row', onPick);
+  }, []);
 
   // Filter rooms by name when filter active
   const filteredRooms = useMemo(() => {
@@ -697,13 +740,17 @@ export default function WorkspacePanel({
                 >JSON</button>
               </div>
             )}
-            {!collapsed.meas && measCountRows.map((r) => (
+            {!collapsed.meas && measCountRows.map((r) => {
+              const key = linkKey({ kind: 'countType', id: r.typeId });
+              const status = linkStatus(project, key);
+              return (
+              <MeasureRowMenu key={r.typeId} status={status} onPick={() => setPickerKey(key)} onUnlink={() => measure.unlink(key)}>
               <div
-                key={r.typeId}
+                {...measureDragProps(key)}
                 data-measure-row={`count:${r.typeId}`}
                 className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-border/50 text-ui ${onJumpToPage && r.firstPage ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `count:${r.typeId}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && r.firstPage ? () => onJumpToPage(r.firstPage) : undefined}
-                title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage})` : undefined}
+                title={r.firstPage ? `Rodyti brėžinyje (psl. ${r.firstPage}) · tempkite ant Kiekių eilutės` : 'Tempkite ant Kiekių eilutės'}
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
                 <span className="flex-1 min-w-0 truncate">{r.label}</span>
@@ -715,30 +762,54 @@ export default function WorkspacePanel({
                   />
                 )}
                 <span className="font-mono tabular-nums text-foreground">{r.count} vnt.</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); addCountToEstimate(r); }}
-                  className="text-primary hover:underline shrink-0"
-                  title="Įtraukti kiekį į sąmatą (kainą suvesite patys)"
-                >
-                  Į sąmatą
-                </button>
+                {status?.row ? (
+                  <LinkedTo status={status} onClick={() => setPickerKey(key)} />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); addCountToEstimate(r); }}
+                    className="text-primary hover:underline shrink-0"
+                    title="Įtraukti į sąmatą naują eilutę — jos kiekis seks žymes brėžinyje (kainą suvesite patys)"
+                  >
+                    Į sąmatą
+                  </button>
+                )}
               </div>
-            ))}
-            {!collapsed.meas && measGeomRows.map((m) => (
+              </MeasureRowMenu>
+              );
+            })}
+            {!collapsed.meas && measGeomRows.map((m) => {
+              const status = linkStatus(project, m.key);
+              return (
+              <MeasureRowMenu key={m.id} status={status} onPick={() => setPickerKey(m.key)} onUnlink={() => measure.unlink(m.key)}>
               <div
-                key={m.id}
+                {...measureDragProps(m.key)}
                 data-measure-row={`meas:${m.id}`}
                 className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-border/50 text-ui ${onJumpToPage && m.page ? 'cursor-pointer hover:bg-muted/40' : ''} ${revealKey === `meas:${m.id}` ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                 onClick={onJumpToPage && m.page ? () => onJumpToPage(m.page) : undefined}
-                title={m.page ? `Rodyti brėžinyje (psl. ${m.page})` : undefined}
+                title={m.page ? `Rodyti brėžinyje (psl. ${m.page}) · tempkite ant Kiekių eilutės` : 'Tempkite ant Kiekių eilutės'}
               >
                 <span className="flex-1 min-w-0 truncate text-muted-foreground">{m.label} · psl. {m.page}</span>
                 <span className={`font-mono tabular-nums ${m.display === NO_SCALE ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {m.display}
                 </span>
+                {status ? (
+                  <LinkedTo status={status} onClick={() => setPickerKey(m.key)} />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setPickerKey(m.key); }}
+                    className="text-primary hover:underline shrink-0"
+                    title="Įtraukti šį matavimą į sąmatos eilutę — pridėti, atimti arba vietoj kiekio"
+                    data-testid="measure-to-row"
+                  >
+                    Į eilutę…
+                  </button>
+                )}
               </div>
-            ))}
+              </MeasureRowMenu>
+              );
+            })}
           </>
         )}
 
@@ -776,6 +847,8 @@ export default function WorkspacePanel({
             onQuantityAdjust={handleQuantityAdjust}
             onPriceChange={handlePriceChange}
             onRemoveRow={handleRowRemove}
+            measure={onProjectChange ? measure : null}
+            onJumpToPage={onJumpToPage}
           />
         ))}
         {positionGroups.length === 0 && filter && (
@@ -813,7 +886,49 @@ export default function WorkspacePanel({
           onClose={() => setPopoverState(null)}
         />
       )}
+      {onProjectChange && (
+        <MeasureRowPicker
+          open={!!pickerKey}
+          onOpenChange={(v) => { if (!v) setPickerKey(null); }}
+          project={project}
+          sourceKey={pickerKey}
+          onPick={(row, kaip) => measure.link(pickerKey, row, kaip)}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Matavimai row helpers (Pathon v3 W4-A) ─────────────────────────────────
+
+/** Where a measurement sits: „→ Grindjuostės", or that its line has left the sąmata. One click changes it. */
+function LinkedTo({ status, onClick }) {
+  const gone = !status?.row;
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="min-w-0 max-w-[45%] shrink truncate text-left text-foreground/80 hover:underline"
+      title={gone
+        ? 'Eilutės, į kurią buvo įtrauktas matavimas, sąmatoje nebėra — spustelėkite ir pasirinkite kitą'
+        : `Įtraukta į „${status.row.aprasymas}“ — spustelėkite, kad pakeistumėte eilutę`}
+      data-testid="measure-linked"
+    >
+      {gone ? '→ eilutės nebėra' : `→ ${status.row.aprasymas}`}
+    </button>
+  );
+}
+
+/** Right-click on a Matavimai row: „Į eilutę…" and, when it sits on one, „Nuimti nuo eilutės". */
+function MeasureRowMenu({ status, onPick, onUnlink, children }) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onSelect={onPick}>{status ? 'Kita eilutė…' : 'Į eilutę…'}</ContextMenuItem>
+        {status && <ContextMenuItem onSelect={onUnlink}>Nuimti nuo eilutės</ContextMenuItem>}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -964,6 +1079,8 @@ const PositionGroup = memo(function PositionGroup({
   onQuantityAdjust,
   onPriceChange,
   onRemoveRow,
+  measure = null,
+  onJumpToPage = null,
 }) {
   return (
     <div>
@@ -1008,6 +1125,10 @@ const PositionGroup = memo(function PositionGroup({
           onQuantityAdjust={(delta) => onQuantityAdjust(row._id || `${row.eil_nr}-${row.aprasymas}`, delta)}
           onPriceChange={(p) => onPriceChange(row._id || `${row.eil_nr}-${row.aprasymas}`, p)}
           onRemove={onRemoveRow ? () => onRemoveRow(row) : null}
+          dropProps={measure ? measure.dropProps(row) : null}
+          dropOver={!!measure && !!row.id && measure.overRowId === row.id}
+          measure={measure}
+          onJumpToPage={onJumpToPage}
         />
       ))}
     </div>
@@ -1025,6 +1146,10 @@ const PositionRow = memo(function PositionRow({
   onQuantityAdjust,
   onPriceChange,
   onRemove,
+  dropProps = null,
+  dropOver = false,
+  measure = null,
+  onJumpToPage = null,
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -1110,7 +1235,8 @@ const PositionRow = memo(function PositionRow({
     <div
       onClick={onClick}
       title={t('project.mainView.openLedgerTitle')}
-      className="grid items-start cursor-pointer hover:bg-muted/40 transition-colors group"
+      {...(dropProps || {})}
+      className={`grid items-start cursor-pointer hover:bg-muted/40 transition-colors group ${dropOver ? 'bg-primary/10 outline outline-2 -outline-offset-2 outline-primary' : ''}`}
       style={{
         // Narrowed kiekis/kaina/suma columns from 104/86/86 → 88/72/76 so
         // the description column gets back ~40 px when the right-side
@@ -1143,6 +1269,12 @@ const PositionRow = memo(function PositionRow({
         >
           {row.aprasymas}
         </span>
+        <MeasuredChip
+          row={row}
+          onSetKaip={measure ? measure.setKaip : null}
+          onUnlink={measure ? measure.unlink : null}
+          onJumpToPage={onJumpToPage}
+        />
         {/* 2026-05-06: source badge (FORMULĖ / PRIELAIDA / AI ŽENKLAS / RANKINIS)
             removed per user request — visual clutter, no actionable signal.
             Tooltip on aprašymas keeps the source readable on hover. */}

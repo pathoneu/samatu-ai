@@ -919,3 +919,28 @@ test('adoptServerProject replaces the cached project and re-bases the next save,
   await flushProjectSaves();
   assert.equal(JSON.parse(puts[0].body).base_updated_at, '2026-10-16T11:00:00Z');
 });
+
+test('every save keeps the rows on what he measured — a moved length moves its row, a project without links is left alone', async () => {
+  _resetSaveState();
+  installLocalStorage({ samatu_projects: JSON.stringify([
+    {
+      id: 'm1', name: 'Matavimai',
+      pageScalesDurable: { 1: { calibrated: true, metersPerPointX: 0.01, metersPerPointY: 0.01 } },
+      measurements: [{ id: 'd1', kind: 'distance', page: 1, points: [{ x: 0, y: 0 }, { x: 420, y: 0 }] }],
+      darbu_sarasas: [{ id: 'a', aprasymas: 'Grindjuostės', mato_vnt: 'm', kiekis: 40 }],
+    },
+    { id: 'm2', name: 'Be matavimų', darbu_sarasas: [] },
+  ]) });
+  installFetchRecorder();
+  // linking alone (the field the panel writes) is enough — the store brings the row along
+  let saved = updateProject('m1', { measurementRows: { 'm:d1': { eilute_id: 'a', kaip: 'pridėti' } } });
+  assert.equal(saved.darbu_sarasas[0].kiekis, 44.2);
+  // the viewer saves its list with the line made longer: the row follows, no link on the objects needed
+  saved = updateProject('m1', { measurements: [{ id: 'd1', kind: 'distance', page: 1, points: [{ x: 0, y: 0 }, { x: 500, y: 0 }] }] });
+  assert.equal(saved.darbu_sarasas[0].kiekis, 45);
+  assert.equal(getProject('m1').darbu_sarasas[0].kiekis, 45);
+  // a project with no links: the rows a caller hands in are stored as they came
+  const rows = [{ id: 'x', kiekis: 1 }];
+  assert.equal(updateProject('m2', { darbu_sarasas: rows }).darbu_sarasas, rows);
+  await flushProjectSaves();
+});

@@ -1092,8 +1092,8 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         // here (no second save — the panel saved it) so the top-bar totals move with his answers.
         onPatikraProject={(next) => { if (next) setProject(next); }}
         onProjectChange={(updated) => {
-          updateProject(project.id, updated);
-          setProject(updated);
+          // the store's copy: a save can bring rows along (measurements on rows, lib/measuredRows)
+          setProject(updateProject(project.id, updated) || updated);
           // pdfUrl is only ever used as a boolean here (step gating), so mint
           // a blob URL ONLY when we don't have one. Doing it on every project
           // change leaked an object URL per edit — the old one was never
@@ -1123,8 +1123,7 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
               // reload picks up the same data). Pre-2026-05-10 this only
               // hit the store, leaving the UI showing stale lt_sanity until
               // a full reload — the revalidate button looked like a no-op.
-              setProject(updated);
-              updateProject(project.id, updated);
+              setProject(updateProject(project.id, updated) || updated);
             }}
             onShowDrawing={pdfUrl ? () => setStep('brezinys') : null}
             // The drawing is beside the rows now: a row's „show on the drawing" focuses it there and
