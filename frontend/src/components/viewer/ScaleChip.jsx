@@ -4,15 +4,20 @@
  * by colour alone); a click opens its card upward with the explanation and the actions — „Patvirtinti 1:115",
  * „Patvirtinti visiems N lapams", „Kalibruoti", „Patikrinti", and „Visi lapų masteliai" (the overview). The
  * model is lib/scaleChip (the one merged scale map + the overview's rows). Esc or a click elsewhere closes it.
+ *
+ * W5-B B8 (coverage #22, #23): the card also takes a typed „1:50" and offers the standard scales with the sheet's
+ * paper size, and „Šiam lapui mastelio nereikia" for schedules and specifications (lib/scaleEntry) — the chip then
+ * reads „Mastelio nereikia" and nobody asks for this sheet's scale again until he says it is needed.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { paperLabel, parseRatio, standardRatios } from '@/lib/scaleEntry';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
-import { Check, CheckCheck, ListChecks, Ruler, Scaling } from 'lucide-react';
+import { Check, CheckCheck, CircleSlash, ListChecks, Ruler, Scaling } from 'lucide-react';
 import { scaleChipModel } from '@/lib/scaleChip';
 import { SCALE_STATE_LT } from '@/lib/scaleLabel';
 import { visiblePageOf } from '@/lib/visiblePage';
 
-export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12 }) {
+export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12, openNonce = 0, pageSizeOf = null, isNotNeeded = null, onSetRatio = null, onNotNeeded = null }) {
   const { state: scroll } = useScroll(documentId);
   const page = visiblePageOf(scroll);
   const chip = useMemo(
@@ -20,8 +25,15 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
     [page, scales, project, durable, totalPages],
   );
   const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
   const rootRef = useRef(null);
+  const notNeeded = !!isNotNeeded?.(page);
+  const paper = paperLabel(pageSizeOf?.(page));
+  const typedRatio = parseRatio(typed);
+  const applyRatio = (ratio) => { if (!ratio) return; setOpen(false); setTyped(''); onSetRatio?.(chip.page, ratio); };
   useEffect(() => { setOpen(false); }, [page]);
+  // „Nustatyti mastelį“ beside the detection button opens this card (W5-B B7, #25) — a new nonce, one opening
+  useEffect(() => { if (openNonce) setOpen(true); }, [openNonce]);
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
@@ -39,13 +51,23 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         <div
           role="dialog"
           aria-label={`Lapo ${chip.page} mastelis`}
-          className="absolute bottom-full mb-2 left-0 w-80 rounded-panel border border-border bg-card text-card-foreground shadow-lg"
+          className="absolute bottom-full mb-2 left-0 w-80 max-h-[min(560px,calc(100vh-200px))] overflow-y-auto rounded-panel border border-border bg-card text-card-foreground shadow-lg"
           data-testid="scale-chip-card"
         >
           <div className="px-3 pt-2.5 pb-2 border-b border-border">
-            <p className="text-ui font-semibold">Lapas {chip.page} · {chip.text}</p>
-            <p className="mt-1 text-meta text-muted-foreground leading-snug">{chip.title}</p>
+            <p className="text-ui font-semibold">Lapas {chip.page} · {notNeeded ? 'mastelio nereikia' : chip.text}</p>
+            <p className="mt-1 text-meta text-muted-foreground leading-snug">
+              {notNeeded ? 'Pažymėjote, kad šis lapas — lentelė ar specifikacija: jo mastelio programa nebeklausia.' : chip.title}
+            </p>
           </div>
+          {notNeeded && onNotNeeded && (
+            <div className="p-1">
+              <button type="button" className={btn} onClick={act(() => onNotNeeded(chip.page, false))} data-testid="scale-chip-needed">
+                <Scaling className="w-4 h-4 shrink-0" />Šiam lapui mastelis reikalingas
+              </button>
+            </div>
+          )}
+          {!notNeeded && (<>
           <div className="p-1">
             {chip.canConfirm && (
               <button type="button" className={btn} onClick={act(() => onConfirm?.([chip.page]))} data-testid="scale-chip-confirm">
@@ -73,6 +95,46 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
               </button>
             )}
           </div>
+          {onSetRatio && (
+            <div className="px-3 py-2 border-t border-border" data-testid="scale-chip-entry">
+              <p className="text-meta text-muted-foreground">
+                Žinote mastelį? Įrašykite arba pasirinkite{paper ? <> — lapas <span className="mono tabular text-foreground">{paper}</span></> : null}
+              </p>
+              <form className="mt-1.5 flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyRatio(typedRatio); }}>
+                <label htmlFor="scale-chip-ratio" className="text-ui text-foreground mono">1:</label>
+                <input
+                  id="scale-chip-ratio"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="50"
+                  aria-label="Mastelis, pavyzdžiui 1:50"
+                  className="w-20 h-8 px-2 rounded-panel border border-border bg-card text-ui mono tabular focus:outline-none focus:ring-2 focus:ring-ring"
+                  data-testid="scale-chip-ratio"
+                />
+                <button type="submit" disabled={!typedRatio} className="h-8 px-2.5 rounded-panel border border-border text-ui font-semibold text-foreground hover:bg-muted disabled:opacity-40" data-testid="scale-chip-ratio-apply">
+                  Taikyti šiam lapui
+                </button>
+              </form>
+              {typed && !typedRatio && <p className="mt-1 text-meta text-muted-foreground">Įrašykite skaičių po „1:“, pavyzdžiui 50 arba 1:100.</p>}
+              <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Įprasti masteliai">
+                {standardRatios().map((r) => (
+                  <button key={r} type="button" onClick={() => applyRatio(r)} className="h-8 px-2 rounded-panel border border-border text-ui mono tabular text-foreground hover:bg-muted" data-testid={`scale-chip-std-${r}`}>
+                    1:{r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {onNotNeeded && (
+            <div className="p-1 border-t border-border">
+              <button type="button" className={btn} onClick={act(() => onNotNeeded(chip.page, true))} data-testid="scale-chip-not-needed"
+                title="Lentelėms, specifikacijoms ir titulams mastelis nereikalingas — programa jo šiam lapui nebeklaus">
+                <CircleSlash className="w-4 h-4 shrink-0" />Šiam lapui mastelio nereikia
+              </button>
+            </div>
+          )}
+          </>)}
         </div>
       )}
       <button
@@ -87,7 +149,9 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
       >
         <Scaling className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-muted-foreground">Mastelis</span>
-        {chip.state === 'nenustatytas' || !chip.label ? (
+        {notNeeded ? (
+          <span className="font-semibold text-foreground">nereikia</span>
+        ) : chip.state === 'nenustatytas' || !chip.label ? (
           <span className="font-semibold text-foreground">nenustatytas</span>
         ) : (
           <>
@@ -97,7 +161,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         )}
       </button>
       {/* A guessed scale is confirmed in ONE click, right on the chip (Togal's chip; audit act „Confirm scale" 4 → 1). */}
-      {chip.canConfirm && !open && (
+      {chip.canConfirm && !open && !notNeeded && (
         <button
           type="button"
           onClick={() => onConfirm?.([chip.page])}

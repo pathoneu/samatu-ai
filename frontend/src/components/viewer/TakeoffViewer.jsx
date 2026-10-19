@@ -21,7 +21,7 @@ import { useZoom, ZoomMode, ZoomGestureWrapper } from '@embedpdf/plugin-zoom/rea
 import { ThumbnailsPane, ThumbImg } from '@embedpdf/plugin-thumbnail/react';
 import { useSearch } from '@embedpdf/plugin-search/react';
 import { usePrint } from '@embedpdf/plugin-print/react';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MoveHorizontal, Maximize2, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
+import { ChevronUp, ChevronDown, PanelLeft, Search, Printer, Download, History, ListChecks, Keyboard } from 'lucide-react';
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf, roomTypeWord } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
@@ -57,6 +57,15 @@ import MeasureContextMenu, { RenameDialog } from './MeasureContextMenu';
 import OutlineToolPanel from './OutlineToolPanel';
 import OverlayLegend from './OverlayLegend';
 import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
+import SheetHeaderBadge from './SheetHeaderBadge';
+import ZoomCluster from './ZoomCluster';
+import ViewSettingsPopover, { CleanBgFilter, ViewCrosshair } from './ViewSettingsPopover';
+import { readViewSettings, viewCss, writeViewSettings } from '@/lib/viewSettings';
+import { cachedSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
+import { scaleGateFromScale } from '@/lib/scaleGate';
+import { pageScaleIn } from '@/lib/pageScales';
+import { focusFrameForRoom } from '@/lib/focusFrame';
+import { isNotNeeded, notNeededEntry, scaleForRatio } from '@/lib/scaleEntry';
 import ModePill from './ModePill';
 import SelectionBar from './SelectionBar';
 import useChromeRects from './useChromeRects';
@@ -67,6 +76,7 @@ import { escStep, openLayerInDocument } from '@/lib/escOrder';
 import { frameForRoom, frameForMeasurements } from '@/lib/frameSelection';
 import { modePillFor } from '@/lib/modePill';
 import useDragPan, { PAN_CURSOR_CSS } from './useDragPan';
+import useMiddlePan from './useMiddlePan';
 import useOutlineTool, { roomHoles } from './useOutlineTool';
 import useRoomTool from './useRoomTool';
 import { RoomPickPanel } from './RoomProposalLayer';
@@ -184,18 +194,18 @@ function SearchBox({ documentId, onClose }) {
   );
 }
 
-// The two small cards of the canvas chrome that the horizontal toolbar used to hold (v3 W1-B B6): the
-// reading / editions buttons and the search at the top right, pages and zoom at the bottom right.
+// The canvas chrome's cards (v3 W1-B B6, W5-B): the sheet header (SheetHeaderBadge) and the reading / editions
+// buttons with the search at the top right, the zoom column (ZoomCluster) at the bottom right.
 const chromeBtn = 'h-8 min-w-8 px-1.5 inline-flex items-center justify-center rounded text-viewer-chrome-foreground hover:bg-viewer-chrome-hover disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 const chromeCard = 'pointer-events-auto rounded-panel border border-border bg-card shadow-md flex items-center gap-0.5 px-1 py-1';
 
 /** Top right: „Perskaityti iš naujo" and „Palyginti leidimus" (renderToolbarAddon), then the text search. */
-function CanvasHeader({ documentId, totalPages, addon = null, searchOpen, onToggleSearch, onCloseSearch }) {
+function CanvasHeader({ documentId, totalPages, addon = null, addonContext = null, searchOpen, onToggleSearch, onCloseSearch }) {
   const { state: scroll } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
   return (
     <div className={chromeCard} data-canvas-header>
-      {addon && <span className="inline-flex items-center gap-1 px-0.5">{addon(cur, totalPages || 1)}</span>}
+      {addon && <span className="inline-flex items-center gap-1 px-0.5">{addon(cur, totalPages || 1, addonContext ? addonContext(cur) : null)}</span>}
       {searchOpen && <SearchBox documentId={documentId} onClose={onCloseSearch} />}
       <button
         type="button"
@@ -205,41 +215,6 @@ function CanvasHeader({ documentId, totalPages, addon = null, searchOpen, onTogg
         aria-pressed={!!searchOpen}
         onClick={onToggleSearch}
       ><Search className="w-4 h-4" /></button>
-    </div>
-  );
-}
-
-/** Bottom right: page back / forward, zoom out / in with the level, fit width / fit page. */
-function NavCluster({ documentId, totalPages }) {
-  const { state: zoom, provides: zoomApi } = useZoom(documentId);
-  const { state: scroll, provides: scrollApi } = useScroll(documentId);
-  const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
-  const cur = visiblePageOf(scroll);
-  // scroll.totalPages is a scroll metric, not the page count — use the document's pageCount.
-  const total = totalPages || 1;
-  // Fit actions consult the PLUGIN's currentPage, which can lag the viewport
-  // (audit P1: fit yanked the view back to a stale page) — sync it first.
-  const syncPageThen = (fn) => {
-    if (cur !== (scroll?.currentPage ?? cur)) scrollApi?.scrollToPage({ pageNumber: cur });
-    fn();
-  };
-  const sep = <span aria-hidden="true" className="w-px h-5 bg-border mx-0.5" />;
-  return (
-    <div className={chromeCard} data-nav-cluster role="group" aria-label="Puslapiai ir mastelis ekrane">
-      {/* Deterministic: jump to visible page ± 1. The plugin's relative
-          scrollToNext/PreviousPage steps from its own (stale) currentPage —
-          under wheel scrolling that no-ops or bounces (founder: "page changer
-          does not work"). */}
-      <button type="button" className={chromeBtn} title={withKey('Ankstesnis puslapis', 'prevPage')} aria-label="Ankstesnis puslapis" disabled={cur <= 1} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.max(1, cur - 1) })}><ChevronLeft className="w-4 h-4" /></button>
-      <span className="mono tabular text-ui text-foreground px-0.5 whitespace-nowrap" aria-label={`Puslapis ${cur} iš ${total}`}>{cur} / {total}</span>
-      <button type="button" className={chromeBtn} title={withKey('Kitas puslapis', 'nextPage')} aria-label="Kitas puslapis" disabled={cur >= total} onClick={() => scrollApi?.scrollToPage({ pageNumber: Math.min(total, cur + 1) })}><ChevronRight className="w-4 h-4" /></button>
-      {sep}
-      <button type="button" className={chromeBtn} title={withKey('Tolinti', 'zoomOut')} aria-label="Tolinti" onClick={() => zoomApi?.zoomOut()}><ZoomOut className="w-4 h-4" /></button>
-      <span className="mono tabular text-ui text-foreground w-12 text-center">{pct}%</span>
-      <button type="button" className={chromeBtn} title={withKey('Artinti', 'zoomIn')} aria-label="Artinti" onClick={() => zoomApi?.zoomIn()}><ZoomIn className="w-4 h-4" /></button>
-      {sep}
-      <button type="button" className={chromeBtn} title={withKey('Sutalpinti per visą plotį', 'fitWidth')} aria-label="Sutalpinti per visą plotį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitWidth))}><MoveHorizontal className="w-4 h-4" /></button>
-      <button type="button" className={chromeBtn} title={withKey('Sutalpinti visą puslapį', 'fitPage')} aria-label="Sutalpinti visą puslapį" onClick={() => syncPageThen(() => zoomApi?.requestZoom(ZoomMode.FitPage))}><Maximize2 className="w-4 h-4" /></button>
     </div>
   );
 }
@@ -487,8 +462,10 @@ function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, on
 // focused room the old effect re-ran scrollToPage on EVERY tick — the viewer
 // literally fought the user's navigation. Jump ONCE per new target; re-arm
 // only when the focus object itself changes (clicking a room again re-jumps).
-function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null }) {
+function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = null, rooms = null, onFrame = null }) {
   const { provides: scrollApi, state: scroll } = useScroll(documentId);
+  const retriesRef = useRef(0);
+  const lastPageRef = useRef(null);
   // roomPageOf is THE shared page-field precedence (roomZones owns it) — the
   // zone layer and this scroller must never disagree about a room's page.
   const targetPage = (focusedRoom ? roomPageOf(focusedRoom) : null) ?? focusedPage ?? null;
@@ -500,14 +477,25 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   useEffect(() => { doneRef.current = null; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || !scrollApi?.scrollToPage) return;
-    if (doneRef.current === targetPage) return; // one jump per target — never re-yank
-    doneRef.current = targetPage;
+    if (doneRef.current === focusKey) return; // one jump per focus — never re-yank (scrollApi churns)
+    doneRef.current = focusKey;
     // A room he clicked ON the drawing is already on screen (Pathon v3 W1-D): jumping to its page would
     // throw the view back to the sheet's top-left corner under his cursor.
     const skip = skipJumpRef?.current;
-    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) return;
+    if (skip && focusedRoom && String(focusedRoom.nr) === skip.nr && Date.now() < skip.until) { lastPageRef.current = targetPage; return; }
+    // A room focused from outside the drawing (a list row, Patikra, a search hit) is FRAMED — the room, not the
+    // top of its sheet (W5-B B7, #132; lib/focusFrame). The host's FocusZoomer waits for the layout itself, so
+    // the page-jump retries below stand down.
+    if (focusedRoom && onFrame) {
+      const full = (rooms || []).find((r) => String(r?.nr) === String(focusedRoom.nr)) || focusedRoom;
+      const frame = focusFrameForRoom(full);
+      if (frame) { retriesRef.current = 99; lastPageRef.current = frame.page; onFrame(frame); return; }
+    }
+    // No frame: the page, as before — and not again for another room on the page already shown.
+    if (lastPageRef.current === targetPage && focusedRoom) return;
+    lastPageRef.current = targetPage;
     scrollApi.scrollToPage({ pageNumber: targetPage, behavior: 'smooth' });
-  }, [targetPage, scrollApi]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetPage, scrollApi, focusKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE JUMP CAN LAND ON NOTHING (2026-09-04, measured). `scrollToPage` is
   // callable before the pages have been measured, and calling it then computes
@@ -521,7 +509,6 @@ function FocusScroller({ documentId, focusedRoom, focusedPage, skipJumpRef = nul
   // moment the viewport is off page 1 — which is also what makes it safe. A
   // user who scrolls anywhere during that first second has left page 1, so this
   // can never fight him (founder bug 2026-07-25 "scrolls by itself").
-  const retriesRef = useRef(0);
   useEffect(() => { retriesRef.current = 0; }, [focusKey]);
   useEffect(() => {
     if (!targetPage || targetPage <= 1 || !scrollApi?.scrollToPage) return;
@@ -632,11 +619,12 @@ function FocusZoomer({ documentId, focus, pages }) {
 function LegendPageWatcher({ documentId, pageRef, onPage }) {
   const { state: scroll } = useScroll(documentId);
   const cur = visiblePageOf(scroll);
-  useEffect(() => { pageRef.current = cur; onPage?.(cur); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
+  // W5-B B10: the sheet on screen is also told to the Matavimai list's „Šis lapas“ filter (MeasureGroups)
+  useEffect(() => { pageRef.current = cur; onPage?.(cur); window.__pathonViewerPage = cur; window.dispatchEvent(new CustomEvent('samatu:viewer-page', { detail: { page: cur } })); }, [cur]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
-function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, onRoomOpenings = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null }) {
+function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, onRoomOpenings = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null }) {
   const { activeDocumentId } = useActiveDocument();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
@@ -665,6 +653,25 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
       { name: sheet.autoName, tipas: sheet.autoTipas, discipline: sheet.autoDiscipline }),
     `Lapas ${sheet.page} pakeistas`,
   );
+  // „Neskaityti šio lapo" (W5-B B9): the pages the re-read and the detection run read as blank; Undo in the toast.
+  const skippedRef = useRef(skippedPages);
+  useEffect(() => { skippedRef.current = skippedPages; });
+  const skippedSet = useMemo(() => new Set((skippedPages || []).map(Number)), [skippedPages]);
+  const putSkipped = (pages) => {
+    const next = [...new Set(pages.map(Number))].filter((n) => n >= 1).sort((a, b) => a - b);
+    skippedRef.current = next;
+    onSkippedPagesChange?.(next);
+  };
+  const toggleSkipSheet = (sheet) => {
+    const before = (skippedRef.current || []).map(Number);
+    const on = !before.includes(sheet.page);
+    putSkipped(on ? [...before, sheet.page] : before.filter((p) => p !== sheet.page));
+    toast.success(on ? `Lapas ${sheet.page} nebus skaitomas` : `Lapas ${sheet.page} vėl bus skaitomas`, {
+      description: on ? 'Jis lieka PDF ir brėžinyje. Perskaitant brėžinį iš naujo ir „Perskaityti lapą“ programa jo neskaitys.' : undefined,
+      duration: 10_000,
+      action: { label: 'Atšaukti', onClick: () => putSkipped(before) },
+    });
+  };
   const resetSheet = (sheet) => changeSheet(
     sheet, clearSheetOverride(sheetOverridesRef.current, sheet.page),
     `Lapui ${sheet.page} grąžintas automatinis pavadinimas`,
@@ -698,9 +705,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // A click at rest (or with „Žymėti") on the drawing: the room under it, else nothing (empty paper clears).
   const selectRoomAt = (pt) => {
     const where = displayPointOf(pt);
-    const hit = where ? roomAtPoint(rooms, where, {
+    let hit = where ? roomAtPoint(rooms, where, {
       renderedWidth: pt.renderedWidth, renderedHeight: pt.renderedHeight, hidden: hiddenRoomNrs,
     }) : null;
+    // W5-B B2: a click in the title block, a legend, a table or a notes block outside the plan selects no room
+    // (zones already read for this sheet; unknown zones never block) — the cursor says why.
+    const refused = hit && where && projectId ? noRoomZoneAt(cachedSheetZones(projectId, where.page), where.x_pct, where.y_pct) : null;
+    if (refused) { flashCursorHint(refused.sentence); hit = null; }
     applyRoomSelection(nextRoomSelection({ focused: focusedRoomNr, extra: extraRoomNrs }, hit?.nr ?? null, { shift: !!pt.shiftKey }));
   };
   // `fillFor` = the room nr currently armed for „Kontūras paspaudus" click-to-fill (2026-10-18: it was
@@ -944,6 +955,25 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [scalesOpen, setScalesOpen] = useState(false);
   // The last „Patikrinti mastelį" readout: {page, readout} | null. Nothing is saved.
   const [scaleCheck, setScaleCheck] = useState(null);
+  // „Nustatyti mastelį“ next to the detection button (W5-B B7, #25): the scale chip's card opens (a nonce per click).
+  const [scaleChipOpen, setScaleChipOpen] = useState(0);
+  // W5-B B8: a typed or picked 1:N becomes his scale for the sheet; „nereikia" marks a schedule or specification.
+  // Both are one undoable change (the toast's „Atšaukti" puts the sheet's previous entry back).
+  const putSheetScale = (page, entry, message) => {
+    const before = measureScales[page] ?? measureScales[String(page)] ?? null;
+    const set = (value) => setMeasureScales((prev) => {
+      const next = { ...prev };
+      delete next[String(page)];
+      if (value) next[page] = value; else delete next[page];
+      return next;
+    });
+    set(entry);
+    toast.success(message, { duration: 10_000, action: { label: 'Atšaukti', onClick: () => set(before) } });
+  };
+  const setSheetRatio = (page, ratio) => putSheetScale(page, scaleForRatio(ratio), `Lapo ${page} mastelis 1:${String(ratio).replace('.', ',')} — jūsų`);
+  const setSheetNotNeeded = (page, on) => putSheetScale(page, on ? notNeededEntry() : null,
+    on ? `Lapui ${page} mastelio nereikia — programa jo nebeklaus` : `Lapui ${page} mastelis vėl reikalingas`);
+  const sheetNotNeeded = (page) => isNotNeeded(measureScales[page] ?? measureScales[String(page)]);
   const confirmScales = (pages) => {
     setMeasureScales((prev) => confirmLaneScales(prev, pages, laneScales || {}));
     toast.success(pages.length > 1 ? `Patvirtinta ${pages.length} lapų mastelis` : `Patvirtintas ${pages[0]} lapo mastelis`, {
@@ -1230,6 +1260,21 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     if (!gone.size) return;
     setMeasurements((prev) => prev.filter((m) => !gone.has(m.id)));
     setSelectedMeasureIds((cur) => cur.filter((x) => !gone.has(x)));
+  };
+  // A delete he chose (selection bar, Delete key, right-click menu) says what went and offers „Atšaukti" — the
+  // undo, never a question (W5-B B6; Rimas §1.5). The count tool's one-click removal stays silent.
+  const deleteMeasurementWithUndo = (idOrIds) => {
+    const ids = new Set((Array.isArray(idOrIds) ? idOrIds : [idOrIds]).filter((x) => x != null));
+    const removed = measurements.filter((m) => ids.has(m.id));
+    if (!removed.length) return;
+    deleteMeasurement([...ids]);
+    toast(removed.length === 1 ? 'Matavimas ištrintas' : `Ištrinta matavimų: ${removed.length}`, {
+      duration: 10_000,
+      action: {
+        label: 'Atšaukti',
+        onClick: () => setMeasurements((prev) => [...prev, ...removed.filter((m) => !prev.some((x) => x.id === m.id))]),
+      },
+    });
   };
   // Batch actions on a lasso selection (one history entry each).
   const changeCountTypeMany = (ids, typeId) => {
@@ -1548,6 +1593,8 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     chromeObserver.current = ro;
   }, []);
   const railCompact = chromeHeight > 0 && chromeHeight < railHeight() + 16;
+  // The middle button drags the drawing from any tool (W5-B B5); the chrome element exists once the document has.
+  useMiddlePan({ rootRef: tvRootRef, enabled: !!chromeEl });
   // „Patalpa" (R, W1-D): the one-click room outline, armed as the measure tool 'room' when the host gives the
   // preview and the save; otherwise the card stays disabled with its reason.
   const onRoomTool = !check && onRoomToolPreview && onRoomToolCommit ? () => armMeasureTool('room') : null;
@@ -1711,6 +1758,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     navigate(`/project/${encodeURIComponent(projectId)}/patikra?kambarys=${encodeURIComponent(nr)}`);
   };
   const [renaming, setRenaming] = useState(null);     // { id, value } while „Pervadinti" is open
+  // „Rodinys" (W5-B B4): how the drawing is shown — view only, remembered per browser (lib/viewSettings).
+  const [viewSettings, setViewSettingsState] = useState(() => readViewSettings());
+  const setViewSettings = (next) => { writeViewSettings(next); setViewSettingsState(next); };
+  const viewRules = viewCss(viewSettings);
   const KIND_NAMES = { distance: 'Atstumas', perimeter: 'Perimetras', area: 'Plotas', count: 'Žymė' };
   const oneMark = selectedMarks.length === 1 ? selectedMarks[0] : null;
   const barMarks = marksBarOn ? {
@@ -1723,7 +1774,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     onRename: oneMark ? () => setRenaming({ id: oneMark.id, value: oneMark.name || '' }) : null,
     onChangeType: oneMark?.kind === 'count' ? (typeId) => changeCountType(oneMark.id, typeId) : null,
     onReveal: oneMark ? () => revealMeasurement(oneMark) : null,
-    onDelete: () => deleteMeasurement(selectedMeasureIds),
+    onDelete: () => deleteMeasurementWithUndo(selectedMeasureIds),
     onDeselect: () => setSelectedMeasureIds([]),
   } : null;
   // A room Shift+clicked beside the focused one (W1-D) is the merge target M / „Sujungti" starts with.
@@ -1765,6 +1816,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     header: '[data-canvas-header]',
     legend: '[data-layer-legend]',
     scaleChip: '[data-testid="scale-chip-root"]',
+    zoom: '[data-zoom-cluster]',
   });
   // Where the top row of cards ends (pages / zoom and search may wrap to two rows on a narrow canvas).
   const chromeTopBottom = Math.max(
@@ -1779,11 +1831,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const r = chromeRects.rects;
     const size = { width: r.legend?.width || 280, height: r.legend?.height || 96 };
     const spots = [
-      { id: 'bottom-right', left: f.width - 8 - size.width, top: f.height - 8 - size.height },
+      { id: 'bottom-right', left: f.width - 8 - size.width - (r.zoom ? r.zoom.width + 8 : 0), top: f.height - 8 - size.height },
       { id: 'top-right', left: f.width - 8 - size.width, top: chromeTopBottom + 8 },
       { id: 'bottom-left', left: (check ? 8 : RAIL_WIDTH + 16), top: f.height - 8 - size.height - (r.scaleChip ? r.scaleChip.height + 8 : 0) },
     ];
-    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip].filter(Boolean) });
+    return pickSpot({ spots, size, avoid: [r.label, r.bar, r.pill, r.nav, r.header, r.scaleChip, r.zoom].filter(Boolean) });
   })();
 
   // The pop-up's actions for the corner / edge it was opened on (A2).
@@ -1879,7 +1931,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
         const chromeLeft = sheetRailWidth({ railOpen, sheetRail: !!sheetRail, strip: true });
         return (
         <div className="flex flex-col h-full" data-tv-root ref={tvRootRef}>
-          {!check && <FocusScroller documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef} />}
+          {!check && (
+            <FocusScroller
+              documentId={activeDocumentId} focusedRoom={focusedRoom} focusedPage={focusedPage} skipJumpRef={skipJumpRef}
+              rooms={rooms}
+              onFrame={(f) => { frameNonce.current += 1; setFrameFocus({ page: f.page, rect: f.rect, nonce: `focus-${frameNonce.current}` }); }}
+            />
+          )}
           {/* „show me this place" works outside the check view too (the workspace's onRevealEvidence) */}
           {(check || focus) && <FocusZoomer documentId={activeDocumentId} focus={focus} pages={documentState?.document?.pages} />}
           {/* Shift+F / „." — the selection framed (its own zoomer: its requests never collide with the host's) */}
@@ -1894,7 +1952,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onToggleThumbs={toggleRail}
             onMeasureToolKey={armMeasureTool}
             canDeleteSelected={(measureTool === 'select' || measureTool === 'lasso') && selectedMeasureIds.length > 0}
-            onDeleteSelected={() => deleteMeasurement(selectedMeasureIds)}
+            onDeleteSelected={() => deleteMeasurementWithUndo(selectedMeasureIds)}
             onOpenSearch={() => setSearchOpen(true)}
             onUndo={check ? null : undoMeasure}
             onRedo={check ? null : redoMeasure}
@@ -1913,9 +1971,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             onDuplicateMarks={check ? null : duplicateMarks}
           />}
           {panning && <style>{PAN_CURSOR_CSS}</style>}
+          {viewRules && <style>{viewRules}</style>}
+          {viewSettings.cleanBg > 0 && <CleanBgFilter t={viewSettings.cleanBg} />}
           <div className="relative flex flex-1 min-h-0">
             {sheetRail
-              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} />
+              ? <SheetRail mode={railOpen ? 'full' : 'strip'} documentId={activeDocumentId} rail={sheetRail} currentPageOf={visiblePageOf} onRename={onSheetOverridesChange ? renameSheet : null} onReset={resetSheet} onExpand={() => setSheetRailFull(true)} skipped={skippedSet} onToggleSkip={onSkippedPagesChange ? toggleSkipSheet : null} />
               : railOpen && <ThumbnailRail documentId={activeDocumentId} />}
             {/* ZoomGestureWrapper must be INSIDE Viewport: useViewportElement()
                 reads ViewportElementContext, whose Provider is rendered BY the
@@ -1996,6 +2056,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       sheetLinks={sheetRail ? { sheets: sheetRail.sheets, version: sheetLinksVersion } : null}
                       revisionOverlay={check ? null : revisionOverlay}
                       roomTool={roomToolArmed ? roomTool.state : null}
+                      zonesShown={!check && viewSettings.zones}
                     />
                   )}
                 />
@@ -2033,22 +2094,30 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                   />
                 </div>
               )}
-              {/* Top right, one row: pages and zoom, then the reading / editions buttons and the search. (At the
-                  bottom right the pages / zoom card left the pill too little room at 1280 px — the pill wrapped.) */}
+              {/* Top right, one row: the sheet (badge, name, „← 1 iš N →", W5-B B1), then the reading / editions
+                  buttons and the search. Zoom is the column at the bottom right (ZoomCluster). */}
               <div className="absolute top-2 right-2 flex flex-wrap items-start justify-end gap-2" style={{ left: check ? 8 : RAIL_WIDTH + 16 }} data-chrome-top>
-                <NavCluster documentId={activeDocumentId} totalPages={totalPages} />
+                <SheetHeaderBadge documentId={activeDocumentId} totalPages={totalPages} sheets={sheetRail?.sheets || null} />
                 <CanvasHeader
                   documentId={activeDocumentId}
                   totalPages={totalPages}
                   addon={check ? null : renderToolbarAddon}
+                  addonContext={project ? (page) => ({ scaleGate: sheetNotNeeded(page) ? { ok: true, state: 'nereikia', reason: null } : scaleGateFromScale(pageScaleIn(effectiveScales, page)), onSetScale: () => setScaleChipOpen((n) => n + 1) }) : null}
                   searchOpen={searchOpen}
                   onToggleSearch={() => setSearchOpen((v) => !v)}
                   onCloseSearch={() => setSearchOpen(false)}
                 />
               </div>
+              {/* Zoom, area zoom, minimap, full screen — one column at the bottom right (W5-B B5). */}
+              <ZoomCluster
+                documentId={activeDocumentId}
+                pages={documentState?.document?.pages}
+                onAreaZoom={({ page, rect }) => { frameNonce.current += 1; setFrameFocus({ page, rect, nonce: `area-${frameNonce.current}` }); }}
+                viewSettings={<ViewSettingsPopover settings={viewSettings} onChange={setViewSettings} />}
+              />
               {/* The active mode's pill, bottom centre right of the tool cards. */}
               {pill && (
-                <div className="absolute bottom-2 right-2 flex justify-center" style={{ left: Math.max(check ? 8 : RAIL_WIDTH + 16, chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.left + chromeRects.rects.scaleChip.width + 8 : 0) }}>
+                <div className="absolute bottom-2 flex justify-center" style={{ left: Math.max(check ? 8 : RAIL_WIDTH + 16, chromeRects.rects.scaleChip ? chromeRects.rects.scaleChip.left + chromeRects.rects.scaleChip.width + 8 : 0), right: chromeRects.frame && chromeRects.rects.zoom ? chromeRects.frame.width - chromeRects.rects.zoom.left + 8 : 8 }}>
                   <ModePill pill={pill} onAction={onPillAction} />
                 </div>
               )}
@@ -2060,7 +2129,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 <SelectionBar
                   frame={chromeRects.frame}
                   anchor={null}
-                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip, chromeRects.rects.label, chromeRects.rects.anchor].filter(Boolean)}
+                  avoid={[chromeRects.rects.nav, chromeRects.rects.header, chromeRects.rects.pill, chromeRects.rects.scaleChip, chromeRects.rects.zoom, chromeRects.rects.label, chromeRects.rects.anchor].filter(Boolean)}
                   insetLeft={check ? 8 : RAIL_WIDTH + 16}
                   room={barRoomActions}
                   marks={barRoomActions ? null : barMarks}
@@ -2127,6 +2196,11 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 onCalibrate={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
                 onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}
                 onOverview={() => setScalesOpen(true)}
+                openNonce={scaleChipOpen}
+                pageSizeOf={(page) => documentState?.document?.pages?.[page - 1]?.size || null}
+                isNotNeeded={sheetNotNeeded}
+                onSetRatio={setSheetRatio}
+                onNotNeeded={setSheetNotNeeded}
               />
             )}
             {(scalesOpen || scaleCheck) && !check && project && (
@@ -2272,7 +2346,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               target={measureMenu}
               measurement={menuMeasurement}
               selection={menuSelection}
-              onDeleteMany={deleteMeasurement}
+              onDeleteMany={deleteMeasurementWithUndo}
               onChangeTypeMany={changeCountTypeMany}
               onRecolorMany={recolorMany}
               onDeselect={() => setSelectedMeasureIds([])}
@@ -2280,13 +2354,14 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               onClose={() => setMeasureMenu(null)}
               onRename={renameMeasurement}
               onChangeType={changeCountType}
-              onDelete={deleteMeasurement}
+              onDelete={deleteMeasurementWithUndo}
               onReveal={revealMeasurement}
               onFindSimilar={projectId ? findSimilarFrom : null}
             />
           )}
           <ViewerCoachMarks rootRef={tvRootRef} enabled={!check && active} />
           <CursorHint rootRef={tvRootRef} resolve={resolveCursorHint} mode={hintMode} enabled={active && !check} />
+          <ViewCrosshair rootRef={tvRootRef} enabled={active && viewSettings.crosshair && !!chromeEl} />
         </div>
         );
       }}
@@ -2339,8 +2414,9 @@ export default function TakeoffViewer({
   // jumps to a place and fits it. Absent → the viewer is exactly what it was.
   check = null,
   focus = null,
-  // (currentPage, totalPages) => node — a control at the head of the toolbar, after the page-rail toggle
-  // („Perskaityti lapą", components/viewer/DetectRunButton). Not drawn in the check sheet.
+  // (currentPage, totalPages, {scaleGate, onSetScale} | null) => node — a control at the head of the toolbar
+  // („Perskaityti lapą", components/viewer/DetectRunButton; the third argument is the sheet's scale gate, W5-B B7).
+  // Not drawn in the check sheet.
   renderToolbarAddon = null,
   // Sheets (Togal-v2 W7): the classification (`project.puslapiai`), the user's
   // `project.sheet_overrides` and their setter; `sheetLinksVersion` changes once a rename has been
@@ -2358,6 +2434,9 @@ export default function TakeoffViewer({
   // host when the tool is on (so it can show that node). Absent → the review floats beside the drawing.
   legendPanelSlot = null,
   onLegendPanelChange = null,
+  // „Neskaityti šio lapo" (W5-B B9): `project.neskaitomi_lapai` and its setter. Absent → no button.
+  skippedPages = null,
+  onSkippedPagesChange = null,
 }) {
   const { engine, isLoading, error } = usePdfiumEngine(engineOptions());
   const plugins = useMemo(
@@ -2405,6 +2484,8 @@ export default function TakeoffViewer({
           active={active}
           legendPanelSlot={legendPanelSlot}
           onLegendPanelChange={onLegendPanelChange}
+          skippedPages={skippedPages}
+          onSkippedPagesChange={onSkippedPagesChange}
         />
       </EmbedPDF>
     </div>

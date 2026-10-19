@@ -11,11 +11,16 @@ import { OVERLAY_LAYERS, overlayPageChoices, overlayRequestBody } from '@/lib/ex
 import { overlayPdfFilename } from '@/lib/exportFilename';
 import { triggerDownload } from '@/lib/downloadBlob';
 import { ltCount } from '@/lib/ltPlural';
+import { readViewSettings } from '@/lib/viewSettings';
 
 export default function OverlayPdfDialog({ project, onClose }) {
   const pages = useMemo(() => overlayPageChoices(project), [project]);
   const [chosen, setChosen] = useState(() => new Set(pages.map((p) => p.nr)));
-  const [layers, setLayers] = useState(() => Object.fromEntries(OVERLAY_LAYERS.map((l) => [l.key, l.on])));
+  // „Užrašai" starts as the viewer's „Rodinys" left it (labels off there → off here; W5-B B4)
+  const [layers, setLayers] = useState(() => {
+    const view = readViewSettings();
+    return { ...Object.fromEntries(OVERLAY_LAYERS.map((l) => [l.key, l.on])), labels: view.names || view.dims };
+  });
   const [preview, setPreview] = useState({ url: null, loading: true, error: null });
   const [busy, setBusy] = useState(false);
 

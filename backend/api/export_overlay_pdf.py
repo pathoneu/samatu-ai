@@ -67,6 +67,8 @@ class Layers(BaseModel):
     counts: bool = True
     outlines: bool = True
     walls: bool = False
+    # „Užrašai" (W5-B B4): room numbers with areas, measurement values — the viewer's „Rodinys" label switch
+    labels: bool = True
 
 
 class PageScale(BaseModel):
@@ -406,7 +408,8 @@ def draw_sheet(c, sheet: dict, project: dict, layers: Layers, scale: dict | None
                     text += f" · {lt_number(float(area))} m²"
             except (TypeError, ValueError):
                 pass
-            label(text, x, y, size=7.5, colour=colour, bold=True)
+            if layers.labels:
+                label(text, x, y, size=7.5, colour=colour, bold=True)
         if n_user:
             legend.append(("line", CONFIRMED, f"Patalpos kontūras — nubrėžtas ar pataisytas jūsų ({n_user})", "solid"))
         if n_ai:
@@ -451,7 +454,8 @@ def draw_sheet(c, sheet: dict, project: dict, layers: Layers, scale: dict | None
                          if scale else "nekalibruota")
                 anchor = pts[len(pts) // 2] if len(pts) > 2 else ((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2)
             name = str(m.get("classification") or "").strip()
-            label(f"{name}: {value}" if name else value, *P(*anchor), size=6.5, colour=colour)
+            if layers.labels:
+                label(f"{name}: {value}" if name else value, *P(*anchor), size=6.5, colour=colour)
         if shown:
             legend.append(("line", (0.16, 0.44, 0.71), f"Jūsų matavimai — ilgis arba plotas pagal lapo mastelį ({shown})",
                            "solid"))

@@ -903,7 +903,7 @@ function ReadoutChip({ x, y, text, anchor = 'middle', selected = false }) {
   const h = 20;
   const rx = anchor === 'start' ? x - 6 : x - w / 2;
   return (
-    <g pointerEvents="none">
+    <g pointerEvents="none" data-ov-label="dim">
       <rect x={rx} y={y - h + 5} width={w} height={h} rx={2}
         style={paint({ fill: ov('label-bg'), stroke: selected ? INK : ov('selected', 0.35) })}
         fillOpacity={0.96} strokeWidth={selected ? 1.5 : 1} />
