@@ -4286,6 +4286,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "aprasymas": f"{vieta} plytelės",
             "vnt": "m2", "kiekis": round(kiekis * _tile_waste(field, pasks), 2), "saltinis": SAL,
             "susijes_darbas": f"{vieta} plytelių klijavimas",
+            **({"_assumption": f"Plytelių atliekos {_waste.pct_label(_tile_waste(field, pasks))} % — brėžinyje "
+                               f"parašytas klojimo raštas."}
+               if abs(_tile_waste(field, pasks) - TILE_WASTE) > 1e-9 else {}),
             _IS_MATERIAL_LINE: True,
         })
         _fug = {
@@ -4694,8 +4697,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         if _waste.enabled():  # v3 W5-E E7, default off: §1.6 waste of the pattern the floor plan writes
             _fw = _waste.factor("floor", _waste.pattern_of_texts(
                 _waste.room_floor_text(r) for r in rooms if float(r.get("pvc_grindys_m2") or 0) > 0))
-            _lam_row["medziagos_aprasymas"] = f"Grindų danga (m² + {_waste.pct_label(_fw)}% atliekų)"
+            # the material NAME stays stable (price-list assemblies match on it, api/assemblies_default.py);
+            # the read pattern and its factor go into the row's assumption text
             _lam_row["medziagos_kiekis"] = round(pvc_billed * _fw, 2)
+            if abs(_fw - FLOOR_COVERING_WASTE) > 1e-9:
+                _lam_row["_assumption"] = (f"Grindų dangos atliekos {_waste.pct_label(_fw)} % — brėžinyje parašytas "
+                                           f"klojimo raštas ({_waste.PATTERN_LT[_waste.pattern_of_texts(_waste.room_floor_text(r) for r in rooms if float(r.get('pvc_grindys_m2') or 0) > 0)]}).")
         if _lam_meta["source"] == "anchor":
             _lam_row["_confidence_reason"] = _lam_meta["provenance"]
             _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,

@@ -8,6 +8,9 @@ in metres exactly as before (a missing depth is a blank, never a default).
 TERM, behind flag ``SAMATU_NICHE_DEPTH`` (default off — nothing changes with it off): when every room with niche
 metres has a depth, the two finishing rows („LED nišų glaistymas", „LED nišų dažymas") are billed in m² =
 Σ metres × depth × 3 instead of metres. The framing row stays in metres. Pure helpers.
+
+NEVER DEFAULT-ON (manager decision 2026-10-19): every contractor sąmata in the corpus bills niche finishing in
+metres, so this flag would change his units the moment depths are typed. It stays an opt-in experiment.
 """
 from __future__ import annotations
 

@@ -3,7 +3,8 @@
 Behind flag ``SAMATU_WASTE_BY_PATTERN`` (default off — nothing changes with it off). With it on, the
 tile and floor-covering material rows take their waste from ``UNIVERSAL_RULES["waste_factors"]`` keyed by
 the pattern read off the drawing's own text (the floor-plan covering label, the tile specification excerpt)
-instead of the fixed 1,08 / 1,10; paint litres carry the §3 paint waste.
+instead of the fixed 1,08 / 1,10; paint litres carry the §3 paint waste. Material row NAMES never change (price-list
+assemblies match on them, api/assemblies_default.py) — the pattern and factor go into the row's `_assumption`.
 
 Factors come only from CLAUDE.md §1.6 / §1.7 / §3 via ``UNIVERSAL_RULES``. A pattern is claimed only when
 the text names exactly one; two different patterns in one group, or none, fall back to straight laying.
@@ -22,6 +23,7 @@ STRAIGHT = "straight"
 HERRINGBONE = "herringbone"
 DIAGONAL = "diagonal"
 HEXAGONAL = "hexagonal"
+PATTERN_LT = {STRAIGHT: "tiesus", HERRINGBONE: "eglutė", DIAGONAL: "įstrižai", HEXAGONAL: "šešiakampės"}
 
 # The words a LT drawing uses for each pattern (accents folded, lower case).
 _PATTERN_WORDS = (

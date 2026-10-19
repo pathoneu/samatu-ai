@@ -4,9 +4,18 @@
   · „Vonios montavimas" — from the sanitary reader's tub-only count (``detected_symbols_summary.vonios_kubilai``,
     the count the bathtub-mixer row already rides on). A tub-or-tray symbol with no tub reading becomes the
     blank row with a question, never a guessed 1.
-  · „Trapų montavimas" — from a LEGEND count only (W2-A counts a legend row; W2-B's count → row path stores
-    it as ``parsed["_legendos_kiekiai"]`` = {kind: {"kiekis": n, "tekstas": legend row text}}). No count, no row:
+  · „Trapų montavimas" — from a LEGEND count only (W2-A counts a legend row; the count → row path (W5-D) stores
+    it as ``parsed["_legendos_kiekiai"]`` (see CONTRACT below) = {kind: {"kiekis": n, "tekstas": legend row text}}). No count, no row:
     the main pass's glance (`trapai`) is not a reading and no paid prompt is changed.
+
+CONTRACT ``parsed["_legendos_kiekiai"]`` (writer: W5-D; nothing writes it yet) — a dict keyed by count kind:
+
+    {"trapai": {"kiekis": 3,                      # int ≥ 1 — pieces counted on the drawing
+                "tekstas": "Trapas",              # the legend row's own text, quoted in the evidence sentence
+                "row_id": "…", "page": 4}}        # optional: the legend row and its sheet
+
+  A missing key, a kind without an entry, or ``kiekis`` < 1 means no count and no row. Only ``trapai`` is read
+  here today; other kinds may share the dict.
 
 Pure helpers; the rows themselves are appended by vision_call._build_pozicijos_from_rooms.
 """

@@ -247,3 +247,17 @@ The first stutter a person notices (a frame over 100 ms) appears between 1000 an
 - Real listeners: `lsof -nP -iTCP -sTCP:LISTEN | grep -E "python|node"`.
 - The "N running tasks" panel can show **zombie agents** (40 h+ timers = finished-but-not-cleared). They cost nothing and clear on app/session restart.
 - Spun-off task-sessions live in `.claude/worktrees/*` on their own branches, sometimes based on an **older** commit than `viewer-rebuild` — merge their results forward deliberately, don't assume a clean fast-forward.
+
+## Engine flags (v3 W5-E) — all default off
+
+Each changes billed or material quantities only when set to `1`; with all of them unset every gate pass is
+identical to baseline. The manager / founder decides each one on the measured report.
+
+| Flag | What it does | Status |
+|---|---|---|
+| `SAMATU_WASTE_BY_PATTERN` | tile / floor-covering waste by the laying pattern the drawing writes, paint +7 % (`extractor/waste_pattern.py`); material names stay stable | off, founder decides |
+| `SAMATU_BATH_DRAIN_ROWS` | „Vonios montavimas" from the tub-only count; „Trapų montavimas" from `parsed["_legendos_kiekiai"]` (`extractor/fixture_rows_flag.py`, contract in its docstring) | off |
+| `SAMATU_WALLPAPER_ROLLS` | wallpaper rolls for walls whose finish reads „tapetai" (`extractor/wallpaper_flag.py`) | off |
+| `SAMATU_NICHE_DEPTH` | niche finishing in m² = metres × depth × 3 (`extractor/niche_depth.py`) | **never default-on**: every contractor bills niche finishing in metres |
+| `SAMATU_FURNITURE_ZONES` | furniture zones off the paintable walls; panels are information only (`extractor/wall_zones.py`) | off |
+

@@ -92,8 +92,9 @@ def test_flag_on_reads_the_pattern(monkeypatch):
     on = _build(monkeypatch, "1")
     lam = _row(on, "Parketo / laminato klojimas")
     mat = _floor_mat(on)
-    assert mat["aprasymas"] == "Grindų danga (m² + 16% atliekų)"      # eglutės raštas → parquet_herringbone
-    assert mat["kiekis"] == round(lam["kiekis"] * 1.16, 2)
+    assert mat["aprasymas"] == "Grindų danga (m² + 10% atliekų)"      # the name stays: price lists match on it
+    assert mat["kiekis"] == round(lam["kiekis"] * 1.16, 2)            # eglutės raštas → parquet_herringbone
+    assert "16 %" in lam["_assumption"] and "eglutė" in lam["_assumption"]
     # vonios plytelės: the specification says šešiakampės → +16 % instead of +8 %
     assert _row(on, "Vonios grindų plytelės")["kiekis"] == round(6.0 * 1.16, 2)
     assert _row(on, "Vonios sienų plytelės")["kiekis"] == round(_row(off, "Vonios sienų plytelių klijavimas")["kiekis"] * 1.16, 2)
