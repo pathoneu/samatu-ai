@@ -5,7 +5,7 @@
  * Layout (left → right):
  *   [logo] {projectName} / {subtitle}  |  ← {page/total ▾} →  {pageTitle}
  *   ...flex spacer...
- *   [− zoom% +]  [🔍 Ieškoti]  [✨ Pathon]  [⋯]
+ *   [− zoom% +]  [🔍 Ieškoti]  [Pathon]  [⋯]
  *
  * Sprint 3-B: dropped the Patikrinti queue badge along with the
  * verification wizard. Trust by default, fix by exception.

@@ -10,14 +10,12 @@
  *   - 'vision' → "iš AI" (Vision-only, low trust)
  *   - 'dimension' → "iš dimensijos" (placeholder for future)
  *
- * Phase C-4-bis: AI-adjacent sources (eksplikacija auto-reader, Vision)
- * also render a small ✨ AI badge so the user perceives the tool's
- * intelligence, à la modern takeoff UIs.
+ * v3 W6-A: the sparkle „AI" badge after the Vision label is gone (a toy trope, 8 px, empty
+ * label) — the label and its title already say the number came from the drawing's picture.
  *
  * No "bbox" or "polygon" jargon in any visible string.
  */
 import { useTranslation } from 'react-i18next';
-import AiBadge from './AiBadge';
 
 // v3 W1-C: a quiet 12 px text link in sentence case — it was a 9 px uppercase pill, blue-300 on
 // blue-500/15 (a dark-theme leftover: 1,47:1 on parchment, 11 times per screen). The words say where
@@ -58,11 +56,6 @@ export default function ProvenanceChip({ source, onClick }) {
   const { t } = useTranslation();
   const meta = SOURCE_META[source];
   if (!meta) return null;
-  // 2026-05-06: ✨ badge ONLY for direct Vision output. Eksplikacija is
-  // deterministic pdfplumber extraction (NOT AI inference), so it does not
-  // deserve the AI sparkle. Showing it on eksplikacija rooms was creating
-  // visual clutter and misrepresenting the data flow.
-  const isAi = source === 'vision';
   return (
     <span className="inline-flex items-center gap-1" data-testid={`provenance-chip-${source}`}>
       <button
@@ -72,7 +65,6 @@ export default function ProvenanceChip({ source, onClick }) {
       >
         {t(meta.labelKey)}
       </button>
-      {isAi && <AiBadge label="" />}
     </span>
   );
 }
