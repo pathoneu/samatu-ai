@@ -48,6 +48,7 @@ import {
 import QuantitiesPanel from '@/components/viewer/quantities/QuantitiesPanel';
 import AiChat from '@/components/project/AiChat';
 import { syncLegendRows } from '@/lib/legendReview';
+import { legendCounts } from '@/lib/legendCounts';
 
 // Patikra's question list / room sheet (its own chunk, as when it was a separate route).
 const PatikraEntry = lazy(() => import('@/pages/PatikraEntry'));
@@ -512,6 +513,8 @@ export default function InteriorWorkspace({
       pageScalesDurable: measureScales,
       ...(countTypes ? { countTypes } : {}),
       ...(synced !== rows ? { darbu_sarasas: synced } : {}),
+      // v3 W5-D: the legend counts by kind (backend fixture_rows_flag contract) follow the marks
+      _legendos_kiekiai: legendCounts({ measurements, countTypes: countTypes || project.countTypes || [] }),
     });
     if (updated) onProjectChange?.(updated);
   };

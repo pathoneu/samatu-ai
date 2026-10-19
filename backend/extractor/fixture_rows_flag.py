@@ -8,7 +8,10 @@
     it as ``parsed["_legendos_kiekiai"]`` (see CONTRACT below) = {kind: {"kiekis": n, "tekstas": legend row text}}). No count, no row:
     the main pass's glance (`trapai`) is not a reading and no paid prompt is changed.
 
-CONTRACT ``parsed["_legendos_kiekiai"]`` (writer: W5-D; nothing writes it yet) — a dict keyed by count kind:
+CONTRACT ``parsed["_legendos_kiekiai"]`` (writer: W5-D — frontend/src/lib/legendCounts.js, from the count types made
+from legend rows and their marks; sent in every recompute context and stored on the project) — a dict keyed by
+count kind (the legend row's text folded to legendCounts.KINDS: trapai, difuzoriai, davikliai, jungikliai, rozetes,
+sviestuvai; two legend rows of one kind add up, their texts joined with „; " and listed in "eilutes"):
 
     {"trapai": {"kiekis": 3,                      # int ≥ 1 — pieces counted on the drawing
                 "tekstas": "Trapas",              # the legend row's own text, quoted in the evidence sentence

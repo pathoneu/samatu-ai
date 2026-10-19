@@ -11,6 +11,7 @@
  * helper, two callers, nothing to drift.
  */
 import { measuredContributions } from './measuredRows.js';
+import { legendCounts } from './legendCounts.js';
 
 export function buildRecomputeContext(rawData) {
   const d = rawData || {};
@@ -42,6 +43,9 @@ export function buildRecomputeContext(rawData) {
     // Pathon v3 W4-A: what he measured on rows (lib/measuredRows.js) — the rebuilt rows come back carrying their
     // „matavimas" lines (backend api/measured_rows.py). Absent when nothing is linked: the request is unchanged.
     matavimai: matavimai.length ? matavimai : undefined,
+    // Pathon v3 W5-D: the legend counts by kind ({trapai: {kiekis, tekstas, …}}, lib/legendCounts.js) — what
+    // backend/extractor/fixture_rows_flag.py reads; derived from the marks on every recompute, never stale.
+    _legendos_kiekiai: legendCounts(d),
   };
 }
 
@@ -49,5 +53,5 @@ export function buildRecomputeContext(rawData) {
 export const RECOMPUTE_CONTEXT_KEYS = Object.freeze([
   '_door_types', 'detected_symbols_summary', '_plyteliu_specs', '_symbol_legend', '_duru_ziniarastis',
   '_vector_symbols', 'bendras_plotas_m2', 'v9_meta', '_overrides', '_ceiling_anchor', '_walls_anchor', '_floor_anchors', '_meta', '_autoriaus_kiekiai',
-  'matavimai',
+  'matavimai', '_legendos_kiekiai',
 ]);
