@@ -15,7 +15,7 @@
  * the fully composed final frame. Scene micro-copy is LT draft.
  */
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 const mono = "'IBM Plex Mono', monospace";
 const plex = "'IBM Plex Sans', sans-serif";

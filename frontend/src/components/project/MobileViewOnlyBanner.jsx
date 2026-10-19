@@ -4,7 +4,7 @@
 // localStorage so the banner only nags once per device.
 
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 const STORAGE_KEY = 'samatu_mobile_banner_dismissed';
 

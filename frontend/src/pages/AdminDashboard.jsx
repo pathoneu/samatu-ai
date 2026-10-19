@@ -16,7 +16,7 @@
  */
 import React from 'react';
 import { Navigate } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Download, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { Button } from '@/components/ui/button';

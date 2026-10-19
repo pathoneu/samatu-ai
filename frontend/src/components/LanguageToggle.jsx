@@ -8,7 +8,7 @@
  * authenticated app stays LT for a later phase.
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { changeAppLanguage, SUPPORTED_LANGS } from '@/i18n';
 
 export default function LanguageToggle({ className = '', size = 'sm' }) {

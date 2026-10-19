@@ -12,7 +12,7 @@
  *
  * Spec §5.4 top-bar behaviors.
  */
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { useStore } from 'zustand';
 import { viewerStore } from '../../lib/viewerStore';
 

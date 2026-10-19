@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { lt } from 'date-fns/locale';

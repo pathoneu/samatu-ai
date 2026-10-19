@@ -5,7 +5,7 @@
  */
 
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { format } from 'date-fns';
 import { ArrowRight, Loader2 } from 'lucide-react';
 

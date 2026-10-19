@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { toast } from 'sonner';
 import { Check, Loader2 } from 'lucide-react';
 import { parseLtNumber, isValidAmount } from '@/lib/parseLtNumber';

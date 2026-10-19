@@ -5,7 +5,7 @@
  * refreshProjectFromBackend, Pathon v3 W1-F F4). The load may finish after this mounts, so it also listens.
  */
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { RefreshCw } from 'lucide-react';
 import Notice from '@/components/ui/Notice';
 import {

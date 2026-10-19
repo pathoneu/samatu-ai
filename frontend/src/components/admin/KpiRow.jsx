@@ -9,7 +9,7 @@
  *    delta taken from analytics.deltas.cost_eur (same underlying series).
  */
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Users, FolderKanban, ScanLine, Wallet, TrendingUp } from 'lucide-react';
 import { DeltaChip, KpiSkeleton } from './adminPrimitives';
 import { fmtInt, fmtEur } from './adminUtils';

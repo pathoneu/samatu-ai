@@ -3,7 +3,7 @@
 // hint, and ortho-toggle status. Per UX research §7: "no mode indicator" is
 // the #1 support ticket on every annotation tool, so this banner is mandatory.
 
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 
 export default function TraceModeBanner({ visible, polygonDraft, orthoEnabled }) {
   const { t } = useTranslation();

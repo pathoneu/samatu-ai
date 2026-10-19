@@ -60,6 +60,7 @@ import ToolRail, { RAIL_WIDTH, railHeight } from './ToolRail';
 import SheetHeaderBadge from './SheetHeaderBadge';
 import ZoomCluster from './ZoomCluster';
 import ViewSettingsPopover, { CleanBgFilter, ViewCrosshair } from './ViewSettingsPopover';
+import { browserStorage } from '@/lib/browserStorage';
 import { readViewSettings, viewCss, writeViewSettings } from '@/lib/viewSettings';
 import { cachedSheetZones, noRoomZoneAt } from '@/lib/sheetZonesApi';
 import { scaleGateFromScale } from '@/lib/scaleGate';
@@ -1386,9 +1387,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     setThumbsPref(next);
   };
   // A sheet set (SheetRail) opens on its 56 px strip; the full rail is „Lapai" or T (Pathon v3 frame, A4).
-  const [sheetRailFull, setSheetRailFullState] = useState(() => readSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null));
+  const [sheetRailFull, setSheetRailFullState] = useState(() => readSheetRailFull(browserStorage()));
   const setSheetRailFull = (next) => {
-    writeSheetRailFull(typeof window !== 'undefined' ? window.localStorage : null, next);
+    writeSheetRailFull(browserStorage(), next);
     setSheetRailFullState(next);
   };
 

@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { Progress } from '@/components/ui/progress';
 import { useBilling } from '@/hooks/useBilling';
 

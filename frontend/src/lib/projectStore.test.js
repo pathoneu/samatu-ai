@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  _handleSyncResponse, _hasStorageNotice, _resetSaveState, _getServerVersion,
+  _handleSyncResponse, _hasStorageNotice, _resetStorageNotice, _resetSaveState, _getServerVersion,
   updateProject, getProject, getProjects, createProject, flushProjectSaves,
   resetPullCache, exportProjectsBackup, importProjectsBackup, getPriceLists,
   pullProjectsFromBackend, markPriceFillPending, peekPriceFillPending,
@@ -943,4 +943,72 @@ test('every save keeps the rows on what he measured — a moved length moves its
   const rows = [{ id: 'x', kiekis: 1 }];
   assert.equal(updateProject('m2', { darbu_sarasas: rows }).darbu_sarasas, rows);
   await flushProjectSaves();
+});
+
+// ── The cache under Safari's quota (2026-10-19) ───────────────────────────────
+
+/** A localStorage double with WebKit's limit: ~2.5 M characters per origin, all keys together. */
+function installQuotaStorage(initial = {}, limitChars = 2_500_000) {
+  const ls = installLocalStorage(initial);
+  const map = new Map(Object.entries(initial));
+  const used = (except) => [...map].reduce((n, [k, v]) => (k === except ? n : n + k.length + v.length), 0);
+  ls.getItem = (k) => (map.has(k) ? map.get(k) : null);
+  ls.removeItem = (k) => { map.delete(k); };
+  ls.setItem = (k, v) => {
+    const s = String(v);
+    if (used(k) + k.length + s.length > limitChars) {
+      const e = new Error('The quota has been exceeded.'); e.name = 'QuotaExceededError'; throw e;
+    }
+    map.set(k, s);
+  };
+  return ls;
+}
+
+const bigProject = (id, day, chars = 750_000) => ({
+  id, name: id, updated_at: `2026-10-${String(day).padStart(2, '0')}T10:00:00Z`, blob: 'x'.repeat(chars),
+});
+
+test('a 6 MB project set: the newest projects that fit are cached, nothing throws, no warning', () => {
+  _resetSaveState();
+  // 8 × 0,75 M ≈ 6 M characters — what a pull of a real account leaves in memory; the seed is not quota-checked
+  const set = Array.from({ length: 8 }, (_, i) => bigProject(`p${i + 1}`, i + 1));
+  const ls = installQuotaStorage({ samatu_projects: JSON.stringify(set) });
+  installFetchRecorder();
+  _resetStorageNotice();
+  updateProject('p2', { name: 'Redaguota' });    // an old project with an unsent edit
+  assert.doesNotThrow(() => flushProjectSaves());
+  const cached = JSON.parse(ls.getItem('samatu_projects'));
+  const ids = cached.map((p) => p.id);
+  assert.ok(cached.length >= 2 && cached.length < 8, `cached ${cached.length}`);
+  assert.ok(ids.includes('p2'), 'the project with the unsent edit is cached first');
+  assert.ok(ids.includes('p8'), 'then the newest');
+  assert.ok(!ids.includes('p1'), 'the oldest is the one left out');
+  assert.equal(cached.find((p) => p.id === 'p2').name, 'Redaguota');
+  assert.equal(_hasStorageNotice(), false, 'a partial cache is not an error');
+  assert.equal(getProjects().length, 8, 'this session still sees every project');
+});
+
+test('a refused write never leaves the old copy behind to win after a reload', () => {
+  _resetSaveState();
+  const old = { id: 'p1', name: 'Senas', updated_at: '2026-10-01T10:00:00Z', blob: 'x'.repeat(100) };
+  const ls = installQuotaStorage({ samatu_projects: JSON.stringify([old]) }, 2_000);
+  installFetchRecorder();
+  updateProject('p1', { name: 'Naujas', blob: 'y'.repeat(5_000) });   // the new copy cannot fit at all
+  assert.doesNotThrow(() => flushProjectSaves());
+  assert.equal(ls.getItem('samatu_projects'), null, 'the stale cached copy is gone');
+  _resetSaveState();   // a reload: the cache is all there is
+  assert.equal(getProject('p1'), null, 'nothing stale to read — the page loads it from the server');
+});
+
+test('storage blocked outright (Safari „Block all cookies"): a save neither throws nor loses the edit', () => {
+  _resetSaveState();
+  const ls = installLocalStorage({ samatu_projects: JSON.stringify([{ id: 'p1', name: 'A' }]) });
+  const blocked = () => { const e = new Error('The operation is insecure.'); e.name = 'SecurityError'; throw e; };
+  ls.setItem = blocked;
+  ls.removeItem = blocked;
+  const puts = installFetchRecorder();
+  updateProject('p1', { name: 'B' });
+  assert.doesNotThrow(() => flushProjectSaves());
+  assert.equal(getProject('p1').name, 'B');
+  assert.equal(JSON.parse(puts[puts.length - 1].body).name, 'B');
 });

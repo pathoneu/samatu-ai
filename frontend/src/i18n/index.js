@@ -16,6 +16,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import lt from './lt.json';
 import en from './en.json';
+import { makeMissingKeyHandler } from '@/lib/i18nFallback';
 
 export const LANG_STORAGE_KEY = 'pathon_lang';
 export const SUPPORTED_LANGS = ['lt', 'en'];
@@ -45,6 +46,9 @@ i18n.use(initReactI18next).init({
     escapeValue: false, // React already escapes
   },
   returnObjects: true, // allow t('...feats', { returnObjects: true }) arrays
+  // Never a key on screen (2026-10-19, Safari walk): whatever i18next could not resolve is looked up
+  // directly in the Lithuanian catalogue, else the caller's default text, else nothing.
+  parseMissingKeyHandler: makeMissingKeyHandler(lt),
 });
 
 // Keep <html lang> in sync (a11y + SEO). Safe on SSR-less client.

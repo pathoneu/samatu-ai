@@ -14,7 +14,7 @@
  */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/i18n/react';
 import { ArrowLeft } from 'lucide-react';
 import { PathonMark } from '@/components/layout/Logo';
 import LanguageToggle from '@/components/LanguageToggle';
