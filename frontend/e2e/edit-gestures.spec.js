@@ -412,12 +412,29 @@ test.describe('W5-A editing gestures', () => {
 
   test('A12: walls layer on, a click on a wall face → its length as a distance', async ({ page }) => {
     await openProject(page);
-    const { rooms } = await stored(page);
-    const ring = rooms['06'].polygon_pct;
-    // a point on 06's outline, which runs along the wall faces: a third of the way along its longest edge
+    // a wall face of the sheet's own wall solid (the rings the walls layer draws): the long face nearest room 06,
+    // a third of the way along it
+    // (the geometry route allows 30 calls a minute per client; a full suite run can use them up — wait for the window)
+    let geo = null;
+    await expect.poll(async () => {
+      geo = await page.evaluate(async (id) => {
+        const r = await fetch(`/api/projects/${id}/pages/1/geometry`, { credentials: 'include' });
+        return r.ok ? r.json() : null;
+      }, PROJECT);
+      return Array.isArray(geo?.walls_pct);
+    }, { timeout: 90_000, intervals: [2000, 5000] }).toBe(true);
     let best = null;
-    ring.forEach((p, i) => { const q = ring[(i + 1) % ring.length]; const len = Math.hypot(q[0] - p[0], q[1] - p[1]); if (!best || len > best.len) best = { p, q, len }; });
-    const fx = best.p[0] + (best.q[0] - best.p[0]) / 3; const fy = best.p[1] + (best.q[1] - best.p[1]) / 3;
+    for (const ring of geo.walls_pct) {
+      ring.forEach((p, i) => {
+        const q = ring[(i + 1) % ring.length];
+        const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        if (len < 0.06) return;
+        const m = [p[0] + (q[0] - p[0]) / 3, p[1] + (q[1] - p[1]) / 3];
+        const d = Math.hypot(m[0] - ROOM_06[0], m[1] - ROOM_06[1]);
+        if (!best || d < best.d) best = { m, d };
+      });
+    }
+    const [fx, fy] = best.m;
     await bringIntoView(page, fx, fy);
     const start = (await stored(page)).measurements.length;
     await page.keyboard.press('s');

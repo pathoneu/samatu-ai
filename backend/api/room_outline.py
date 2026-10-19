@@ -923,7 +923,7 @@ def api_room_hole_at(request: Request, project_id: str, room_nr: str, body: Hole
     dashed and his Enter saves it through `outline-set` (Undo there). Read only; no journal row."""
     project = _project_for(request, project_id)          # ownership FIRST (tests/test_route_ownership_policy.py)
     from main import _check_rate_limit, _client_key
-    _check_rate_limit(_client_key(request), "page_geometry")
+    _check_rate_limit(_client_key(request), "room_hole")   # its own bucket: a click must not eat the sheets' geometry fetches
     wanted = str(room_nr).strip()
     room = next((r for r in (project.get("patalpos") or []) if isinstance(r, dict) and _nr(r) == wanted), None)
     if room is None:
