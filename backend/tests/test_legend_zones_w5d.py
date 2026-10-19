@@ -97,3 +97,24 @@ def test_two_rows_never_claim_the_same_shape_hit():
     solo = {0: {"saltinis": "rastras", "count": 1, "per_page": [], "instances": [{"page": 1, "box_pct": [0, 0, 0.1, 0.1], "score": 0.9}]}}
     _one_symbol_one_row(solo)
     assert solo[0]["count"] == 1
+
+
+
+def test_d12_a_sheet_whose_only_content_zone_is_a_legend_is_a_legend_sheet():
+    """The €0 type from zones (the twin of frontend sheetRail.sheetTypeFromZones). On the corpus the rule found
+    two sheets, both plans whose plan zone was not found (objektas_d p4, objektas_h p8) — so the UI applies it
+    only to a sheet the reading left without a type."""
+    from extractor.sheet_zones import sheet_type_from_zones
+    zone = lambda kind: {"kind": kind, "bbox_pct": [0, 0, 0.2, 0.2]}  # noqa: E731
+    assert sheet_type_from_zones([zone("legenda"), zone("antspaudas"), zone("pastabos")]) == "legenda"
+    assert sheet_type_from_zones([zone("legenda"), zone("planas")]) is None
+    assert sheet_type_from_zones([zone("legenda"), zone("lentele")]) is None
+    assert sheet_type_from_zones([zone("antspaudas")]) is None and sheet_type_from_zones([]) is None
+    # a real synthetic sheet: a legend and the sheet title, no plan drawn
+    from synthetic_plan import Sheet
+    only = Sheet(walls=[], badges=[], legend_block_at=(330.0, 100.0))
+    pdf = build_plan([only])
+    kinds = sorted(z["kind"] for z in sz.read_zones(pdf, 1)["zones"])
+    assert "legenda" in kinds and "planas" not in kinds
+    assert sheet_type_from_zones(sz.read_zones(pdf, 1)["zones"]) == "legenda"
+    assert sheet_type_from_zones(sz.read_zones(build_plan([_legend_sheet()]), 1)["zones"]) is None

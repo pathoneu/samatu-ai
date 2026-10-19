@@ -147,6 +147,25 @@ def columns(projects: list[str]) -> None:
         print(f"== {code}: {total} legend rows ({', '.join(per)})")
 
 
+# ── D12 ──────────────────────────────────────────────────────────────────────
+
+def sheet_types(projects: list[str]) -> None:
+    """Every sheet's zones; the sheets the zones alone call „legenda", beside what the paid reading called them."""
+    from extractor import sheet_zones as sz
+    for code, pdf, extract in corpus(projects):
+        n = _pages(pdf)
+        paid = {int(p.get("nr") or 0): p.get("tipas") for p in (extract or {}).get("puslapiai") or [] if isinstance(p, dict)}
+        hits = []
+        t0 = time.time()
+        for p in range(1, n + 1):
+            zones = sz.read_zones(pdf, p).get("zones") or []
+            if sz.sheet_type_from_zones(zones) == "legenda":
+                hits.append(f"p{p} (paid reading: {paid.get(p) or '—'}; zones {sorted(z['kind'] for z in zones)})")
+        print(f"== {code}: {n} sheets, legend-only {len(hits)} ({time.time() - t0:.0f}s)")
+        for h in hits:
+            print(f"    {h}")
+
+
 def main() -> int:
     global NO_LABELS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -155,7 +174,7 @@ def main() -> int:
     ap.add_argument("--no-labels", action="store_true")
     args = ap.parse_args()
     NO_LABELS = args.no_labels
-    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns}.get(args.what)
+    fn = {"floor-legend": floor_legend, "legend-zones": legend_zones, "columns": columns, "sheet-types": sheet_types}.get(args.what)
     if fn is None:
         print(f"unknown report: {args.what}")
         return 2

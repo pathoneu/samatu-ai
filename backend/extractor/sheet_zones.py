@@ -897,6 +897,16 @@ def zones_for_pages(pdf_bytes: bytes, pages: Iterable[int], *, table_max_objects
 _PRIORITY = {"antspaudas": 0, "lentele": 1, "legenda": 2, "pastabos": 3, "kita": 4, "planas": 5}
 
 
+def sheet_type_from_zones(zones: Sequence[dict]) -> str | None:
+    """The €0 sheet type the zones alone can give (Pathon v3 W5-D, D12): "legenda" for a sheet whose only content
+    zone is a legend — a legend zone, no plan and no table (a title block, notes or a stray block may stand
+    beside it). None otherwise: every other sheet keeps whatever type it has. No model, no prompt."""
+    kinds = [str(z.get("kind")) for z in zones or [] if isinstance(z, dict)]
+    if "legenda" in kinds and "planas" not in kinds and "lentele" not in kinds:
+        return "legenda"
+    return None
+
+
 def zone_at(zones: Sequence[dict], x_pct: float, y_pct: float) -> dict | None:
     """The zone a display-frame point falls in. Where zones overlap, a plan comes last and among the others
     the INNERMOST (smallest) wins — a legend inside the title block's band is the legend."""
