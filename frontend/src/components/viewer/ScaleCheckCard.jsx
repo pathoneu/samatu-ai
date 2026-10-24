@@ -7,6 +7,7 @@
 import { X } from 'lucide-react';
 import { formatNumberLT } from '@/lib/measureGeometry';
 import { scaleStatusText } from '@/lib/scaleLabel';
+import { useTranslation } from '@/i18n/react';
 
 const m = (v) => `${formatNumberLT(v, 2)} m`;
 // one decimal, signed; a difference that rounds to nothing reads „0,0 %", never „−0,0 %"
@@ -16,6 +17,7 @@ const pct = (v) => {
 };
 
 export default function ScaleCheckCard({ readout, page, scale, onClose }) {
+  const { t } = useTranslation();
   if (!readout) return null;
   return (
     <div className="w-80 rounded-[2px] border border-border bg-card text-card-foreground shadow-lg text-meta" data-testid="scale-check">
@@ -24,7 +26,7 @@ export default function ScaleCheckCard({ readout, page, scale, onClose }) {
         <button type="button" className="p-1 rounded-[2px] hover:bg-muted" onClick={onClose} title="Uždaryti (Esc)" aria-label="Uždaryti patikrą"><X className="w-4 h-4" /></button>
       </div>
       <div className="px-3 py-2 border-b border-border">
-        <div className="text-muted-foreground text-meta">{scaleStatusText(scale)}</div>
+        <div className="text-muted-foreground text-ui" data-testid="scale-check-source">{scaleStatusText(scale, t, { clickable: false })}</div>
         <div className="mt-1">
           Pažymėta atkarpa:{' '}
           {readout.lengthM != null

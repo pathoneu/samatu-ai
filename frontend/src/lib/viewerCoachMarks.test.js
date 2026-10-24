@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   COACH_STEPS, COACH_STORAGE_KEY, COACH_STEP_KEY, COACH_MAX_WORDS, coachMarksDone, markCoachMarksDone, coachCardPosition,
-  coachStartStep, saveCoachStep, resetCoachMarks, wordCount, modalOpen, MODAL_SELECTOR,
+  coachStartStep, saveCoachStep, resetCoachMarks, wordCount, modalOpen, MODAL_SELECTOR, coachAvoid,
 } from './viewerCoachMarks.js';
 import { shortcutById } from './viewerShortcuts.js';
 import { isBannedText } from './userText.js';
@@ -132,6 +132,23 @@ test('beside a tool card (side right) the card stands right of it, arrow at its 
   assert.equal(p.arrowTop, 300 + 17 - 288);
   const low = coachCardPosition({ left: 120, top: 690, width: 64, height: 20, bottom: 710 }, { vw: 1280, vh: 720, side: 'right' });
   assert.ok(low.top + 220 <= 720 - 12 + 0.001, 'kept inside the window');
+});
+
+test('a card never covers the room header: moved under it when anchored, else it waits', () => {
+  // the room sheet at 1440×900: the header strip spans the right half; the anchor-less card sat centred near the top
+  const header = { left: 637, top: 137, width: 787, height: 116 };
+  const pos = coachCardPosition(null, { vw: 1440, vh: 900, cardW: 300, cardH: 120 });
+  assert.equal(coachAvoid(pos, { cardW: 300, cardH: 120, vh: 900, avoid: [header], anchored: false }), null);
+  const moved = coachAvoid({ left: 700, top: 120, arrowLeft: 40, arrowTop: null, arrowDown: false }, { cardW: 300, cardH: 120, vh: 900, avoid: [header] });
+  assert.equal(moved.top, 137 + 116 + 10);
+  assert.equal(moved.arrowLeft, null);
+  // no room under it → waits
+  assert.equal(coachAvoid({ left: 700, top: 120 }, { cardW: 300, cardH: 700, vh: 900, avoid: [header] }), null);
+  // clear of it, or nothing to avoid → unchanged
+  const clear = { left: 120, top: 100, arrowLeft: null, arrowTop: 30, arrowDown: false };
+  assert.equal(coachAvoid(clear, { cardW: 300, cardH: 120, vh: 900, avoid: [header] }), clear);
+  assert.equal(coachAvoid(clear, { cardW: 300, cardH: 120, vh: 900 }), clear);
+  assert.equal(coachAvoid(clear, { cardW: 300, cardH: 120, vh: 900, avoid: [{ left: 0, top: 0, width: 0, height: 0 }] }), clear);
 });
 
 test('wordCount ignores dashes and punctuation', () => {

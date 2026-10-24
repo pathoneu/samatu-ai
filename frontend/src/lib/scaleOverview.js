@@ -4,14 +4,15 @@
  * Togal predicts a scale per sheet, asks a person to confirm it and refuses to apply one scale to a set
  * blindly. The panel lists every sheet with the scale in force, where it comes from in his words, the scale
  * the sheet writes when that differs, how many of the drawing's dimension strings the lane read on it, and a
- * state: nenustatytas · spėjamas · patvirtintas. Pure — the panel stays dumb.
+ * state: nenustatytas · spėjamas · nuskaitytas · patvirtintas (lib/scaleProvenance). Pure — the panel stays dumb and
+ * puts `desc` into words with i18n.
  *
  * Inputs are what the viewer already holds: the project (for the lane and the rooms) and the live durable map
  * (the viewer owns it between saves).
  */
 import { laneScalesOf, staleConfirmation } from './durableScale.js';
 import { effectivePageScales, pageScaleIn } from './pageScales.js';
-import { scaleState, scaleSourceText } from './scaleLabel.js';
+import { blankReasonOf, describeScale } from './scaleProvenance.js';
 
 const roomsOf = (project) => project?.v8_rooms || project?.patalpos || [];
 
@@ -63,12 +64,12 @@ function pagesOf(project, pageCount, scales) {
 
 /**
  * `{rows, groups}`.
- *   rows[i]  = {page, state, label, ratio, source, written, strings, sample, canConfirm, stale}
+ *   rows[i]  = {page, state, desc, label, ratio, written, strings, sample, canConfirm, stale}
  *     label    '1:115' / '~1:50' / '' — the scale in force;
- *     source   scaleSourceText — where it comes from;
+ *     desc     lib/scaleProvenance.describeScale — where it comes from, as data (the panel words it);
  *     written  the scale the sheet writes when the strings measure another ('1:100'), else '';
  *     strings  how many dimension strings the lane read on this sheet; sample = the first few, as written;
- *     canConfirm  a lane scale he has not confirmed yet;
+ *     canConfirm  a lane scale he has not confirmed yet (read from the drawing or a proposal);
  *     stale    {confirmed, now} when he confirmed a ratio the lane no longer measures there.
  *   groups   = [{ratio, label, pages}] — two or more unconfirmed sheets sharing one lane ratio, for
  *              „Patvirtinti visus su tuo pačiu masteliu".
@@ -80,7 +81,8 @@ export function buildScaleOverview(project, { pageCount = null, durable = projec
   const rows = pagesOf(project, pageCount, scales).map((page) => {
     const scale = pageScaleIn(scales, page);
     const laneScale = pageScaleIn(lane, page);
-    const state = scaleState(scale);
+    const desc = describeScale(scale, { blankReason: blankReasonOf(project, page) });
+    const { state } = desc;
     const own = strings[page] || [];
     const stale = staleConfirmation(pageScaleIn(durable || {}, page), laneScale);
     return {
@@ -88,11 +90,11 @@ export function buildScaleOverview(project, { pageCount = null, durable = projec
       state,
       label: state === 'nenustatytas' ? '' : `${prefixOf(scale)}${labelOf(scale)}`,
       ratio: ratioOf(scale),
-      source: scaleSourceText(scale),
+      desc,
       written: (scale?.uzrasyta || []).filter((n) => Number(n) > 0).map((n) => `1:${n}`).join(', '),
       strings: own.length,
       sample: own.slice(0, sampleSize).map((s) => s.text),
-      canConfirm: state === 'spejamas' && scale?.source === 'plan',
+      canConfirm: (state === 'spejamas' || state === 'nuskaitytas') && scale?.source === 'plan',
       stale,
     };
   });
@@ -110,7 +112,7 @@ export function buildScaleOverview(project, { pageCount = null, durable = projec
 
 /** Counts per state, for the panel's header line. */
 export function overviewCounts(rows) {
-  const out = { nenustatytas: 0, spejamas: 0, patvirtintas: 0 };
+  const out = { nenustatytas: 0, spejamas: 0, nuskaitytas: 0, patvirtintas: 0 };
   for (const r of rows || []) out[r.state] = (out[r.state] || 0) + 1;
   return out;
 }
