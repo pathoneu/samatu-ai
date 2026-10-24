@@ -107,7 +107,8 @@ def test_tile_floor_and_waterproofing_lines_carry_their_rooms(client):
     for prefix, expect_room in (("Vonios sienų plytelių klijavimas", "03"),
                                 ("Vonios sienų plytelių fugavimas", "03"),
                                 ("Vonios grindų plytelių klijavimas", "03"),
-                                ("Hidroizoliacijos įrengimas", "03"),
+                                ("Grindų hidroizoliacija", "03"),               # two rows by default (founder, 2026-10-24)
+                                ("Hidroizoliacinė juosta kampams", "03"),
                                 ("Grindų išlyginamasis sluoksnis", "01"),
                                 ("Parketo / laminato klojimas", "01")):
         row = _row(out, prefix)
@@ -125,7 +126,7 @@ def test_the_bathroom_check_sheet_lists_its_tiles(client):
     labels = {q["aprasymas"] for q in quantities}
     assert any(l.startswith("Vonios sienų plytelių klijavimas") for l in labels), labels
     assert any(l.startswith("Vonios grindų plytelių klijavimas") for l in labels), labels
-    assert any(l.startswith("Hidroizoliacijos įrengimas") for l in labels), labels
+    assert any(l.startswith("Grindų hidroizoliacija") for l in labels), labels
     # and the living room lists its floor, with the bathroom named as left out
     q01, ex01 = room_facts.room_quantities(out, "01")
     assert any(q["aprasymas"].startswith("Parketo / laminato klojimas") for q in q01)
@@ -198,7 +199,7 @@ def test_an_excluded_room_is_named_only_on_the_lines_it_belonged_to(client):
     _, excluded = room_facts.room_quantities(out, "03")
     labels = {e["aprasymas"] for e in excluded}
     assert any(l.startswith("Vonios sienų plytelių klijavimas") for l in labels), labels
-    assert any(l.startswith("Hidroizoliacijos įrengimas") for l in labels), labels
+    assert any(l.startswith("Grindų hidroizoliacija") for l in labels), labels
     # a bathroom never had parquet, a kitchen splashback or „kitų sienų" tiles
     assert not any(l.startswith("Parketo / laminato") for l in labels), labels
     assert not any(l.startswith("Kitų sienų plytelių") for l in labels), labels

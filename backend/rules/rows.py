@@ -233,3 +233,81 @@ def paint_coverage_for_class(paint_class: int) -> tuple[float, float]:
         3: "fresh_plaster",
     }.get(paint_class, "plastered_q2_q3")
     return float(pc[walls_key]), float(pc["ceiling_smooth"])
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# Profile-driven row generators and the row boundary (Phase 2 commit 2)
+# ═════════════════════════════════════════════════════════════════════════
+import re as _re  # noqa: E402
+
+from .rounding import round_qty  # noqa: E402
+
+WET_PASKIRTYS = frozenset({"vonia", "wc", "san"})
+# Never a wet room for the waterproofing rows, whatever its name holds (his eight sąmatos never count it).
+NEVER_WET_PASKIRTYS = frozenset({"skalbykla"})
+_FOLD = str.maketrans("ąčęėįšųūž", "aceeisuuz")
+
+
+def _fold(s) -> str:
+    return " ".join(str(s or "").lower().translate(_FOLD).split())
+
+
+def is_wet_room(room: dict, paskirtis: str, markers) -> bool:
+    """A wet room for the waterproofing rows: its purpose is vonia / wc / san, or its name carries one of
+    the profile's `wet_room_markers` as a word („Vonios kambarys", „WC", „San. mazgas"). A laundry
+    („Skalbykla") never is."""
+    if paskirtis in NEVER_WET_PASKIRTYS:
+        return False
+    if paskirtis in WET_PASKIRTYS:
+        return True
+    name = _fold(room.get("pavadinimas"))
+    if not name or "skalbykl" in name:
+        return False
+    for m in markers or ():
+        fm = _fold(m)
+        if fm and _re.search(r"(?<![a-z0-9])" + _re.escape(fm) + r"(?![a-z0-9])", name):
+            return True
+    return False
+
+
+HIDRO_FLOOR_LABEL = "Grindų hidroizoliacija"
+HIDRO_TAPE_LABEL = "Hidroizoliacinė juosta kampams"
+
+
+def hidro_two_rows(wet_rooms: list[dict], *, kg_per_m2: float) -> list[tuple[dict, list[tuple[dict, float, str]]]]:
+    """The founder's two waterproofing rows (2026-10-24): floor m² = the wet rooms' NET floor area,
+    corner tape m = their GROSS perimeter. Returns [(row, [(room, value, sentence), …]), …] — the
+    caller attaches the ledger. Empty when there is no wet room with an area."""
+    floor = [(r, float(r.get("plotas_m2") or 0)) for r in wet_rooms]
+    floor = [(r, v) for r, v in floor if v > 0]
+    if not floor:
+        return []
+    tape = [(r, float(r.get("perimetras_m") or 0)) for r in wet_rooms]
+    tape = [(r, v) for r, v in tape if v > 0]
+    floor_m2 = round(sum(v for _, v in floor), 2)
+    out = [({
+        "aprasymas": HIDRO_FLOOR_LABEL, "vnt": "m2", "kiekis": floor_m2,
+        "medziagos_aprasymas": "Hidroizoliacinė medžiaga (2 sluoksniai)",
+        "medziagos_kiekis": round(floor_m2 * kg_per_m2, 2), "medziagos_vnt": "kg",
+    }, [(r, round(v, 2), "Drėgna patalpa — grindų plotas") for r, v in floor])]
+    if tape:
+        tape_m = round(sum(v for _, v in tape), 2)
+        out.append(({
+            "aprasymas": HIDRO_TAPE_LABEL, "vnt": "m", "kiekis": tape_m,
+            "medziagos_aprasymas": "Hidroizoliacinė sandarinimo juosta",
+            "medziagos_kiekis": tape_m, "medziagos_vnt": "m",
+        }, [(r, round(v, 2), "Drėgna patalpa — perimetras (grindų ir sienų sandūra)") for r, v in tape]))
+    return out
+
+
+def round_rows_at_boundary(rows: list[dict]) -> list[dict]:
+    """R4: each row's work and material quantities rounded once, here, in their own unit (Decimal
+    ROUND_HALF_UP to 0,01; counts whole). A blank stays blank. Mutates and returns `rows`."""
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if isinstance(r.get("kiekis"), (int, float)) and not isinstance(r.get("kiekis"), bool):
+            r["kiekis"] = round_qty(r["kiekis"], r.get("vnt"))
+        if isinstance(r.get("medziagos_kiekis"), (int, float)) and not isinstance(r.get("medziagos_kiekis"), bool):
+            r["medziagos_kiekis"] = round_qty(r["medziagos_kiekis"], r.get("medziagos_vnt"))
+    return rows

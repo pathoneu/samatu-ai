@@ -52,6 +52,7 @@ from rules.conventions import (  # noqa: E402,F401 — re-exported
     _WINDOW_SILL_M,
     CORNER_MIN_EDGE_M,
 )
+from rules.conventions import LT_RANGOVAS, profile_overrides, resolve_profile  # noqa: E402,F401
 from rules.rows import (  # noqa: E402,F401 — re-exported
     calc_paint_liters,
     is_high_ceiling,
@@ -361,7 +362,19 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
         except (ValueError, TypeError):
             pass
 
+    # Phase 2 (2026-10-25): the conventions profile keys this project set explicitly (rules/conventions.py
+    # LT_RANGOVAS) — read by calc_room_quantities; absent = every default, byte-identical to before.
+    _prof = profile_overrides(prefs)
+    if _prof:
+        rules["_profilis"] = _prof
+
     return rules
+
+
+def _room_profile(rules: dict | None) -> dict:
+    """The explicit profile overrides a calc_room_quantities call carries ({} = defaults)."""
+    p = (rules or {}).get("_profilis") if isinstance(rules, dict) else None
+    return p if isinstance(p, dict) else {}
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -667,7 +680,7 @@ def classify_room_name(pavadinimas: str | None,
 # OPENING DEDUCTION HELPERS (Sprint §2A.1, NRM2 / VOB / LT)
 # ═════════════════════════════════════════════════════════════════════════
 
-def _opening_should_deduct(area_m2: float, standard: str) -> bool:
+def _opening_should_deduct(area_m2: float, standard: str, threshold: float | None = None) -> bool:
     """True if a single opening (door/window) of given area should be
     subtracted from this room's wall area under the given standard.
 
@@ -676,7 +689,8 @@ def _opening_should_deduct(area_m2: float, standard: str) -> bool:
     """
     if standard in ("NRM2", "VOB"):
         return area_m2 >= UNIVERSAL_RULES["nrm2_no_deduct_threshold_m2"]
-    return area_m2 >= UNIVERSAL_RULES["openings_threshold_m2"]
+    # `threshold` — the profile's `aperture_no_deduct_max_m2` when the project set it (LT standard only)
+    return area_m2 >= (UNIVERSAL_RULES["openings_threshold_m2"] if threshold is None else threshold)
 
 
 _DOOR_KINDS = ("duris", "pasleptos_duris")
@@ -1686,7 +1700,34 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
     return out
 
 
-def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, standard: str) -> float:
+def skirting_door_widths_m(room: dict, n_doors: int, mode=0.85) -> float:
+    """What the room's doors take off its skirting length (profile `skirting_door_deduct_m`).
+
+    A number: that many metres per door (`n_doors`, the calculator's own count) — 0,85 is the engine's
+    long-standing value, 0,90 the founder's rule. „drawn": each listed door's own width (units ×
+    plotis), 0,9 m for a door with no readable width, and the standard 0,9 m for the doors `n_doors`
+    counts beyond the listed ones. A door listed in both rooms it joins is a gap in both skirtings."""
+    if mode != "drawn":
+        try:
+            per = float(mode)
+        except (TypeError, ValueError):
+            per = 0.85
+        return n_doors * per
+    total, listed = 0.0, 0
+    for el in room.get("elementai") or []:
+        if not isinstance(el, dict) or (el.get("tipas") or "").lower() not in _DOOR_KINDS:
+            continue
+        k = _el_units(el)            # a shared door interrupts the skirting on BOTH sides
+        if k <= 0:
+            continue
+        w = _el_width_m(el)
+        total += k * (w if w and 0.3 <= w <= 4.0 else STANDARD_DOOR_W_M)
+        listed += k
+    return total + max(0, int(n_doors) - listed) * STANDARD_DOOR_W_M
+
+
+def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, standard: str,
+                          threshold: float | None = None) -> float:
     """What the room's doors take out of the paintable wall: each opening's
     area LESS the jambs and head that get painted, (w + 2h) × wall thickness.
 
@@ -1720,7 +1761,7 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
             continue
         sized += k
         area = w * h
-        if _opening_should_deduct(area, standard):
+        if _opening_should_deduct(area, standard, threshold):
             total += k * max(0.0, area - (w + 2 * h) * t)
     # Doors without a size: the mean door area the reader derived for the room
     # (`door_area_m2`, from elements that carried sizes elsewhere) or the
@@ -1731,7 +1772,7 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
     except (TypeError, ValueError):
         fallback_area = w * h
     for _ in range(max(0, int(n_doors) - sized)):
-        if _opening_should_deduct(fallback_area, standard):
+        if _opening_should_deduct(fallback_area, standard, threshold):
             total += max(0.0, fallback_area - (w + 2 * h) * t)
     return round(total, 3)
 
@@ -2168,17 +2209,18 @@ def experiment_corners_from_outline() -> bool:
     return _experiment_corners
 
 
-def room_outline_corners(room: dict) -> tuple[int, int] | None:
+def room_outline_corners(room: dict, from_outline: bool = False) -> tuple[int, int] | None:
     """(inner, outer) corner counts the calculator takes from an outline instead of the 4-corner default:
     a merged room's, stored by the merge route in `_sujungimas` (a rebuild reads numbers, not geometry);
-    under the eval experiment any room with a wall outline. None → the default."""
+    under the eval experiment — or when the profile's corner convention bills vertical corners only
+    (`from_outline`, Phase 2) — any room with a wall outline. None → the default."""
     m = room.get("_sujungimas") if isinstance(room.get("_sujungimas"), dict) else None
     if m is not None:
         vi, isr = m.get("kampai_vidiniai"), m.get("kampai_isoriniai")
         if isinstance(vi, int) and not isinstance(vi, bool) and isinstance(isr, int) and not isinstance(isr, bool) \
                 and vi >= 0 and isr >= 0 and vi + isr >= 3:
             return vi, isr
-    if experiment_corners_from_outline():
+    if from_outline or experiment_corners_from_outline():
         from .dimension_sum import WALL_OUTLINES
         ring = room.get("polygon_pct")
         k = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
@@ -2328,8 +2370,10 @@ def calc_room_quantities(room: dict,
     door_area = float(room.get("door_area_m2") or UNIVERSAL_RULES["default_door_area_m2"])
     window_area = float(room.get("window_area_m2") or UNIVERSAL_RULES["default_window_area_m2"])
 
-    doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
-    windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
+    prof = _room_profile(rules)
+    aperture_thr = prof.get("aperture_no_deduct_max_m2")     # None = the LT rule in UNIVERSAL_RULES
+    doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard, aperture_thr) else 0
+    windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard, aperture_thr) else 0
     # Apimtis (2026-09-06): „sienų plotas be angų" — the contractor measures
     # straight through the openings (cut-outs are waste and cutting labour), so
     # nothing is deducted from the wall area in any branch below.
@@ -2411,7 +2455,7 @@ def calc_room_quantities(room: dict,
     # so the presence/absence of an optional Vision field can no longer flip
     # the double-billing rule (a fully tiled wet room billed as tile AND as
     # paint). See resolve_wall_tile_read() for the priority order.
-    doors_deduction = _door_net_deduction_m2(room, n_doors, wall_thickness_m, standard)
+    doors_deduction = _door_net_deduction_m2(room, n_doors, wall_thickness_m, standard, aperture_thr)
     if not rt_rules.get("deduct_openings", True):
         doors_deduction = 0.0          # apimtis: „sienų plotas be angų" — see the openings block above
     wall_area_available = max(0.0, walls_gross - doors_deduction)
@@ -2938,7 +2982,7 @@ def calc_room_quantities(room: dict,
         # A merged room („Sujungti", 2026-10-16) — and, only under the eval experiment, any room with a wall
         # outline — counts its corners off the outline: convex vertices are inner corners (two walls meet),
         # reflex ones outer (a wall edge sticks into the room: real bead, in both corner modes).
-        outline_corners = room_outline_corners(room)
+        outline_corners = room_outline_corners(room, from_outline=prof.get("kampai", "visi") != "visi")
         outer_corners_m = 0.0
         if outline_corners is not None:
             inner_corners_m = outline_corners[0] * H if count_inner_corners else 0.0
@@ -2963,6 +3007,24 @@ def calc_room_quantities(room: dict,
         # wall-ceiling line of the room — the brief bills the corners only)
         hole_corners_m = hole_corners * H
         kampai += hole_corners_m + outer_corners_m
+        # Phase 2 (2026-10-25): the profile's corner convention keeps only the terms it bills; the dropped
+        # ones are zeroed in the room's term fields too, so the ledger's addends still sum to kampu_metrai.
+        _kc = prof.get("kampai", "visi")
+        if _kc != "visi":
+            perim_term = perim - hole_walls_m
+            if _kc in ("isoriniai", "isoriniai_angos", "tik_lubos"):
+                inner_corners_m = 0.0
+                pusiniai_m = 0.0
+                count_partition_corners = False
+            if _kc in ("isoriniai", "vertikalus", "vertikalus_lubos", "tik_lubos"):
+                opening_reveals_m = 0.0
+            if _kc == "tik_lubos":
+                outer_corners_m = 0.0
+                hole_corners_m = 0.0
+            kampai = (inner_corners_m + opening_reveals_m
+                      + (pusiniai_m if count_partition_corners else 0.0)
+                      + (perim_term if _kc in ("vertikalus_lubos", "tik_lubos") else 0.0)
+                      + hole_corners_m + outer_corners_m)
     else:
         inner_corners_m = 0.0
         opening_reveals_m = 0.0
@@ -3063,14 +3125,17 @@ def calc_room_quantities(room: dict,
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
     # Sprint §38 (2026-04-29): also skip on concrete floors (garažas, parter)
     # — no plinth where there's no finished surface.
-    door_widths_total = n_doors * 0.85
+    # Phase 2 (2026-10-25): what a door takes off and the work row's waste are profile parameters
+    # (`skirting_door_deduct_m` 0,85 per door / 0,90 / „drawn" widths; `skirting_waste` 1,10 / 1,00).
+    door_widths_total = skirting_door_widths_m(room, n_doors, prof.get("skirting_door_deduct_m", 0.85))
+    skirting_waste = float(prof.get("skirting_waste", SKIRTING_WASTE))
     floor_type_for_grindjuostes = floor_type
     grindjuostes_base = (
         max(0, perim - door_widths_total)
         if (not tile_floor and floor_type_for_grindjuostes != "concrete" and walls_paint_factor > 0)
         else 0
     )
-    grindjuostes = grindjuostes_base * SKIRTING_WASTE  # +10% waste (NRM2 §27)
+    grindjuostes = grindjuostes_base * skirting_waste  # +10% waste (NRM2 §27) unless the profile says net
     # …and which predicate zeroed it, for the same reason as the walls one
     # above: „Šios patalpos grindjuosčių sąmatoje nėra" restates the outcome
     # instead of naming the input the contractor would go and change.
@@ -3165,7 +3230,9 @@ def calc_room_quantities(room: dict,
         # does not contain must not be shown as if it did.
         "kampai_pusiniai_m": round(
             pusiniai_m if count_partition_corners else 0.0, 2),
-        "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0 else 0.0, 2),
+        "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0
+                                     and prof.get("kampai", "visi") in ("visi", "vertikalus_lubos", "tik_lubos")
+                                     else 0.0, 2),
         "kampai_skyliu_m": round(hole_corners_m, 2),
         "kampai_isoriniai_m": round(outer_corners_m, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
@@ -3185,6 +3252,8 @@ def calc_room_quantities(room: dict,
         "_grindjuosciu_baze_m": round(grindjuostes_base, 2),
         "_grindjuosciu_duru_m": round(
             door_widths_total if grindjuostes_base > 0 else 0.0, 2),
+        # the waste factor this room's work metres carry (profile `skirting_waste`; the ledger reads it)
+        "_grindjuosciu_atliekos": skirting_waste,
         # The predicate that left this room out of the grindjuosčių lines, or
         # None when it is in them. Same contract as `_walls_unpainted_reason`.
         "_grindjuosciu_praleista": grindjuosciu_praleista,

@@ -94,6 +94,11 @@ _ASSUMPTION_FIELDS = {
     # „Priimti įvertinimą" in Nustatymai; read by niche_inference.estimate_accepted. Every room's billed
     # metres are rebuilt below (vision_call.refresh_led_metres), the same way the other two paths do.
     "led_nisu_ivertinimas",
+    # 2026-10-25 (Phase 2): the conventions profile — {name: value} over the `lt_rangovas` defaults
+    # (rules/conventions.py LT_RANGOVAS: aperture threshold, skirting door deduction and waste, kampai,
+    # reveals scope, waterproofing rows, rounding, paint / tile row granularity). Validated on read
+    # (`profile_overrides`), so an unknown key or value is ignored, never a 500.
+    "profilis",
 }
 _GESTURE_FIELDS = {
     "add_symbol",        # G2

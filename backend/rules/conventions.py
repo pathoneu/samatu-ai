@@ -299,3 +299,108 @@ _SOURCES: dict[str, str] = {
 }
 
 CONVENTIONS: dict[str, Convention] = {name: Convention(name, src) for name, src in _SOURCES.items()}
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# The `lt_rangovas` profile (Phase 2 commit 2, R5)
+# ═════════════════════════════════════════════════════════════════════════
+# Every convention a contractor can hold differently, named, with its default,
+# the alternatives the fit (`rules/fit.py`) scores, and where the default comes
+# from. A project overrides any of them at Prielaidos level through
+# `_overrides["profilis"] = {name: value}` (the recompute endpoints carry the key
+# like any other assumption). An absent key means the default below; with no key
+# at all every quantity is what the engine computed before the profile existed,
+# except the two founder decisions written as defaults (`hidro_rows`,
+# `rounding`), which change rows on purpose.
+
+PROFILE_KEY = "profilis"
+
+
+@dataclass(frozen=True)
+class Param:
+    name: str
+    default: object
+    choices: tuple
+    source: str
+    doc: str
+    fitted_on: tuple[str, ...] = field(default_factory=tuple)
+
+
+KAMPAI_CONVENTIONS = ("visi", "vertikalus_lubos", "vertikalus", "isoriniai_angos", "isoriniai", "tik_lubos")
+
+LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
+    Param("aperture_no_deduct_max_m2", 1.0, (1.0, 3.0),
+          "LT practice (UNIVERSAL_RULES openings_threshold_m2); 3,0 m² = founder's alternative (plan §1 rule 2)",
+          "An opening smaller than this is not deducted from the wall face (≥ the value is deducted)."),
+    Param("skirting_door_deduct_m", 0.85, (0.85, 0.90, "drawn"),
+          "engine default since 2026-04 (0,85 m per door); 0,90 = founder's rule (plan §1 rule 3); "
+          "„drawn“ = each door's own width (0,9 m when unread)",
+          "What one door takes off the skirting length."),
+    Param("skirting_waste", 1.10, (1.10, 1.00),
+          "formula-validation.md §2.8 (+10 %); 1,00 = his labour rows are net (phase-0 baseline §3 (iv))",
+          "Factor on the skirting WORK length; the material row adds its own +10 % either way."),
+    Param("wet_room_markers", ("vonia", "vonios", "wc", "san. mazgas"),
+          (("vonia", "vonios", "wc", "san. mazgas"),),
+          "founder (plan §1 rule 4) and his eight sąmatos: „Skalbykla“ is never a wet room (phase-0 §3 (iii))",
+          "Room-name markers of a wet room for the waterproofing rows (a vonia / wc / san purpose counts too)."),
+    Param("hidro_rows", "two", ("two", "one"),
+          "founder decision 2026-10-24 (overrules his one-row practice on 6 of 7 sąmatos)",
+          "„two“: „Grindų hidroizoliacija“ m² (net floor of the wet rooms) + „Hidroizoliacinė juosta kampams“ m "
+          "(their gross perimeter); „one“: one „Hidroizoliacijos įrengimas“ row, vnt = number of wet rooms."),
+    Param("rounding", "row_boundary", ("row_boundary", "legacy"),
+          "plan §1 R4 (Decimal ROUND_HALF_UP to 0,01 at the row boundary, counts whole)",
+          "Where row quantities are rounded."),
+    Param("kampai", "visi", KAMPAI_CONVENTIONS,
+          "engine 2026-05-31 (perimeter + inner + outer + opening edges + partition junctions); alternatives from "
+          "the manager's 2026-10-25 walk (2,5–3,4× his rows on the contractor's projects)",
+          "What „Dažymo kampų montavimas“ adds up: „isoriniai“ outer vertical corners × H; „isoriniai_angos“ + "
+          "the openings' edges; „vertikalus“ outer + inner vertical corners (and partition junctions); "
+          "„vertikalus_lubos“ + the wall–ceiling junction (perimeter); „visi“ + the openings' edges (today); "
+          "„tik_lubos“ the wall–ceiling junction alone. The vertical conventions count a room's corners off "
+          "its wall outline when it has one (convex = inner, reflex = outer), else 4 × H inner and no outer."),
+)}
+
+
+def _float_in(val, lo: float, hi: float):
+    try:
+        v = float(val)
+    except (TypeError, ValueError):
+        return None
+    return v if lo <= v <= hi else None
+
+
+def profile_overrides(overrides) -> dict:
+    """The profile keys a project set explicitly (validated); {} when none."""
+    raw = (overrides or {}).get(PROFILE_KEY) if isinstance(overrides, dict) else None
+    if not isinstance(raw, dict):
+        return {}
+    out: dict = {}
+    for name, val in raw.items():
+        p = LT_RANGOVAS.get(name)
+        if p is None:
+            continue
+        if name == "wet_room_markers":
+            if isinstance(val, (list, tuple)) and val and all(isinstance(x, str) for x in val):
+                out[name] = tuple(x.strip().lower() for x in val if x.strip())
+        elif name == "aperture_no_deduct_max_m2":
+            v = _float_in(val, 0.01, 1e9)
+            if v is not None:
+                out[name] = v
+        elif name == "skirting_door_deduct_m":
+            v = "drawn" if val == "drawn" else _float_in(val, 0.0, 2.0)
+            if v is not None:
+                out[name] = v
+        elif name == "skirting_waste":
+            v = _float_in(val, 1.0, 1.5)
+            if v is not None:
+                out[name] = v
+        elif val in p.choices:
+            out[name] = val
+    return out
+
+
+def resolve_profile(overrides=None) -> dict:
+    """Every profile parameter's value for one project: its explicit override, else the default."""
+    out = {name: p.default for name, p in LT_RANGOVAS.items()}
+    out.update(profile_overrides(overrides))
+    return out

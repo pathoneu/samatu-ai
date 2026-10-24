@@ -78,7 +78,10 @@ def _extract_tail(parsed: dict, overrides: dict | None = None) -> dict:
 
 
 def _build(parsed: dict, overrides: dict | None = None) -> list[dict]:
-    return _build_pozicijos_from_rooms(_extract_tail(parsed, overrides))["pozicijos"]
+    p = _extract_tail(parsed, overrides)
+    if overrides:
+        p["_overrides"] = overrides      # as the extraction sets it before the build (vision_call Step 2.95)
+    return _build_pozicijos_from_rooms(p)["pozicijos"]
 
 
 def _row(rows, prefix):
@@ -162,13 +165,16 @@ def test_hydro_drops_the_shower_zone_where_the_plan_lists_no_shower():
 
 
 def test_hydro_row_names_the_rooms_whose_shower_zone_is_assumed():
-    rows = _build(_three_bathrooms())
+    # the shower zone lives in the one-row form's m² (profile `hidro_rows = "one"`); the default two rows
+    # bill the floor and the corner tape only
+    one = {"profilis": {"hidro_rows": "one"}}
+    rows = _build(_three_bathrooms(), one)
     hydro = _row(rows, "Hidroizoliacijos įrengimas")
     assert hydro["confidence"] != "zalia"
     assert "03, 06 ir 07" in hydro["_confidence_reason"]
     assert "dušo zona" in hydro["_assumption"].lower()
     # with the plumbing plan every bathroom is answered — nothing assumed
-    hydro_read = _row(_build(_with_plumbing(_three_bathrooms())), "Hidroizoliacijos įrengimas")
+    hydro_read = _row(_build(_with_plumbing(_three_bathrooms()), one), "Hidroizoliacijos įrengimas")
     assert "_assumption" not in hydro_read
 
 
@@ -267,7 +273,7 @@ def test_the_prielaidos_rebuild_keeps_the_extractions_counts():
     context = {k: extracted[k] for k in ("_meta", "detected_symbols_summary")}
     rebuilt = _build_pozicijos_from_rooms(
         {**context, "patalpos": copy.deepcopy(extracted["patalpos"]), "santrauka": {}})["pozicijos"]
-    for prefix in _SHOWER_ROWS + ("WC rėmo montavimas", "Hidroizoliacijos įrengimas"):
+    for prefix in _SHOWER_ROWS + ("WC rėmo montavimas", "Grindų hidroizoliacija", "Hidroizoliacinė juosta kampams"):
         assert _row(first, prefix)["kiekis"] == _row(rebuilt, prefix)["kiekis"], prefix
         assert _row(first, prefix).get("_detail_m2") == _row(rebuilt, prefix).get("_detail_m2"), prefix
 
