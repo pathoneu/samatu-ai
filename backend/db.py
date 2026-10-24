@@ -1707,6 +1707,60 @@ def _migrate_schema() -> None:
             )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_assemblies_user "
                   "ON assemblies(user_id, created_at DESC)")
+        # page_scales (v4 geometry, plan 2026-10-24 §3.5): every sheet scale a
+        # person set with the „Mastelis" line (geometry/scale.py source 1).
+        # Append-only provenance: the newest row per (project, page) is in force,
+        # the older ones are the history. See `add_page_scale`.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS page_scales (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                page         INTEGER NOT NULL,
+                m_per_pt     REAL NOT NULL,
+                source       TEXT NOT NULL,      -- geometry.provenance.ScaleSource value
+                source_text  TEXT,               -- the dimension string under the line, e.g. „4280"
+                details      TEXT,               -- JSON: line length in points, value in metres, string box
+                user_id      TEXT,
+                created_at   TEXT NOT NULL
+            )""")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_page_scales_project "
+                  "ON page_scales(project_id, page, id DESC)")
+
+
+# ── Page scales (v4 geometry, 2026-10-24) ───────────────────────────────────
+
+def add_page_scale(project_id: str, page: int, m_per_pt: float, source: str,
+                   source_text: str | None = None, details: dict | None = None,
+                   user_id: str | None = None) -> dict:
+    """Append one sheet scale a person set; it is in force until a newer row for the page."""
+    row = {"project_id": project_id, "page": int(page), "m_per_pt": float(m_per_pt), "source": str(source),
+           "source_text": source_text, "details": details or {}, "user_id": user_id, "created_at": _now_iso()}
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO page_scales (project_id, page, m_per_pt, source, source_text, details, user_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (project_id, row["page"], row["m_per_pt"], row["source"], source_text,
+             json.dumps(row["details"], ensure_ascii=False), user_id, row["created_at"]))
+        row["id"] = cur.lastrowid
+    return row
+
+
+def get_page_scales(project_id: str) -> dict[int, dict]:
+    """{page: the newest row} — the person's scales in force for the project."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM page_scales WHERE project_id = ? ORDER BY page, id DESC", (project_id,)).fetchall()
+    out: dict[int, dict] = {}
+    for r in rows:
+        if int(r["page"]) in out:
+            continue
+        d = dict(r)
+        try:
+            d["details"] = json.loads(d.get("details") or "{}")
+        except (TypeError, ValueError):
+            d["details"] = {}
+        out[int(r["page"])] = d
+    return out
 
 
 # ── Extraction jobs: the record that outlives the process (2026-10-03) ───────

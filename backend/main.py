@@ -416,6 +416,7 @@ from api.free_reread import router as free_reread_router
 # „Perskaityti lapą" (2026-10-16): the same €0 reading as a job with named stages, per sheet.
 from api.detect_run import router as detect_run_router
 from api.room_outline import router as room_outline_router
+from api.geometry import router as geometry_router   # v4: sheet scale with provenance, „Mastelis" line
 from api.page_geometry import router as page_geometry_router
 from api.room_names import router as room_names_router
 from api.feedback import router as feedback_router
@@ -781,6 +782,7 @@ app.include_router(evidence_router)
 app.include_router(free_reread_router)
 app.include_router(detect_run_router)
 app.include_router(room_outline_router)
+app.include_router(geometry_router)               # v4: /geometry/scale-line + /geometry/scale
 app.include_router(page_geometry_router)
 app.include_router(room_names_router)
 app.include_router(feedback_router)
