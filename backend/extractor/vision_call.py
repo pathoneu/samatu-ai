@@ -1163,14 +1163,8 @@ def _stamp_eksplikacija_evidence(room: dict, eks_row: dict, eks: dict) -> None:
     Lifted out of `extract_interior` 2026-09-04 so this is unit-testable
     without a paid Vision run. Statement-for-statement the same work.
     """
-    room["eksplikacija_row_idx"] = eks_row.get("row_idx")
-    for key in ("eksplikacija_row_bbox", "eksplikacija_page_width_pdf",
-                "eksplikacija_page_height_pdf"):
-        if eks_row.get(key):
-            room[key] = eks_row[key]
-    page = eks_row.get("page") or (eks or {}).get("eksplikacija_source_page")
-    if page:
-        room["eksplikacija_source_page"] = page
+    from .room_identity import stamp_row_evidence
+    stamp_row_evidence(room, eks_row, eks)
 
 
 def _apply_schedule_match(elem: dict, matched: dict) -> None:
@@ -6307,7 +6301,51 @@ def extract_interior(
         from .eksplikacija_guard import row_contradicts as _row_contradicts
         claimed = set()
         merged_count = 0
-        for room in rooms:
+
+        # ── Room identity from the drawing (Pathon v4 Phase 3a, 2026-10-25) ──
+        # A room table read from the drawing's TEXT (not the model's
+        # eksplikacija reader) is the room list: its numbers (`<unit>-<nr>`
+        # for stacked unit tables, with `_vienetas` / `_nr_brezinyje`), names
+        # and areas. The model's rooms only lend their readings to the row
+        # they match (number, else name + area); a model room no row confirms
+        # is dropped with a note. extractor/room_identity.py. When the table
+        # does not belong to these rooms (`identity_from_table` → None) the
+        # old join below runs exactly as before.
+        _ident = None
+        try:
+            from .room_identity import identity_from_table
+            _gv = ((parsed.get("_meta") or {}).get("eksplikacija_guard") or {})
+            _gv_final = (_gv.get("retry") or {}).get("verdict", _gv.get("verdict"))
+            if eks_rows and _gv_final != "reject":
+                _ident = identity_from_table(rooms, {**eks, "patalpos": eks_rows})
+        except Exception as _iexc:  # noqa: BLE001 — identity failing leaves the old join
+            print(f"[extractor] room identity failed (non-fatal): {_iexc}")
+            _ident = None
+        if _ident is not None:
+            rooms = _ident["rooms"]
+            parsed["patalpos"] = rooms
+            from .room_identity import dropped_room_warning, join_rows
+            merged_count = join_rows(_ident, eks)
+            for _d in _ident["dropped"]:
+                parsed.setdefault("warnings", []).append(dropped_room_warning(_d))
+            parsed.setdefault("_meta", {})["kambariu_tapatybe"] = {
+                "saltinis": "lentele", "lenteles_eilutes": len(rooms),
+                "sutapo": _ident["matched"], "tik_lenteleje": len(rooms) - _ident["matched"],
+                "atmesta": [{"nr": d.get("nr"), "pavadinimas": d.get("pavadinimas")} for d in _ident["dropped"]],
+                "perkeisti_numeriai": _ident["renamed"],
+            }
+            # The guard judged the table by number only; the model's own
+            # numbers (K1…) matched none of it („insufficient"). Joined by
+            # name and area the rows are these rooms' table — say so, so the
+            # ceiling anchor below reads the table's own total.
+            if _gv_final == "insufficient" and _ident["matched"] >= 3:
+                parsed["_meta"]["eksplikacija_guard"] = {
+                    "verdict": "accept", "matched": _ident["matched"], "agreed": _ident["matched"],
+                    "rate": 1.0, "by": "kambariu_tapatybe", "pirmas": {k: _gv.get(k) for k in ("verdict", "matched", "agreed", "rate")}}
+            print(f"[extractor] room identity: {len(rooms)} rooms from the drawing's table "
+                  f"({_ident['matched']} matched to the model's, {len(_ident['dropped'])} model rooms dropped, "
+                  f"renumbered {len(_ident['renamed'])})")
+        for room in ([] if _ident is not None else rooms):
             nr = str(room.get("nr") or "").strip()
             eks_row = eks_by_nr.get(nr)
             # Row guard: a nr collision whose NAME flatly contradicts the
@@ -6403,6 +6441,16 @@ def extract_interior(
         })
     except Exception as exc:
         print(f"[extractor] eksplikacija merge failed: {exc}")
+
+    # No room table in the drawing's text took the list (Phase 3a): the names
+    # and numbers are the model's reading — every room says so.
+    try:
+        if not (parsed.get("_meta") or {}).get("kambariu_tapatybe"):
+            from .room_identity import mark_model_list
+            _n_model = mark_model_list(parsed.get("patalpos") or [])
+            parsed.setdefault("_meta", {})["kambariu_tapatybe"] = {"saltinis": "modelis", "patalpos": _n_model}
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] room identity marking failed (non-fatal): {exc}")
 
     # Step 2.44: plan-area annotations lane (2026-09-06, item 3 of the €0
     # generalisation work). Only when NO room table merged: the designer's own

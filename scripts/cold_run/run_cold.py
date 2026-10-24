@@ -247,14 +247,21 @@ def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> d
     res["scales"] = scales_from_dims(dims)
     res["dimension_strings_total"] = len(dims)
 
+    from extractor.room_identity import identity_from_table, join_rows
+
     t = time.time()
     ek = extract_eksplikacija_pdfplumber(pdf_bytes)
     res["timings"]["room_table_s"] = round(time.time() - t, 2)
-    table_rooms = [{"nr": str(r.get("nr")), "pavadinimas": r.get("pavadinimas"), "plotas_m2": r.get("plotas_m2"),
-                    "puslapio_nr": r.get("page"),
-                    # several units' stacked tables (2026-10-24): the unit and the number as drawn travel with the room
-                    **{k: r[k] for k in ("_vienetas", "_nr_brezinyje") if r.get(k) is not None}}
-                   for r in ek.get("patalpos") or []]
+    # The room list exactly as the paid reading assembles it (vision_call Step 2.4 → extractor/room_identity.py):
+    # the text-layer table's rows ARE the rooms — numbers as drawn (`<unit>-<nr>` with `_vienetas` /
+    # `_nr_brezinyje` for stacked unit tables), names, areas, row evidence. No model rooms here.
+    ident = identity_from_table([], ek)
+    table_rooms = []
+    if ident is not None:
+        join_rows(ident, ek)
+        table_rooms = ident["rooms"]
+        for r in table_rooms:
+            r.setdefault("puslapio_nr", r.get("eksplikacija_source_page"))
     res["room_table"] = {"page": ek.get("eksplikacija_source_page"), "rooms": table_rooms,
                          "sum_m2": _r2(sum(float(r["plotas_m2"] or 0) for r in table_rooms)),
                          "meta": {k: ek.get("_meta", {}).get(k) for k in ("eksplikacija_pages_found", "tables_examined", "header_detected")}}
@@ -284,6 +291,24 @@ def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> d
                                   "dimension_pairs": {k: lane["meta"]["plan_dimension_lane"].get(k) for k in ("status", "confirmed", "corrected", "proposed", "unmatched")},
                                   "raster_outlines": {k: lane["meta"]["wall_outline_lane"].get(k) for k in ("status", "traced", "corrected", "unmatched", "error")},
                                   "timings": lane["timings"]})
+
+    # ── variant C: the app's path (Phase 3a) — production's stored model rooms (nr/name/area only) through the
+    # paid reading's room assembly (room_identity.identity_from_table + join_rows): what a fresh reading of this
+    # project builds now, the model's keys K1… replaced by the drawing's. Production's page classification. ──
+    if blob:
+        seed = [{k: r.get(k) for k in ROOM_SEED_KEYS if r.get(k) is not None} for r in blob.get("patalpos") or [] if isinstance(r, dict)]
+        app = identity_from_table(seed, ek) if seed else None
+        res["app"] = {"room_source": "room_identity" if app is not None else "model_list (no text-layer table)",
+                      "rooms_in": len(app["rooms"]) if app is not None else len(seed)}
+        if app is not None:
+            join_rows(app, ek)
+            res["app"].update({"renamed": app["renamed"], "dropped": [d.get("nr") for d in app["dropped"]],
+                               "matched": app["matched"]})
+        app_rooms = app["rooms"] if app is not None else seed
+        if app_rooms:
+            lane = run_lane(pdf_bytes, app_rooms, blob.get("puslapiai") or [], scan)
+            res["app"].update({"lane": geo_summary(lane["geo"]), "rooms": room_rows(lane["parsed"]),
+                               "timings": lane["timings"]})
 
     # ── project-level deterministic scans ──
     t = time.time()
@@ -350,6 +375,12 @@ def main() -> int:
               f"table rooms {len(res['room_table']['rooms'])} | cold rooms {c.get('rooms_in')} ({c.get('room_source')}) | "
               f"outlines {len(lane.get('konturai') or [])} | summed perims {len(lane.get('perimetrai_sudeti') or [])} | "
               f"{res['timings']['total_s']} s")
+        for variant in ("cold", "app", "seeded"):
+            rr = (res.get(variant) or {}).get("rooms") or []
+            if rr:
+                print(f"  {variant:6s}: rooms {len(rr)} | placed by badge/label "
+                      f"{sum(1 for r in rr if r.get('vieta') in ('zenkliukas', 'plotas_uzrasas'))} | "
+                      f"outlined {sum(1 for r in rr if r.get('outline_m2'))} | keys {[r.get('nr') for r in rr]}")
     return 0
 
 

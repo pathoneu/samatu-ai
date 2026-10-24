@@ -166,6 +166,57 @@ def read_figures_and_heights(parsed: dict, pdf_bytes: bytes, project_id=None) ->
         return {}
 
 
+def renumber_rooms(parsed: dict, pdf_bytes: bytes, project_id=None) -> dict | None:
+    """Pathon v4 Phase 3a: a stored project whose rooms carry the model's invented keys (objektas_i: K1…K8 /
+    D1…D9 where the drawing numbers 1–8 and 1–9 in two units) is re-keyed to the drawing's numbers before the lane
+    runs, so the lane places each room by its own badge in its own unit. The drawing's room table is read from its
+    text layer (pdfplumber_eksplikacija, €0); the stored rooms are matched to its rows by number, else name + area
+    (extractor/room_identity.rekey_stored_rooms); only `nr` changes on a matched room (plus `_vienetas`,
+    `_nr_brezinyje`, `_modelio_nr`) — nothing he set moves, no room is added or dropped.
+
+    Writes on `parsed` (the copy): the re-keyed rooms, `_perkeisti_numeriai` = {old: new} (composed with an
+    earlier map, so Patikra can say „K2 → 1-2") and `_meta.kambariu_tapatybe` (also when there was nothing to
+    re-key: a project checked once is never read for its table again — it is the same drawing). The browser
+    applies the map to the stored project before it merges the rooms by number (lib/freeReread.js). Returns the
+    map, or None. Never fails the read."""
+    meta = parsed.get("_meta") if isinstance(parsed.get("_meta"), dict) else {}
+    if isinstance(meta.get("kambariu_tapatybe"), dict):
+        return None                                     # assembled from the drawing, or already checked
+    rooms = parsed.get("patalpos") or []
+    if not rooms:
+        return None
+    # Every room already wears a number of the room table the reading stored: the keys are the drawing's — no
+    # need to open the PDF for its table again (pdfplumber needs ~65 s on objektas_b's 65 sheets).
+    stored_rows = ((parsed.get("_eksplikacija") or {}).get("patalpos") or []) if isinstance(parsed.get("_eksplikacija"), dict) else []
+    table_nrs = {str(r.get("nr") or "").strip() for r in stored_rows if isinstance(r, dict)}
+    if table_nrs and all(isinstance(r, dict) and str(r.get("nr") or "").strip() in table_nrs for r in rooms):
+        parsed.setdefault("_meta", {})["kambariu_tapatybe"] = {"saltinis": "patikrinta", "pagal": "issaugota_lentele"}
+        return None
+    try:
+        from extractor.pdfplumber_eksplikacija import extract_eksplikacija_pdfplumber
+        from extractor.room_identity import rekey_stored_rooms
+        eks = extract_eksplikacija_pdfplumber(pdf_bytes)
+        res = rekey_stored_rooms(rooms, eks)
+    except Exception as exc:  # noqa: BLE001 — re-keying is never the reason a re-read fails
+        log.warning("free-reread room renumbering failed for %s: %r", project_id, exc)
+        return None
+    record: dict = {"saltinis": "patikrinta", "lenteles_eilutes": len(eks.get("patalpos") or [])}
+    if res is None:
+        parsed.setdefault("_meta", {})["kambariu_tapatybe"] = record
+        return None
+    parsed["patalpos"] = res["rooms"]
+    # a v8 blob carries the same rooms twice; the browser reads `v8_rooms` first
+    if isinstance(parsed.get("v8_rooms"), list) and parsed["v8_rooms"]:
+        parsed["v8_rooms"] = res["rooms"]
+    earlier = parsed.get("_perkeisti_numeriai") if isinstance(parsed.get("_perkeisti_numeriai"), dict) else {}
+    composed = {old: res["map"].get(new, new) for old, new in earlier.items()}
+    composed.update(res["map"])
+    parsed["_perkeisti_numeriai"] = composed
+    record.update({"saltinis": "lentele", "perkeisti_numeriai": res["map"], "nesutapo": res["unmatched"]})
+    parsed.setdefault("_meta", {})["kambariu_tapatybe"] = record
+    return res["map"]
+
+
 def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     """The free re-read's whole reading of one stored project — the geometry lane on a COPY of it, the
     drawing's tables (the „lentelės" stage, read while the lane moves from the text to the plan), then the
@@ -177,6 +228,8 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     from api.skip_sheets import without_skipped
     pdf_bytes = without_skipped(project, pdf_bytes)
     parsed = copy.deepcopy(project)
+    # the drawing's numbers on rooms the model keyed (Phase 3a) — before the lane, which places rooms by them
+    renumbered = renumber_rooms(parsed, pdf_bytes, project.get("id"))
     tables: dict = {}
 
     def tables_once() -> None:
@@ -249,12 +302,14 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         **{k: tables[k] for k in ("_langu_ziniarastis", "_apdailos_lentele") if tables.get(k) is not None},
         **({"_vector_symbols": vector_symbols} if vector_symbols is not None else {}),
         **figures,
+        **({"_perkeisti_numeriai": parsed["_perkeisti_numeriai"]} if renumbered else {}),
         "santrauka": {
             "konturai": len(out.get("konturai") or []),
             "perimetrai_sudeti": len(out.get("perimetrai_sudeti") or []),
             "perimetrai_tusti": len(out.get("perimetrai_tusti") or []),
             "grindu_dangos": len(floors.get("perskaityta") or {}),
             "sekundes": out.get("seconds"),
+            **({"perkeisti_numeriai": len(renumbered)} if renumbered else {}),
         },
     }
 
