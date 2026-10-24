@@ -302,3 +302,75 @@ def test_the_turn_limit_lets_an_arc_through_and_stops_at_a_corner():
     r_lo = do.LEAF_M[0] / (0.75 * 0.0254 / 72 * 100)
     lim = do._turn_max_deg(r_lo)
     assert math.degrees((do.DASH_MAX_PT + do.DASH_GAP_PT) / r_lo) <= lim < 45.0
+
+
+# ── 5. an open space whose rooms differ in ceiling height (objektas_b, 2026-10-24) ──
+
+def _open_space_parsed(h1: float, h2: float) -> dict:
+    return {"puslapiai": [{"nr": 1, "tipas": "floor_plan"}],
+            "patalpos": [{"nr": "01", "pavadinimas": "A", "plotas_m2": 12.6, "plotas_saltinis": "eksplikacija",
+                          "puslapio_nr": 1, "perimetras_m": 13.9, "lubu_aukstis_m": h1},
+                         {"nr": "02", "pavadinimas": "B", "plotas_m2": 9.0, "plotas_saltinis": "eksplikacija",
+                          "puslapio_nr": 1, "perimetras_m": 12.3, "lubu_aukstis_m": h2}]}
+
+
+def _one_space_plan() -> bytes:
+    from tests.synthetic_plan import build_plan
+    a = two_rooms()
+    a.walls = [w for w in a.walls if abs(w[0] - 4.2) > 0.01]       # no partition: one space, two rooms in the table
+    return build_plan([a])
+
+
+def test_mixed_heights_and_no_boundary_leave_the_rooms_unshared_with_a_reason(monkeypatch):
+    """objektas_b: tambūras, living room (5,7 m, double height) and corridor (2,82 m) are one face. A share by
+    floor area gave the living room 47,8 m of the 65,1 m (+36 m² of wall). No share is written: each room keeps
+    what it had and says why."""
+    from extractor import geometry_lane as gl
+    monkeypatch.setattr(gl, "propose_split", lambda *a, **k: {"status": "no_proposal"})
+    parsed = _open_space_parsed(5.7, 2.82)
+    out = gl.apply_geometry(parsed, _one_space_plan())
+    r1, r2 = parsed["patalpos"]
+    assert out["erdves_skirtingu_auksciu"] == [["01", "02"]]
+    assert r1["perimetras_m"] == 13.9 and r2["perimetras_m"] == 12.3          # what each had — not a share
+    assert "perimetras_saltinis" not in r1 and "_perimetras_ivertis_m" not in r1
+    assert "lubų aukščiai skirtingi" in r1["_perimetras_priezastis"] and r1["_atvira_erdve"]["nariai"] == ["01", "02"]
+    # the same space at one height is still shared by floor area, exactly as before
+    same = _open_space_parsed(2.7, 2.7)
+    gl.apply_geometry(same, _one_space_plan())
+    assert same["patalpos"][0]["perimetras_saltinis"] == "atviros_erdves_ivertis"
+
+
+def test_heights_settled_after_the_lane_take_the_share_back_and_agreeing_heights_restore_it(monkeypatch):
+    """In the paid reading the double height arrives AFTER the lane (objektas_b: height salvage). The project-level
+    pass every calc path runs (universal_rules.prepare_rooms_for_calc) checks the shares against the final heights."""
+    from extractor import geometry_lane as gl
+    from extractor.universal_rules import prepare_rooms_for_calc
+    monkeypatch.setattr(gl, "propose_split", lambda *a, **k: {"status": "no_proposal"})
+    parsed = _open_space_parsed(2.82, 2.82)
+    gl.apply_geometry(parsed, _one_space_plan())
+    r1, r2 = parsed["patalpos"]
+    assert r1["perimetras_saltinis"] == "atviros_erdves_ivertis"
+    share = r1["perimetras_m"]
+    r1["lubu_aukstis_m"] = 5.7                                    # the height salvage, later in the reading
+    out = prepare_rooms_for_calc(parsed["patalpos"])
+    assert out["atviros_erdves"]["unshared"] == 2
+    assert r1["perimetras_m"] == 13.9 and r2["perimetras_m"] == 12.3 and "perimetras_saltinis" not in r1
+    assert "lubų aukščiai skirtingi" in r1["_perimetras_priezastis"]
+    r1["lubu_aukstis_m"] = 2.82                                   # he corrects it in Prielaidos
+    out = prepare_rooms_for_calc(parsed["patalpos"])
+    assert out["atviros_erdves"]["reshared"] == 2 and r1["perimetras_m"] == share
+    assert r1["perimetras_saltinis"] == "atviros_erdves_ivertis" and r1["_perimetras_pries_geometrija"] == 13.9
+
+
+def test_mixed_heights_in_a_two_room_space_read_each_sides_own_walls():
+    """With a boundary the lane can propose, each side's own faces are read (the boundary is a wall of neither):
+    no share by floor area, no „heights differ" reason left behind."""
+    from extractor import geometry_lane as gl
+    parsed = _open_space_parsed(5.7, 2.82)
+    gl.apply_geometry(parsed, _one_space_plan())
+    r1, r2 = parsed["patalpos"]
+    for r in (r1, r2):
+        assert r["_konturas"]["saltinis"] == "padalinta_programos"
+        assert r["perimetras_saltinis"] != "atviros_erdves_ivertis" and r["perimetras_m"] > 0
+        assert gl.UNSHARED not in r and "aukščiai" not in str(r.get("_perimetras_priezastis") or "")
+    assert abs(r1["perimetras_m"] + r2["perimetras_m"] - r1["_atvira_erdve"]["perimetras_m"]) < 0.3

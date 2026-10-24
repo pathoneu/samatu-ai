@@ -9,10 +9,14 @@
 On objektas_i the lane went from **0 of 17 rooms located, 0 outlines, 0 doors** to **17/17 located, 17/17 outlined
 (15 on their own face, 2 as one open space divided by the lane's proposal), median |area − table| 0,10 % (A) /
 0,14 % (B), 22–24 doors classified, 5–6 perimeters summed from dimension strings**. objektas_j2 went from 0 to
-7/8 outlined (+1 … +3 % vs the table, the open living room stays open). Plain eval passes are unchanged; the
-replay passes improve on rows (27,9 → 28,0 % within ±10 %, 39,6 → 40,5 % €) and on billed lines (22,88 → 22,86 %),
-but **objektas_b's painted walls get worse (+20,1 % → +31,2 %)** — an existing open-space rule, now reached because
-b's rooms are located for the first time; see §4. Target „perimeters read for most rooms" is **not** met: 5–6 of 17.
+7/8 outlined (+1 … +3 % vs the table, the open living room stays open); with the scale branch merged,
+objektas_j1 (seeded) went from 0 to 15/18 outlined. Plain eval passes are unchanged; replay billed lines
+22,88 → 22,84 %, replay rows unchanged (27,9 % / 39,6 %). objektas_b's painted walls first went to +31,2 % (open-space
+share by floor area handed the double-height living room 47,8 m of 65,1 m); with the mixed-height rule (§4) they are
+**+20,53 %** — 0,41 pp over the +20,12 % baseline, from four walls now read from strings 0,25–0,40 m longer than the
+stored ones. Target „perimeters read for most rooms" is **not** met: 5–6 of 17.
+
+*Update after the merge of `togal-v2` (scale branch, LANE_VERSION 15):* §2 j1/j2, §3 and §4 carry the final numbers.
 
 ## 1. Rules chosen
 
@@ -63,8 +67,16 @@ lever for „perimeters read" (the outline lengths themselves agree with the str
 Windows: 0 classified — the glazing on this drawing is drawn in cyan inside the gap and `_glazing_lines` does not
 see it; not investigated here.
 
-Other projects: **j2** 0 → 7/8 outlined cold (8/9 seeded), median +2,3 %, 8 doors; the table still loses room 2
-(8 of 9). **j1**: unchanged — no text-layer table and no line-backed scale (left to `v4/geometry-scale`).
+Other projects (after the merge with the scale branch):
+
+| | before | after |
+|---|---|---|
+| j2 cold | 0 located, 0 outlines | 8/8 located, **7/8 outlined**, median +2,26 %, 1 perimeter from strings, 8 doors (room 3 living: walls do not close) |
+| j2 seeded (production's 9 rooms) | 0 | 9/9 located, 8/9 outlined, median +2,59 %, 9 doors |
+| j1 cold | no room source (no table, no m² labels) | unchanged |
+| j1 seeded (production's 18 rooms) | 18 located, 0 outlines (no scale) | 18 located, **15/18 outlined**, median 0,00 %, 14 doors |
+
+The j2 table still loses room 2 (8 of 9 rows).
 
 ## 3. Corpus — the four eval passes
 
@@ -72,23 +84,36 @@ Other projects: **j2** 0 → 7/8 outlined cold (8/9 seeded), median +2,3 %, 8 do
 |---|---|---|
 | plain, billed lines | 22,60 % | **22,60 %** |
 | plain, rows ±10 % / € ±10 % | 26,1 % / 34,7 % | **26,1 % / 34,7 %** |
-| replay, billed lines | 22,88 % | **22,86 %** |
-| replay, rows ±10 % / € ±10 % | 27,9 % / 39,6 % | **28,0 % / 40,5 %** |
+| replay, billed lines | 22,88 % | **22,84 %** |
+| replay, rows ±10 % / € ±10 % | 27,9 % / 39,6 % | **27,9 % / 39,6 %** |
 
-Replay prints GATE FAIL (as before): the 6 known a/g/h lines are identical to the baseline run; 4 new lines are all
-objektas_b (below). Per project only b moved: billed MAE 18,07 → 17,97 %; Dažymas +20,1 → +31,2 % (walls +31,7 →
-+49,1 %), Rotband −10,8 → +1,0 %, Kampai −19,3 → −18,5 %, Angokr. −22,9 → −22,4 %; rows ±10 % 9,9 → 10,8 %, € 21,0 → 26,4 %.
+Final run (after the merge with `togal-v2` and the mixed-height rule). Replay prints GATE FAIL (as before): 6 lines
+are the known a/g/h lines, identical to the baseline run; 3 are objektas_b Dažymas +20,12 → **+20,53 %**, walls
++31,69 → +32,33 % (0,41 / 0,64 pp, over the 0,25 pp tolerance). b otherwise: billed MAE 18,07 → 17,88 %, Angokr.
+−22,9 → −22,4 %, Kampai −19,3 → −19,1 %, Rotband −10,8 → −10,4 %, Plytelės −9,6 → −9,1 %; rows unchanged (9,9 % / 21,0 %).
+The +0,4 pp: b's rooms 04, 05, 06, 10 now take perimeters read from strings or the outline (14,25 / 8,20 / 15,79 /
+16,56 m) instead of the stored 14,0 / 7,8 / 15,4 / 16,2 m — geometry against a stored figure, no share involved.
 
-## 4. Why objektas_b's walls moved — needs a decision
+(Intermediate run, before the mixed-height rule: replay billed 22,86 %, rows 28,0 % / 40,5 %, b Dažymas +31,2 %.)
 
-b's 15 circled room numbers are now found (checked on the sheet), so the lane outlines 11 rooms and sums 7
-perimeters; every per-room perimeter agrees with the stored one within 0,4 m — **except** the open space
-tambūras + living + corridor (01, 02, 03: one face, 65,1 m). `geometry_lane` shares an open space's perimeter by
-floor area: 02 gets 47,8 m (was 33,5), 01 and 03 lose 16,1 m. The living room is double height (5,7 m), the other two
-2,82 m, so +14,3 × 5,7 − 16,1 × 2,82 ≈ +36 m² of wall. The share is labelled an estimate
-(`atviros_erdves_ivertis`), but rows use it. Fix belongs in `geometry_lane.py` (not this branch's file): e.g. share
-by each member's own wall faces (the outline edges nearest its seat), or leave the members of a mixed-height open
-space blank with a reason. I did not revert the locator change: it improves every other b family and the rows.
+## 4. objektas_b — the open-space share and the mixed-height rule
+
+b's 15 circled room numbers are now found (checked on the sheet), so the lane outlines 11 rooms. Tambūras, living
+room and corridor (01, 02, 03) are one face, 65,1 m of wall. `geometry_lane` shared it by floor area: 02 got 47,8 m
+(was 33,5), 01 and 03 lost 16,1 m. The living room is double height (5,7 m), the other two 2,82 m: ≈ +36 m² of wall.
+
+Rule now (`geometry_lane._mixed_heights`, `settle_open_space_heights`): **an open space whose members' ceiling heights
+differ (> 0,05 m) is not shared by floor area.** A two-room space is divided by the lane's own boundary as before
+and each side's own faces are read (the boundary is a wall of neither); a larger space, or one with no boundary,
+leaves each member with the figure it had and the reason „atvira erdvė su …, lubų aukščiai skirtingi — bendras
+erdvės sienų ilgis … m pagal plotą nedalijamas; patikrinkite šios patalpos sienų ilgį". Unknown heights tell
+nothing (the share stands). Because the paid reading settles heights AFTER the lane (b's 5,7 m comes from the
+height salvage — the lane saw 2,82 m everywhere), the same check runs in the project-level pass every calc path
+runs, `universal_rules.prepare_rooms_for_calc` (one guarded call). It is reversible: heights that agree again
+(a correction in Prielaidos) get the share back.
+
+Honest limit: „the figure it had" is a stored Vision figure on b; with no figure at all the calc falls back to its
+square estimate. Blank-without-any-number is not possible in today's calc.
 
 ## 5. Not done / caveats
 
@@ -98,9 +123,7 @@ space blank with a reason. I did not revert the locator change: it improves ever
   `vision_call` / Phase-3 decision.
 - Fault 5 (furniture strings) and „2 of N walls without a string" are `dimension_sum.py` work.
 - A curve-fitted false arc (a rug's rounded corner) exists on sheet 5 as before; it only matters at a wall gap.
-- Tests: `backend/tests/test_lane_objektas_i_2026_10_24.py` (13, synthetic only).
-- `LANE_VERSION` not raised here (togal-v2 is at 14 after the scale merge); stored projects gain these readings
-  on the free re-read only once it is raised — use 15 on the merge.
-- j1 / j2 were measured on this branch WITHOUT the scale branch: j1 cold has no room source at all (no table,
-  no m² labels), so the new 1:100 scale helps only the seeded variant (18/18 badges already located); j2 sheet 1
-  should keep or improve its 7/8. Re-run the cold run after the merge.
+- Tests: `backend/tests/test_lane_objektas_i_2026_10_24.py` (16, synthetic only).
+- `LANE_VERSION` = 15 (after the scale branch's 14).
+- Files outside the original list touched: `geometry_lane.py` (assigned), `universal_rules.py` (one guarded call in
+  `prepare_rooms_for_calc`), `scripts/cold_run/run_cold.py` (passes the unit fields).
