@@ -167,7 +167,13 @@ def _forget_open_space(room: dict) -> None:
 # 15 (2026-10-24, objektas_i): badges measured against the sheet's dimension strings, the wall solid from every fill
 # colour that closes rings with the walls, two units with repeated room numbers (`<unit>-<nr>`), dashed door arcs —
 # and an open space whose rooms differ in ceiling height is not shared by floor area (objektas_b's double-height living room).
-LANE_VERSION = 15
+# 16 (2026-10-24, objektas_i perimeters + windows): a wall face without its own string is completed — a short face
+# (≤ 8 mm on paper, ≤ 0,6 m) from the outline, a face whose axis the other strings close („matmenų grandinė"), a face
+# whose opposite string agrees with the outline — each listed in `_perimetras_suma["papildyta"]`, read only while ≤ 25 %
+# of the perimeter comes from the outline; a window frame drawn as an outlined thin rectangle (one, or one per sash,
+# or a closed path) is glazing; a glazed gap with one leaf hinged at its end is a door (objektas_i A: 5 → 11 of 17
+# perimeters read, 0 → 16 windows + 1 balcony door).
+LANE_VERSION = 16
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
