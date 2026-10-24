@@ -119,3 +119,7 @@ frontend/e2e/.state/
 spikes/sam2/.venv/
 spikes/sam2/out/
 spikes/sam2/weights/
+
+# raster rooms spike (2026-10-24): local venv, overlays, lane dumps, results
+spikes/raster_rooms/.venv/
+spikes/raster_rooms/out/
