@@ -114,3 +114,8 @@ backend/telemetry/*.jsonl
 frontend/e2e/__screens__/
 frontend/e2e/.results/
 frontend/e2e/.state/
+
+# SAM 2 spike (2026-10-24): local venv, weights, overlays and lane dumps
+spikes/sam2/.venv/
+spikes/sam2/out/
+spikes/sam2/weights/
