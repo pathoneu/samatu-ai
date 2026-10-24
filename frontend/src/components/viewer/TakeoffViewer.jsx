@@ -37,6 +37,8 @@ import { dimensionStringsOf } from '@/lib/scaleOverview';
 import { scaleCheckReadout } from '@/lib/scaleCheck';
 import { visiblePageOf } from '@/lib/visiblePage';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
+import { blankReasonOf } from '@/lib/scaleProvenance';
+import { useTranslation } from '@/i18n/react';
 import { centreDelta } from '@/lib/checkOverlay';
 import { SNAP_KIND_TEXT } from '@/lib/drawingSnap';
 import { selfIntersects } from '@/lib/polygonGeometry';
@@ -245,7 +247,8 @@ function isoALabel(wMm, hMm) {
  * StatusBar — bottom h-6 strip: page/zoom · sheet size in mm (+ ISO-A label) ·
  * fill-mode hint or the current page's calibrated scale.
  */
-function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false, snapKind = null }) {
+function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, measureScales, measureTool = null, outlineEdit = null, projectId = null, symbolHint = null, scaleChipShown = false, snapKind = null, blankScaleReason = null }) {
+  const { t } = useTranslation();
   const { state: zoom } = useZoom(documentId);
   const { state: scroll } = useScroll(documentId);
   const pct = typeof zoom?.currentZoomLevel === 'number' ? Math.round(zoom.currentZoomLevel * 100) : 100;
@@ -259,7 +262,9 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
     sheet = `${wMm}×${hMm} mm${label ? ` (${label})` : ''}`;
   }
   const pageScale = measureScales?.[cur];
-  const scaleText = scaleStatusText(pageScale);
+  // where the scale comes from, in the words of lib/scaleProvenance (the backend's own provenance)
+  const scaleOpts = { blankReason: blankScaleReason?.(cur) || '' };
+  const scaleText = scaleStatusText(pageScale, t, scaleOpts);
   // Whether the visible sheet has wall geometry to snap to — same cache the page hosts fill, so this
   // costs no extra request; `select` and `count` do not snap, the others do.
   const snapsHere = measureTool != null && measureTool !== 'select' && measureTool !== 'count' && measureTool !== 'room';
@@ -284,7 +289,7 @@ function StatusBar({ documentId, totalPages, pages, fillFor, fillBusy = false, m
           {/* The scale readout and its way in are the scale chip on the drawing (Pathon v3 W1-D, ScaleChip);
               without one (a viewer with no project, the check view) the sentence stays here, read-only. */}
           {!scaleChipShown && (
-            <span title={scaleStatusTitle(pageScale)} className={`${snapNote ? '' : 'ml-auto'} shrink-0 whitespace-nowrap`}>{scaleText}</span>
+            <span title={scaleStatusTitle(pageScale, t, scaleOpts)} className={`${snapNote ? '' : 'ml-auto'} min-w-0 truncate`} data-testid="status-scale">{scaleText}</span>
           )}
         </>
       )}
@@ -632,6 +637,7 @@ function LegendPageWatcher({ documentId, pageRef, onPage, gotoRef = null }) {
 
 function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, rooms, focusedRoom, focusedPage, hiddenRoomNrs, hoveredRoomNrExternal, onRoomZoneClick, onPagePoint, onClearFocus, projectId, pdfBlob, exportFileName, onRoomPolygonFill, fillRequest, initialMeasurements, initialMeasureScales, initialCountTypes, onMeasureDataChange, laneScales = null, onRoomOutlineEdit = null, project = null, onOutlineTool = null, onRoomToolPreview = null, onRoomToolCommit = null, onRoomOpenings = null, sheetPages = null, sheetOverrides = null, onSheetOverridesChange = null, sheetLinksVersion = 0, revisionOverlay = null, active = true, legendPanelSlot = null, onLegendPanelChange = null, skippedPages = null, onSkippedPagesChange = null, onLegendBlankRows = null }) {
   const { activeDocumentId } = useActiveDocument();
+  const { t } = useTranslation();
   // ---- Sheets (Togal-v2 W7) ------------------------------------------------
   // The rail's names/types/groups (lib/sheetRail) from the classification + the user's overrides.
   // A rename or „Atkurti automatinį" is undone from its toast („Atšaukti"): the Istorija stack holds
@@ -2333,6 +2339,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
             projectId={projectId}
             symbolHint={symbol.active ? SYMBOL_HINTS[symbol.phase] : null}
             snapKind={snapKind}
+            blankScaleReason={project ? (p) => blankReasonOf(project, p) : null}
           />
           <CalibrateDialog
             request={calibRequest}
@@ -2354,7 +2361,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
               setSelectedMeasureId(null);
               // Say what was set, in the status bar's words (2026-10-16): the dialog closes at once and
               // the status bar is small — a confirmation nobody has to look for.
-              toast.success(scaleStatusText(scale), {
+              toast.success(scaleStatusText(scale, t), {
                 description: pages ? `Pritaikyta visiems ${pages.length} lapams.` : `Pritaikyta ${calibRequest.pageNr} lapui. Patikrinkite „Atstumo" įrankiu ties žinomu matmeniu.`,
               });
             }}

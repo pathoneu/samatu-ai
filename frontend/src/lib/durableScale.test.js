@@ -188,7 +188,8 @@ test('objektas_a on production: the main floor plan (sheet 2) gets the geometry 
   const scales = laneScalesOf(project);
   assert.equal(scales[2].calibrated, true);
   assert.equal(scales[2].label, '1:82');
-  assert.equal(scaleStatusText(scales[2]), 'Spėjamas mastelis 1:82 (išmatuotas pagal matmenis)');
+  const { makeT } = await import('./testT.js');
+  assert.equal(scaleStatusText(scales[2], makeT('lt')), 'Mastelis 1:82 — spėjamas pagal plano matmenis');
   // the label says where sheet 2's scale came from: the geometry lane's own record (1:82,49 measured, not written)
   assert.deepEqual(laneScaleOriginOf(project)[2], { kilme: 'ismatuotas', uzrasyta: [] });
   // a sheet both lanes read keeps the pair lane's ratio — and what it said before: every sheet of that reading

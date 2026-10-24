@@ -16,6 +16,7 @@ import { useTranslation } from '@/i18n/react';
 import { X } from 'lucide-react';
 import {
   COACH_STEPS, coachMarksDone, markCoachMarksDone, coachCardPosition, coachStartStep, saveCoachStep, modalOpen,
+  coachAvoid, COACH_AVOID_SELECTOR,
 } from '@/lib/viewerCoachMarks';
 import { keyText } from '@/lib/viewerShortcuts';
 import { FIRST_USE_PANELS, firstUseSeen, markFirstUseSeen } from '@/lib/firstUseHints';
@@ -27,6 +28,15 @@ function findAnchor(rootRef, selector) {
   const el = inViewer || (typeof document !== 'undefined' ? document.querySelector(selector) : null);
   const r = el?.getBoundingClientRect?.();
   return r && r.width > 0 && r.height > 0 ? { el, rect: { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom } } : null;
+}
+
+/** Every on-screen header the card must keep clear of (lib/viewerCoachMarks.coachAvoid). */
+function avoidRects() {
+  if (typeof document === 'undefined') return [];
+  return [...document.querySelectorAll(COACH_AVOID_SELECTOR)].map((el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  }).filter((r) => r.width > 0 && r.height > 0);
 }
 
 function stepKey(step) {
@@ -46,6 +56,9 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
   // sat on the coach layer above every dialog and covered it).
   const [yielding, setYielding] = useState(false);
   const [over, setOver] = useState(() => coachMarksDone());
+  // Headers it must not cover (Patikra's room header): the card moves under one, or waits until it is gone.
+  const [avoid, setAvoid] = useState([]);
+  const shownRef = useRef(false);   // Esc skips the walkthrough only while a card is actually on screen
 
   useEffect(() => {
     if (!enabled || coachMarksDone()) return undefined;
@@ -64,6 +77,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
       const bar = rootRef?.current?.querySelector('[data-tool-rail]')?.getBoundingClientRect();
       setBarRect(bar && bar.width > 0 ? { left: bar.left, top: bar.top, width: bar.width, height: Math.min(bar.height, 120), bottom: bar.bottom } : null);
       setYielding(modalOpen());
+      setAvoid(avoidRects());
       setTick((n) => n + 1);
     };
     measure();
@@ -77,7 +91,7 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
   useEffect(() => {
     if (!visible || yielding) return undefined;   // with a dialog open, Esc is the dialog's
     const onKey = (e) => {
-      if (e.key !== 'Escape' || modalOpen()) return;
+      if (e.key !== 'Escape' || modalOpen() || !shownRef.current) return;
       e.stopPropagation();
       finish();
     };
@@ -85,18 +99,24 @@ export default function ViewerCoachMarks({ rootRef, enabled = true, delayMs = 90
     return () => window.removeEventListener('keydown', onKey, true);
   }, [visible, yielding]);
 
+  shownRef.current = false;
   if (!visible || !current) return over ? <FirstUsePills rootRef={rootRef} /> : null;
   if (yielding) return null;
   const cardH = cardRef.current?.offsetHeight || 150;
   const vp = { vw: window.innerWidth, vh: window.innerHeight, cardW: CARD_W, cardH };
-  const pos = rect
+  const placed = rect
     ? coachCardPosition(rect, { ...vp, side: current.place || 'below' })
     : { ...coachCardPosition(barRect, { ...vp, side: 'right' }), arrowLeft: null, arrowTop: null };
+  const pos = coachAvoid(placed, { cardW: CARD_W, cardH, vh: vp.vh, avoid, anchored: Boolean(rect) });
+  if (!pos) return null;   // it would cover a header: wait, the same card comes back when the header is gone
+  shownRef.current = true;
+  // the ring stays on its anchor; a card moved under a header is no longer beside it, so no ring then
+  const movedOff = pos !== placed;
   const last = step === COACH_STEPS.length - 1;
   const title = t(`project.coach.${current.id}.title`);
   const key = stepKey(current);
   const keyNote = t(`project.coach.${current.id}.keyNote`, { defaultValue: '' });
-  const ring = rect && current.place !== 'over';
+  const ring = rect && current.place !== 'over' && !movedOff;
   return (
     <>
       {ring && (

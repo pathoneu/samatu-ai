@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { mergePageScales, effectivePageScales, pageScaleIn, checkViewerScales } from './pageScales.js';
 import { METERS_PER_POINT_AT_1_TO_1, autoPageScalesFromRooms, laneScalesOf, confirmPageScalesDurable } from './durableScale.js';
 import { scaleState, scaleStatusText } from './scaleLabel.js';
+import { makeT } from './testT.js';
+
+const t = makeT('lt');
 
 // objektas_h's shape: the geometry lane measured every sheet; nothing calibrated by hand.
 const H = { _meta: { geometrija: { masteliai: { 1: { m_per_pt: 0.04065, mastelis: 115 }, 3: { m_per_pt: 0.040602, mastelis: 115 } } } } };
@@ -50,11 +53,11 @@ test('a sheet he confirmed says „Patvirtintas" on the room sheet too, word for
   const sheet = pageScaleIn(roomSheetViewer(confirmed), 1);
   assert.equal(scaleState(main), 'patvirtintas');
   assert.equal(scaleState(sheet), 'patvirtintas');
-  assert.equal(scaleStatusText(sheet), scaleStatusText(main));
-  assert.match(scaleStatusText(sheet), /^Patvirtintas mastelis 1:115/);
+  assert.equal(scaleStatusText(sheet, t), scaleStatusText(main, t));
+  assert.match(scaleStatusText(sheet, t), /^Mastelis 1:115 — patvirtinote jūs/);
   // the sheet he did not confirm stays the program's guess in both
-  assert.equal(scaleStatusText(pageScaleIn(roomSheetViewer(confirmed), 3)), scaleStatusText(pageScaleIn(mainViewer(confirmed), 3)));
-  assert.match(scaleStatusText(pageScaleIn(roomSheetViewer(confirmed), 3)), /^Spėjamas mastelis 1:115/);
+  assert.equal(scaleStatusText(pageScaleIn(roomSheetViewer(confirmed), 3), t), scaleStatusText(pageScaleIn(mainViewer(confirmed), 3), t));
+  assert.match(scaleStatusText(pageScaleIn(roomSheetViewer(confirmed), 3), t), /^Mastelis 1:115 — spėjamas/);
 });
 
 test('the room sheet shows the main viewer\'s whole map — the rooms\' approximate scale included', () => {

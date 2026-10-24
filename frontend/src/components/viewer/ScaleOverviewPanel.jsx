@@ -3,7 +3,8 @@
  *
  * One row per sheet: number, the scale in force, where it comes from, the scale the sheet writes when the
  * dimensions measure another, how many dimension strings were read on it, and its state — nenustatytas ·
- * spėjamas · patvirtintas. A guessed lane scale can be confirmed one sheet at a time or for every sheet that
+ * spėjamas · iš brėžinio · patvirtintas (v4: where it comes from is worded by lib/scaleProvenance from the
+ * backend's own provenance; „spėjamas" only for low confidence or no source). A guessed lane scale can be confirmed one sheet at a time or for every sheet that
  * shares it; „Taisyti" sets it by two clicks (the Mastelis tool); „Patikrinti" measures a known length.
  * Rows come from lib/scaleOverview (pure); this file only draws them. ScaleOverviewDock and ScaleGateChip read
  * the visible page from the scroll plugin.
@@ -12,43 +13,58 @@ import { useMemo } from 'react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { X, Check, Scaling, Ruler, AlertTriangle } from 'lucide-react';
 import { buildScaleOverview, overviewCounts, plural } from '@/lib/scaleOverview';
-import { SCALE_STATE_LT } from '@/lib/scaleLabel';
+import { useTranslation } from '@/i18n/react';
+import { provenancePhrase, scaleStateWord } from '@/lib/scaleProvenance';
 import { scaleGateFromScale } from '@/lib/scaleGate';
 import { pageScaleIn } from '@/lib/pageScales';
 import { visiblePageOf } from '@/lib/visiblePage';
 
+// Solid = read from the drawing or his own; dashed = a proposal. Never red: none of these is an error.
 const STATE_CLASS = {
-  nenustatytas: 'border-border text-muted-foreground',
-  spejamas: 'border-conf-med text-foreground bg-conf-med/[0.12]',
-  patvirtintas: 'border-primary text-primary',
+  nenustatytas: 'border-solid border-border text-muted-foreground',
+  spejamas: 'border-dashed border-conf-med text-foreground bg-conf-med/[0.12]',
+  nuskaitytas: 'border-solid border-border text-foreground',
+  patvirtintas: 'border-solid border-primary text-primary',
 };
 
 function StateBadge({ state }) {
+  const { t } = useTranslation();
   return (
-    <span className={`inline-block px-1.5 py-px rounded-[2px] border text-meta leading-tight whitespace-nowrap ${STATE_CLASS[state] || ''}`}>
-      {SCALE_STATE_LT[state] || state}
+    <span className={`inline-block px-1.5 py-px rounded-[2px] border text-ui leading-tight whitespace-nowrap ${STATE_CLASS[state] || ''}`}>
+      {scaleStateWord(state, t)}
     </span>
   );
 }
 
+function sourceOf(row, t) {
+  const p = provenancePhrase(row.desc, t);
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 export function ScaleOverviewPanel({ rows, groups, currentPage, onJump, onConfirm, onFix, onCheck, onClose }) {
+  const { t } = useTranslation();
   const counts = overviewCounts(rows);
+  const countLine = [
+    t('project.scaleProvenance.overview.countConfirmed', { count: counts.patvirtintas }),
+    counts.nuskaitytas ? t('project.scaleProvenance.overview.countRead', { count: counts.nuskaitytas }) : null,
+    t('project.scaleProvenance.overview.countGuessed', { count: counts.spejamas }),
+    t('project.scaleProvenance.overview.countNone', { count: counts.nenustatytas }),
+  ].filter(Boolean).join(' · ');
+  const stateOf = new Map(rows.map((r) => [r.page, r.state]));
   const btn = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[2px] border border-border text-meta text-foreground hover:bg-muted';
   return (
     <div className="w-[380px] max-w-[calc(100vw-24px)] max-h-[70vh] flex flex-col rounded-[2px] border border-border bg-card text-card-foreground shadow-lg" data-testid="scale-overview">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
         <span className="text-ui font-semibold flex-1">Masteliai</span>
-        <span className="text-meta text-muted-foreground">
-          {counts.patvirtintas} patvirtinti · {counts.spejamas} spėjami · {counts.nenustatytas} nenustatyti
-        </span>
+        <span className="text-ui text-muted-foreground">{countLine}</span>
         <button type="button" className="p-1 rounded-[2px] hover:bg-muted" onClick={onClose} title="Uždaryti" aria-label="Uždaryti mastelius"><X className="w-4 h-4" /></button>
       </div>
-      <p className="px-3 py-1.5 text-meta text-muted-foreground leading-snug border-b border-border">
-        Spėjamą mastelį programa nustatė pati — pagal plane užrašytus matmenis arba patalpų plotus. Patikrinkite jį žinomu matmeniu ir patvirtinkite.
+      <p className="px-3 py-1.5 text-ui text-muted-foreground leading-snug border-b border-border">
+        {t('project.scaleProvenance.overview.help')}
       </p>
       {groups.map((g) => (
         <div key={g.ratio} className="px-3 py-1.5 border-b border-border bg-muted/40 text-meta">
-          <div>{g.pages.length} {plural(g.pages.length, 'lapas', 'lapai', 'lapų')} su tuo pačiu spėjamu masteliu <b className="mono">{g.label}</b>: {g.pages.join(', ')}</div>
+          <div>{g.pages.length} {plural(g.pages.length, 'lapas', 'lapai', 'lapų')} {t(g.pages.every((p) => stateOf.get(p) === 'spejamas') ? 'project.scaleProvenance.overview.groupGuessed' : 'project.scaleProvenance.overview.groupSame')} <b className="mono">{g.label}</b>: {g.pages.join(', ')}</div>
           <button type="button" className={`${btn} mt-1`} onClick={() => onConfirm(g.pages)} data-testid="scale-confirm-all">
             <Check className="w-3.5 h-3.5" />Patvirtinti visus su tuo pačiu masteliu
           </button>
@@ -71,8 +87,8 @@ export function ScaleOverviewPanel({ rows, groups, currentPage, onJump, onConfir
               </button>
               <StateBadge state={r.state} />
             </div>
-            <div className="mt-0.5 text-meta text-muted-foreground leading-snug">
-              {r.source}
+            <div className="mt-0.5 text-ui text-muted-foreground leading-snug" data-scale-source>
+              {sourceOf(r, t)}
               {r.strings > 0 && (
                 <> · plane perskaityta {r.strings} {plural(r.strings, 'matmuo', 'matmenys', 'matmenų')}{r.sample.length ? ` (${r.sample.join(', ')}${r.strings > r.sample.length ? '…' : ''})` : ''}</>
               )}

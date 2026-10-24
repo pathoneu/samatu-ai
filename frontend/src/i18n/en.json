@@ -701,6 +701,86 @@
       "vat": "VAT {{rate}}%",
       "totalWithVat": "TOTAL incl. VAT"
     },
+    "scaleProvenance": {
+      "withLabel": "{{label}} — {{phrase}}",
+      "chipNone": "no scale",
+      "state": {
+        "nenustatytas": "not set",
+        "spejamas": "estimated",
+        "nuskaitytas": "from the drawing",
+        "patvirtintas": "confirmed"
+      },
+      "phrase": {
+        "none": "no scale",
+        "noneReason": "no scale — {{reason}}",
+        "lines_one": "from the plan's dimensions ({{count}} figure)",
+        "lines_few": "from the plan's dimensions ({{count}} figures)",
+        "lines_many": "from the plan's dimensions ({{count}} figures)",
+        "lines_other": "from the plan's dimensions ({{count}} figures)",
+        "linesPlain": "from the plan's dimensions",
+        "walls_one": "from dimensions along the walls ({{count}} figure)",
+        "walls_few": "from dimensions along the walls ({{count}} figures)",
+        "walls_many": "from dimensions along the walls ({{count}} figures)",
+        "walls_other": "from dimensions along the walls ({{count}} figures)",
+        "wallsPlain": "from dimensions along the walls",
+        "writtenConfirmed": "written on the drawing, confirmed by the dimensions",
+        "writtenConfirmedSheet": "written on the drawing, confirmed by the dimensions on sheet {{page}}",
+        "writtenUnchecked": "written, not checked — please check",
+        "measuredWrittenOther": "measured; the written {{written}} does not match",
+        "sibling": "from sheet {{page}}",
+        "siblingPlain": "from another sheet of the same plan",
+        "siblingWrittenOther": "from sheet {{page}}; the written {{written}} does not match",
+        "userLine": "your line",
+        "userLineText": "your line over „{{text}}“",
+        "userKnown": "set by you from a known length",
+        "userPicked": "picked by you",
+        "auto": "estimated from the room areas",
+        "guessLow": "estimated from the plan's dimensions — please check",
+        "legacy": "estimated from the plan's dimensions",
+        "legacyWrittenOther": "estimated from the plan's dimensions; the written {{written}} does not match",
+        "confirmed": "{{phrase}}; confirmed by you",
+        "confirmedPlain": "confirmed by you"
+      },
+      "short": {
+        "lines": "from the plan's dimensions",
+        "walls": "from dimensions along the walls",
+        "writtenConfirmed": "written, confirmed",
+        "writtenUnchecked": "written, not checked",
+        "measured": "measured",
+        "sibling": "from sheet {{page}}",
+        "siblingPlain": "from another sheet",
+        "userLine": "your line",
+        "user": "yours",
+        "guess": "estimated",
+        "confirmed": "confirmed",
+        "none": "no scale"
+      },
+      "status": {
+        "line": "Scale {{text}}",
+        "noneClick": "Scale not set — click here"
+      },
+      "explain": {
+        "nuskaitytas": "The program read this scale from the drawing itself. In doubt — check it against a known dimension.",
+        "spejamas": "This is the program's estimate — check it against a known dimension and confirm it.",
+        "auto": "The scale is worked out from the room areas in the schedule — so it is approximate (~).",
+        "user": "You set this scale yourself from a length you know.",
+        "confirmed": "You confirmed it.",
+        "none": "No scale yet — measurements will have no metres.",
+        "clickToSet": "Click to set the scale from another known length.",
+        "odd": "{{label}} is not a usual drawing scale — the sheet was probably printed at another size than drawn.",
+        "ocr": "The figures were read from the sheet's image — compare with the drawing."
+      },
+      "overview": {
+        "countConfirmed": "{{count}} confirmed",
+        "countRead": "{{count}} from the drawing",
+        "countGuessed": "{{count}} estimated",
+        "countNone": "{{count}} not set",
+        "groupGuessed": "with the same estimated scale",
+        "groupSame": "with the same scale",
+        "help": "A scale „from the drawing“ was read from the plan's dimensions or its written scale; an estimated one is approximate. In doubt — check it against a known dimension and confirm it.",
+        "sourceNone": "None"
+      }
+    },
     "scaleBanner": {
       "srcText": "text marker",
       "srcDimensions": "dimension annotations",

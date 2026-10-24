@@ -135,3 +135,34 @@ export function modalOpen(doc = (typeof document !== 'undefined' ? document : nu
     return false;
   }
 }
+
+/**
+ * Headers a walkthrough card must never cover — Patikra's room header (`data-coach-avoid`, 2026-10-24: opened
+ * from the viewer at 1440×900 the „Lapai" card, whose sheet rail is not on that screen, sat centred near the
+ * top, right over the room's name and its „Kitas" button).
+ */
+export const COACH_AVOID_SELECTOR = '[data-coach-avoid]';
+
+const overlaps = (a, b) => a.left < b.left + b.width && b.left < a.left + a.width
+  && a.top < b.top + b.height && b.top < a.top + a.height;
+const usable = (r) => r && r.width > 0 && r.height > 0;
+
+/**
+ * The card's place (`pos` from coachCardPosition, size `cardW`×`cardH`) with every `avoid` rect kept clear:
+ *   · it covers none → `pos` unchanged;
+ *   · it points at an anchor and fits under the lowest header it covers → moved there (arrows dropped — they
+ *     would point at nothing);
+ *   · otherwise (no anchor on this screen, or no room under the header) → null: the card waits and the same
+ *     step comes back when the header is gone. One card at a time either way.
+ */
+export function coachAvoid(pos, { cardW, cardH, vh, avoid = [], anchored = true, gap = 10, margin = 12 } = {}) {
+  if (!pos) return pos;
+  const rects = (avoid || []).filter(usable);
+  const at = (top) => ({ left: pos.left, top, width: cardW, height: cardH });
+  const hit = rects.filter((r) => overlaps(at(pos.top), r));
+  if (!hit.length) return pos;
+  if (!anchored) return null;
+  const top = Math.max(...hit.map((r) => r.top + r.height)) + gap;
+  if (top + cardH > vh - margin || rects.some((r) => overlaps(at(top), r))) return null;
+  return { ...pos, top, arrowLeft: null, arrowTop: null, arrowDown: false };
+}

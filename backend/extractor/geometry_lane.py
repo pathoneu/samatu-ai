@@ -173,7 +173,12 @@ def _forget_open_space(room: dict) -> None:
 # of the perimeter comes from the outline; a window frame drawn as an outlined thin rectangle (one, or one per sash,
 # or a closed path) is glazing; a glazed gap with one leaf hinged at its end is a door (objektas_i A: 5 → 11 of 17
 # perimeters read, 0 → 16 windows + 1 balcony door).
-LANE_VERSION = 16
+# 17 (2026-10-25, v4 Phase 3a room identity): a stored project whose rooms carry the reading model's invented keys
+# (objektas_i: K1…K8 / D1…D9) is re-keyed by the free re-read to the drawing's room table — `<unit>-<nr>` with
+# `_vienetas` / `_nr_brezinyje` — before the lane runs, so each room is placed by its own badge in its own unit
+# (api/free_reread.renumber_rooms, extractor/room_identity.py); `_perkeisti_numeriai` says which key became which.
+# The lane itself reads as at 16.
+LANE_VERSION = 17
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

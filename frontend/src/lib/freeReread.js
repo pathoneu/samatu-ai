@@ -19,6 +19,7 @@
  */
 
 import { mergeReextractRooms } from './mergeReextract.js';
+import { carryIdentity, renumberMap, renumberProject } from './roomRenumber.js';
 
 /**
  * Project-level reads the free re-read returns beside the rooms (api/free_reread.py): the door schedule, the
@@ -66,6 +67,9 @@ export function mergeReadMeta(storedMeta, readMeta) {
   if (Array.isArray(readMeta.grindu_legenda)) out.grindu_legenda = readMeta.grindu_legenda;
   // the wall / partition types the legends name (W5-D D9) — a record of the drawing, taken whole
   if (isObj(readMeta.sienu_tipai)) out.sienu_tipai = readMeta.sienu_tipai;
+  // where the room numbers come from (v4 Phase 3a, api/free_reread.renumber_rooms) — kept, so the drawing's table
+  // is not opened again on the next re-read
+  if (isObj(readMeta.kambariu_tapatybe)) out.kambariu_tapatybe = readMeta.kambariu_tapatybe;
   const zonos = mergeZones(base.zonos, readMeta.zonos);
   if (zonos !== undefined) out.zonos = zonos;
   return out;
@@ -76,12 +80,18 @@ export function mergeReadMeta(storedMeta, readMeta) {
  * `{ project: null }` when there is nothing to land (the lane failed, or it
  * answered without rooms).
  */
-export function mergeFreeReread(base, result, now = new Date().toISOString()) {
-  if (!isObj(base) || !isObj(result) || result.lane === 'failed') return { project: null, diff: null };
+export function mergeFreeReread(rawBase, result, now = new Date().toISOString()) {
+  if (!isObj(rawBase) || !isObj(result) || result.lane === 'failed') return { project: null, diff: null };
   const fresh = Array.isArray(result.patalpos) ? result.patalpos.filter(isObj) : [];
   if (!fresh.length) return { project: null, diff: null };
+  // rooms the read gave the drawing's numbers (K2 → 1-2, v4 Phase 3a): the stored project is renumbered first, so
+  // each room meets its fresh read under one key and keeps what he set on it (lib/roomRenumber.js)
+  const renumber = renumberMap(result._perkeisti_numeriai);
+  const base = renumberProject(rawBase, renumber);
   const stored = Array.isArray(base.v8_rooms) && base.v8_rooms.length ? base.v8_rooms : base.patalpos;
-  const { rooms, diff } = mergeReextractRooms(stored, fresh, now);
+  const merged = mergeReextractRooms(stored, fresh, now);
+  const rooms = carryIdentity(merged.rooms, fresh, renumber);
+  const { diff } = merged;
   const project = {
     ...base,
     patalpos: rooms,
