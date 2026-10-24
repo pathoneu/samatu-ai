@@ -30,7 +30,11 @@ ARC_SPAN_DEG = (60.0, 200.0)   # one leaf swings a quarter, a two-way leaf a hal
 SINGLE_LEAF_SPAN_DEG = 125.0   # only a single leaf's arc says where a door stands when the wall is not cut
 DASH_MAX_PT = 4.0              # a dash of a dashed arc
 DASH_GAP_PT = 3.0              # …and how far the next one may start
+DASH_MIN_PT = 0.5              # a piece shorter than this has no direction and links no chain
+DASH_TURN_CAP_DEG = 45.0       # …and the direction never turns more than this between two dashes of one arc
 MIN_DASHES = 6
+TRIM_ROUNDS = 3                # a chain that fits no circle: dashes off the circle are set aside this many times…
+TRIM_KEEP = 0.75               # …while the arc keeps this share of the chain's dashes
 FIT_TOL_PT = 0.6               # the circle fit's worst residual (or 3 % of the radius)
 MIN_ANGLE_BINS = 5             # points spread over at least this many 10° bins — not one dash cluster
 GLAZING_MIN_LINES = 2
@@ -200,11 +204,40 @@ def _flatten(curve) -> list[tuple[float, float]]:
     return [(float(p[0]), float(p[1])) for p in (curve.get("pts") or [])]
 
 
+def _turn_max_deg(r_lo: float) -> float:
+    """How far the direction may turn from one dash to the next along a swing arc. Consecutive dashes of an arc
+    of radius r stand at most (dash + gap) apart along it, so their directions differ by at most
+    (DASH_MAX_PT + DASH_GAP_PT) / r radians — largest at the smallest leaf radius. Half as much again covers
+    the direction noise of a piece a point or two long. A sharper turn is not the same arc: a dashed threshold
+    or a badge box whose corner touches the arc's end (objektas_i, 2026-10-24: every swing arc chained into
+    the dashed threshold rectangle beside it, and no circle fitted the chain — 0 doors on the sheet)."""
+    if r_lo <= 0:
+        return DASH_TURN_CAP_DEG
+    return min(DASH_TURN_CAP_DEG, 1.5 * math.degrees((DASH_MAX_PT + DASH_GAP_PT) / r_lo))
+
+
+def _direction_deg(a, b) -> float | None:
+    """The undirected direction of a piece (0–180°), None when it is too short to have one."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    if math.hypot(dx, dy) < DASH_MIN_PT:
+        return None
+    return math.degrees(math.atan2(dy, dx)) % 180.0
+
+
 def _arcs_from_dashes(pieces, r_lo: float, r_hi: float) -> list[Arc]:
-    """Dashed arcs stored as separate hairline pieces: chain pieces whose ends touch (same colour), fit a
-    circle to every chain long enough."""
+    """Dashed arcs stored as separate hairline pieces: chain pieces whose ends touch (same colour) and whose
+    directions turn no more than an arc's dashes can (`_turn_max_deg`), fit a circle to every chain long
+    enough. A piece too short to have a direction (a speck of a dash pattern) joins no chain."""
     if len(pieces) < MIN_DASHES:
         return []
+    dirs = [_direction_deg(a, b) for a, b, _ in pieces]
+    turn_max = _turn_max_deg(r_lo)
+
+    def compatible(i: int, j: int) -> bool:
+        if dirs[i] is None or dirs[j] is None:
+            return False
+        d = abs(dirs[i] - dirs[j]) % 180.0
+        return min(d, 180.0 - d) <= turn_max
     grid: dict[tuple[int, int], list[int]] = {}
     cell = DASH_GAP_PT + 1.0
     for k, (a, b, _) in enumerate(pieces):
@@ -224,7 +257,7 @@ def _arcs_from_dashes(pieces, r_lo: float, r_hi: float) -> list[Arc]:
             for dx in (-1, 0, 1):
                 for dy in (-1, 0, 1):
                     for j in grid.get((cx + dx, cy + dy), ()):
-                        if j == k or pieces[j][2] != col:
+                        if j == k or pieces[j][2] != col or not compatible(k, j):
                             continue
                         if any(math.hypot(p[0] - q[0], p[1] - q[1]) <= DASH_GAP_PT for q in pieces[j][:2]):
                             ri, rj = find(k), find(j)
@@ -237,11 +270,55 @@ def _arcs_from_dashes(pieces, r_lo: float, r_hi: float) -> list[Arc]:
     for idxs in chains.values():
         if len(idxs) < MIN_DASHES:
             continue
-        pts = [p for i in idxs for p in pieces[i][:2]]
-        arc = _fit_arc(pts, r_lo, r_hi, "dash")
+        arc = _fit_dash_chain([pieces[i][:2] for i in idxs], r_lo, r_hi)
         if arc is not None:
             out.append(arc)
     return out
+
+
+def _circle(pts):
+    """(cx, cy, r) of the algebraic least-squares circle through the points, or None."""
+    n = len(pts)
+    sx = sy = sxx = syy = sxy = sxz = syz = sz = 0.0
+    for x, y in pts:
+        z = x * x + y * y
+        sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; sxz += x * z; syz += y * z; sz += z
+    sol = _solve3([[2 * sxx, 2 * sxy, sx], [2 * sxy, 2 * syy, sy], [2 * sx, 2 * sy, float(n)]], [sxz, syz, sz])
+    if sol is None:
+        return None
+    cx, cy, c = sol
+    r2 = c + cx * cx + cy * cy
+    return (cx, cy, math.sqrt(r2)) if r2 > 0 else None
+
+
+def _fit_dash_chain(segs, r_lo: float, r_hi: float) -> Arc | None:
+    """A circle through a chain of dashes. The whole chain first; when that fails, the dashes that lie off the
+    best circle are set aside and the rest fitted again (at most TRIM_ROUNDS times), so long as the arc keeps
+    MIN_DASHES dashes and TRIM_KEEP of the chain. A swing arc whose end touches one or two pieces of a dashed
+    threshold or a box corner of the same colour (objektas_i: the bathroom door's arc ran into the threshold
+    corner) is still an arc; a chain that is mostly something else is not."""
+    pts = [p for s in segs for p in s]
+    arc = _fit_arc(pts, r_lo, r_hi, "dash")
+    if arc is not None:
+        return arc
+    keep = list(segs)
+    for _ in range(TRIM_ROUNDS):
+        c = _circle([p for s in keep for p in s])
+        if c is None:
+            return None
+        cx, cy, r = c
+        tol = max(FIT_TOL_PT, 0.03 * r)
+        worst = lambda s: max(abs(math.hypot(x - cx, y - cy) - r) for x, y in s)   # noqa: E731
+        trimmed = [s for s in keep if worst(s) <= tol]
+        if len(trimmed) == len(keep):
+            trimmed = sorted(keep, key=worst)[:-1]              # nothing within: drop the farthest and refit
+        keep = trimmed
+        if len(keep) < MIN_DASHES or len(keep) < TRIM_KEEP * len(segs):
+            return None
+        arc = _fit_arc([p for s in keep for p in s], r_lo, r_hi, "dash")
+        if arc is not None:
+            return arc
+    return None
 
 
 def _fit_arc(pts: Sequence[tuple[float, float]], r_lo: float, r_hi: float, source: str) -> Arc | None:

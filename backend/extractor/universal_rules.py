@@ -1940,6 +1940,12 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
            "angos": {"rooms": 0, "matched": 0, "widths": 0, "exterior": 0, "passages": 0, "unbacked": 0, "added": 0,
                      "added_windows": 0, "converted": 0, "stood_unbacked": 0, "stood_left": 0}}
     try:
+        # 2026-10-24: an open space's share of walls by floor area is checked against the final heights
+        from .geometry_lane import settle_open_space_heights
+        out["atviros_erdves"] = settle_open_space_heights(rooms)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         out["angos"] = reconcile_openings_with_walls(rooms)
         for r in rooms:
             if isinstance(r, dict):
