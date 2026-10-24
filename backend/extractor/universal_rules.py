@@ -1441,6 +1441,18 @@ def reconcile_openings_with_walls(rooms: list[dict]) -> dict:
                 if o is None:
                     break
                 take(o, idx, "window_as_door" if tier == 2 else "window")
+        # 3c. (2026-10-24, v4) a listed window whose size fits no opening is still a window: it takes a free
+        #     opening to the outside the drawing GLAZES — the closest width — before 4d adds an unlisted window
+        #     there (objektas_a 102: „langas 2750 ×2" and „3300" fit none of the 2,11 / 1,73 / 0,96 m glazed
+        #     openings; without this the three listed and three drawn windows were both counted)
+        for idx, e in windows:
+            if e.get("_is_sienu_angos"):
+                continue
+            for _ in range(_el_units(e) - len(fates.get(idx, []))):
+                o = _closest_free(free, _el_width_m(e), lambda o: o["i"] == "laukas" and o.get("n") == "langas", tol=9.9)
+                if o is None:
+                    break
+                take(o, idx, "window")
         # 4. doors: the closest opening to another room (a wide one between living spaces is a passage);
         #    else an opening to the outside of door width — exterior; else no opening backs it
         for idx, e in doors:
