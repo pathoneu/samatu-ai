@@ -145,6 +145,14 @@ def test_wall_matched_strings_that_agree_with_the_written_scale_take_it_exactly(
     assert sc.m_per_pt == pytest.approx(50 * PT_M, rel=1e-9)
 
 
+def test_wall_matched_strings_beat_a_written_scale_they_contradict():
+    """objektas_j2 sheet 1: writes „M 1:40", printed resized to ≈ 1:45 — the strings win, the written one is a note."""
+    pdf = _pdf(_sheet(45, hairlines=False, stated="PLANAS M 1:40"))
+    sc = scale_for_page(ScaleContext(pdf), 1)
+    assert sc.source == ScaleSource.DIMENSION_WALLS
+    assert _denom(sc) == pytest.approx(45, rel=0.01) and "1:40" in sc.reason
+
+
 def test_too_few_strings_never_make_a_scale_by_coincidence():
     """Two strings agree with something on any drawing — five different values are the floor."""
     pdf = _pdf(_sheet(50, strings=None))
@@ -158,7 +166,7 @@ def test_a_written_scale_nothing_confirms_is_used_with_low_confidence():
     pdf = _pdf(_sheet(50, strings=None, stated="1A. PERTVARŲ PLANAS M 1:50".replace("Ų", "U")))
     sc = scale_for_page(ScaleContext(pdf), 1)
     assert sc.source == ScaleSource.STATED and sc.confidence == "low"
-    assert sc.m_per_pt == pytest.approx(50 * PT_M) and sc.source_text == "M 1:50"
+    assert sc.m_per_pt == pytest.approx(50 * PT_M) and sc.source_text == "M 1:50 (užrašytas, nepatikrintas)" and sc.details["verified"] is False
 
 
 def test_strings_in_centimetres_on_their_hairlines_confirm_the_written_scale():

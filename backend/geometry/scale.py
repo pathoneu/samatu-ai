@@ -583,7 +583,7 @@ def scale_for_page(ctx: ScaleContext, page: int, donors: Iterable[int] | None = 
                           f"{_ratio(m)} — rinkinys tikriausiai spausdintas kitu dydžiu.")
             sib.details["stated"] = stated
             return sib
-        return _stated_scale(n, LOW, f"M {_ratio(n)}", stated=stated)
+        return _stated_scale(n, LOW, f"M {_ratio(n)} (užrašytas, nepatikrintas)", stated=stated, verified=False)
     if sib is not None:
         if stated:
             sib.details["stated"] = stated
