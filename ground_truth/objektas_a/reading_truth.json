@@ -8,12 +8,12 @@
         "103": 1
       },
       "durys_lauko": 1,
-      "langai": 0,
+      "langai": 1,
       "praejimai": {},
       "neaisku": [
         "durys"
       ],
-      "pastaba": "pagrindinis įėjimas šiaurėje (lankas, trikampis); angos į 102 ir į 103 be lankų — laikomos durimis, plane vienareikšmiškai nematyti"
+      "pastaba": "pagrindinis įėjimas šiaurėje (lankas, trikampis); angos į 102 ir į 103 be lankų — laikomos durimis, plane vienareikšmiškai nematyti | 2026-10-24 manager: langas pietinėje lauko sienoje (1,34 m anga, rėmas ir stiklas išilgai sienos, 300 DPI) — buvo 0, pataisyta į 1"
     },
     "102": {
       "durys": {},
@@ -45,9 +45,9 @@
     "104": {
       "durys": {},
       "durys_lauko": 0,
-      "langai": 1,
+      "langai": 2,
       "praejimai": {},
-      "pastaba": "durys iš 103 įrašytos prie 103; langas šiaurinėje sienoje"
+      "pastaba": "durys iš 103 įrašytos prie 103; langas šiaurinėje sienoje | 2026-10-24 manager: antras langas vakarinėje lauko sienoje (0,96 m anga) — buvo 1, pataisyta į 2"
     },
     "105": {
       "durys": {},
