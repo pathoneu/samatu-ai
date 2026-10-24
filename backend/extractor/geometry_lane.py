@@ -164,7 +164,10 @@ def _forget_open_space(room: dict) -> None:
 # dimension lines and wall alignment left without one get it from the wall-matched strings, the written „M 1:xx"
 # (validated), a sibling sheet laid over it, or the person's „Mastelis" line; `masteliai_tusti` says why a plan
 # sheet has none. A stored project gains those sheets with one free re-read.
-LANE_VERSION = 14
+# 15 (2026-10-24, objektas_i): badges measured against the sheet's dimension strings, the wall solid from every fill
+# colour that closes rings with the walls, two units with repeated room numbers (`<unit>-<nr>`), dashed door arcs —
+# and an open space whose rooms differ in ceiling height is not shared by floor area (objektas_b's double-height living room).
+LANE_VERSION = 15
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -342,6 +345,97 @@ def _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, 
     meta["grindu_dangos"]["dvi_dangos"] = sorted(nr for nr in two if nr not in read)
 
 
+HEIGHT_SAME_M = 0.05     # members of one open space whose ceilings differ more than this are not shared by floor area
+UNSHARED = "_perimetras_nepadalytas"
+
+
+def _mixed_heights(members: Sequence[dict]) -> bool:
+    """True when every member of an open space has a ceiling height and they differ (HEIGHT_SAME_M). Unknown
+    heights tell nothing: the share stands as before."""
+    hs = []
+    for r in members:
+        try:
+            h = float(r.get("lubu_aukstis_m"))
+        except (TypeError, ValueError):
+            return False
+        if h <= 0:
+            return False
+        hs.append(h)
+    return len(hs) >= 2 and max(hs) - min(hs) > HEIGHT_SAME_M
+
+
+def _keep_unshared(room: dict, others: str, total_m: float) -> None:
+    """A member of a mixed-height open space: no share by floor area is written. A share an earlier run wrote is
+    taken back (the figure kept before returns); the reason says why there is no share and what the walls total."""
+    if str(room.get("perimetras_saltinis") or "") == OPEN_PLAN_ESTIMATE:
+        if room.get("_perimetras_pries_geometrija") is not None:
+            room["perimetras_m"] = room["_perimetras_pries_geometrija"]
+        else:
+            room.pop("perimetras_m", None)
+        for key in ("perimetras_saltinis", "_perimetras_pries_geometrija") + PERIMETER_ESTIMATE_KEYS:
+            room.pop(key, None)
+    room[UNSHARED] = True
+    room["_perimetras_priezastis"] = (f"atvira erdvė su {others}, lubų aukščiai skirtingi — bendras erdvės sienų ilgis "
+                                      f"{total_m:.2f} m pagal plotą nedalijamas; patikrinkite šios patalpos sienų "
+                                      "ilgį").replace(".", ",")
+
+
+def _write_share(room: dict, others: str, total_m: float, total_area: float) -> None:
+    """The room's share of an open space's walls by floor area — the estimate the rows use, its source saying so."""
+    area = float(room.get("plotas_m2") or 0)
+    if room.get("perimetras_m") is not None and room.get("perimetras_saltinis") not in ESTIMATES:
+        room.setdefault("_perimetras_pries_geometrija", room["perimetras_m"])
+    share = round(total_m * area / total_area, 2)
+    room.pop(UNSHARED, None)
+    room["perimetras_m"] = share
+    room["perimetras_saltinis"] = OPEN_PLAN_ESTIMATE
+    room["_perimetras_ivertis_m"] = share
+    room["_perimetras_ivertis_saltinis"] = "atviros_erdves_konturas"
+    room["_perimetras_priezastis"] = (f"atvira erdvė su {others} — sienos šių patalpų neskiria; bendras erdvės sienų ilgis "
+                                      f"{total_m:.2f} m padalytas pagal plotą").replace(".", ",")
+
+
+def settle_open_space_heights(rooms: Sequence[dict]) -> dict:
+    """The open-space shares against the FINAL ceiling heights — run by the project-level pass before any room is
+    computed (universal_rules.prepare_rooms_for_calc), because heights are often settled after the lane ran
+    (objektas_b: the living room's 5,7 m comes from the height salvage, the lane saw 2,82 m everywhere).
+    A space whose members' heights differ loses its share by floor area (each member keeps the figure it had,
+    with the reason); a space whose heights agree again gets its share back. Only shares this lane wrote are
+    touched; a stated or summed perimeter never. {spaces, unshared, reshared}. Never raises."""
+    out = {"spaces": 0, "unshared": 0, "reshared": 0}
+    try:
+        by_nr = {_nr(r): r for r in rooms if isinstance(r, dict) and _nr(r)}
+        seen: set[tuple] = set()
+        for r in list(by_nr.values()):
+            g = r.get("_atvira_erdve")
+            if not isinstance(g, dict) or not g.get("nariai"):
+                continue
+            key = tuple(sorted(str(n) for n in g["nariai"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            members = [by_nr[n] for n in key if n in by_nr]
+            if len(members) < 2:
+                continue
+            out["spaces"] += 1
+            total_m = float(g.get("perimetras_m") or 0)
+            total_area = sum(float(m.get("plotas_m2") or 0) for m in members)
+            mixed = _mixed_heights(members)
+            for m in members:
+                others = ", ".join(n for n in key if n != _nr(m))
+                src = str(m.get("perimetras_saltinis") or "")
+                if mixed and src == OPEN_PLAN_ESTIMATE:
+                    _keep_unshared(m, others, total_m)
+                    out["unshared"] += 1
+                elif (not mixed and m.get(UNSHARED) and total_m > 0 and total_area > 0
+                      and float(m.get("plotas_m2") or 0) > 0 and src not in STATED_PERIMETERS):
+                    _write_share(m, others, total_m, total_area)
+                    out["reshared"] += 1
+    except Exception:  # noqa: BLE001 — a malformed room must not sink a recompute
+        pass
+    return out
+
+
 def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, page, m_per_pt, size, meta) -> None:
     """A space TWO rooms share is divided by the boundary the lane itself proposes (vector_rooms.propose_split:
     through a wall end when the table's two areas agree with it, else where the areas stand in the table's
@@ -380,6 +474,8 @@ def _divide_shared_spaces(rooms, groups, todo, seats_on_page, areas, pdf_bytes, 
                               "pagal": cut["pagal"], "riba_pct": cut["line_pct"]}
             r.pop("_konturo_priezastis", None)
             r.pop("_konturo_siulymas", None)
+            if r.pop(UNSHARED, None):                          # mixed heights: no share was written — its own walls now
+                r.pop("_perimetras_priezastis", None)
             if str(r.get("perimetras_saltinis") or "") == OPEN_PLAN_ESTIMATE:
                 # the share by floor area written a moment ago — this side's own walls are read below
                 # (sum_perimeters: the strings along them, else the outline's length as an estimate with its reason)
@@ -424,7 +520,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                   "perimetrai_sudeti": [], "perimetrai_tusti": [], "angos_sienose": [], "nupiesta": {"langai": 0, "durys": 0, "be_tarpo": 0}, "ribos": [], "ribos_nepasiulytos": [], "konturu_siulymai": [],
                   "grindu_dangos": {"lapai": [], "perskaityta": {}, "dvi_dangos": []},
                   "kiti_aukstai": [], "skirtingu_lapu_erdves": [], "masteliai_atmesti": {}, "masteliai_kiti": {}, "poros_patvirtintos": [], "poros_atmestos": [],
-                  "perimetrai_atmesti": [], "seconds": 0.0}
+                  "perimetrai_atmesti": [], "erdves_skirtingu_auksciu": [], "seconds": 0.0}
     status = "insufficient"
     try:
         _stage(on_stage, "mastelis")
@@ -620,10 +716,15 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 meta["atviros_erdves"].append(g["nariai"])
                 members = [r for r in rooms if _nr(r) in g["nariai"]]
                 total_area = sum(areas.get(_nr(r)) or 0 for r in members)
+                mixed = _mixed_heights(members)
+                if mixed:
+                    meta["erdves_skirtingu_auksciu"].append(sorted(g["nariai"]))
                 for r in members:
                     if _nr(r) not in todo:
                         continue
                     r["_atvira_erdve"] = dict(g)
+                    if not mixed and r.pop(UNSHARED, None):    # an earlier run's „heights differ" no longer holds
+                        r.pop("_perimetras_priezastis", None)
                     # The shared space's walls are real; each room's share of them is written nowhere.
                     # The share by floor area is the ESTIMATE the walls are computed with — blank, reason,
                     # a number to accept. objektas_h: the rooms' guessed perimeters gave 340 m² of painted
@@ -633,15 +734,14 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     if total_area <= 0 or not (areas.get(_nr(r)) or 0) > 0:
                         continue
                     others = ", ".join(n for n in g["nariai"] if n != _nr(r))
-                    if r.get("perimetras_m") is not None and r.get("perimetras_saltinis") not in ESTIMATES:
-                        r.setdefault("_perimetras_pries_geometrija", r["perimetras_m"])
-                    share = round(g["perimetras_m"] * areas[_nr(r)] / total_area, 2)
-                    r["perimetras_m"] = share                  # a number the rows can use; the SOURCE says it is an estimate
-                    r["perimetras_saltinis"] = OPEN_PLAN_ESTIMATE
-                    r["_perimetras_ivertis_m"] = share
-                    r["_perimetras_ivertis_saltinis"] = "atviros_erdves_konturas"
-                    r["_perimetras_priezastis"] = (f"atvira erdvė su {others} — sienos šių patalpų neskiria; bendras erdvės sienų ilgis "
-                                                   f"{g['perimetras_m']:.2f} m padalytas pagal plotą").replace(".", ",")
+                    if mixed:
+                        # 2026-10-24 (objektas_b): a share by floor area hands a double-height room's walls to its
+                        # low neighbours or the reverse — no share is written; a two-room space is divided below
+                        # and each side's own walls are read, a larger one keeps what each room had
+                        _keep_unshared(r, others, g["perimetras_m"])
+                        continue
+                    # a number the rows can use; the SOURCE says it is an estimate
+                    _write_share(r, others, float(g["perimetras_m"]), total_area)
                     meta["perimetrai_tusti"].append(_nr(r))
             _divide_shared_spaces(rooms, res["groups"], todo, everyone, areas, pdf_bytes, page, scale[page], (W, H), meta)
         # an outline of this lane's that never reached today's trace — the room is not placed today, or its plan

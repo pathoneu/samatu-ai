@@ -8,7 +8,9 @@ from them. What two real sheets taught (objektas_g, objektas_h, 2026-09-19):
 1. SOLID = every fill of the walls' colour, MERGED. CAD exports a wall as
    triangles (objektas_h: 176 pieces); a triangle's own axis points anywhere,
    so nothing may be decided per piece. Compact fills of the wall colour
-   (columns, the wall between two windows) are walls too.
+   (columns, the wall between two windows) are walls too. A SECOND colour joins
+   the solid when it closes rings with the first (2026-10-24, objektas_i: new
+   partitions mid grey, outer walls dark grey — `_ring_colours`).
 2. OPENINGS are found between FACING boundary edges of the solid: two edges
    that look at each other across free space, overlap by no more than a wall
    is thick (STRIP_MAX_M) and have free space on BOTH sides of the strip
@@ -39,6 +41,7 @@ origin top-left); `polygon_pct` = fractions of the page size.
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Sequence
 
 from shapely.geometry import LineString, Point, Polygon, box
@@ -61,6 +64,9 @@ HAIRLINE_PT = 0.5           # ≈ 0,18 mm on paper — closes float-rounding gap
 SIMPLIFY_PT = 1.5
 MAX_FILL_SHARE = 0.2        # a fill covering more of the page than this is a background, not a wall
 MIN_WALLS = 3
+WALL_MAX_THICK_M = 0.8         # a second wall colour's pieces: no wall is thicker (insulated outer walls 0,3–0,5 m)
+BAR_ASPECT = 3.0               # …and a wall piece is at least this many times longer than thick
+PAPER_MIN = 0.99               # a fill this close to white in every channel is the paper — a mask, never a wall
 STRONG = ("zenkliukas", "plotas_uzrasas")
 SIDE_PROBE_PT = 1.0            # how far outside an opening's free side the space it leads to is looked up
 FOREIGN_OUTLINE_TOL_PT = 3.0   # an outline traced from a raster or drawn by hand sits this far off the wall face
@@ -72,18 +78,104 @@ UNCLOSED = "sienos neuždaro patalpos (vieta ne uždaroje erdvėje)"
 SOURCE = "vektoriniai_konturai"
 
 
-def _wall_solid(pdf_bytes: bytes, page: int, page_area: float):
+def _fused(fills):
+    return unary_union(list(fills)).buffer(HAIRLINE_PT / 2, join_style=2).buffer(-HAIRLINE_PT / 2, join_style=2).simplify(0.3)
+
+
+def _bar_shaped(poly: Polygon, m_per_pt: float | None) -> bool:
+    """A piece of wall in physical terms: no thicker than a wall can be (WALL_MAX_THICK_M at the sheet's scale)
+    and at least BAR_ASPECT times as long as it is thick. Without a scale, the page-point wall test."""
+    if not m_per_pt:
+        return _is_wall_shape(poly)
+    if poly.area <= 0:
+        return False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)      # degenerate (collinear) fills
+        rect = poly.minimum_rotated_rectangle
+    if rect.is_empty or rect.geom_type != "Polygon":
+        return False
+    xs = list(rect.exterior.coords)
+    if len(xs) < 4:
+        return False
+    short, long = sorted((math.dist(xs[0], xs[1]), math.dist(xs[1], xs[2])))
+    return short > 0 and short * m_per_pt <= WALL_MAX_THICK_M and long >= BAR_ASPECT * short
+
+
+def _contacts(part, grown_solid) -> int:
+    """In how many separate places a piece meets the wall solid (both grown by a hairline)."""
+    inter = part.buffer(HAIRLINE_PT).intersection(grown_solid)
+    if inter.is_empty:
+        return 0
+    return len(_polygons(inter)) or 1
+
+
+def _paper(colour) -> bool:
+    return all(float(v) >= PAPER_MIN for v in colour)
+
+
+def _ring_colours(shapes, solid, wall_colours: set, page_area: float, m_per_pt: float | None) -> list[tuple]:
+    """The further fill colours that are WALLS: those that close rings with the walls already in the solid.
+
+    An architect may draw the outer and bearing walls in one grey and the new partitions in another (objektas_i,
+    2026-10-24: partitions 0,58 grey, outer walls 0,39 grey — the outer shell was dropped and no room closed).
+    A colour joins when, and only when:
+      1. it is ink — not black (text and symbols, never read as a fill here) and not the paper's white (a white
+         fill on white paper is a mask: objektas_g's white fills cover the walls under every door symbol);
+      2. its material is wall material — at least half of its area is in bar-shaped pieces (`_bar_shaped`: no
+         thicker than WALL_MAX_THICK_M, BAR_ASPECT times longer than thick); a floor-zone fill or a solid block
+         is not;
+      3. it closes a ring with the walls — one of its connected pieces meets the solid in two or more separate
+         places, so walls → this colour → walls goes round a space. A legend swatch touches nothing; a shelf
+         touches once; a hatch inside a wall adds nothing to the union.
+    A share of the dominant colour's area decides nothing (objektas_i's outer walls hold 24,5 % of it on one
+    upload and 29 % on the other). Accepted colours grow the solid, so a third colour may close a ring through
+    the second. Sorted by area, largest first; deterministic."""
+    grown = solid.buffer(HAIRLINE_PT)
+    totals: dict = {}
+    for col, poly in shapes:
+        if col in wall_colours or _paper(col) or poly.area >= MAX_FILL_SHARE * page_area:
+            continue
+        totals[col] = totals.get(col, 0.0) + poly.area
+    accepted: list[tuple] = []
+    pending = sorted(totals, key=lambda c: (-totals[c], c))
+    changed = True
+    while changed and pending:
+        changed = False
+        for col in list(pending):
+            fills = [p for c, p in shapes if c == col and p.area < MAX_FILL_SHARE * page_area]
+            bars = sum(p.area for p in fills if _bar_shaped(p, m_per_pt))
+            if not fills or bars < 0.5 * sum(p.area for p in fills):
+                pending.remove(col)                    # never wall material, however the solid grows
+                continue
+            if not any(_contacts(part, grown) >= 2 for part in _polygons(_fused(fills))):
+                continue
+            accepted.append(col)
+            pending.remove(col)
+            solid = unary_union([solid, *fills])
+            grown = solid.buffer(HAIRLINE_PT)
+            changed = True
+    return accepted
+
+
+def _wall_solid(pdf_bytes: bytes, page: int, page_area: float, m_per_pt: float | None = None):
     """(solid, number of wall-shaped pieces). Pieces that only touch are fused
-    and collinear vertices dropped, so an edge of the solid is a wall face."""
+    and collinear vertices dropped, so an edge of the solid is a wall face.
+
+    The solid is every fill of the dominant wall colour plus every further colour that closes rings with it
+    (`_ring_colours`); a sheet drawing its walls in one colour gets exactly the solid it always got."""
     shapes = filled_shapes(pdf_bytes, page)
     colour = dominant_wall_colour(shapes)
     if colour is None:
         return None, 0
     fills = [p for c, p in shapes if c == colour and p.area < MAX_FILL_SHARE * page_area]
-    n_walls = sum(1 for p in fills if _is_wall_shape(p))
     if not fills:
         return None, 0
-    solid = unary_union(fills).buffer(HAIRLINE_PT / 2, join_style=2).buffer(-HAIRLINE_PT / 2, join_style=2).simplify(0.3)
+    solid = _fused(fills)
+    extra = _ring_colours(shapes, solid, {colour}, page_area, m_per_pt)
+    if extra:
+        fills = fills + [p for c, p in shapes if c in extra and p.area < MAX_FILL_SHARE * page_area]
+        solid = _fused(fills)
+    n_walls = sum(1 for p in fills if _is_wall_shape(p))
     return solid, n_walls
 
 
@@ -426,7 +518,7 @@ def trace_vector_rooms(pdf_bytes: bytes, page: int, locations: dict[str, dict], 
         W, H, _ = page_geometry(pdf_bytes, page)
     else:
         W, H = page_size
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H, m_per_pt)
     if solid is None or n_walls < MIN_WALLS:
         return {"rooms": {}, "reasons": {nr: "nėra vektorinių sienų" for nr in here}, "groups": [], "siulymai": {}}
     pts = {nr: Point(float(loc["cx"]) * W, float(loc["cy"]) * H) for nr, loc in here.items()}
@@ -497,7 +589,7 @@ def outline_at(pdf_bytes: bytes, page: int, x_pct: float, y_pct: float, table_ar
         W, H = page_size
     if W <= 0 or H <= 0 or not m_per_pt:
         return {"status": "no_walls"}
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H, m_per_pt)
     if solid is None or n_walls < MIN_WALLS:
         return {"status": "no_walls"}
     point = Point(float(x_pct) * W, float(y_pct) * H)
@@ -666,7 +758,7 @@ def _space_to_divide(pdf_bytes: bytes, page: int, seats_pct: dict[str, Sequence[
         if face is None or face.is_empty or face.geom_type != "Polygon" or not all(face.contains(pt) for pt in seats.values()):
             return "not_shared", W, H, seats, None
         return None, W, H, seats, face
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H, m_per_pt)
     if solid is None or n_walls < MIN_WALLS:
         return "no_walls", W, H, {}, None
     want_both = sum(float((table_areas or {}).get(nr) or 0) for nr in seats)
@@ -778,7 +870,7 @@ def joined_space(pdf_bytes: bytes, page: int, own_seat_pct: Sequence[float], oth
         W, H = page_size
     if W <= 0 or H <= 0 or not m_per_pt:
         return None
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H, m_per_pt)
     if solid is None or n_walls < MIN_WALLS:
         return None
     try:
@@ -870,7 +962,7 @@ def wall_openings(pdf_bytes: bytes, page: int, outlines_pct: dict[str, Sequence[
         W, H = page_size
     if not outlines_pct or W <= 0 or H <= 0 or not m_per_pt:
         return {}
-    solid, n_walls = _wall_solid(pdf_bytes, page, W * H)
+    solid, n_walls = _wall_solid(pdf_bytes, page, W * H, m_per_pt)
     if solid is None or n_walls < MIN_WALLS:
         return {}
     polys = _outlines(outlines_pct, W, H)
