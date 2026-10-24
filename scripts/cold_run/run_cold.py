@@ -251,7 +251,10 @@ def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> d
     ek = extract_eksplikacija_pdfplumber(pdf_bytes)
     res["timings"]["room_table_s"] = round(time.time() - t, 2)
     table_rooms = [{"nr": str(r.get("nr")), "pavadinimas": r.get("pavadinimas"), "plotas_m2": r.get("plotas_m2"),
-                    "puslapio_nr": r.get("page")} for r in ek.get("patalpos") or []]
+                    "puslapio_nr": r.get("page"),
+                    # several units' stacked tables (2026-10-24): the unit and the number as drawn travel with the room
+                    **{k: r[k] for k in ("_vienetas", "_nr_brezinyje") if r.get(k) is not None}}
+                   for r in ek.get("patalpos") or []]
     res["room_table"] = {"page": ek.get("eksplikacija_source_page"), "rooms": table_rooms,
                          "sum_m2": _r2(sum(float(r["plotas_m2"] or 0) for r in table_rooms)),
                          "meta": {k: ek.get("_meta", {}).get(k) for k in ("eksplikacija_pages_found", "tables_examined", "header_detected")}}

@@ -709,6 +709,197 @@ def _try_parse_row(
     return out
 
 
+# ── Stacked tables of several units (2026-10-24, objektas_i) ────────────────
+#
+# A semi-detached house, a duplex, a block: one sheet prints one room table PER
+# UNIT, each under its own heading and closed by its own subtotal, and each
+# numbers its rooms from 1 again („1 Koridorius … 8 Tech. patalpa", then „1
+# Koridorius … 9 Svetainė/virtuvė"). pdfplumber's ruling saw neither table
+# whole: the cold run of objektas_i read 7 of 17 rows with mangled numbers
+# (`1, 101, 201, …`). These tables are read from the TEXT LINES instead:
+#   · a block starts at each line holding an eksplikacija heading word;
+#   · its rows are the lines below it that START with a room number in the
+#     heading's column and END (reading right) in an area followed by m²/m2 —
+#     text further right on the same line (sheet notes) is not the row's;
+#   · it ends at its subtotal line („Bendras … plotas: 104,99 m2"), at the next
+#     heading, or at a line that is not a row.
+# The result is used ONLY when two or more such blocks repeat each other's
+# room numbers — exactly the case one table per building cannot hold. Then
+# every room is keyed `<unit>-<number>` (the LT way of writing an apartment's
+# room, „2-1") with the unit and the number as drawn kept beside it, and each
+# block whose subtotal is printed must add up to it. A sheet with one table, or
+# tables that do not repeat numbers, never reaches this path: the ruled-table
+# result above stands byte for byte.
+UNIT_HEADING_MARKERS = ("eksplik",)
+UNIT_ROW_NR_RE = re.compile(r"^\d{1,3}[.)]?$")
+UNIT_AREA_RE = re.compile(r"^\d{1,3}(?:[.,]\d{1,2})$")
+UNIT_AREA_UNIT_RE = re.compile(r"^(?:m²|m2|m\^2|kv\.?m\.?)$", flags=re.IGNORECASE)
+UNIT_SUM_TOL_M2 = 0.05            # a unit's rows against its printed subtotal
+UNIT_LINE_PT = 2.0                # words whose tops lie this close are one line
+UNIT_COLUMN_EM = 6.0              # the number column may start this many character heights left of the heading
+UNIT_MAX_ROW_GAP_EM = 3.5         # …and a block ends at a vertical gap this many line heights
+
+
+def _text_lines(words: list[dict]) -> list[list[dict]]:
+    lines: list[list[dict]] = []
+    for w in sorted(words, key=lambda w: (round(float(w["top"]), 1), float(w["x0"]))):
+        if lines and abs(float(lines[-1][0]["top"]) - float(w["top"])) <= UNIT_LINE_PT:
+            lines[-1].append(w)
+        else:
+            lines.append([w])
+    return [sorted(line, key=lambda w: float(w["x0"])) for line in lines]
+
+
+def _unit_row(line: list[dict], x_lo: float, x_hi: float) -> dict | None:
+    """One room row read rightwards from its number up to the FIRST area („16,14", „16,14 m2", „16,14m2"):
+    {nr, pavadinimas, plotas_m2, plotas_m2_raw, bbox}. The area column is right-aligned, so the gap before
+    it says nothing; what stands beyond the area on the same line (sheet notes) is not the row's."""
+    start = next((i for i, w in enumerate(line) if x_lo <= float(w["x0"]) <= x_hi), None)
+    if start is None or not UNIT_ROW_NR_RE.match(str(line[start]["text"])):
+        return None
+    words = line[start:]
+    for i in range(1, len(words)):
+        txt = str(words[i]["text"])
+        glued = re.match(r"^(\d{1,3}[.,]\d{1,2})(m²|m2)$", txt, flags=re.IGNORECASE)
+        if not (glued or UNIT_AREA_RE.match(txt)):
+            continue
+        raw = glued.group(1) if glued else txt
+        val, _ = _parse_number_preserving_decimals(raw)
+        name = _clean_name(" ".join(str(w["text"]) for w in words[1:i]))
+        if val is None or not (MIN_PLOTAS_M2 <= val <= MAX_PLOTAS_M2) or not re.search(r"[^\W\d_]", name):
+            return None
+        unit_after = i + 1 < len(words) and UNIT_AREA_UNIT_RE.match(str(words[i + 1]["text"]))
+        last = words[i + 1] if unit_after else words[i]
+        return {"nr": str(words[0]["text"]).rstrip(".)"), "pavadinimas": name, "plotas_m2": val,
+                "plotas_m2_raw": raw,
+                "bbox": [float(words[0]["x0"]), min(float(w["top"]) for w in words[:i + 1]),
+                         float(last["x1"]), max(float(w["bottom"]) for w in words[:i + 1])]}
+    return None
+
+
+def _unit_total(line: list[dict], x_lo: float, x_hi: float) -> tuple[str, float] | None:
+    """A block's subtotal line, read from the heading's column: (label, value)."""
+    start = next((i for i, w in enumerate(line) if x_lo <= float(w["x0"]) <= x_hi), None)
+    if start is None:
+        return None
+    text = " ".join(str(w["text"]) for w in line[start:])
+    if not any(m in text.lower() for m in ("bendras", "iš viso", "is viso", "viso")):
+        return None
+    m = re.search(r"(\d+(?:[  ]\d{3})*[.,]\d{1,2})\s*(?:m²|m2)", text, flags=re.IGNORECASE)
+    if not m:
+        return None
+    val, _ = _parse_number_preserving_decimals(m.group(1))
+    if val is None:
+        return None
+    label = _clean_name(text[:m.start()]).rstrip(":").strip()
+    return label[:MAX_TOTAL_LABEL_CHARS], val
+
+
+def _unit_tables_on_page(page, page_idx: int) -> list[dict]:
+    """The stacked room tables of one sheet, each {rooms, total, total_label, heading_bbox}; [] on any doubt."""
+    try:
+        words = page.extract_words(keep_blank_chars=False, use_text_flow=False) or []
+    except Exception:
+        return []
+    lines = _text_lines(words)
+    heads = [i for i, line in enumerate(lines)
+             if any(m in _fold_header(str(w["text"])) for w in line for m in UNIT_HEADING_MARKERS)]
+    blocks: list[dict] = []
+    for k, hi in enumerate(heads):
+        head_words = [w for w in lines[hi] if any(m in _fold_header(str(w["text"])) for m in UNIT_HEADING_MARKERS)]
+        hw = head_words[0]
+        h = max(1.0, float(hw["bottom"]) - float(hw["top"]))
+        # the heading PHRASE („PATALPŲ EKSPLIKACIJA") starts at its first word, not at the marker word
+        line = lines[hi]
+        j = line.index(hw)
+        while j > 0 and float(line[j]["x0"]) - float(line[j - 1]["x1"]) <= 1.5 * h:
+            j -= 1
+        hw = {**hw, "x0": line[j]["x0"]}
+        # the number column starts under the heading — left-aligned with it, or a little left of it
+        x_lo = float(hw["x0"]) - UNIT_COLUMN_EM * h
+        x_hi = float(hw["x1"])
+        stop = heads[k + 1] if k + 1 < len(heads) else len(lines)
+        rooms: list[dict] = []
+        total = None
+        last_bottom = float(hw["bottom"])
+        for line in lines[hi + 1:stop]:
+            top = min(float(w["top"]) for w in line)
+            if top - last_bottom > UNIT_MAX_ROW_GAP_EM * h * 2:
+                break
+            t = _unit_total(line, x_lo, x_hi)
+            if t is not None:
+                total = t
+                break
+            if not any(x_lo <= float(w["x0"]) <= x_hi for w in line):
+                continue                               # drawing text beside the table on the same height
+            row = _unit_row(line, x_lo, x_hi)
+            if row is None:
+                if rooms:
+                    break
+                continue
+            rooms.append(row)
+            last_bottom = max(float(w["bottom"]) for w in line)
+        if len(rooms) < MIN_ROOMS_THRESHOLD:
+            continue
+        nrs = [r["nr"] for r in rooms]
+        if len(set(nrs)) != len(nrs):
+            return []                                  # one table repeating a number: not a table we can key
+        if sum(1 for r in rooms if _looks_like_room_name(r["pavadinimas"], False)) * 2 < len(rooms):
+            continue                                   # mostly not room names: a legend, not a room table
+        if total is not None and abs(round(sum(r["plotas_m2"] for r in rooms), 2) - total[1]) > UNIT_SUM_TOL_M2:
+            return []                                  # rows that do not add up to the unit's own sum: misread
+        blocks.append({"rooms": rooms, "total": total[1] if total else None,
+                       "total_label": total[0] if total else None, "page": page_idx})
+    return blocks
+
+
+def stacked_unit_rooms(pdf) -> tuple[list[dict], dict] | None:
+    """Rooms of two or more stacked unit tables repeating each other's numbers, keyed `<unit>-<nr>`, or None.
+    `pdf` = an open pdfplumber document. Units are numbered in the order their tables are printed (top to bottom,
+    left to right on the sheet that holds the most of them)."""
+    best: list[dict] = []
+    for page_idx, page in enumerate(pdf.pages, start=1):
+        try:
+            if not _is_eksplikacija_page(page, False):
+                continue
+        except Exception:
+            continue
+        blocks = _unit_tables_on_page(page, page_idx)
+        if len(blocks) > len(best):
+            best = blocks
+    if len(best) < 2:
+        return None
+    seen: set[str] = set()
+    repeated = False
+    for b in best:
+        nrs = {r["nr"].lstrip("0") or "0" for r in b["rooms"]}
+        repeated = repeated or bool(nrs & seen)
+        seen |= nrs
+    if not repeated:
+        return None
+    rooms: list[dict] = []
+    page = best[0]["page"]
+    try:
+        pg = pdf.pages[page - 1]
+        W, H = float(pg.width), float(pg.height)
+    except Exception:
+        W = H = None
+    for u, b in enumerate(best, start=1):
+        for i, r in enumerate(b["rooms"]):
+            out = {"nr": f"{u}-{r['nr']}", "pavadinimas": r["pavadinimas"], "plotas_m2": r["plotas_m2"],
+                   "plotas_m2_raw": r["plotas_m2_raw"], "row_idx": u * 1000 + i, "page": b["page"],
+                   "_row_source": "unit_table", "plotas_source": "eksplikacija",
+                   "_vienetas": u, "_nr_brezinyje": r["nr"],
+                   "eksplikacija_row_bbox": [round(v, 2) for v in r["bbox"]]}
+            if W and H:
+                out["eksplikacija_page_width_pdf"] = round(W, 2)
+                out["eksplikacija_page_height_pdf"] = round(H, 2)
+            rooms.append(out)
+    units = [{"vienetas": u, "kambariai": len(b["rooms"]), "suma_m2": b["total"], "pavadinimas": b["total_label"]}
+             for u, b in enumerate(best, start=1)]
+    return rooms, {"page": page, "units": units}
+
+
 def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
     """Try to extract eksplikacija from PDF text-layer tables.
 
@@ -947,6 +1138,25 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
                     out["_meta"]["total_row_page"] = pick["page"]
                     out["_meta"]["total_rows_sum_m2"] = rooms_sum
                     out["_meta"]["total_candidates"] = best_totals
+
+            # ── Several units' tables stacked on one sheet (2026-10-24) ──────
+            # Only when two or more tables repeat each other's room numbers
+            # (`stacked_unit_rooms`); everything above stands untouched otherwise.
+            units = stacked_unit_rooms(pdf)
+            if units is not None and len(units[0]) > len(out["patalpos"]):
+                unit_rooms, info = units
+                out["patalpos"] = unit_rooms
+                out["eksplikacija_source_page"] = info["page"]
+                out["_meta"]["vienetai"] = info["units"]
+                out["_meta"]["replaced_by_unit_tables"] = len(best_extraction)
+                for k in ("total_area_m2", "total_row_label", "total_row_page", "total_rows_sum_m2", "total_candidates"):
+                    out["_meta"].pop(k, None)
+                sums = [u["suma_m2"] for u in info["units"]]
+                if all(s is not None for s in sums):
+                    out["_meta"]["total_area_m2"] = round(sum(sums), 2)
+                    out["_meta"]["total_row_label"] = "vienetų sumų suma"
+                    out["_meta"]["total_row_page"] = info["page"]
+                    out["_meta"]["total_rows_sum_m2"] = round(sum(float(r["plotas_m2"]) for r in unit_rooms), 2)
 
     except Exception as exc:
         out["_meta"]["error"] = str(exc)
