@@ -5289,6 +5289,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _consolidate_paint_pozicijos(parsed)
     _consolidate_led_niche_pozicijos(parsed)
     pozicijos = parsed["pozicijos"]
+    # Phase 2 (2026-10-25): his granularity — walls + ceilings paint in one row, wall + floor tiles in one
+    # row — when the profile says „merged" (default „split", rules/conventions.py LT_RANGOVAS).
+    pozicijos = _rules_rows.apply_granularity(pozicijos, _profile, _ledger)
 
     # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.
     # lines stay grouped even when generator interleaves emit order.
@@ -7597,7 +7600,8 @@ def extract_interior(
         parsed["_overrides"] = rules_override
     # Apimtis chosen at upload (families, ceilings, walls with/without openings;
     # rooms are not known yet) — see extractor/scope.py.
-    _apimtis = _scope.normalize_apimtis((rules_override or {}).get("apimtis"))
+    _apimtis = _scope.normalize_apimtis(_scope.with_profile_defaults((rules_override or {}).get("apimtis"),
+                                                                     rules_override))
     _scope.mark_rooms(parsed.get("patalpos") or [], _apimtis)
     if _apimtis:
         parsed["_apimtis"] = _apimtis

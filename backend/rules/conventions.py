@@ -358,6 +358,31 @@ LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
           "„vertikalus_lubos“ + the wall–ceiling junction (perimeter); „visi“ + the openings' edges (today); "
           "„tik_lubos“ the wall–ceiling junction alone. The vertical conventions count a room's corners off "
           "its wall outline when it has one (convex = inner, reflex = outer), else 4 × H inner and no outer."),
+    Param("reveals_scope", None, (None,),
+          "founder 2026-09-25 (REVEALS_SCOPE_DEFAULT: windows, exterior doors, passages); Prielaidos "
+          "„angokrasciai_apimtis“ wins",
+          "Which openings' reveals are billed — {langai, lauko_durys, praejimai, vidaus_durys: bool}; "
+          "None = REVEALS_SCOPE_DEFAULT."),
+    Param("kampai", "visi", KAMPAI_CONVENTIONS,
+          "engine 2026-05-31 (perimeter + inner + outer + opening edges + partition junctions); alternatives from "
+          "the manager's 2026-10-25 walk (2,5–3,4× his rows on the contractor's projects)",
+          "What „Dažymo kampų montavimas“ adds up: „isoriniai“ outer vertical corners × H; „isoriniai_angos“ + "
+          "the openings' edges; „vertikalus“ outer + inner vertical corners (and partition junctions); "
+          "„vertikalus_lubos“ + the wall–ceiling junction (perimeter); „visi“ + the openings' edges (today); "
+          "„tik_lubos“ the wall–ceiling junction alone. The vertical conventions count a room's corners off "
+          "its wall outline when it has one (convex = inner, reflex = outer), else 4 × H inner and no outer."),
+    Param("paint_rows", "split", ("split", "merged"),
+          "his sąmatos merge walls + ceilings on 5 of 6 projects (phase-0 §2); split kept as default — the row "
+          "scorecard pools our rows into his either way, and „Jūsų eilutės“ already renders his layout",
+          "„merged“: one „Sienų, lubų glaistymas/dažymas“ row per height band instead of separate wall / ceiling rows."),
+    Param("tile_rows", "split", ("split", "merged"),
+          "his sąmatos merge wall + floor tiles on 5 of 6 projects (phase-0 §2); split kept as default",
+          "„merged“: one „Sienų ir grindų plytelių klijavimas“ row instead of wall / floor rows."),
+    Param("scope_defaults", None, (None,),
+          "extractor/scope.py `_apimtis` (2026-09-06) — the contractor's habitual scope as a profile default; "
+          "phase-0 §2: he leaves out floors / tiles / plumbing / electrical on some jobs by choice",
+          "Default scope choices in the `_apimtis` shape (darbai_ne, patalpos_ne, patalpu_sritys_ne, lubos, "
+          "sienos_angos, rotband, rotband_dalis, kampai); a project's own choice of the same key wins."),
 )}
 
 
@@ -379,7 +404,13 @@ def profile_overrides(overrides) -> dict:
         p = LT_RANGOVAS.get(name)
         if p is None:
             continue
-        if name == "wet_room_markers":
+        if name == "reveals_scope":
+            if isinstance(val, dict):
+                out[name] = {k: bool(v) for k, v in val.items() if k in REVEALS_SCOPE_KINDS}
+        elif name == "scope_defaults":
+            if isinstance(val, dict):
+                out[name] = dict(val)
+        elif name == "wet_room_markers":
             if isinstance(val, (list, tuple)) and val and all(isinstance(x, str) for x in val):
                 out[name] = tuple(x.strip().lower() for x in val if x.strip())
         elif name == "aperture_no_deduct_max_m2":

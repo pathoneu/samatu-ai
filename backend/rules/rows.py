@@ -300,6 +300,67 @@ def hidro_two_rows(wet_rooms: list[dict], *, kg_per_m2: float) -> list[tuple[dic
     return out
 
 
+# ── Granularity: his rows merge families we emit apart ─────────────────────
+_PAINT_ROW = _re.compile(r"^(Sienų|Lubų) glaistymas/dažymas( \((iki|virš) 3 ?m aukščio\))?$")
+_TILE_ROW = _re.compile(r"^(?!Didžiaformač).+ plytelių klijavimas$")
+PAINT_MERGED_LABEL = "Sienų, lubų glaistymas/dažymas"
+TILE_MERGED_LABEL = "Sienų ir grindų plytelių klijavimas"
+
+
+def _merge_rows(members: list[dict], label: str, ledger) -> dict:
+    first = members[0]
+    total = round(sum(float(m.get("kiekis") or 0) for m in members), 2)
+    out = {k: v for k, v in first.items() if k not in ("contributions", "excluded", "roll_up", "medziagos_kiekis",
+                                                       "medziagos_aprasymas", "medziagos_vnt", "position_id")}
+    out["aprasymas"] = label
+    out["kiekis"] = total
+    out["_sujungtos_eilutes"] = [m.get("aprasymas") for m in members]
+    mats = [m for m in members if m.get("medziagos_kiekis") is not None]
+    if mats and len({m.get("medziagos_vnt") for m in mats}) == 1:
+        out["medziagos_aprasymas"] = mats[0].get("medziagos_aprasymas")
+        out["medziagos_vnt"] = mats[0].get("medziagos_vnt")
+        out["medziagos_kiekis"] = round(sum(float(m["medziagos_kiekis"]) for m in mats), 2)
+    if ledger is not None and all(m.get("roll_up") for m in members):
+        contribs = [dict(c) for m in members for c in (m.get("contributions") or [])]
+        excluded = [dict(e) for m in members for e in (m.get("excluded") or [])]
+        roll = [ledger.sum_step(contribs, ledger.rooms_label(len(contribs)))]
+        if abs(roll[-1]["value"] - total) > ledger.rounding_bound(total):
+            roll.append(ledger.step("anchor", "Sujungtų eilučių suma", total,
+                                    " + ".join(str(m.get("aprasymas")) for m in members)))
+        ledger.attach(out, contribs, excluded, roll)
+    return out
+
+
+def apply_granularity(rows: list[dict], profile: dict, ledger=None) -> list[dict]:
+    """Merge our wall + ceiling paint rows (per height band) and our wall + floor tile rows into his one
+    row when the profile says „merged". The merged row takes the first member's place; the quantities
+    add up exactly (nothing is recomputed). `profile` = resolve_profile(...)."""
+    out = list(rows)
+    if profile.get("paint_rows") == "merged":
+        bands: dict[str, list[int]] = {}
+        for i, r in enumerate(out):
+            m = _PAINT_ROW.match(str(r.get("aprasymas") or ""))
+            if m and not r.get("_is_material_line"):
+                bands.setdefault(m.group(3) or "", []).append(i)
+        has_virs = "virš" in bands
+        merged: dict[int, dict] = {}
+        drop: set[int] = set()
+        for band, idx in bands.items():
+            if len(idx) < 2:
+                continue
+            suffix = f" ({band} 3m aukščio)" if band and has_virs else ""
+            merged[idx[0]] = _merge_rows([out[i] for i in idx], PAINT_MERGED_LABEL + suffix, ledger)
+            drop.update(idx[1:])
+        out = [merged.get(i, r) for i, r in enumerate(out) if i not in drop]
+    if profile.get("tile_rows") == "merged":
+        idx = [i for i, r in enumerate(out)
+               if _TILE_ROW.match(str(r.get("aprasymas") or "")) and str(r.get("vnt") or "") == "m2"]
+        if len(idx) >= 2:
+            m = _merge_rows([out[i] for i in idx], TILE_MERGED_LABEL, ledger)
+            out = [m if i == idx[0] else r for i, r in enumerate(out) if i not in idx[1:]]
+    return out
+
+
 def round_rows_at_boundary(rows: list[dict]) -> list[dict]:
     """R4: each row's work and material quantities rounded once, here, in their own unit (Decimal
     ROUND_HALF_UP to 0,01; counts whole). A blank stays blank. Mutates and returns `rows`."""

@@ -1240,7 +1240,7 @@ def recompute(
             # `_overrides.apimtis`; enforced exactly as in /recompute-interior
             # (extractor/scope.py) so a Prielaidos edit cannot undo it.
             from extractor import scope as _scope
-            _apimtis = _scope.normalize_apimtis(overrides.get("apimtis"))
+            _apimtis = _scope.normalize_apimtis(_scope.with_profile_defaults(overrides.get("apimtis"), overrides))
             _scope.mark_rooms(rooms, _apimtis)       # also CLEARS a stale mark when no scope
             if _apimtis:
                 _scope.apply_ceiling_choice(rooms, _apimtis)

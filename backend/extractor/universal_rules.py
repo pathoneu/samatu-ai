@@ -292,14 +292,17 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     if _t > 0:
         for rt in rules:
             rules[rt]["wall_thickness_m"] = _t
-    # Apimtis (2026-09-06): walls measured without deducting the openings.
-    if (prefs.get("apimtis") or {}).get("sienos_angos") == "neatimti":
+    # Apimtis (2026-09-06): walls measured without deducting the openings. The profile's `scope_defaults`
+    # (Phase 2) fill the keys the project did not choose.
+    from .scope import with_profile_defaults
+    _ap = with_profile_defaults(prefs.get("apimtis"), prefs) or {}
+    if _ap.get("sienos_angos") == "neatimti":
         for rt in rules:
             rules[rt]["deduct_openings"] = False
     # Corner bead on the room's own (concave) corners: the „Ką skaičiuoti"
     # choice first; otherwise the Setup Wizard checkbox, which promised this
     # for months and was never read by the calculator.
-    _kampai = (prefs.get("apimtis") or {}).get("kampai")
+    _kampai = _ap.get("kampai")
     if _kampai in ("tik_isoriniai", "su_vidiniais"):
         for rt in rules:
             rules[rt]["count_inner_corners"] = _kampai == "su_vidiniais"
@@ -1628,6 +1631,11 @@ def settle_reveals_scope(rooms: list[dict], overrides: dict | None = None) -> di
     raw = (overrides or {}).get("angokrasciai_apimtis") if isinstance(overrides, dict) else None
     scope = dict(REVEALS_SCOPE_DEFAULT)
     chosen = False
+    # Phase 2 (2026-10-25): the profile's `reveals_scope` replaces the default when the project set it;
+    # his own Prielaidos choice above still wins over both.
+    prof_scope = profile_overrides(overrides).get("reveals_scope")
+    if isinstance(prof_scope, dict):
+        scope.update({k: bool(v) for k, v in prof_scope.items() if k in REVEALS_SCOPE_KINDS})
     if isinstance(raw, dict):
         for k in REVEALS_SCOPE_KINDS:
             if k in raw:
