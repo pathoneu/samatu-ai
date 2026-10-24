@@ -224,8 +224,10 @@ def _deps(label: str) -> tuple[bool, bool] | None:
     return None
 
 
-# Perimeter classes a per-room row may not rest on.
-ILLEGAL_PERIMETERS = ("default",)
+# Perimeter classes a per-room row may not rest on: Pass-1's figure and the zoomed re-read are a model
+# reading pixels (R2), the square from the area a default (R7). A room with no outline and no strings
+# keeps its rows blank until the lane or he gives the walls.
+ILLEGAL_PERIMETERS = ("model", "default")
 
 
 def gate_room_inputs(pozicijos: list[dict], rooms: list[dict], parsed: dict,

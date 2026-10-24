@@ -4154,7 +4154,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
         if _gj_meta["source"] == "anchor":
             _g_roll = _floor_anchor_steps(_gj_meta, _FLOOR_ANCHOR_NOTE)
-            _g_reason = {"_confidence_reason": _gj_meta["provenance"]}
+            _g_reason = {"_confidence_reason": _gj_meta["provenance"], _rp.KILME_KEY: _rp.DRAWING}
         else:
             _g_roll = [_ledger.sum_step(_g_contribs,
                                         _ledger.rooms_label(len(_g_contribs)))]
@@ -4635,7 +4635,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_PL,
                  "aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas",
                  "vnt": "m", "kiekis": _pg_meta["base"], "saltinis": SAL,
-                 "confidence": "high",
+                 "confidence": "high", _rp.KILME_KEY: _rp.DRAWING,
                  "_confidence_reason": _pg_meta["provenance"],
                  "_assumption": (
                      "Ilgis — iš grindų plano legendos. Patalpų skaičiai šalia — "
@@ -4796,7 +4796,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 _lam_row["_assumption"] = (f"Grindų dangos atliekos {_waste.pct_label(_fw)} % — brėžinyje parašytas "
                                            f"klojimo raštas ({_waste.PATTERN_LT[_waste.pattern_of_texts(_waste.room_floor_text(r) for r in rooms if float(r.get('pvc_grindys_m2') or 0) > 0)]}).")
         if _lam_meta["source"] == "anchor":
-            _lam_row["_confidence_reason"] = _lam_meta["provenance"]
+            _lam_row["_confidence_reason"] = _lam_meta["provenance"]; _lam_row[_rp.KILME_KEY] = _rp.DRAWING
             _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,
                                       _floor_anchor_steps(_lam_meta, _FLOOR_ANCHOR_NOTE))
         else:
