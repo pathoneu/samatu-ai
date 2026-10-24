@@ -237,6 +237,39 @@ def test_a_glazed_gap_with_one_leaf_hinged_at_its_end_is_a_door():
     assert do.opening_kind([[100, mid], [190.7, mid]], 2.4, WALL * M_PER_PT, far, M_PER_PT, set())[0] == "langas"
 
 
+def _leaf_sheet(with_arc: bool) -> bytes:
+    """A 0,9 m gap (x 100..134) in the band; a door LEAF drawn as an outlined thin rectangle (3 pt × 0,9 m) standing
+    PERPENDICULAR to the wall at the gap's left end; with `with_arc` its swing arc too. A second, EMPTY 1,4 m gap
+    (x 200..253) has no lines at all — an open passage."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.setFillGray(0.4)
+    for x0, x1 in ((20, 100), (134, 200), (253, 400)):
+        c.rect(x0, _y(300 + WALL), x1 - x0, WALL, stroke=0, fill=1)
+    c.setStrokeGray(0.0)
+    c.setLineWidth(0.24)
+    leaf = 0.9 / M_PER_PT
+    c.rect(100, _y(300), 3.0, leaf, stroke=1, fill=0)            # from the wall face up into the room
+    if with_arc:
+        p = c.beginPath()
+        p.arc(100 - leaf, _y(300 + leaf), 100 + leaf, _y(300 - leaf), startAng=0, extent=90)
+        c.drawPath(p, stroke=1, fill=0)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def test_a_door_leaf_rectangle_across_the_wall_is_never_glazing_and_an_empty_gap_is_nothing():
+    """Manager review 2026-10-24: a leaf drawn as a thin outlined rectangle perpendicular to the wall at the gap end
+    must never count as a frame; an empty gap stays unlabelled. Frame edges count only parallel to the opening."""
+    mid = 300 + WALL / 2
+    for with_arc in (False, True):
+        marks = do.page_marks(_leaf_sheet(with_arc), 1, M_PER_PT)
+        kind = do.opening_kind([[100, mid], [134, mid]], 0.9, WALL * M_PER_PT, marks, M_PER_PT, set())[0]
+        assert kind == ("durys" if with_arc else None), (with_arc, kind)
+        assert do.opening_kind([[200, mid], [253, mid]], 1.4, WALL * M_PER_PT, marks, M_PER_PT, set())[0] is None
+
+
 # ---------------------------------------------------------------- the walls pass: listed windows and drawn glazing
 
 def _walls_room(elementai, angos):
