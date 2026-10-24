@@ -24,9 +24,12 @@ let a 0,8 m door string pass for a 0,95 m wall (objektas_g room 06). A length
 written once serves the equal wall OPPOSITE (same extent): designers rarely
 write a number twice — `saltinis = "priesinga_siena"` says whose it is.
 
-Short pieces nobody dimensioned (< SHORT_EDGE_M — a 0,15 m step in the
-outline) have no number to read: they are counted from the outline, up to
-SHORT_SHARE of the perimeter, and the sum says how much (`is_konturo_m`).
+Faces nobody dimensioned (a 0,15 m step, a 0,6 m jamb return) have no number
+to read: since 2026-10-24 they are completed by the rules (a)/(c)/(b) at the
+constants below — short faces and faces the opposite string vouches for from
+the outline, a face its axis' other strings close by their difference — each
+listed in `_perimetras_suma["papildyta"]` and the outline's part said
+(`is_konturo_m`); more than OUTLINE_SHARE_MAX off the outline stays an estimate.
 A SLANTED wall is stated by the one string written along a slanted dimension
 line parallel to it, ends opposite the wall's corners (objektas_h 2026-09-21:
 „2060" along the bedroom's slanted wall).
@@ -63,8 +66,28 @@ END_TOL_M = 0.12            # …and its row starts and ends this close to the w
 TIER_PT = 0.8               # strings of one row share a dimension line
 AXIS_DEG = 3.0              # a wall this close to horizontal/vertical carries a horizontal/vertical string
 SLANT_PARALLEL_DEG = 4.0    # …a slanted one carries the string whose dimension line runs this parallel to it
-SHORT_EDGE_M = 0.4
-SHORT_SHARE = 0.05
+SHORT_EDGE_M = 0.4          # a pier inside ONE wall's chain this short is filled from the outline (`_fill_holes`)
+# 2026-10-24 (v4, objektas_i): a whole FACE without its own string may be completed — never silently, each one listed
+# in `_perimetras_suma["papildyta"]` with how:
+#  (a) a short face — a jamb return, a wall stub — is taken from the outline: drawn shorter than SHORT_FACE_PAPER_MM
+#      on paper there is no room for a legible string. 8 mm is 0,40 m at 1:50 (the old SHORT_EDGE_M) and 0,60 m at
+#      1:75 (objektas_i's 0,60 m returns); capped at SHORT_FACE_MAX_M whatever the scale, +SHORT_FACE_TOL_M for the
+#      outline's own rounding.
+#  (c) a „matmenų grandinė": the faces of a closed axis-parallel ring running one way along an axis add up to those
+#      running back — outer dimension minus the inner ones. When exactly ONE face on an axis has no string and every
+#      other face on that axis has a length, its length is that difference (`saltinis = "grandine"`), and it must
+#      agree with the face's own outline length (WALL_TOL) or it is not taken.
+#  (b) a face whose OPPOSITE parallel face (the room lies between them, their extents overlap) is stated by a string
+#      that agrees with that face's outline length within OPPOSITE_AGREE: the outline is right in that direction, so
+#      the face is taken from the outline (`saltinis = "konturas"`, `budas = "priesinga_patikrinta"`).
+# The perimeter stays an ESTIMATE when more than OUTLINE_SHARE_MAX of it comes from the outline: G1 lets an outline
+# edge be off its string by up to 2 %, so a quarter of the perimeter off the outline moves the sum by at most 0,5 % —
+# the tolerance the corpus check holds read perimeters to.
+SHORT_FACE_PAPER_MM = 8.0
+SHORT_FACE_MAX_M = 0.6
+SHORT_FACE_TOL_M = 0.01
+OPPOSITE_AGREE = 0.01
+OUTLINE_SHARE_MAX = 0.25
 SHORT_HOLES_MAX_M = 0.5     # undimensioned piers inside ONE wall's chain may add up to this much
 HOLE_IGNORE_M = 0.03        # …and a gap this small between two strings is no gap at all
 OPENING_NEAR_M = 0.6        # an opening's line (the wall's axis) lies this close to the room's face of that wall
@@ -356,6 +379,77 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
     return None
 
 
+def short_face_m(m_per_pt: float) -> float:
+    """The longest face rule (a) takes from the outline at this scale (module constants)."""
+    return min(SHORT_FACE_MAX_M, SHORT_FACE_PAPER_MM / 25.4 * 72.0 * m_per_pt) + SHORT_FACE_TOL_M
+
+
+def _axis_pos(edge, horiz: bool) -> float:
+    return (edge[0][1] + edge[1][1]) / 2 if horiz else (edge[0][0] + edge[1][0]) / 2
+
+
+def _complete_faces(sienos: list[dict], edges: list, m_per_pt: float, ring_whole: bool) -> list[dict]:
+    """Rules (a), (c), (b) of the module constants, in that order, on the faces still without a length. Writes
+    `ilgis_m`/`saltinis`/`budas` (+ `grandine` or `pagal`) on each completed face; returns the list of them for
+    `_perimetras_suma["papildyta"]`: {siena (index), ilgis_m, kontrole_m, saltinis, budas}."""
+    done: list[dict] = []
+
+    def mark(i: int, length: float, saltinis: str, budas: str, **extra) -> None:
+        s = sienos[i]
+        s["ilgis_m"] = round(length, 3)
+        s["saltinis"] = saltinis
+        s["budas"] = budas
+        s.update(extra)
+        done.append({"siena": i, "ilgis_m": s["ilgis_m"], "kontrole_m": s["kontrole_m"], "saltinis": saltinis, "budas": budas})
+
+    # (a) short faces — from the outline
+    limit = short_face_m(m_per_pt)
+    for i, s in enumerate(sienos):
+        if s["ilgis_m"] is None and s["kontrole_m"] <= limit:
+            mark(i, s["kontrole_m"], "konturas", "trumpa")
+
+    # (c) a closed axis-parallel ring: on each axis the faces one way add up to the faces back
+    if ring_whole:
+        for horiz in (True, False):
+            idx = [i for i, s in enumerate(sienos) if s["_frame"][0] == horiz]
+            gaps = [i for i in idx if sienos[i]["ilgis_m"] is None]
+            if len(gaps) != 1 or len(idx) < 2:
+                continue
+            g = gaps[0]
+
+            def sign(i: int, horiz: bool = horiz) -> int:
+                (ax, ay), (bx, by) = edges[i]
+                return 1 if ((bx - ax) if horiz else (by - ay)) > 0 else -1
+            length = -sign(g) * sum(sign(i) * float(sienos[i]["ilgis_m"]) for i in idx if i != g)
+            control = sienos[g]["kontrole_m"]
+            if length > 0 and abs(length - control) <= max(WALL_TOL * control, WALL_TOL_M):
+                mark(g, length, "grandine", "grandine",
+                     grandine=[{"siena": i, "ilgis_m": round(float(sienos[i]["ilgis_m"]), 3), "zenklas": -sign(g) * sign(i)}
+                               for i in idx if i != g])
+
+    # (b) the opposite parallel face is stated by a string that agrees with its outline — the outline is right there
+    for i, s in enumerate(sienos):
+        if s["ilgis_m"] is not None or s["_frame"][0] is None:
+            continue
+        horiz, e0, e1 = s["_frame"]
+        pos = _axis_pos(edges[i], horiz)
+        best = None
+        for j, o in enumerate(sienos):
+            if j == i or o["_frame"][0] != horiz or o["saltinis"] != "eilute" or not o["ilgis_m"]:
+                continue
+            overlap = min(e1, o["_frame"][2]) - max(e0, o["_frame"][1])
+            if overlap <= 0 or abs(float(o["ilgis_m"]) - o["kontrole_m"]) > OPPOSITE_AGREE * o["kontrole_m"]:
+                continue
+            gap = abs(_axis_pos(edges[j], horiz) - pos)
+            if gap * m_per_pt < 0.3:                           # in line with the face, not across the room
+                continue
+            if best is None or gap < best[0]:
+                best = (gap, j)
+        if best is not None:
+            mark(i, s["kontrole_m"], "konturas", "priesinga_patikrinta", pagal=best[1])
+    return done
+
+
 EVIDENCE_MATCH = 0.002   # page fraction: an eilutė's line ends and the fresh string's agree within this
 
 
@@ -480,18 +574,12 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                 s["saltinis"] = "priesinga_siena"
                 s["eilutes"] = [dict(e) for e in twin["eilutes"]]
         repeated = sum(1 for s in sienos if s["saltinis"] == "priesinga_siena")
+        control_total = round(sum(s["kontrole_m"] for s in sienos), 2)
+        ring_whole = len(sienos) == len(corners) and len(sienos) >= 3 and all(s["_frame"][0] is not None for s in sienos)
+        completed = _complete_faces(sienos, edges, m_per_pt, ring_whole)
         for s in sienos:
             del s["_frame"]
-        control_total = round(sum(s["kontrole_m"] for s in sienos), 2)
-        # short pieces nobody dimensioned: no number to read — from the outline, and said so
-        short = [s for s in sienos if s["ilgis_m"] is None and s["kontrole_m"] < SHORT_EDGE_M]
-        from_outline = round(sum(s["kontrole_m"] for s in short), 2)
-        if short and control_total and from_outline <= SHORT_SHARE * control_total:
-            for s in short:
-                s["ilgis_m"] = s["kontrole_m"]
-                s["saltinis"] = "konturas"
-        else:
-            from_outline = 0.0
+        from_outline = round(sum(s["kontrole_m"] for s in sienos if s["saltinis"] == "konturas"), 2)
         missing = [s for s in sienos if s["ilgis_m"] is None]
         slanted = [s for s in missing if s["istriza"]]
         for s in sienos:
@@ -503,9 +591,15 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
         # what the chains' holes added: the rooms' own openings, and piers nobody dimensioned (said with the short pieces)
         from_openings = round(sum(p.get("anga_m", 0.0) for w in sienos for p in (w.get("dalys") or [])), 2)
         from_piers = round(sum(p.get("trumpa_m", 0.0) for w in sienos for p in (w.get("dalys") or [])), 2)
+        from_chain = round(sum(s["ilgis_m"] for s in sienos if s["saltinis"] == "grandine"), 2)
+        n_read = sum(1 for s in sienos if s["saltinis"] in ("eilute", "priesinga_siena"))
         suma = {"suma_m": total, "kontrole_m": control_total, "sutampa": False, "lapai": pages, "eilutes": texts,
                 "is_konturo_m": round(from_outline + from_piers, 2) if not missing else 0.0, "pakartota": repeated,
-                "angos_m": from_openings if not missing else 0.0}
+                "angos_m": from_openings if not missing else 0.0,
+                # 2026-10-24 (v4): faces without their own string, completed — each listed with how, never silently
+                "is_grandines_m": from_chain if not missing else 0.0, "papildyta": completed if not missing else [],
+                "sienu_is_matmenu": n_read, "sienu": len(sienos)}
+        outline_share = (from_outline + from_piers) / total if total > 0 else 0.0
         if kont.get("plotas_nesutampa"):
             reason = AREA_MISMATCH_REASON
         elif not sienos:
@@ -515,6 +609,10 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
             if slanted:
                 reason += f" ({len(slanted)} įstriža — jos ilgis plane neužrašytas)" if len(slanted) == 1 else \
                           f" ({len(slanted)} įstrižos — jų ilgiai plane neužrašyti)"
+        elif outline_share > OUTLINE_SHARE_MAX:
+            n_outline = sum(1 for s in sienos if s["saltinis"] == "konturas")
+            reason = (f"{n_outline} iš {len(sienos)} sienų be matmens — jų ilgis iš kontūro "
+                      f"({from_outline + from_piers:.2f} m, {outline_share * 100:.0f} % perimetro)").replace(".", ",")
         elif not control_total or abs(total - control_total) / control_total > CONTROL_TOL:
             reason = (f"matmenų suma {total:.2f} m nesutampa su kontūru {control_total:.2f} m").replace(".", ",")
         else:
