@@ -522,8 +522,12 @@ def _not_placed(monkeypatch, parsed, nr="01"):
             r.pop("_vieta", None)
 
 
-def _no_scale(pdf):
-    """Today's strings carry no scale for the plan's sheets."""
+def _no_scale(pdf, monkeypatch=None):
+    """Today's strings carry no scale for the plan's sheets. Since LANE_VERSION 14 (geometry/scale.py) the sheet's
+    written „M 1:100" is a scale too, so a sheet with NO scale also writes none (`monkeypatch`)."""
+    if monkeypatch is not None:
+        from geometry import scale as gs
+        monkeypatch.setattr(gs.ScaleContext, "stated", lambda self, page: set())
     return [{**d, "scale_m_per_pt": None} for d in gl.read_dimension_strings(pdf, pages=None)]
 
 
@@ -540,11 +544,11 @@ def test_a_room_outlined_before_that_is_not_placed_today_loses_the_outline_and_g
     assert {k: r2.get(k) for k in _OUTLINE_KEYS} == neighbour             # the room confirmed today is untouched
 
 
-def test_rooms_outlined_before_on_a_sheet_without_a_scale_today_lose_their_outlines():
+def test_rooms_outlined_before_on_a_sheet_without_a_scale_today_lose_their_outlines(monkeypatch):
     parsed, pdf = _outlined_once()
     r1, r2 = parsed["patalpos"]
     assert r2["_perimetras_pries_geometrija"] == 12.3
-    out = gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf))
+    out = gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf, monkeypatch))
     for r, earlier in ((r1, 13.9), (r2, 12.3)):
         assert [k for k in _FROM_THE_OUTLINE if k in r] == [], r["nr"]
         assert r["perimetras_m"] == earlier and "perimetras_saltinis" not in r and "_perimetras_pries_geometrija" not in r
@@ -571,7 +575,7 @@ def test_a_room_he_worked_on_keeps_everything_when_it_is_not_traced_today(monkey
         _not_placed(monkeypatch, parsed)
         gl.apply_geometry(parsed, pdf)
     else:
-        gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf))
+        gl.apply_geometry(parsed, pdf, dims=_no_scale(pdf, monkeypatch))
     assert {k: r1.get(k) for k in kept} == kept
 
 
