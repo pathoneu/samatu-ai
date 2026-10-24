@@ -243,11 +243,8 @@ def trace_room(free: np.ndarray, seed_px: tuple[int, int], area_m2: float, m_per
 # ── the lane ─────────────────────────────────────────────────────────────────
 
 def _scales(dims: Sequence[dict] | None, override: dict[int, float] | None) -> dict[int, float]:
-    out: dict[int, float] = {}
-    for d in dims or []:
-        s = _f(d.get("scale_m_per_pt"))
-        if s:
-            out.setdefault(int(d["page"]), s)
+    from geometry.scale import line_scales       # v4 scale hook: one reading of the strings' scale (geometry/scale.py)
+    out = line_scales(dims)
     if override:
         out.update({int(k): float(v) for k, v in override.items()})
     return out
