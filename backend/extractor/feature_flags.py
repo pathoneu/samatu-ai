@@ -163,6 +163,12 @@ _FLAG_DEFINITIONS = {
     # Enable: ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE=1
     "eksplikacija_wide_acceptance": (
         "ENABLE_EKSPLIKACIJA_WIDE_ACCEPTANCE", False),
+    # 2026-10-24 (v4 plan §3.2 / R6, Phase 1 cause 7): local OCR of a sheet whose
+    # text layer gives no dimension string and no written scale (objektas_c: strings
+    # drawn as outlines; j4: all text as outlines; j3: a scan). backend/text/ocr.py;
+    # engine SAMATU_OCR_ENGINE (rapid | paddle | tesseract), nothing leaves the
+    # machine. OFF: no OCR call anywhere (asserted by a test). Enable: SAMATU_OCR=1
+    "ocr": ("SAMATU_OCR", False),
 }
 
 
