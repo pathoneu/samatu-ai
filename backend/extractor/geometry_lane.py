@@ -507,7 +507,11 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # ── v4 scale hook 2/3: sheets still without a scale get geometry/scale.py's (wall-matched strings, the
         # written „M 1:xx" validated, a sibling laid over it); every scale carries its provenance.
         asked = set(sheets) | anchors
-        scale_src = lane_fill(pdf_bytes, dims, scale, asked, alignment, user_scales)
+        try:
+            scale_src = lane_fill(pdf_bytes, dims, scale, asked, alignment, user_scales)
+        except Exception:  # noqa: BLE001 — the new sources never sink the lane: it goes on with the scales it had
+            _log.exception("geometry/scale.py lane_fill failed")
+            scale_src = {}
         for p in scale:
             if p not in sizes:
                 W, H, _ = page_geometry(pdf_bytes, p)

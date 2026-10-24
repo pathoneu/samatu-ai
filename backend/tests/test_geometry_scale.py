@@ -279,6 +279,22 @@ def test_the_lane_fills_a_sheet_its_own_lines_left_without_a_scale_and_says_wher
     assert src[2].source == ScaleSource.BLANK or src[2].page_from == 1
 
 
+def test_a_failure_in_the_new_sources_never_sinks_the_lane(monkeypatch):
+    from extractor import geometry_lane as gl
+    from tests.test_geometry_lane import _parsed, _two_sheets
+
+    def boom(*_a, **_k):
+        raise RuntimeError("synthetic failure")
+
+    import geometry.scale as gs
+    monkeypatch.setattr(gs, "lane_fill", boom)
+    parsed = _parsed()
+    out = gl.apply_geometry(parsed, _two_sheets())
+    assert out["status"] == "applied" and out["konturai"], "the lane runs on its own line scales"
+    m = parsed["_meta"]["geometrija"]["masteliai"]
+    assert m and all("saltinis" not in v for v in m.values())
+
+
 def test_scales_for_pages_answers_every_page():
     pdf = _pdf(_sheet(100, hairlines=True), _sheet(100, strings=None))
     out = scales_for_pages(ScaleContext(pdf), [1, 2])
