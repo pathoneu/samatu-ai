@@ -34,6 +34,7 @@ import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Protocol, Sequence
 
 log = logging.getLogger("samatu.text.ocr")
@@ -104,8 +105,53 @@ def ocr_enabled() -> bool:
 
 # ── engines ─────────────────────────────────────────────────────────────────
 
+MODEL_DIR_ENV = "SAMATU_OCR_MODEL_DIR"
+DEFAULT_MODEL_DIR = Path(__file__).resolve().parents[1] / "data" / "models" / "ocr"   # backend/data/models/ocr (gitignored)
+# The three models RapidEngine runs, as RapidOCR names them (its default_models.yaml routes them to one file each):
+# (task, OCR version, model size, language). `model_files()` turns them into file names, URLs and SHA-256 sums.
+RAPID_MODELS = (("det", "PP-OCRv6", "medium", "lt"), ("rec", "PP-OCRv6", "medium", "lt"),
+                ("cls", "PP-OCRv4", "mobile", "ch"))
+
+
+def model_dir() -> Path:
+    return Path(os.environ.get(MODEL_DIR_ENV) or DEFAULT_MODEL_DIR)
+
+
+def _production() -> bool:
+    """The same test main.py uses for its production hardening."""
+    return (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").strip().lower() in ("prod", "production")
+
+
+def model_files() -> dict[str, dict]:
+    """{task: {file, url, sha256}} of RAPID_MODELS — from RapidOCR's own model table, so the fetch script and the
+    engine can never disagree about which file a model is."""
+    from rapidocr.inference_engine.base import FileInfo, InferSession
+    from rapidocr.utils.typings import EngineType, ModelType, OCRVersion, TaskType
+    out = {}
+    for task, version, size, lang in RAPID_MODELS:
+        info = InferSession.get_model_url(FileInfo(EngineType("onnxruntime"), OCRVersion(version), TaskType(task),
+                                                   lang, ModelType(size)))
+        url = str(info["model_dir"])
+        out[task] = {"file": url.rsplit("/", 1)[-1], "url": url, "sha256": info.get("SHA256")}
+    return out
+
+
+def engine_version() -> str:
+    """What a cached OCR result depends on besides the sheet: the engine, its library version, the models."""
+    try:
+        from importlib.metadata import version
+        lib = version("rapidocr")
+    except Exception:  # noqa: BLE001
+        lib = "?"
+    return f"rapid-{lib}-" + "-".join(f"{v}{s}" for _t, v, s, _l in RAPID_MODELS)
+
+
 class RapidEngine:
-    """RapidOCR (onnxruntime) with PP-OCRv6 medium: the detector, and the recogniser for Lithuanian (`lt`)."""
+    """RapidOCR (onnxruntime) with PP-OCRv6 medium: the detector, and the recogniser for Lithuanian (`lt`).
+
+    Models: from `model_dir()` (`scripts/fetch_ocr_models.py` puts them there at image build). When a file is
+    missing, production refuses (OcrUnavailable — never a download while a person waits); elsewhere RapidOCR
+    downloads it into that same directory (SHA-256 checked) on first use."""
     name = "rapid"
 
     def __init__(self) -> None:
@@ -114,13 +160,25 @@ class RapidEngine:
         except ImportError as e:  # pragma: no cover — depends on the machine
             raise OcrUnavailable("rapidocr is not installed") from e
         v6, medium = OCRVersion("PP-OCRv6"), ModelType("medium")
-        self._eng = RapidOCR(params={
+        params = {
             "Rec.lang_type": "lt", "Rec.ocr_version": v6, "Rec.model_type": medium,
             "Det.ocr_version": v6, "Det.model_type": medium, "Global.log_level": "error",
             # RapidOCR shrinks any image to 2000 px on its long side before detecting: a 300 DPI A3 sheet becomes
             # ~100 DPI and 2 mm dimension digits vanish. A drawing is read at the resolution it was rendered at.
             "Global.max_side_len": MAX_SIDE_PX,
-        })
+        }
+        d = model_dir()
+        files = model_files()
+        missing = [f["file"] for f in files.values() if not (d / f["file"]).is_file()]
+        if not missing:
+            params.update({f"{t.capitalize()}.model_path": str(d / f["file"]) for t, f in files.items()})
+        elif _production():
+            raise OcrUnavailable(f"OCR models missing in {d}: {', '.join(missing)} — run scripts/fetch_ocr_models.py "
+                                 f"at image build")
+        else:
+            d.mkdir(parents=True, exist_ok=True)
+            params["Global.model_root_dir"] = str(d)
+        self._eng = RapidOCR(params=params)
         self._lock = threading.Lock()
 
     def read(self, rgb) -> list[Line]:

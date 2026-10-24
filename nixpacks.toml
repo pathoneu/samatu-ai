@@ -28,6 +28,9 @@ cmds = [
   "python3 -m venv /opt/venv",
   ". /opt/venv/bin/activate && pip install --upgrade pip",
   ". /opt/venv/bin/activate && pip install --no-deps -r backend/requirements.lock && pip check",
+  # OCR models baked at build (backend/text/ocr.py refuses to download in production); --soft: a model-host
+  # outage does not fail the deploy, OCR (flag SAMATU_OCR, default OFF) then stays unavailable. 2026-10-24.
+  ". /opt/venv/bin/activate && python scripts/fetch_ocr_models.py --soft",
 ]
 
 [start]
