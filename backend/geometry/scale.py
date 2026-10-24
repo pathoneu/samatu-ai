@@ -103,6 +103,7 @@ class ScaleContext:
     _faces: dict[int, tuple[list, list]] = field(default_factory=dict)
     _strokes: dict[int, list] = field(default_factory=dict)
     _sigs: dict[int, object] = field(default_factory=dict)
+    _ocr: dict[int, bool] = field(default_factory=dict)        # v4 ocr hook: page → OCR added strings / a scale
 
     def strings(self) -> list[dict]:
         if self.dims is None:
@@ -111,7 +112,43 @@ class ScaleContext:
         return self.dims
 
     def strings_on(self, page: int) -> list[dict]:
-        return [d for d in self.strings() if int(d.get("page") or 0) == int(page)]
+        on = [d for d in self.strings() if int(d.get("page") or 0) == int(page)]
+        if len(on) < WALL_MIN_AGREE and self._ocr_fill(page):          # v4 ocr hook
+            on = [d for d in self.strings() if int(d.get("page") or 0) == int(page)]
+        return on
+
+    def _ocr_fill(self, page: int) -> bool:
+        """v4 ocr hook (plan §9 Phase 1 cause 7). With `SAMATU_OCR` on, a sheet whose TEXT LAYER gives no written
+        scale and fewer dimension strings than any source can use (< WALL_MIN_AGREE, none on a hairline) is read by
+        local OCR (`text.ocr.dimension_strings`). objektas_c sheet 3: four „760" in the layer, its other strings
+        drawn as outlines. The OCR strings REPLACE the layer's on that sheet (the render shows those too, so
+        nothing is lost and nothing is counted twice) — marked `source: "ocr"`, no hairline, so only source 3 can
+        use them — and its written scale joins `_stated` (source 4). Once per page; True when OCR added
+        something. Flag off: returns False before importing anything."""
+        page = int(page)
+        if page in self._ocr:
+            return self._ocr[page]
+        from text.ocr import ocr_enabled
+        if not ocr_enabled():
+            return False
+        self._ocr[page] = False
+        layer = [d for d in self.strings() if int(d.get("page") or 0) == page]
+        if len(layer) >= WALL_MIN_AGREE or any(d.get("scale_m_per_pt") for d in layer):
+            return False
+        self.load_stated([page])
+        if self._stated.get(page):
+            return False
+        try:
+            from text.ocr import dimension_strings
+            dims, stated = dimension_strings(self.pdf_bytes, page)
+        except Exception:  # noqa: BLE001 — OCR missing or failing leaves the sheet as the text layer left it
+            log.exception("OCR unavailable on page %s", page)
+            return False
+        if dims:
+            self.dims = [d for d in self.strings() if int(d.get("page") or 0) != page] + dims
+        self._stated.setdefault(page, set()).update(stated)
+        self._ocr[page] = bool(dims or stated)
+        return self._ocr[page]
 
     def page_count(self) -> int:
         from extractor.pdfium_guard import PDFIUM_LOCK
@@ -125,7 +162,7 @@ class ScaleContext:
 
     def size(self, page: int) -> tuple[float, float]:
         if page not in self._sizes:
-            for d in self.strings_on(page):
+            for d in (d for d in self.strings() if int(d.get("page") or 0) == int(page)):
                 if d.get("page_width") and d.get("page_height"):
                     self._sizes[page] = (float(d["page_width"]), float(d["page_height"]))
                     break
@@ -139,6 +176,8 @@ class ScaleContext:
         """The plan scales the sheet writes („M 1:50") — the line reader's own rule."""
         if page not in self._stated:
             self.load_stated([page])
+        if not self._stated.get(page):
+            self._ocr_fill(page)                                     # v4 ocr hook
         return self._stated.get(page, set())
 
     def load_stated(self, pages: Iterable[int]) -> None:
@@ -546,9 +585,20 @@ def _candidate_pages(ctx: ScaleContext) -> list[int]:
     return sorted(pages)
 
 
+OCR_NOTE = "skaičiai perskaityti iš lapo vaizdo (lape nėra teksto sluoksnio) — patikrinkite mastelį"
+
+
 def scale_for_page(ctx: ScaleContext, page: int, donors: Iterable[int] | None = None) -> Scale:
     """The sheet's scale with its provenance (module doc). `donors`: the sheets a sibling may lend from
     (default: every sheet that carries dimension strings or a person's line)."""
+    sc = _scale_for_page(ctx, page, donors)
+    if ctx._ocr.get(int(page)) and sc.found and sc.source in (ScaleSource.DIMENSION_WALLS, ScaleSource.STATED):
+        sc.source_text = f"{sc.source_text}; {OCR_NOTE}" if sc.source_text else OCR_NOTE     # v4 ocr hook
+        sc.details["ocr"] = True
+    return sc
+
+
+def _scale_for_page(ctx: ScaleContext, page: int, donors: Iterable[int] | None = None) -> Scale:
     page = int(page)
     own = measured_scale(ctx, page)
     stated = sorted(ctx.stated(page))
