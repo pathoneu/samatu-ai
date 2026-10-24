@@ -152,6 +152,24 @@ export function provenanceState(pageScale) {
   return describeScale(pageScale).state;
 }
 
+// The chip's few words for each phrase (the chip shares the drawing's bottom edge with the tool pill, so the
+// full phrase — with its count or the scale it contradicts — is the card's first line, not the chip's).
+const SHORT = {
+  none: 'none', noneReason: 'none',
+  lines: 'lines', linesPlain: 'lines', walls: 'walls', wallsPlain: 'walls',
+  writtenConfirmed: 'writtenConfirmed', writtenConfirmedSheet: 'writtenConfirmed', writtenUnchecked: 'writtenUnchecked',
+  measuredWrittenOther: 'measured', sibling: 'sibling', siblingWrittenOther: 'sibling', siblingPlain: 'siblingPlain',
+  userLine: 'userLine', userLineText: 'userLine', userKnown: 'user', userPicked: 'user',
+  auto: 'guess', guessLow: 'guess', legacy: 'guess', legacyWrittenOther: 'guess',
+  confirmed: 'confirmed', confirmedPlain: 'confirmed',
+};
+
+/** The chip's few words: „iš plano matmenų" / „užrašytas, nepatikrintas" / „spėjamas" / „iš 1 lapo". */
+export function provenanceShort(desc, t) {
+  const key = SHORT[desc?.phrase?.key] || 'guess';
+  return t(`${NS}.short.${key}`, desc?.phrase?.params?.page != null ? { page: desc.phrase.params.page } : {});
+}
+
 function phraseText(phrase, t) {
   if (!phrase) return '';
   const params = { ...(phrase.params || {}) };

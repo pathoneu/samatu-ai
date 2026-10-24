@@ -741,6 +741,20 @@
         "confirmed": "{{phrase}}; confirmed by you",
         "confirmedPlain": "confirmed by you"
       },
+      "short": {
+        "lines": "from the plan's dimensions",
+        "walls": "from dimensions along the walls",
+        "writtenConfirmed": "written, confirmed",
+        "writtenUnchecked": "written, not checked",
+        "measured": "measured",
+        "sibling": "from sheet {{page}}",
+        "siblingPlain": "from another sheet",
+        "userLine": "your line",
+        "user": "yours",
+        "guess": "estimated",
+        "confirmed": "confirmed",
+        "none": "no scale"
+      },
       "status": {
         "line": "Scale {{text}}",
         "noneClick": "Scale not set — click here"

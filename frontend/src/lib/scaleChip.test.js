@@ -21,6 +21,7 @@ test('a guessed sheet (no backend provenance): „1:115 — spėjamas …", one-
   const chip = scaleChipModel({ page: 2, scales, project, durable: {}, pageCount: 4, t });
   assert.equal(chip.text, '1:115 — spėjamas pagal plano matmenis');
   assert.equal(chip.phrase, 'spėjamas pagal plano matmenis');
+  assert.equal(chip.short, 'spėjamas', 'the chip keeps to a few words');
   assert.equal(chip.state, 'spejamas');
   assert.equal(chip.line, 'dashed');
   assert.equal(chip.canConfirm, true);
@@ -87,6 +88,7 @@ test('objektas_i: the chip says where 1:75 comes from — read from the plan, so
   assert.equal(chip.state, 'nuskaitytas');
   assert.equal(chip.line, 'solid');
   assert.equal(chip.text, '1:75 — iš plano matmenų (139 skaičiai)');
+  assert.equal(chip.short, 'iš plano matmenų');
   assert.equal(chip.sentence, 'Mastelis 1:75 — iš plano matmenų (139 skaičiai)');
   assert.doesNotMatch(`${chip.text} ${chip.sentence} ${chip.title}`, /spėj|užrašytas brėžinyje/i);
   assert.equal(chip.canConfirm, true, 'he can still make it his');

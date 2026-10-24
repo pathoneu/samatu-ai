@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  blankReasonOf, describeScale, provenanceExplanation, provenancePhrase, provenanceText, scaleProvenanceLine, scaleStateWord,
+  blankReasonOf, describeScale, provenanceExplanation, provenancePhrase, provenanceShort, provenanceText, scaleProvenanceLine, scaleStateWord,
 } from './scaleProvenance.js';
 import { confirmedLaneScale, laneScalesOf, METERS_PER_POINT_AT_1_TO_1 } from './durableScale.js';
 import { isBannedText } from './userText.js';
@@ -170,4 +170,19 @@ test('words: none banned, none a raw key, the English catalogue mirrors every on
       }
     }
   }
+});
+
+test('the chip\'s few words follow the same source', () => {
+  const short = (rec) => provenanceShort(describeScale(lane(50, rec)), t);
+  assert.equal(short({ saltinis: 'dimension_lines', patikimumas: 'high', tekstas: '139 matmenų eilutės ant matmenų linijų' }), 'iš plano matmenų');
+  assert.equal(short({ saltinis: 'dimension_walls', patikimumas: 'medium', tekstas: '9 matmenų eilutės atitinka sienas' }), 'iš matmenų prie sienų');
+  assert.equal(short({ saltinis: 'stated', patikimumas: 'high', is_lapo: 4 }), 'užrašytas, patvirtintas');
+  assert.equal(short({ saltinis: 'stated', patikimumas: 'low' }), 'užrašytas, nepatikrintas');
+  assert.equal(short({ saltinis: 'dimension_lines', patikimumas: 'high', pastaba: 'Lape užrašytas mastelis 1:40, bet matmenys atitinka 1:50 — x.' }), 'išmatuotas');
+  assert.equal(short({ saltinis: 'sibling', patikimumas: 'medium', is_lapo: 1 }), 'iš 1 lapo');
+  assert.equal(short({ saltinis: 'user_line', patikimumas: 'high', tekstas: '4280' }), 'jūsų linija');
+  assert.equal(short({}), 'spėjamas');
+  assert.equal(provenanceShort(describeScale(confirmedLaneScale(lane(50, {}), 0)), t), 'patvirtintas');
+  assert.equal(provenanceShort(describeScale(null, { blankReason: 'x' }), t), 'mastelio nėra');
+  assert.equal(provenanceShort(describeScale(lane(50, { saltinis: 'sibling', patikimumas: 'medium', is_lapo: 1 })), en), 'from sheet 1');
 });

@@ -778,6 +778,20 @@
         "confirmed": "{{phrase}}; patvirtinote jūs",
         "confirmedPlain": "patvirtinote jūs"
       },
+      "short": {
+        "lines": "iš plano matmenų",
+        "walls": "iš matmenų prie sienų",
+        "writtenConfirmed": "užrašytas, patvirtintas",
+        "writtenUnchecked": "užrašytas, nepatikrintas",
+        "measured": "išmatuotas",
+        "sibling": "iš {{page}} lapo",
+        "siblingPlain": "iš kito lapo",
+        "userLine": "jūsų linija",
+        "user": "jūsų",
+        "guess": "spėjamas",
+        "confirmed": "patvirtintas",
+        "none": "mastelio nėra"
+      },
       "status": {
         "line": "Mastelis {{text}}",
         "noneClick": "Mastelis nenustatytas — spustelėkite čia"

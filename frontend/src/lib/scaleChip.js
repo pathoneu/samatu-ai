@@ -3,8 +3,8 @@
  * design §4 track E; audit act „Confirm scale" 4 → 1).
  *
  * Confirming a guessed scale took four actions behind a hidden toolbar button (scroll → „Masteliai" →
- * „Patvirtinti" → ✕). The chip sits at the drawing's bottom-left and reads „1:75 — iš plano matmenų (139 skaičiai)"
- * (v4: the words come from the backend's provenance, lib/scaleProvenance); one click opens
+ * „Patvirtinti" → ✕). The chip sits at the drawing's bottom-left and reads „1:75 — iš plano matmenų" (v4: the words
+ * come from the backend's provenance, lib/scaleProvenance; the full phrase heads its card); one click opens
  * its card: „Patvirtinti 1:115" (one click), „Patvirtinti visiems N lapams" (the sheets that share the guessed
  * ratio), „Kalibruoti" (the two-click calibration; its dialog offers the nearest standard scale, ticked),
  * „Patikrinti" (the existing check against a known length).
@@ -13,13 +13,14 @@
  * the state, and lib/scaleOverview's rows for what may be confirmed and which sheets share a ratio. Pure.
  */
 import { buildScaleOverview } from './scaleOverview.js';
-import { provenanceExplanation, provenancePhrase, provenanceText, scaleProvenanceLine } from './scaleProvenance.js';
+import { provenanceExplanation, provenancePhrase, provenanceShort, provenanceText, scaleProvenanceLine } from './scaleProvenance.js';
 import { pageScaleIn } from './pageScales.js';
 
 /**
- * The chip for sheet `page` → {page, state, line, label, text, phrase, sentence, title, canConfirm, group}.
+ * The chip for sheet `page` → {page, state, line, label, text, phrase, short, sentence, title, canConfirm, group}.
  *   text     what the card's header says: „1:75 — iš plano matmenų (139 skaičiai)" / „mastelio nėra — …";
- *   phrase   the same without the scale (the chip shows the scale in bold beside it);
+ *   phrase   the same without the scale;
+ *   short    the chip's own few words beside the scale in bold („iš plano matmenų", „spėjamas");
  *   line     'solid' (read from the drawing or his) · 'dashed' (a proposal) · 'none';
  *   sentence the status line's words (lib/scaleProvenance), the chip's accessible name;
  *   title    why — the plain explanation with the backend's own note (provenanceExplanation);
@@ -45,6 +46,7 @@ export function scaleChipModel({ page, scales, project = null, durable = null, p
     label,
     text: provenanceText(desc, t),
     phrase: provenancePhrase(desc, t),
+    short: provenanceShort(desc, t),
     sentence: scaleProvenanceLine(scale, t, { blankReason }),
     // where it comes from and what that means — the card's own buttons are the „what to do"
     title: provenanceExplanation(desc, t),

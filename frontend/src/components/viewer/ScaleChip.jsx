@@ -1,8 +1,9 @@
 /**
  * ScaleChip — the sheet's scale at the drawing's bottom-left, confirmed in one click (Pathon v3 W1-D, D4).
- * It replaces the status bar's scale sentence as the way in: „1:75 — iš plano matmenų (139 skaičiai)" says where
+ * It replaces the status bar's scale sentence as the way in: „1:75 — iš plano matmenų" says where
  * the scale comes from in words (lib/scaleProvenance, from the backend's own provenance; never by colour alone —
- * the border is solid for a scale read from the drawing or his own, dashed for a proposal); a click opens its card upward with the explanation and the actions — „Patvirtinti 1:115",
+ * the border is solid for a scale read from the drawing or his own, dashed for a proposal; the full phrase,
+ * „1:75 — iš plano matmenų (139 skaičiai)", heads the card); a click opens its card upward with the explanation and the actions — „Patvirtinti 1:115",
  * „Patvirtinti visiems N lapams", „Kalibruoti", „Patikrinti", and „Visi lapų masteliai" (the overview). The
  * model is lib/scaleChip (the one merged scale map + the overview's rows). Esc or a click elsewhere closes it.
  *
@@ -159,7 +160,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         ) : (
           <>
             <span className="mono tabular font-semibold text-foreground">{chip.label}</span>
-            <span className="text-foreground" data-testid="scale-chip-phrase">— {chip.phrase}</span>
+            <span className="text-foreground" data-testid="scale-chip-phrase">— {chip.short}</span>
           </>
         )}
       </button>
