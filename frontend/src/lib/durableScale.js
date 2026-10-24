@@ -166,7 +166,9 @@ function measuredAs(record, ratio) {
 }
 
 /**
- * Where each lane scale comes from — `{page: {kilme, uzrasyta}}`.
+ * Where each lane scale comes from — `{page: {kilme, uzrasyta, provenance?}}`. `provenance` = the backend's own
+ * record (saltinis, patikimumas, tekstas, is_lapo, pastaba — v4 2026-10-24) when the geometry lane stored one for
+ * this ratio; lib/scaleProvenance words the scale from it and falls back to `kilme` only for older blobs.
  *
  * 2026-10-06 (contractor walkthrough on objektas_h): the status bar said „1:115 (iš brėžinio)", which reads as a
  * scale written on the sheet; 1:115 is what the dimension strings MEASURE on a sheet printed at another size
@@ -183,6 +185,21 @@ function measuredAs(record, ratio) {
  * when that lane measured the same ratio on the sheet (`measuredAs`) — a record of another ratio says nothing
  * about this one.
  */
+// The backend's provenance keys (backend/geometry/scale.py `lane_record`; lib/scaleProvenance words them).
+const PROVENANCE_SOURCES = ['user_line', 'dimension_lines', 'dimension_walls', 'stated', 'sibling', 'blank'];
+
+/**
+ * `{provenance}` for a geometry-lane record that carries the backend's provenance and is about ratio `r` (the
+ * ratio the page shows — a record of another ratio says nothing about it); `{}` otherwise.
+ */
+function laneProvenanceOf(record, r) {
+  if (!record || !PROVENANCE_SOURCES.includes(record.saltinis) || !measuredAs(record, r)) return {};
+  const provenance = { saltinis: record.saltinis };
+  for (const k of ['patikimumas', 'tekstas', 'pastaba']) if (typeof record[k] === 'string' && record[k]) provenance[k] = record[k];
+  if (Number(record.is_lapo) > 0) provenance.is_lapo = Number(record.is_lapo);
+  return { provenance };
+}
+
 export function laneScaleOriginOf(project) {
   const meta = project?._meta || {};
   const geo = meta.geometrija || {};
@@ -190,13 +207,14 @@ export function laneScaleOriginOf(project) {
   const notes = { poros: meta.plan_dimension_lane?.mastelis_kitas || {}, geometrija: geo.masteliai_kiti || {} };
   const out = {};
   for (const [page, { ratio: r, lane }] of Object.entries(laneRatiosOf(project))) {
+    const out0 = laneProvenanceOf(exact[page], r);
     const own = notes[lane]?.[page];
     const theirs = notes[lane === 'poros' ? 'geometrija' : 'poros']?.[page];
     const other = [own, theirs].find((n, i) => n && typeof n === 'object'
       && (i === 0 || !(Number(n.ismatuota) > 0) || Number(n.ismatuota) === r));
     if (other) {
       const uzrasyta = (Array.isArray(other.uzrasyta) ? other.uzrasyta : []).map(Number).filter((n) => n > 0);
-      out[page] = { kilme: 'ismatuotas', uzrasyta };
+      out[page] = { kilme: 'ismatuotas', uzrasyta, ...out0 };
       continue;
     }
     const g = measuredAs(exact[page], r) ? exact[page] : null;
@@ -204,9 +222,9 @@ export function laneScaleOriginOf(project) {
     if (mpp > 0) {
       const written = DRAWING_SCALES.includes(r) && Number(g.mastelis) === r
         && Math.abs(mpp / (r * METERS_PER_POINT_AT_1_TO_1) - 1) <= STATED_EXACT;
-      out[page] = { kilme: written ? 'uzrasytas' : 'ismatuotas', uzrasyta: [] };
+      out[page] = { kilme: written ? 'uzrasytas' : 'ismatuotas', uzrasyta: [], ...out0 };
     } else {
-      out[page] = { kilme: DRAWING_SCALES.includes(r) ? 'matmenys' : 'ismatuotas', uzrasyta: [] };
+      out[page] = { kilme: DRAWING_SCALES.includes(r) ? 'matmenys' : 'ismatuotas', uzrasyta: [], ...out0 };
     }
   }
   return out;
@@ -228,6 +246,7 @@ export function pageScalesFromLane(mastelisByPage, origins = null) {
     out[p] = {
       metersPerPointX: mpp, metersPerPointY: mpp, calibrated: true, source: 'plan', label: `1:${r}`,
       ...(origin ? { kilme: origin.kilme, uzrasyta: origin.uzrasyta || [] } : {}),
+      ...(origin?.provenance ? { provenance: origin.provenance } : {}),
     };
   }
   return out;
@@ -262,6 +281,7 @@ export function confirmedLaneScale(laneScale, at = Date.now()) {
     confirmed: true,
     label: laneScale.label || `1:${ratio}`,
     ...(laneScale.kilme ? { kilme: laneScale.kilme, uzrasyta: laneScale.uzrasyta || [] } : {}),
+    ...(laneScale.provenance ? { provenance: laneScale.provenance } : {}),
     laneRatio: ratio,
     confirmedAt: new Date(at).toISOString(),
   };

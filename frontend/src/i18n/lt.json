@@ -738,6 +738,72 @@
       "vat": "PVM {{rate}}%",
       "totalWithVat": "IŠ VISO su PVM"
     },
+    "scaleProvenance": {
+      "withLabel": "{{label}} — {{phrase}}",
+      "chipNone": "mastelio nėra",
+      "state": {
+        "nenustatytas": "nenustatytas",
+        "spejamas": "spėjamas",
+        "nuskaitytas": "iš brėžinio",
+        "patvirtintas": "patvirtintas"
+      },
+      "phrase": {
+        "none": "mastelio nėra",
+        "noneReason": "mastelio nėra — {{reason}}",
+        "lines_one": "iš plano matmenų ({{count}} skaičius)",
+        "lines_few": "iš plano matmenų ({{count}} skaičiai)",
+        "lines_many": "iš plano matmenų ({{count}} skaičiaus)",
+        "lines_other": "iš plano matmenų ({{count}} skaičių)",
+        "linesPlain": "iš plano matmenų",
+        "walls_one": "iš matmenų prie sienų ({{count}} skaičius)",
+        "walls_few": "iš matmenų prie sienų ({{count}} skaičiai)",
+        "walls_many": "iš matmenų prie sienų ({{count}} skaičiaus)",
+        "walls_other": "iš matmenų prie sienų ({{count}} skaičių)",
+        "wallsPlain": "iš matmenų prie sienų",
+        "writtenConfirmed": "užrašytas brėžinyje, patvirtintas matmenimis",
+        "writtenConfirmedSheet": "užrašytas brėžinyje, patvirtintas {{page}} lapo matmenimis",
+        "writtenUnchecked": "užrašytas, nepatikrintas — patikrinkite",
+        "measuredWrittenOther": "išmatuotas; užrašytas {{written}} neatitinka",
+        "sibling": "iš {{page}} lapo",
+        "siblingPlain": "iš kito to paties plano lapo",
+        "siblingWrittenOther": "iš {{page}} lapo; užrašytas {{written}} neatitinka",
+        "userLine": "jūsų nubrėžta linija",
+        "userLineText": "jūsų nubrėžta linija ant „{{text}}“",
+        "userKnown": "jūsų nustatytas pagal žinomą ilgį",
+        "userPicked": "jūsų pasirinktas",
+        "auto": "spėjamas pagal patalpų plotus",
+        "guessLow": "spėjamas iš plano matmenų — patikrinkite",
+        "legacy": "spėjamas pagal plano matmenis",
+        "legacyWrittenOther": "spėjamas pagal plano matmenis; užrašytas {{written}} neatitinka",
+        "confirmed": "{{phrase}}; patvirtinote jūs",
+        "confirmedPlain": "patvirtinote jūs"
+      },
+      "status": {
+        "line": "Mastelis {{text}}",
+        "noneClick": "Mastelis nenustatytas — spustelėkite čia"
+      },
+      "explain": {
+        "nuskaitytas": "Mastelį programa perskaitė iš paties brėžinio. Abejojate — patikrinkite žinomu matmeniu.",
+        "spejamas": "Tai programos spėjimas — patikrinkite žinomu matmeniu ir patvirtinkite.",
+        "auto": "Mastelis apskaičiuotas iš patalpų plotų eksplikacijoje — todėl apytikslis (~).",
+        "user": "Mastelį nustatėte patys pagal ilgį, kurį žinote.",
+        "confirmed": "Jūs jį patvirtinote.",
+        "none": "Mastelis dar nenustatytas — matavimai bus be metrų.",
+        "clickToSet": "Spustelėkite, jei norite nustatyti mastelį pagal kitą žinomą ilgį.",
+        "odd": "{{label}} nėra įprastas braižymo mastelis — lapas, matyt, atspausdintas kitu dydžiu, nei braižytas.",
+        "ocr": "Skaičiai perskaityti iš lapo vaizdo — palyginkite su brėžiniu."
+      },
+      "overview": {
+        "countConfirmed": "{{count}} patvirtinti",
+        "countRead": "{{count}} iš brėžinio",
+        "countGuessed": "{{count}} spėjami",
+        "countNone": "{{count}} nenustatyti",
+        "groupGuessed": "su tuo pačiu spėjamu masteliu",
+        "groupSame": "su tuo pačiu masteliu",
+        "help": "Mastelį „iš brėžinio“ programa perskaitė iš plano matmenų ar užrašo, spėjamą — nustatė apytiksliai. Abejojate — patikrinkite žinomu matmeniu ir patvirtinkite.",
+        "sourceNone": "Nėra"
+      }
+    },
     "scaleBanner": {
       "srcText": "tekstinis žymeklis",
       "srcDimensions": "dimensijų užrašai",

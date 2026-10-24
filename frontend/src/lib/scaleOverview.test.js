@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildScaleOverview, dimensionStringsOf, overviewCounts, plural } from './scaleOverview.js';
 import { confirmLaneScales, laneScalesOf } from './durableScale.js';
+import { provenancePhrase } from './scaleProvenance.js';
+import { makeT } from './testT.js';
+
+const t = makeT('lt');
+const source = (row) => provenancePhrase(row.desc, t);
 
 const eil = (text, page, y = 0.41) => ({ text, value_m: Number(text) / 1000, page, line_pct: [[0.39, y], [0.42, y]] });
 // objektas_h's shape: eight sheets, the lane measured 1:115 on sheets 1–3 (fewer here), strings on 1 and 3.
@@ -29,15 +34,15 @@ test('one row per sheet of the PDF with scale, source, written scale, strings an
   assert.equal(rows.length, 4);
   assert.deepEqual(rows.map((r) => r.state), ['spejamas', 'spejamas', 'spejamas', 'nenustatytas']);
   assert.equal(rows[0].label, '1:115');
-  assert.equal(rows[0].source, 'Išmatuotas pagal matmenis');
+  assert.equal(source(rows[0]), 'spėjamas pagal plano matmenis');
   assert.equal(rows[0].strings, 2);
   assert.deepEqual(rows[0].sample, ['600', '996']);
   assert.equal(rows[2].written, '1:100');
-  assert.match(rows[2].source, /lape užrašyta 1:100/);
+  assert.match(source(rows[2]), /užrašytas 1:100 neatitinka/);
   assert.equal(rows[3].label, '');
-  assert.equal(rows[3].source, 'Nėra');
+  assert.equal(source(rows[3]), 'mastelio nėra');
   assert.equal(rows[3].canConfirm, false);
-  assert.deepEqual(overviewCounts(rows), { nenustatytas: 1, spejamas: 3, patvirtintas: 0 });
+  assert.deepEqual(overviewCounts(rows), { nenustatytas: 1, spejamas: 3, nuskaitytas: 0, patvirtintas: 0 });
 });
 
 test('sheets sharing one lane ratio form a confirm-all group; confirming moves them to patvirtintas', () => {
@@ -47,7 +52,7 @@ test('sheets sharing one lane ratio form a confirm-all group; confirming moves t
   const after = buildScaleOverview(project, { pageCount: 4, durable });
   assert.deepEqual(after.rows.map((r) => r.state), ['patvirtintas', 'patvirtintas', 'spejamas', 'nenustatytas']);
   assert.equal(after.rows[0].canConfirm, false);
-  assert.equal(after.rows[0].source, 'Išmatuotas pagal matmenis');
+  assert.equal(source(after.rows[0]), 'patvirtinote jūs');
   assert.deepEqual(after.groups, [], 'one unconfirmed sheet left — no group');
 });
 
@@ -64,7 +69,7 @@ test('his own calibration and the approximate area scale', () => {
   const { rows } = buildScaleOverview(project, { pageCount: 4, durable });
   assert.equal(rows[3].state, 'patvirtintas');
   assert.equal(rows[3].label, '1:50');
-  assert.equal(rows[3].source, 'Jūsų nustatytas pagal žinomą atstumą');
+  assert.equal(source(rows[3]), 'jūsų nustatytas pagal žinomą ilgį');
   // without a page count the pages come from what is known
   assert.deepEqual(buildScaleOverview(project).rows.map((r) => r.page), [1, 2, 3]);
 });
@@ -82,4 +87,17 @@ test('dimensionStringsOf carries ilgis_pt when the read stored it, and leaves it
   ] }] }] });
   assert.equal(s[1][0].ilgis_pt, 73.8);
   assert.equal('ilgis_pt' in s[1][1], false);
+});
+
+test('read sheets count apart, may be confirmed, and a blank sheet carries the lane\'s reason', () => {
+  const read = { _meta: { geometrija: {
+    masteliai: { 1: { m_per_pt: 0.017639, mastelis: 50, saltinis: 'stated', patikimumas: 'high', tekstas: 'M 1:50 (patvirtina 2 lapo matmenys)', is_lapo: 2 } },
+    masteliai_tusti: { 2: 'Lape yra 4 matmenų, bet jie nei ant matmenų linijų, nei atitinka sienas, o mastelis neužrašytas.' },
+  } } };
+  const { rows } = buildScaleOverview(read, { pageCount: 2 });
+  assert.equal(rows[0].state, 'nuskaitytas');
+  assert.equal(rows[0].canConfirm, true);
+  assert.equal(source(rows[0]), 'užrašytas brėžinyje, patvirtintas 2 lapo matmenimis');
+  assert.match(source(rows[1]), /^mastelio nėra — Lape yra 4 matmenų/);
+  assert.deepEqual(overviewCounts(rows), { nenustatytas: 1, spejamas: 0, nuskaitytas: 1, patvirtintas: 0 });
 });

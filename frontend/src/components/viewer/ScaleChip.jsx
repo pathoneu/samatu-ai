@@ -1,7 +1,8 @@
 /**
  * ScaleChip — the sheet's scale at the drawing's bottom-left, confirmed in one click (Pathon v3 W1-D, D4).
- * It replaces the status bar's scale sentence as the way in: „1:115 · spėjamas" says the state in words (never
- * by colour alone); a click opens its card upward with the explanation and the actions — „Patvirtinti 1:115",
+ * It replaces the status bar's scale sentence as the way in: „1:75 — iš plano matmenų (139 skaičiai)" says where
+ * the scale comes from in words (lib/scaleProvenance, from the backend's own provenance; never by colour alone —
+ * the border is solid for a scale read from the drawing or his own, dashed for a proposal); a click opens its card upward with the explanation and the actions — „Patvirtinti 1:115",
  * „Patvirtinti visiems N lapams", „Kalibruoti", „Patikrinti", and „Visi lapų masteliai" (the overview). The
  * model is lib/scaleChip (the one merged scale map + the overview's rows). Esc or a click elsewhere closes it.
  *
@@ -14,15 +15,16 @@ import { paperLabel, parseRatio, standardRatios } from '@/lib/scaleEntry';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { Check, CheckCheck, CircleSlash, ListChecks, Ruler, Scaling } from 'lucide-react';
 import { scaleChipModel } from '@/lib/scaleChip';
-import { SCALE_STATE_LT } from '@/lib/scaleLabel';
+import { useTranslation } from '@/i18n/react';
 import { visiblePageOf } from '@/lib/visiblePage';
 
 export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12, openNonce = 0, pageSizeOf = null, isNotNeeded = null, onSetRatio = null, onNotNeeded = null }) {
+  const { t } = useTranslation();
   const { state: scroll } = useScroll(documentId);
   const page = visiblePageOf(scroll);
   const chip = useMemo(
-    () => scaleChipModel({ page, scales, project, durable, pageCount: totalPages }),
-    [page, scales, project, durable, totalPages],
+    () => scaleChipModel({ page, scales, project, durable, pageCount: totalPages, t }),
+    [page, scales, project, durable, totalPages, t],
   );
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
@@ -44,7 +46,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
   }, [open]);
   const act = (fn) => () => { setOpen(false); fn?.(); };
   const btn = 'w-full inline-flex items-center gap-2 px-3 py-2 rounded text-ui text-left text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50';
-  const guessed = chip.state === 'spejamas';
+  const proposed = chip.line === 'dashed';
   return (
     <div ref={rootRef} className="absolute bottom-2 z-panel flex items-center" style={{ left }} data-testid="scale-chip-root">
       {open && (
@@ -56,7 +58,7 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         >
           <div className="px-3 pt-2.5 pb-2 border-b border-border">
             <p className="text-ui font-semibold">Lapas {chip.page} · {notNeeded ? 'mastelio nereikia' : chip.text}</p>
-            <p className="mt-1 text-meta text-muted-foreground leading-snug">
+            <p className="mt-1 text-ui text-muted-foreground leading-snug" data-testid="scale-chip-explanation">
               {notNeeded ? 'Pažymėjote, kad šis lapas — lentelė ar specifikacija: jo mastelio programa nebeklausia.' : chip.title}
             </p>
           </div>
@@ -143,25 +145,27 @@ export default function ScaleChip({ documentId, scales, project, durable, totalP
         aria-expanded={open}
         aria-haspopup="dialog"
         title={`${chip.sentence}. Spustelėkite — patvirtinti arba nustatyti.`}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-panel border bg-card text-ui shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${guessed ? 'border-ov-proposed' : 'border-border'}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-panel border bg-card text-ui shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${proposed ? 'border-dashed border-ov-proposed' : 'border-solid border-border'}`}
         data-testid="scale-chip"
         data-scale-state={chip.state}
+        data-scale-line={chip.line}
       >
         <Scaling className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-muted-foreground">Mastelis</span>
         {notNeeded ? (
           <span className="font-semibold text-foreground">nereikia</span>
         ) : chip.state === 'nenustatytas' || !chip.label ? (
-          <span className="font-semibold text-foreground">nenustatytas</span>
+          <span className="font-semibold text-foreground">{t('project.scaleProvenance.chipNone')}</span>
         ) : (
           <>
             <span className="mono tabular font-semibold text-foreground">{chip.label}</span>
-            <span className="text-foreground">· {SCALE_STATE_LT[chip.state]}</span>
+            <span className="text-foreground" data-testid="scale-chip-phrase">— {chip.phrase}</span>
           </>
         )}
       </button>
-      {/* A guessed scale is confirmed in ONE click, right on the chip (Togal's chip; audit act „Confirm scale" 4 → 1). */}
-      {chip.canConfirm && !open && !notNeeded && (
+      {/* A proposed scale is confirmed in ONE click, right on the chip (Togal's chip; audit act „Confirm scale" 4 → 1).
+          A scale read from the drawing can still be confirmed in the card — no second button on the drawing. */}
+      {chip.canConfirm && proposed && !open && !notNeeded && (
         <button
           type="button"
           onClick={() => onConfirm?.([chip.page])}
