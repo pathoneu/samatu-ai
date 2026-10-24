@@ -5,10 +5,10 @@
 
 ## Resume point
 
-Done: three commits (perimeter rule 5daddea0, windows f5ae6a5c, engine step 3c 3ea46c80), merge of togal-v2 (cb798d91),
+Done: three commits (perimeter rule 5daddea0, windows f5ae6a5c, engine step 3c 3ea46c80), merges of togal-v2 (cb798d91, then the OCR wiring merge on top), the manager-review test (§4.4),
 full backend suite 5505 passed / 56 skipped / 0 failed (before the merge), four eval passes measured before and after.
 After the merge: lane and OCR tests pass (492), checkOverlay unit tests 20/20; a plain totals + replay rows re-check
-ran after the merge (§4). Open for the manager: the objektas_a decision in §4.2 and the engine commit 3ea46c80.
+ran after the merge (§4); after the second merge the lane + OCR subset passes (703) and the objektas_i cold runs are identical per room. Open for the manager: §4.4 (the two a windows are frames along the wall, not a passage or a leaf) and the engine commit 3ea46c80.
 
 ## 0. Verdict
 
@@ -274,6 +274,50 @@ The perimeter lever moves no eval line except b 08 (an estimate became read, 11,
 
 Re-checked on the merged head cb798d91 (flag unset): plain totals 22,60 % / 26,1 % / 34,7 % GATE OK; replay rows
 27,4 % / 37,9 % — identical to the pre-merge numbers above.
+
+### 4.4 Manager review of the two objektas_a windows (2026-10-24, later) — measured, not changed
+
+The review read the two openings as (1) 101's 1400 mm passage between the 720/780 wall stubs, with no lines in it, and
+(2) a door at 104 whose leaf is drawn as a thin rectangle across the wall. I instrumented `_glazing_lines` and dumped
+the exact segments that make each opening glazed (`why_glazing.py` in the worktree's scratch; page 2 frame, points).
+
+**101:** the opening the lane labels is NOT the 1400 passage.
+- It is the 1,34 m opening in the EXTERIOR south wall below it: line (516,2 → 562,3, y 349,0), `i = laukas`. The 1400
+  gap at y ≈ 300 is no opening of 101 at all; the lane's outline runs through it, and 101's openings to 102 and 103
+  (x 503 / 574, y 302–342, both in the truth) lie in that same strip.
+- Glazing found: a frame rectangle x 517,9–560,6, y 347,6–350,8 (edges at offsets +1,4 / −1,9 pt from the axis) plus
+  the glass line at y 349,3. All three are PARALLEL to the wall, inside the gap, and cover 0,93 of it.
+- Rendered at 4–6× this is the same three-line window symbol a uses everywhere else.
+
+**104:** the 0,96 m west opening, line (579,4; 102,3 → 135,2).
+- Glazing found: a frame rectangle x 577,4–580,7, y 104,0–133,5 plus the glass line at x 579,1. All are PARALLEL to the
+  opening, inside it, and cover 0,90 of it.
+- No leaf-sized arc is hinged at either end. `opening_kind` tries arcs first and would have called it a door.
+
+**The rule already ignores a leaf across the wall.**
+- A rectangle perpendicular to the wall gives edges perpendicular to the opening. `_glazing_lines` drops every segment
+  more than 8° off the opening's direction.
+- Its short edges (≤ 0,12 m) are under the 0,25-of-the-gap sash minimum.
+- An empty gap has no segment at all.
+- New test `test_a_door_leaf_rectangle_across_the_wall_is_never_glazing_and_an_empty_gap_is_nothing`: a leaf rectangle
+  alone → nothing; with its arc → door; empty 1,4 m gap → nothing.
+- So there is nothing to refine geometrically without dropping a's real frames, which are drawn exactly like i's.
+
+**Consequences, unchanged from §3–§4:**
+- objektas_i keeps 15 windows, re-checked on the merged head.
+- The scorecard stays 27/30, against the truth: a 101 truth 0 / app 1, a 104 truth 1 / app 2.
+- Replay stays 22,92 % / 27,4 % / 37,9 %.
+
+**Engine step 3c re-measured:**
+- with it, a Angokraščiai is +17,25 %;
+- without it, +49,89 % (replay billed 23,87 %).
+- The double count without it is real: 102's listed „2750 ×2" and „3300" stand nowhere while three drawn windows are
+  added (`els.py`; test `test_a_listed_window_whose_size_fits_no_opening_…`).
+
+By the review's literal criterion (≤ +0,79 % with 3c) the commit should go. I did NOT drop it: the criterion assumed
+the frame fix would remove a's two windows, and dropping 3c alone makes a's angokraščiai 3× worse. If the founder
+confirms the truth file (no windows at those two openings), revert BOTH f5ae6a5c's frame-rectangle part and 3ea46c80;
+objektas_i then loses its 15 windows.
 
 ## 5. Tests
 
