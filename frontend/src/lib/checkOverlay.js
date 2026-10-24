@@ -51,6 +51,8 @@ export function wallState(wall) {
   const s = wall?.saltinis;
   if (s === 'eilute') return 'read';
   if (s === 'priesinga_siena') return 'borrowed';
+  // dimension_sum rule (c), 2026-10-24: the other strings on the same axis minus this side's other walls
+  if (s === 'grandine') return 'borrowed';
   if (s === 'konturas') return 'outline';
   return 'missing';
 }

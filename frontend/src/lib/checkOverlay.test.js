@@ -59,6 +59,9 @@ test('a wall says where its length came from', () => {
   assert.equal(wallState(perimetras.walls[0]), 'read');
   assert.equal(wallState(perimetras.walls[2]), 'borrowed');
   assert.equal(wallState({ saltinis: 'konturas', ilgis_m: 0.15 }), 'outline');
+  // dimension_sum rule (c), 2026-10-24: a length from the other strings on the axis — shown as its number
+  assert.equal(wallState({ saltinis: 'grandine', ilgis_m: 3.05, eilutes: [] }), 'borrowed');
+  assert.equal(wallLabel({ saltinis: 'grandine', ilgis_m: 3.05, eilutes: [] }), '3,05');
   assert.equal(wallState(perimetras.walls[3]), 'missing');
   assert.equal(wallLabel(perimetras.walls[0]), '1586');
   assert.equal(wallLabel(perimetras.walls[1]), '1200 + 900 + 2400');

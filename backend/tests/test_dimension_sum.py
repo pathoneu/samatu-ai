@@ -294,7 +294,10 @@ def test_the_wall_opposite_is_not_borrowed_when_it_is_not_the_same_length():
     rooms = [_outline("01", cut)]
     _run([sheet], rooms)
     right = next(s for s in rooms[0]["_sienos"] if abs(s["kontrole_m"] - 2.0) < 0.02)
-    assert right["ilgis_m"] is None and rooms[0]["perimetras_saltinis"] == "konturo_ivertis"
+    # never the 3 m string of the wall opposite. Since 2026-10-24 (rule b) the 2 m face is taken from the OUTLINE,
+    # because the opposite face's „3000" agrees with its own outline — said as such, not as a read number
+    assert right["saltinis"] == "konturas" and right["budas"] == "priesinga_patikrinta" and abs(right["ilgis_m"] - 2.0) < 0.02
+    assert not right["eilutes"]
 
 
 def test_an_estimate_is_tried_again_on_the_next_run_and_replaced_when_the_walls_can_be_read():

@@ -39,7 +39,11 @@ FIT_TOL_PT = 0.6               # the circle fit's worst residual (or 3 % of the 
 MIN_ANGLE_BINS = 5             # points spread over at least this many 10° bins — not one dash cluster
 GLAZING_MIN_LINES = 2
 GLAZING_MIN_COVER = 0.55       # a glazing line runs at least this much of the opening
-GLAZING_INSET_PT = 0.5         # …strictly inside the band: the sill lines lie on its edges
+SASH_MIN_COVER = 0.25          # one sash of a window of up to three: its frame lines run at least this much of the gap
+GLAZING_INSET_PT = 0.5        # …strictly inside the band: the sill lines lie on its edges
+FRAME_RECT_MAX_M = 0.12        # an outlined rectangle no deeper than a window frame (objektas_i: 3 pt = 0,08 m at 1:75)…
+BOX_TOL_PT = 0.3               # a closed path's corners may drift this much off a true rectangle (objektas_i: 0,12 pt)
+FRAME_RECT_MIN_LONG_M = 0.3   # …and at least as long as the narrowest window: its long edges are frame lines
 PARALLEL_DEG = 8.0
 HINGE_TOL_M = 0.3              # the arc's centre against the wall end (it sits on the face, the end on the axis)
 LEAF_VS_OPENING = (0.6, 1.2)   # one leaf against the opening's width
@@ -141,12 +145,18 @@ def page_marks(pdf_bytes: bytes, page_no: int, m_per_pt: float) -> PageMarks | N
                 segs.append(((x0, top + h / 2), (x0 + w, top + h / 2)))
             else:
                 segs.append(((x0 + w / 2, top), (x0 + w / 2, top + h)))
+        elif rc.get("stroke") and not rc.get("fill"):
+            segs += _frame_edges(float(rc["x0"]), float(rc["top"]), w, h, m_per_pt)
     arcs: list[Arc] = []
     for cv in curves:
         if cv.get("fill"):
             continue
         pts = _flatten(cv)
         if len(pts) < 2:
+            continue
+        box = _closed_box(pts)
+        if box is not None:                                    # the same frame stored as a closed 4-corner path
+            segs += _frame_edges(*box, m_per_pt)
             continue
         ext = max(max(p[0] for p in pts) - min(p[0] for p in pts), max(p[1] for p in pts) - min(p[1] for p in pts))
         if ext <= DASH_MAX_PT:
@@ -168,6 +178,36 @@ def _colour(obj) -> object:
     if isinstance(c, (list, tuple)):
         return tuple(round(float(v), 2) for v in c)
     return c
+
+
+def _frame_edges(x0: float, top: float, w: float, h: float, m_per_pt: float) -> list:
+    """A window FRAME drawn as one outlined thin rectangle in the wall gap (objektas_i, 2026-10-24: 3 pt deep, the
+    opening's length or one sash's, posts at its ends, the glass line through it): its two long edges are two lines
+    along the opening, exactly as two separately drawn frame lines would be. Anything deeper than a frame, or
+    shorter than the narrowest window, gives nothing."""
+    if not (2.0 < min(w, h) <= FRAME_RECT_MAX_M / m_per_pt and max(w, h) >= FRAME_RECT_MIN_LONG_M / m_per_pt):
+        return []
+    if w >= h:
+        return [((x0, top), (x0 + w, top)), ((x0, top + h), (x0 + w, top + h))]
+    return [((x0, top), (x0, top + h)), ((x0 + w, top), (x0 + w, top + h))]
+
+
+def _closed_box(pts) -> tuple[float, float, float, float] | None:
+    """(x0, top, w, h) when the path is a closed axis-parallel rectangle (4 corners, ends together), else None."""
+    if len(pts) not in (4, 5):
+        return None
+    if len(pts) == 5 and math.dist(pts[0], pts[-1]) > 0.2:
+        return None
+
+    def two(vals: list[float]) -> tuple[float, float] | None:
+        lo, hi = min(vals), max(vals)                       # every corner on one of two values (CAD drift ≤ 0,3 pt)
+        if hi - lo <= BOX_TOL_PT or any(min(v - lo, hi - v) > BOX_TOL_PT for v in vals):
+            return None
+        return lo, hi
+    xs, ys = two([p[0] for p in pts]), two([p[1] for p in pts])
+    if xs is None or ys is None:
+        return None
+    return xs[0], ys[0], xs[1] - xs[0], ys[1] - ys[0]
 
 
 def _flatten(curve) -> list[tuple[float, float]]:
@@ -409,6 +449,21 @@ def opening_kind(line: Sequence[Sequence[float]], plotis_m: float, storis_m: flo
                 used.add(k)
             return "durys", k
     if _glazing_lines(marks, (px, py), (qx, qy), L, float(storis_m or 0) / m_per_pt) >= GLAZING_MIN_LINES:
+        # A door with a fixed light (objektas_i's balcony door, 2026-10-24: a 0,76 m leaf in a 2,4 m glazed gap): the
+        # glazing AND one leaf hinged at an end of the gap, whose closed position lies along the gap. The swing
+        # says door, as everywhere in this module; a leaf too short for the gap's width is the door beside the light.
+        for k, arc in enumerate(marks.arcs):
+            if (used is not None and k in used) or arc.span > SINGLE_LEAF_SPAN_DEG:
+                continue
+            if not (LEAF_M[0] / m_per_pt <= arc.r < LEAF_VS_OPENING[0] * w_pt):
+                continue
+            if min(math.hypot(arc.cx - px, arc.cy - py), math.hypot(arc.cx - qx, arc.cy - qy)) > tol:
+                continue
+            if min(_seg_dist(e, (px, py), (qx, qy)) for e in arc.ends()) > tol:
+                continue                                       # the leaf closes across another gap, not this one
+            if used is not None:
+                used.add(k)
+            return "durys", k
         return "langas", None
     return None, None
 
@@ -425,10 +480,16 @@ def _glazing_lines(marks: PageMarks, p, q, L: float, storis_pt: float) -> int:
     x0, y0 = min(p[0], q[0]) - pad, min(p[1], q[1]) - pad
     x1, y1 = max(p[0], q[0]) + pad, max(p[1], q[1]) + pad
     found: list[tuple[float, float, float]] = []                # (offset across, from, to) along the axis
+    sashes: list[tuple[float, float, float]] = []               # shorter pieces: one sash of a window of several
     for a, b in marks.lines_near(x0, y0, x1, y1):
         dx, dy = b[0] - a[0], b[1] - a[1]
         ln = math.hypot(dx, dy)
         if ln < GLAZING_MIN_COVER * L:
+            if ln >= SASH_MIN_COVER * L and abs(dx * ux + dy * uy) / ln >= cos_par:
+                mx, my = (a[0] + b[0]) / 2 - p[0], (a[1] + b[1]) / 2 - p[1]
+                off, along = mx * nx + my * ny, mx * ux + my * uy
+                if abs(off) <= inset and -0.15 * L <= along <= 1.15 * L:
+                    sashes.append((off, along - ln / 2, along + ln / 2))
             continue
         if abs(dx * ux + dy * uy) / ln < cos_par:
             continue                                           # not along the opening
@@ -443,6 +504,35 @@ def _glazing_lines(marks: PageMarks, p, q, L: float, storis_pt: float) -> int:
         if any(abs(off - o) < 0.15 and lo < h and hi > l for o, l, h in found):
             continue                                           # the same line drawn twice
         found.append((off, lo, hi))
+    # A window of two or three sashes draws each sash's frame on its own (objektas_i 2026-10-24: two 1,2 m frames in a
+    # 2,0 m gap): pieces on one line across (same offset) that TOGETHER cover the opening as a whole line would count
+    # as one line — never a piece already part of a whole line.
+    groups: list[list[tuple[float, float, float]]] = []
+    for s in sorted(sashes):
+        if any(abs(s[0] - o) < 0.15 and s[1] < h and s[2] > l for o, l, h in found):
+            continue
+        if groups and abs(s[0] - groups[-1][0][0]) < 0.15:
+            groups[-1].append(s)
+        else:
+            groups.append([s])
+    for g in groups:
+        if len(g) < 2:
+            continue
+        cover, cur = 0.0, None
+        for _, lo, hi in sorted(g, key=lambda t: t[1]):
+            lo, hi = max(lo, 0.0), min(hi, L)
+            if hi <= lo:
+                continue
+            if cur is None or lo > cur[1]:
+                if cur is not None:
+                    cover += cur[1] - cur[0]
+                cur = [lo, hi]
+            else:
+                cur[1] = max(cur[1], hi)
+        if cur is not None:
+            cover += cur[1] - cur[0]
+        if cover >= GLAZING_MIN_COVER * L:
+            found.append((g[0][0], 0.0, L))
     return len(found)
 
 

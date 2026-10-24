@@ -672,7 +672,7 @@ def _fact_perimetras(project: dict, room: dict,
         suma = room["_perimetras_suma"]
         terms: list[str] = []
         for wall in room.get("_sienos") or []:
-            if wall.get("saltinis") == "konturas":
+            if wall.get("saltinis") in ("konturas", "grandine"):
                 terms.append(lt_num(_f(wall.get("ilgis_m"))))
             elif isinstance(wall.get("dalys"), list) and wall["dalys"] and wall.get("saltinis") == "eilute":
                 # 2026-09-21: a chain whose holes were filled — every part in the order it lies along the wall,
@@ -704,7 +704,27 @@ def _fact_perimetras(project: dict, room: dict,
         if from_openings > 0:
             sentence += f" Durų angų pločio ({lt_num(from_openings)} m) planas neužrašo — paėmiau jį iš sienų brėžinio."
         from_outline = _f(suma.get("is_konturo_m")) or 0.0
-        if from_outline > 0:
+        completed = [p for p in (suma.get("papildyta") or []) if isinstance(p, dict)]
+        if completed:
+            # 2026-10-24 (v4): walls without their own number, completed — each said, never silently
+            n_read, n_all = int(suma.get("sienu_is_matmenu") or 0), int(suma.get("sienu") or 0)
+            if n_all:
+                sentence += f" Sudėta iš matmenų ({n_read} iš {n_all} sienų)."
+            chain = [lt_num(_f(p.get("ilgis_m"))) for p in completed if p.get("saltinis") == "grandine"]
+            short = [lt_num(_f(p.get("ilgis_m"))) for p in completed if p.get("budas") == "trumpa"]
+            opposite = [lt_num(_f(p.get("ilgis_m"))) for p in completed if p.get("budas") == "priesinga_patikrinta"]
+            if chain:
+                sentence += (f" Iš matmenų grandinės (priešingos pusės matmenys minus šios pusės kitos sienos): "
+                             f"{', '.join(chain)} m.")
+            if short:
+                sentence += f" Trumpos atkarpos be užrašo iš brėžinio kontūro: {', '.join(short)} m."
+            if opposite:
+                sentence += (f" Iš brėžinio kontūro, nes priešinga siena užrašyta ir sutampa su kontūru: "
+                             f"{', '.join(opposite)} m — patikrinkite šias sienas.")
+            piers = round(from_outline - sum(_f(p.get("ilgis_m")) or 0.0 for p in completed if p.get("saltinis") == "konturas"), 2)
+            if piers > 0:
+                sentence += f" {lt_num(piers)} m trumpų atkarpų be užrašo paėmiau iš kontūro."
+        elif from_outline > 0:
             sentence += f" {lt_num(from_outline)} m trumpų atkarpų be užrašo paėmiau iš kontūro."
         return _fact("perimetras", round(measured, 2), "m", "read", "planas", page,
                      _outline_rect_pct(room) or region_on_page(room, page, region), sentence + tail, editable)
