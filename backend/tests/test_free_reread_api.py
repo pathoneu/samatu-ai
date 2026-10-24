@@ -214,7 +214,7 @@ def test_status_a_project_read_at_lane_version_12_is_offered_the_reader_frame_re
     _isolate(tmp_path, monkeypatch)
     _store(blob=_blob(geometrija={"versija": 12}))
     body = TestClient(app).get("/api/projects/p1/free-reread").json()
-    assert gl.LANE_VERSION == 13
+    assert gl.LANE_VERSION >= 13                 # 14 (2026-10-24): every scale from geometry/scale.py
     assert body["needed"] is True and body["projekto_versija"] == 12
 
 

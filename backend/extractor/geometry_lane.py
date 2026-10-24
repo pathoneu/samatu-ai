@@ -159,7 +159,12 @@ def _forget_open_space(room: dict) -> None:
 # pdf_vectors.page_frames) instead of guessing it from where the content lies — a /Rotate 90/270 sheet whose drawing
 # sits inside the short side was read in the wrong orientation (objektas_e: text on 17 sheets, walls on 3), so its
 # walls, strings and outlines landed elsewhere; the re-read is free. The corpus's other projects read identically.
-LANE_VERSION = 13
+# 14 (2026-10-24, v4 geometry): every sheet's scale comes from ONE place, backend/geometry/scale.py, with its
+# provenance in `masteliai[page]` (saltinis, tekstas, is_lapo, patikimumas, pastaba) — and sheets the lane's own
+# dimension lines and wall alignment left without one get it from the wall-matched strings, the written „M 1:xx"
+# (validated), a sibling sheet laid over it, or the person's „Mastelis" line; `masteliai_tusti` says why a plan
+# sheet has none. A stored project gains those sheets with one free re-read.
+LANE_VERSION = 14
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -412,7 +417,7 @@ def geometry_dimension_strings(pdf_bytes: bytes) -> list[dict]:
 
 
 def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None = None, *,
-                   on_stage: Callable[[str], None] | None = None) -> dict:
+                   on_stage: Callable[[str], None] | None = None, user_scales: dict | None = None) -> dict:
     t0 = time.time()
     meta: dict = {"versija": LANE_VERSION,
                   "vietos": {}, "grupes": [], "sutapdinimas": {}, "lapai": [], "konturai": [], "konturu_priezastys": {}, "atviros_erdves": [],
@@ -443,10 +448,15 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         traced_on = {int(r["_konturas"]["page"]) for r in rooms if isinstance(r.get("_konturas"), dict) and r["_konturas"].get("page")}
         dimensioned = {int(d["page"]) for d in dims if d.get("span_source") == "line"}
         sheets = sorted(set(plan_pages) | traced_on | dimensioned)
-        scale: dict[int, float] = {}
-        for d in dims:
-            if d.get("scale_m_per_pt"):
-                scale.setdefault(int(d["page"]), float(d["scale_m_per_pt"]))
+        # ── v4 scale hook (geometry/scale.py) 1/3: the strings on their hairlines first (source 2); a person's
+        # „Mastelis" line wins on its sheet, before alignment so the sheets laid over it borrow it; `line_scaled`
+        # keeps which sheets their OWN lines scaled.
+        from geometry.scale import lane_fill, lane_record, line_scales, user_scales_for_project
+        scale: dict[int, float] = line_scales(dims)
+        line_scaled = set(scale)
+        if user_scales is None:
+            user_scales = user_scales_for_project(parsed.get("id"))
+        scale.update({int(p): float(u["m_per_pt"]) for p, u in (user_scales or {}).items() if u.get("m_per_pt")})
 
         _stage(on_stage, "tekstas")
         where = locate_rooms(pdf_bytes, rooms, plan_pages)
@@ -480,7 +490,7 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         # (objektas_b: 19 dimensioned sheets, 17 s). The rooms' own sheets come first; the rest are read
         # only when there is an outline whose walls their strings could state.
         anchors = {int(v["page"]) for v in where.values()} | traced_on
-        everything = any(p not in scale for p in anchors)      # an anchor sheet with no strings needs its plan's scale
+        everything = any(p not in line_scaled for p in anchors)  # an anchor sheet with no strings needs its plan's scale (v4 hook: its OWN lines)
         _stage(on_stage, "planas")
         alignment = lay_over(sheets if everything else anchors)
 
@@ -494,6 +504,20 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                 W, H, _ = page_geometry(pdf_bytes, p)
                 if W > 0 and H > 0:
                     sizes[p] = (W, H)
+        # ── v4 scale hook 2/3: sheets still without a scale get geometry/scale.py's (wall-matched strings, the
+        # written „M 1:xx" validated, a sibling laid over it); every scale carries its provenance.
+        asked = set(sheets) | anchors
+        try:
+            scale_src = lane_fill(pdf_bytes, dims, scale, asked, alignment, user_scales)
+        except Exception:  # noqa: BLE001 — the new sources never sink the lane: it goes on with the scales it had
+            _log.exception("geometry/scale.py lane_fill failed")
+            scale_src = {}
+        for p in scale:
+            if p not in sizes:
+                W, H, _ = page_geometry(pdf_bytes, p)
+                if W > 0 and H > 0:
+                    sizes[p] = (W, H)
+        meta["masteliai_tusti"] = {str(p): sc.reason for p, sc in sorted(scale_src.items()) if not sc.found and p in asked}
         _stage(on_stage, "konturai")
         for group in alignment["groups"]:
             located = [r for r in rooms if r.get("_vieta") and int(r["_vieta"]["page"]) in group]
@@ -646,7 +670,9 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                                             "dx_pct": round(float(t["dx"]) / sizes[base][0], 6),
                                             "dy_pct": round(float(t["dy"]) / sizes[base][1], 6)}
         # the sheets' scales, exact from their own dimension lines — for the viewer's measuring tools
-        meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M))} for p, v in sorted(scale.items())}
+        meta["masteliai"] = {str(p): {"m_per_pt": round(v, 6), "mastelis": int(round(v / _PT_M)),
+                                      **(lane_record(scale_src[p]) if p in scale_src else {})}   # v4 scale hook 3/3: provenance
+                             for p, v in sorted(scale.items())}
 
         # The openings come BEFORE the walls are added: a designer writes the wall pieces either side of a door
         # and never the door itself, so a wall's chain of strings has a hole exactly where the room's own
