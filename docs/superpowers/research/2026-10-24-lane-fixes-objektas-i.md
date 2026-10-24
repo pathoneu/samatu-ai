@@ -99,3 +99,8 @@ space blank with a reason. I did not revert the locator change: it improves ever
 - Fault 5 (furniture strings) and „2 of N walls without a string" are `dimension_sum.py` work.
 - A curve-fitted false arc (a rug's rounded corner) exists on sheet 5 as before; it only matters at a wall gap.
 - Tests: `backend/tests/test_lane_objektas_i_2026_10_24.py` (13, synthetic only).
+- `LANE_VERSION` not raised here (togal-v2 is at 14 after the scale merge); stored projects gain these readings
+  on the free re-read only once it is raised — use 15 on the merge.
+- j1 / j2 were measured on this branch WITHOUT the scale branch: j1 cold has no room source at all (no table,
+  no m² labels), so the new 1:100 scale helps only the seeded variant (18/18 badges already located); j2 sheet 1
+  should keep or improve its 7/8. Re-run the cold run after the merge.
