@@ -27,6 +27,12 @@ W, H = A4
 FONT = Path(__file__).resolve().parents[1] / "assets" / "fonts" / "DejaVuSans.ttf"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_ocr_cache(tmp_path, monkeypatch):
+    """The disk cache of OCR reads goes to the test's own folder, never to backend/data/ocr_cache."""
+    monkeypatch.setenv("SAMATU_OCR_CACHE_DIR", str(tmp_path / "ocr_cache"))
+
+
 def _real_engine():
     for name in ("rapid", "paddle", "tesseract"):
         try:

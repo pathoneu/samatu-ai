@@ -1220,7 +1220,7 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
 
     # ── v4 ocr wiring: a sheet with no text layer (a scan) ───────────────────
     # Only when the text layer gave no room table AND the flag SAMATU_OCR is on: read the table from local OCR of
-    # the sheets whose text layer is empty (`_ocr_room_table`). Flag off: nothing below runs, nothing is imported.
+    # the sheets whose text layer is empty (`_ocr_room_table`). Flag off: only the flag is read, no OCR runs.
     if not out["patalpos"]:
         try:
             from text.ocr import ocr_enabled

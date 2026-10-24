@@ -424,9 +424,21 @@ def _tighten(wd: Word, rgb, sx: float, sy: float) -> Word:
     ink = (box.min(axis=2) if box.ndim == 3 else box) < 150
     if not ink.any():
         return wd
+    full = (rgb.min(axis=2) if rgb.ndim == 3 else rgb) < 150
+    ink = ink.copy()
+    # a row (column) inked across the box that ALSO continues outside it on both sides is a line passing through
+    # the padding — a dimension line under the digits, a wall face — not the word; a digit's own stroke ends in it
+    for y in np.where(ink.mean(axis=1) >= LINE_SHARE)[0]:
+        if x0 > 0 and x1 < W and full[y0 + y, x0 - 1] and full[y0 + y, x1]:
+            ink[y, :] = False
+    for x in np.where(ink.mean(axis=0) >= LINE_SHARE)[0]:
+        if y0 > 0 and y1 < H and full[y0 - 1, x0 + x] and full[y1, x0 + x]:
+            ink[:, x] = False
+    if not ink.any():
+        return wd
     rows, cols = ink.mean(axis=1), ink.mean(axis=0)
-    r = np.where((rows > 0) & (rows < LINE_SHARE))[0]
-    c = np.where((cols > 0) & (cols < LINE_SHARE))[0]
+    r = np.where(rows > 0)[0]
+    c = np.where(cols > 0)[0]
     if len(r) < 2 or len(c) < 2:
         return wd
     t, b, l, rr = int(r[0]), int(r[-1]) + 1, int(c[0]), int(c[-1]) + 1
@@ -469,7 +481,7 @@ def render_page(pdf_bytes: bytes, page: int, dpi: int):
 # becomes a ~5 ms read. Only the built-in engines are cached on disk (a test's fake engine stays in memory).
 CACHE_DIR_ENV = "SAMATU_OCR_CACHE_DIR"
 DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "ocr_cache"
-CACHE_FORMAT = 2          # 2: word boxes cut to their ink (_tighten)
+CACHE_FORMAT = 3          # 2: word boxes cut to their ink (_tighten); 3: only lines that run on outside the box are not ink
 
 
 def cache_dir() -> Path:
