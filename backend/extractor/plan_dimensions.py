@@ -192,10 +192,26 @@ def _value_m(text: str) -> float | None:
     return v if MIN_DIM_M <= v <= MAX_DIM_M else None
 
 
-def _dimensions_on_page(pn: int, W: float, H: float, chars: list[dict], to_display=_identity) -> list[dict]:
+# Strings written in CENTIMETRES (objektas_j4, j1): „173", „80", „1412". Read only when a caller asks for that
+# reading (geometry/scale.py's OCR line match, which decides between the two readings by which one gives a plan's
+# scale) — never by default: the default reading above is the one every other lane was measured with.
+_DIM_CM_RE = re.compile(r"^[1-9]\d{1,3}$")       # no leading zero: an upside-down „80" read „08" is not a length
+
+
+def _value_cm(text: str) -> float | None:
+    if not _DIM_CM_RE.match(text):
+        return None
+    v = int(text) / 100.0
+    return v if MIN_DIM_M <= v <= MAX_DIM_M else None
+
+
+def _dimensions_on_page(pn: int, W: float, H: float, chars: list[dict], to_display=_identity,
+                        units: str = "mm") -> list[dict]:
+    """Dimension strings of one page item. `units="cm"` reads 2–4-digit integers as centimetres (`_value_cm`)."""
+    value = _value_cm if units == "cm" else _value_m
     out: list[dict] = []
     for r in _dimension_runs(chars):
-        v = _value_m(r["text"])
+        v = value(r["text"])
         if v is None:
             continue
         x0, top, x1, bottom = to_display([r["x0"], r["top"], r["x1"], r["bottom"]])

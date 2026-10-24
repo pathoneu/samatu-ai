@@ -63,6 +63,16 @@ from typing import Sequence
 
 from .plan_area_annotations import _iter_pages, _words
 
+
+def _page_items(pdf_bytes: bytes, pages: Sequence[int]):
+    """The sheets' characters: `text.layer.page_items` (the text layer, plus OCR for an empty layer when the flag
+    SAMATU_OCR is on), `_iter_pages` when that module cannot be imported."""
+    try:
+        from text.layer import page_items
+    except ImportError:  # pragma: no cover — the backend always ships text/
+        return _iter_pages(pdf_bytes, pages)
+    return page_items(pdf_bytes, pages)
+
 BADGE_MAX_H_PT = 6.5             # a sheet with no dimension string to measure against keeps the old fixed cap
 BADGE_MAX_W_PT = 9.0
 BADGE_VS_DIMENSION = 2.0         # a badge is at most this many times the height of the sheet's dimension strings
@@ -299,7 +309,9 @@ def locate_rooms(pdf_bytes: bytes, rooms: Sequence[dict], plan_pages: Sequence[i
     pages = [int(p) for p in plan_pages]
     if pages:
         try:
-            directions = list(_iter_pages(pdf_bytes, pages))
+            # the text layer; with SAMATU_OCR on, local OCR for a sheet whose layer is empty (text.layer — flag
+            # off it is `_iter_pages`, call for call): objektas_j4 draws its letters as outlines, j3 is a scan
+            directions = list(_page_items(pdf_bytes, pages))
         except Exception:  # noqa: BLE001 — no text layer is not a failure
             directions = []
         long_numbers = frozenset(str(n) for n in want if _long_number(str(n)))

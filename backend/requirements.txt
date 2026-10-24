@@ -63,3 +63,12 @@ boto3>=1.34
 # W3 billing (2026-07-04) — Stripe Checkout + webhooks. Dormant behind
 # BILLING_ENABLED (default OFF); see backend/billing/flag.py.
 stripe>=11,<13
+
+# v4 OCR (2026-10-24, manager decision): local OCR for sheets with no usable text layer
+# (backend/text/ocr.py), behind SAMATU_OCR (default OFF). RapidOCR 3 runs the PaddleOCR
+# PP-OCRv6 models (medium detector + the multilingual recogniser with Lithuanian) on
+# onnxruntime — PaddlePaddle itself has no Python 3.14 wheel. NOT the legacy
+# `rapidocr-onnxruntime` 1.x package: that one has neither PP-OCRv6 nor `lt`.
+# The model files are fetched at image build (scripts/fetch_ocr_models.py), never per request.
+rapidocr==3.10.0
+onnxruntime==1.31.0

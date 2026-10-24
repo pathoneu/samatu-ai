@@ -801,7 +801,52 @@ def _unit_tables_on_page(page, page_idx: int) -> list[dict]:
         words = page.extract_words(keep_blank_chars=False, use_text_flow=False) or []
     except Exception:
         return []
-    lines = _text_lines(words)
+    return _unit_tables_from_words(words, page_idx)
+
+
+def _ocr_text_lines(words: list[dict]) -> list[list[dict]]:
+    """Lines of OCR words. OCR boxes are cut to their ink, so a capital and a lower-case word on one row differ in
+    top by up to their height; a word joins the line whose middle is within OCR_LINE_SHARE of its height."""
+    lines: list[list[dict]] = []
+    mids: list[float] = []
+    for w in sorted(words, key=lambda w: ((float(w["top"]) + float(w["bottom"])) / 2, float(w["x0"]))):
+        mid, h = (float(w["top"]) + float(w["bottom"])) / 2, max(1.0, float(w["bottom"]) - float(w["top"]))
+        if lines and abs(mids[-1] - mid) <= OCR_LINE_SHARE * h:
+            lines[-1].append(w)
+            mids[-1] = sum((float(o["top"]) + float(o["bottom"])) / 2 for o in lines[-1]) / len(lines[-1])
+        else:
+            lines.append([w])
+            mids.append(mid)
+    return [sorted(line, key=lambda w: float(w["x0"])) for line in lines]
+
+
+OCR_LINE_SHARE = 0.6
+
+
+def _ocr_unit_total(line: list[dict], x_lo: float, x_hi: float) -> tuple[str, float] | None:
+    """A block's sum line as OCR reads it, the unit optional („Bendras plotas 96.53")."""
+    t = _unit_total(line, x_lo, x_hi)
+    if t is not None:
+        return t
+    start = next((i for i, w in enumerate(line) if x_lo <= float(w["x0"]) <= x_hi), None)
+    if start is None:
+        return None
+    text = " ".join(str(w["text"]) for w in line[start:])
+    if not any(m in text.lower() for m in ("bendras", "iš viso", "is viso", "viso")):
+        return None
+    m = re.search(r"(\d+(?:[  ]\d{3})*[.,]\d{1,2})\s*$", text)
+    if not m:
+        return None
+    val, _ = _parse_number_preserving_decimals(m.group(1))
+    return (_clean_name(text[:m.start()]).rstrip(":").strip()[:MAX_TOTAL_LABEL_CHARS], val) if val is not None else None
+
+
+def _unit_tables_from_words(words: list[dict], page_idx: int, ocr: bool = False) -> list[dict]:
+    """`_unit_tables_on_page` over a sheet's words ({text, x0, x1, top, bottom}, top-left origin) — from the text
+    layer, or from OCR (`_ocr_room_table`, `ocr=True`: lines by their middles, the number column searched as far
+    left of the heading as the heading is wide — a heading centred over a wide table, objektas_j3 — and a sum line
+    without its unit)."""
+    lines = _ocr_text_lines(words) if ocr else _text_lines(words)
     heads = [i for i, line in enumerate(lines)
              if any(m in _fold_header(str(w["text"])) for w in line for m in UNIT_HEADING_MARKERS)]
     blocks: list[dict] = []
@@ -817,16 +862,26 @@ def _unit_tables_on_page(page, page_idx: int) -> list[dict]:
         hw = {**hw, "x0": line[j]["x0"]}
         # the number column starts under the heading — left-aligned with it, or a little left of it
         x_lo = float(hw["x0"]) - UNIT_COLUMN_EM * h
+        if ocr:
+            x_lo = min(x_lo, float(hw["x0"]) - (float(hw["x1"]) - float(hw["x0"])))
         x_hi = float(hw["x1"])
         stop = heads[k + 1] if k + 1 < len(heads) else len(lines)
+        body = lines[hi + 1:stop]
+        if ocr:
+            # the drawing beside the table writes its own numbers at the same heights; OCR lines are formed from
+            # the table's side of the sheet only (right of where its number column may start, below its heading)
+            below = float(hw["bottom"])
+            end = min((float(w["top"]) for w in lines[stop]), default=float("inf")) if stop < len(lines) else float("inf")
+            body = _ocr_text_lines([w for w in words if float(w["x1"]) >= x_lo
+                                    and below < (float(w["top"]) + float(w["bottom"])) / 2 < end])
         rooms: list[dict] = []
         total = None
         last_bottom = float(hw["bottom"])
-        for line in lines[hi + 1:stop]:
+        for line in body:
             top = min(float(w["top"]) for w in line)
             if top - last_bottom > UNIT_MAX_ROW_GAP_EM * h * 2:
                 break
-            t = _unit_total(line, x_lo, x_hi)
+            t = (_ocr_unit_total if ocr else _unit_total)(line, x_lo, x_hi)
             if t is not None:
                 total = t
                 break
@@ -836,6 +891,8 @@ def _unit_tables_on_page(page, page_idx: int) -> list[dict]:
             if row is None:
                 if rooms:
                     break
+                if ocr:      # the column headings belong to the table: the gap rule counts from them (OCR boxes
+                    last_bottom = max(float(w["bottom"]) for w in line)      # are ink-tight, so h is small)
                 continue
             rooms.append(row)
             last_bottom = max(float(w["bottom"]) for w in line)
@@ -1161,5 +1218,90 @@ def extract_eksplikacija_pdfplumber(pdf_bytes: bytes) -> dict:
     except Exception as exc:
         out["_meta"]["error"] = str(exc)
 
+    # ── v4 ocr wiring: a sheet with no text layer (a scan) ───────────────────
+    # Only when the text layer gave no room table AND the flag SAMATU_OCR is on: read the table from local OCR of
+    # the sheets whose text layer is empty (`_ocr_room_table`). Flag off: only the flag is read, no OCR runs.
+    if not out["patalpos"]:
+        try:
+            from text.ocr import ocr_enabled
+            if ocr_enabled():
+                _ocr_room_table(pdf_bytes, out)
+        except Exception as exc:  # noqa: BLE001 — OCR missing or failing leaves the result as the text layer left it
+            out["_meta"]["ocr_error"] = str(exc)
+
     out["_meta"]["elapsed_s"] = round(time.time() - t0, 2)
     return out
+
+
+# ── the room table read by OCR (v4 ocr wiring, SAMATU_OCR) ──────────────────
+# objektas_j3 is a scan: its eksplikacija („PATALPŲ EKSPLIKACIJA", rows „1 Tambūras 3.14") exists only as pixels.
+# Local OCR (text/ocr.py) reads it — measured 39 of 40 cells on j3 — and the rows are parsed by the same reader as
+# the stacked unit tables above (`_unit_tables_from_words`: the heading „…EKSPLIKACIJA" anchors the number
+# column, a row is read rightwards from its number to the FIRST area, a block ends at a gap or at its own sum).
+# That reader clusters words into lines by their tops and needs no ruling lines, which a scan does not have.
+# OCR-specific: the decimal comma or point both count (UNIT_AREA_RE already takes both; a trailing „,"/„." that
+# OCR hangs on a number is dropped), and Ú — not a Lithuanian letter, read where the drawing has Ų or Ū — becomes
+# Ų at the end of a word (genitive plural: PATALPŲ) and Ū inside one (TAMBŪRAS). Every room keeps the word it was
+# read from (`plotas_m2_raw`) and says it came from the sheet's image.
+OCR_TABLE_MAX_PAGES = 12          # sheets OCR'd looking for a table (each ~10–30 s the first time, cached after)
+OCR_TABLE_MIN_LAYER_CHARS = 8     # = text.layer.MIN_LAYER_CHARS: a sheet with fewer is read by OCR
+
+
+def _lt_ocr_word(text: str) -> str:
+    t = re.sub(r"(?<=\d)[.,]$", "", str(text))
+    t = re.sub(r"[Úú](?=[^\W\d_])", lambda m: "Ū" if m.group(0) == "Ú" else "ū", t)
+    return t.replace("Ú", "Ų").replace("ú", "ų")
+
+
+def _ocr_room_table(pdf_bytes: bytes, out: dict) -> None:
+    """Fill `out` (extract_eksplikacija_pdfplumber's result) from OCR when a text-less sheet holds a room table."""
+    from text.layer import layer_char_counts
+    from text.ocr import ocr_page
+
+    from .plan_area_annotations import _iter_pages
+    import pypdfium2 as pdfium
+
+    from .pdfium_guard import PDFIUM_LOCK
+    with PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(pdf_bytes)
+        try:
+            n_pages = len(doc)
+        finally:
+            doc.close()
+    counts = layer_char_counts(_iter_pages(pdf_bytes, None))
+    pages = [p for p in range(1, n_pages + 1) if counts.get(p, 0) < OCR_TABLE_MIN_LAYER_CHARS][:OCR_TABLE_MAX_PAGES]
+    out["_meta"]["ocr_pages"] = pages
+    best: list[dict] = []
+    for p in pages:
+        Wd, Hd, words = ocr_page(pdf_bytes, p)
+        # horizontal words only — and any single character: a lone digit is taller than wide, so OCR may call it
+        # vertical (j3: row „3"), but one glyph has no reading direction
+        flat = [{"text": _lt_ocr_word(w.text), "x0": w.x0, "x1": w.x1, "top": w.y0, "bottom": w.y1, "conf": w.conf}
+                for w in words if str(w.text).strip() and (w.angle % 360 == 0 or len(str(w.text).strip()) == 1)]
+        if not any(m in _fold_header(w["text"]) for w in flat for m in UNIT_HEADING_MARKERS):
+            continue
+        blocks = _unit_tables_from_words(flat, p, ocr=True)
+        for b in blocks:
+            if len(b["rooms"]) > len(best):
+                best = [{**r, "_page_size": (Wd, Hd)} for r in b["rooms"]]
+                best_block = b
+    if len(best) < MIN_ROOMS_THRESHOLD:
+        return
+    rooms = []
+    for i, r in enumerate(best):
+        Wd, Hd = r["_page_size"]
+        rooms.append({"nr": r["nr"], "pavadinimas": r["pavadinimas"], "plotas_m2": r["plotas_m2"],
+                      "plotas_m2_raw": r["plotas_m2_raw"], "row_idx": i, "page": best_block["page"],
+                      "_row_source": "ocr_table", "plotas_source": "eksplikacija", "_is_vaizdo": True,
+                      "eksplikacija_row_bbox": [round(v, 2) for v in r["bbox"]],
+                      "eksplikacija_page_width_pdf": round(Wd, 2), "eksplikacija_page_height_pdf": round(Hd, 2)})
+    out["patalpos"] = rooms
+    out["eksplikacija_source_page"] = best_block["page"]
+    out["_meta"]["source"] = "ocr_table"
+    out["_meta"]["ocr_table"] = {"page": best_block["page"], "rooms": len(rooms),
+                                 "pastaba": "lentelė perskaityta iš lapo vaizdo — patikrinkite plotus"}
+    if best_block.get("total") is not None:
+        out["_meta"]["total_area_m2"] = best_block["total"]
+        out["_meta"]["total_row_label"] = best_block.get("total_label")
+        out["_meta"]["total_row_page"] = best_block["page"]
+        out["_meta"]["total_rows_sum_m2"] = round(sum(float(r["plotas_m2"]) for r in rooms), 2)
