@@ -3487,10 +3487,69 @@ def _gate_frameless(pozicijos: list[dict], parsed: dict) -> None:
                     "(Vidaus durys); kol nepasirinkote, kiekio neskaičiuoju.")
 
 
+_PLUMBING_SECTIONS = ("Santechnikos darbai", "Plytelių klijavimas", "GKP montavimas")
+_COUNT_FROM_ROOM_TYPE_LT = ("Kiek jų yra, santechnikos plane neperskaityta — pagal patalpų paskirtį būtų {n} vnt. "
+                            "Įrašykite kiekį pagal santechnikos planą.")
+_COUNT_FROM_GLYPHS_LT = ("Kiekis — iš plano ženklų, kurių brėžinio tekstas nepatvirtina. Suskaičiuokite įrankiu "
+                         "„Ženklai“ arba įrašykite kiekį pagal planą.")
+
+
+def _gate_defaults(pozicijos: list[dict], parsed: dict) -> None:
+    """The fact-defaults (a share, a count by room type, a count per shower) and Pass-1's glyph counts
+    become blank rows that say what to write (v4 3b). His own choices and the plumbing reader's counts
+    (a 3c reader) stay."""
+    overrides = parsed.get("_overrides") if isinstance(parsed.get("_overrides"), dict) else {}
+    plumbing = plumbing_reading(parsed) is not None
+    for p in pozicijos:
+        if not isinstance(p, dict) or p.get(_rp.KILME_KEY):
+            continue
+        k = p.get("kiekis")
+        if not isinstance(k, (int, float)) or isinstance(k, bool):
+            continue
+        label = str(p.get("aprasymas") or "")
+        sal = str(p.get("saltinis") or "")
+        sk = str(p.get("skyrius") or "")
+        if label.startswith("Sienų lyginimas Knauf Rotband"):
+            if p.get("_rotband_source") != "pasirinkimas":
+                _rp.blank(p, "Kokią sienų dalį lyginate Rotband (mūro ir betono sienos), brėžinys nenurodo — "
+                             "nustatykite Patikros žingsnyje, skiltyje „Ką skaičiuoti“; kol nenustatyta, "
+                             "kiekio neskaičiuoju.")
+            continue
+        if label.startswith("Didžiaformačių plytelių"):
+            if overrides.get("didzformat_share") is None:
+                _rp.blank(p, "Kiek plytelių didžiaformačių, brėžinys nurodo tik formatą, ne plotą — įrašykite "
+                             "didžiaformačių plytelių plotą.")
+            else:
+                _rp.tag(p, _rp.DERIVED)
+            continue
+        if label.startswith("Slenksniai"):
+            _rp.blank(p, "Kiek slenksčių, brėžinys nenurodo — įrašykite (paprastai po vieną durims tarp "
+                         "skirtingų grindų dangų).")
+            continue
+        if label.startswith("Lentynėlių iš plytelių"):
+            if overrides.get("lentyneliu_per_vonia") is not None and sal == "project_assumption":
+                _rp.tag(p, _rp.DERIVED)          # his number per shower × the showers the plan counts
+            else:
+                _rp.blank(p, "Kiek lentynėlių dušuose, brėžinys nenurodo — įrašykite kiekį pagal išklotines.")
+            continue
+        if label.startswith("Skylių gręžimas plytelėse") and sal != "simboliai_brezinyje":
+            _rp.blank(p, "Kiek skylių gręžti, santechnikos plane neperskaityta — įrašykite pagal prietaisų kiekį.")
+            continue
+        if sal == "paskirtis_default":
+            _rp.blank(p, _COUNT_FROM_ROOM_TYPE_LT.format(n=int(k) if float(k).is_integer() else k))
+            continue
+        if sal == "simboliai_brezinyje":
+            if plumbing and sk in _PLUMBING_SECTIONS:
+                _rp.tag(p, _rp.MODEL_3C)          # the plumbing reader's count — Phase 3c reduces it to text
+            else:
+                _rp.blank(p, _COUNT_FROM_GLYPHS_LT)
+
+
 def _apply_row_provenance(parsed: dict, pozicijos: list[dict], rooms: list[dict]) -> None:
     """Blank every row whose number has no legal source and stamp every row's `_kilme` (row_provenance)."""
     _gate_gkp_ceilings(pozicijos, rooms)
     _gate_frameless(pozicijos, parsed)
+    _gate_defaults(pozicijos, parsed)
     _rp.gate_room_inputs(pozicijos, rooms, parsed, rooms_for=lambda p: _rooms_behind(p, rooms))
     _rp.blank_followers(pozicijos, skip_prefixes=_NOT_A_FOLLOWER)
     _rp.stamp_remaining(pozicijos)
@@ -5005,7 +5064,14 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "vnt", "kiekis": pakabinami_n,
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
-    if led_juostu_m > 0:
+    if _led:
+        # v4 3b: the LED strip length the legend states (the same reading the LED niche rows take)
+        el_lines.append(_rp.tag({
+            "skyrius": SK_EL, "aprasymas": "LED juostos pajungimas",
+            "vnt": "m", "kiekis": _led["m"], "saltinis": "brezinio_legenda",
+            "_assumption": _led["sakinys"],
+        }, _rp.DRAWING))
+    elif led_juostu_m > 0:
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "LED juostos pajungimas",
             "vnt": "m", "kiekis": round(led_juostu_m, 2),
@@ -5042,6 +5108,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         difuzoriai_n = difuzoriai_vector_n
         difuzoriai_anchored = True
         difuzoriai_unanchored_n = 0
+    else:
+        # v4 3b (2026-10-25): Pass-1's count of the glyphs is a model reading — the checklist row below asks
+        difuzoriai_n = 0
 
     if difuzoriai_n > 0:
         # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
@@ -5051,11 +5120,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_EL, "aprasymas": "Difūzorių montavimas (vėdinimo taškai)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
             "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
+            _rp.KILME_KEY: _rp.DRAWING,
         })
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "Difūzorių apdirbimas (priglaistomas)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
             "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
+            _rp.KILME_KEY: _rp.DRAWING,
         })
     else:
         # HONESTY CHECKLIST (2026-07-25): the symbol reader persistently finds
