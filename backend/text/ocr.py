@@ -34,6 +34,7 @@ import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Protocol, Sequence
 
 log = logging.getLogger("samatu.text.ocr")
@@ -104,8 +105,53 @@ def ocr_enabled() -> bool:
 
 # ── engines ─────────────────────────────────────────────────────────────────
 
+MODEL_DIR_ENV = "SAMATU_OCR_MODEL_DIR"
+DEFAULT_MODEL_DIR = Path(__file__).resolve().parents[1] / "data" / "models" / "ocr"   # backend/data/models/ocr (gitignored)
+# The three models RapidEngine runs, as RapidOCR names them (its default_models.yaml routes them to one file each):
+# (task, OCR version, model size, language). `model_files()` turns them into file names, URLs and SHA-256 sums.
+RAPID_MODELS = (("det", "PP-OCRv6", "medium", "lt"), ("rec", "PP-OCRv6", "medium", "lt"),
+                ("cls", "PP-OCRv4", "mobile", "ch"))
+
+
+def model_dir() -> Path:
+    return Path(os.environ.get(MODEL_DIR_ENV) or DEFAULT_MODEL_DIR)
+
+
+def _production() -> bool:
+    """The same test main.py uses for its production hardening."""
+    return (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or "").strip().lower() in ("prod", "production")
+
+
+def model_files() -> dict[str, dict]:
+    """{task: {file, url, sha256}} of RAPID_MODELS — from RapidOCR's own model table, so the fetch script and the
+    engine can never disagree about which file a model is."""
+    from rapidocr.inference_engine.base import FileInfo, InferSession
+    from rapidocr.utils.typings import EngineType, ModelType, OCRVersion, TaskType
+    out = {}
+    for task, version, size, lang in RAPID_MODELS:
+        info = InferSession.get_model_url(FileInfo(EngineType("onnxruntime"), OCRVersion(version), TaskType(task),
+                                                   lang, ModelType(size)))
+        url = str(info["model_dir"])
+        out[task] = {"file": url.rsplit("/", 1)[-1], "url": url, "sha256": info.get("SHA256")}
+    return out
+
+
+def engine_version() -> str:
+    """What a cached OCR result depends on besides the sheet: the engine, its library version, the models."""
+    try:
+        from importlib.metadata import version
+        lib = version("rapidocr")
+    except Exception:  # noqa: BLE001
+        lib = "?"
+    return f"rapid-{lib}-" + "-".join(f"{v}{s}" for _t, v, s, _l in RAPID_MODELS)
+
+
 class RapidEngine:
-    """RapidOCR (onnxruntime) with PP-OCRv6 medium: the detector, and the recogniser for Lithuanian (`lt`)."""
+    """RapidOCR (onnxruntime) with PP-OCRv6 medium: the detector, and the recogniser for Lithuanian (`lt`).
+
+    Models: from `model_dir()` (`scripts/fetch_ocr_models.py` puts them there at image build). When a file is
+    missing, production refuses (OcrUnavailable — never a download while a person waits); elsewhere RapidOCR
+    downloads it into that same directory (SHA-256 checked) on first use."""
     name = "rapid"
 
     def __init__(self) -> None:
@@ -114,13 +160,25 @@ class RapidEngine:
         except ImportError as e:  # pragma: no cover — depends on the machine
             raise OcrUnavailable("rapidocr is not installed") from e
         v6, medium = OCRVersion("PP-OCRv6"), ModelType("medium")
-        self._eng = RapidOCR(params={
+        params = {
             "Rec.lang_type": "lt", "Rec.ocr_version": v6, "Rec.model_type": medium,
             "Det.ocr_version": v6, "Det.model_type": medium, "Global.log_level": "error",
             # RapidOCR shrinks any image to 2000 px on its long side before detecting: a 300 DPI A3 sheet becomes
             # ~100 DPI and 2 mm dimension digits vanish. A drawing is read at the resolution it was rendered at.
             "Global.max_side_len": MAX_SIDE_PX,
-        })
+        }
+        d = model_dir()
+        files = model_files()
+        missing = [f["file"] for f in files.values() if not (d / f["file"]).is_file()]
+        if not missing:
+            params.update({f"{t.capitalize()}.model_path": str(d / f["file"]) for t, f in files.items()})
+        elif _production():
+            raise OcrUnavailable(f"OCR models missing in {d}: {', '.join(missing)} — run scripts/fetch_ocr_models.py "
+                                 f"at image build")
+        else:
+            d.mkdir(parents=True, exist_ok=True)
+            params["Global.model_root_dir"] = str(d)
+        self._eng = RapidOCR(params=params)
         self._lock = threading.Lock()
 
     def read(self, rgb) -> list[Line]:
@@ -341,7 +399,53 @@ def ocr_words(image, engine: Engine | None = None, pt_per_px: float | tuple[floa
             continue
         kept.append(wd)
     kept.sort(key=lambda wd: (wd.y0, wd.x0))
-    return kept
+    return [_tighten(wd, rgb, sx, sy) for wd in kept]
+
+
+# PP-OCR pads every detected box (its unclip ratio): measured 2026-10-24 on the renders of objektas_c, j3, j4, the ink
+# inside an OCR word box is only 0,59–0,66 of its height (median), ~1,9 pt of padding above and 1,2–1,7 pt below.
+# Every text-layer rule downstream is tuned in points on tight glyph boxes — a badge's height, „another number
+# touching it" within 1,2 heights, table rows 14 pt apart — so a padded box makes a badge look taller and its
+# neighbours nearer (j3: room 6's badge read as touching the dimension „4250" 9,9 pt away). Each word is therefore
+# cut to the ink it covers on the render. Rows (columns, for a vertical word) inked across ≥ LINE_SHARE of the box
+# are a line running through the padding — a dimension line under the digits — and are not the word's ink.
+LINE_SHARE = 0.85
+MIN_TIGHT_SHARE = 0.25      # a cut leaving less than this of the box is noise, not the word: keep the box as read
+
+
+def _tighten(wd: Word, rgb, sx: float, sy: float) -> Word:
+    import numpy as np
+    H, W = rgb.shape[:2]
+    x0, y0 = max(0, int(wd.x0 / sx)), max(0, int(wd.y0 / sy))
+    x1, y1 = min(W, int(np.ceil(wd.x1 / sx))), min(H, int(np.ceil(wd.y1 / sy)))
+    if x1 - x0 < 2 or y1 - y0 < 2:
+        return wd
+    box = rgb[y0:y1, x0:x1]
+    ink = (box.min(axis=2) if box.ndim == 3 else box) < 150
+    if not ink.any():
+        return wd
+    full = (rgb.min(axis=2) if rgb.ndim == 3 else rgb) < 150
+    ink = ink.copy()
+    # a row (column) inked across the box that ALSO continues outside it on both sides is a line passing through
+    # the padding — a dimension line under the digits, a wall face — not the word; a digit's own stroke ends in it
+    for y in np.where(ink.mean(axis=1) >= LINE_SHARE)[0]:
+        if x0 > 0 and x1 < W and full[y0 + y, x0 - 1] and full[y0 + y, x1]:
+            ink[y, :] = False
+    for x in np.where(ink.mean(axis=0) >= LINE_SHARE)[0]:
+        if y0 > 0 and y1 < H and full[y0 - 1, x0 + x] and full[y1, x0 + x]:
+            ink[:, x] = False
+    if not ink.any():
+        return wd
+    rows, cols = ink.mean(axis=1), ink.mean(axis=0)
+    r = np.where(rows > 0)[0]
+    c = np.where(cols > 0)[0]
+    if len(r) < 2 or len(c) < 2:
+        return wd
+    t, b, l, rr = int(r[0]), int(r[-1]) + 1, int(c[0]), int(c[-1]) + 1
+    if (b - t) < MIN_TIGHT_SHARE * (y1 - y0) or (rr - l) < MIN_TIGHT_SHARE * (x1 - x0):
+        return wd
+    return Word(text=wd.text, x0=(x0 + l) * sx, y0=(y0 + t) * sy, x1=(x0 + rr) * sx, y1=(y0 + b) * sy,
+                conf=wd.conf, angle=wd.angle)
 
 
 # ── a PDF sheet ─────────────────────────────────────────────────────────────
@@ -370,20 +474,83 @@ def render_page(pdf_bytes: bytes, page: int, dpi: int):
     return img, Wd, Hd
 
 
+# ── the disk cache: a sheet is OCR'd once, not on every click ──────────────
+# One JSON file per (PDF content hash, page, DPI, engine + library + model versions, rotations) under
+# `cache_dir()` (backend/data/ocr_cache, gitignored; SAMATU_OCR_CACHE_DIR overrides). The content hash IS the
+# project's drawing: a re-upload of the same PDF reuses it, a changed PDF never does. 10–30 s of OCR per sheet
+# becomes a ~5 ms read. Only the built-in engines are cached on disk (a test's fake engine stays in memory).
+CACHE_DIR_ENV = "SAMATU_OCR_CACHE_DIR"
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "ocr_cache"
+CACHE_FORMAT = 3          # 2: word boxes cut to their ink (_tighten); 3: only lines that run on outside the box are not ink
+
+
+def cache_dir() -> Path:
+    return Path(os.environ.get(CACHE_DIR_ENV) or DEFAULT_CACHE_DIR)
+
+
+def _engine_tag(eng) -> str | None:
+    """The engine's part of the disk key, or None when the engine is not a built-in one (no disk cache)."""
+    if type(eng) is RapidEngine:
+        return engine_version()
+    if type(eng) in (PaddleEngine, TesseractEngine):
+        return eng.name
+    return None
+
+
+def _disk_path(digest: str, page: int, dpi: int, tag: str, rot: tuple) -> Path:
+    name = hashlib.sha1(f"{CACHE_FORMAT}|{digest}|{page}|{dpi}|{tag}|{rot}".encode()).hexdigest()
+    return cache_dir() / digest[:2] / f"{digest[:16]}-p{page}-{name[:12]}.json"
+
+
+def _disk_read(path: Path) -> tuple[float, float, list[Word]] | None:
+    import json
+    try:
+        rec = json.loads(path.read_text(encoding="utf-8"))
+        return float(rec["Wd"]), float(rec["Hd"]), [Word(**w) for w in rec["words"]]
+    except FileNotFoundError:
+        return None
+    except Exception:  # noqa: BLE001 — a torn or old file is a miss, never a failure
+        log.warning("OCR cache unreadable: %s", path)
+        return None
+
+
+def _disk_write(path: Path, out: tuple[float, float, list[Word]], meta: dict) -> None:
+    import json
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+        tmp.write_text(json.dumps({**meta, "Wd": out[0], "Hd": out[1],
+                                   "words": [w.__dict__ for w in out[2]]}, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:  # noqa: BLE001 — a read-only disk only costs the next call its OCR
+        log.warning("OCR cache not written: %s", path, exc_info=True)
+
+
 def ocr_page(pdf_bytes: bytes, page: int, dpi: int | None = None, engine: Engine | None = None,
              rotations: Iterable[int] = ROTATIONS) -> tuple[float, float, list[Word]]:
-    """(Wd, Hd, words) of a sheet, display frame, PDF points. Cached per (file, page, dpi, engine, rotations)."""
+    """(Wd, Hd, words) of a sheet, display frame, PDF points. Cached per (file, page, dpi, engine, rotations):
+    in memory, and on disk for the built-in engines (above)."""
     dpi = int(dpi or ocr_dpi())
     eng = engine or get_engine()
     rot = tuple(int(r) % 360 for r in rotations)
-    key = (hashlib.sha1(pdf_bytes).hexdigest(), int(page), dpi, getattr(eng, "name", type(eng).__name__), rot)
+    digest = hashlib.sha1(pdf_bytes).hexdigest()
+    key = (digest, int(page), dpi, getattr(eng, "name", type(eng).__name__), rot)
     with _cache_lock:
         if key in _cache:
             _cache.move_to_end(key)
             return _cache[key]
-    img, Wd, Hd = render_page(pdf_bytes, page, dpi)
-    words = ocr_words(img, eng, (Wd / img.width, Hd / img.height), rot)
-    out = (Wd, Hd, words)
+    tag = _engine_tag(eng)
+    path = _disk_path(digest, int(page), dpi, tag, rot) if tag else None
+    out = _disk_read(path) if path else None
+    if out is None:
+        import time
+        t0 = time.time()
+        img, Wd, Hd = render_page(pdf_bytes, page, dpi)
+        words = ocr_words(img, eng, (Wd / img.width, Hd / img.height), rot)
+        out = (Wd, Hd, words)
+        if path:
+            _disk_write(path, out, {"format": CACHE_FORMAT, "engine": tag, "dpi": dpi, "page": int(page),
+                                    "rotations": list(rot), "seconds": round(time.time() - t0, 2)})
     with _cache_lock:
         _cache[key] = out
         while len(_cache) > CACHE_PAGES:
@@ -430,25 +597,50 @@ def ocr_page_items(pdf_bytes: bytes, page: int, dpi: int | None = None, engine: 
 
 
 def dimension_strings(pdf_bytes: bytes, page: int, dpi: int | None = None,
-                      engine: Engine | None = None) -> tuple[list[dict], set[int]]:
+                      engine: Engine | None = None, units: str = "mm") -> tuple[list[dict], set[int]]:
     """(dimension strings, written scales) OCR finds on a sheet — the line reader's own parsing
     (`plan_dimensions._dimensions_on_page`, `stated_scales_on_page`) over OCR characters. Each string is marked
-    `source: "ocr"` with the word's confidence; none has a hairline (`span_source`), so it can only take part
-    in the wall match (scale source 3)."""
+    `source: "ocr"` with the word's confidence; none has a hairline (`span_source`). `units="cm"`: integers read as
+    centimetres (geometry/scale.py decides which reading the sheet measures). A string starting with 0 is dropped
+    in both readings: a dimension never does, and the engine's systematic error — a short string printed upside
+    down read without the flip („80" → „08", „690" → „069") — always does (research doc 2026-10-24-text-ocr §1)."""
     from extractor.plan_dimensions import _dimensions_on_page, stated_scales_on_page
     Wd, Hd, words = ocr_page(pdf_bytes, page, dpi, engine)
     dims: list[dict] = []
     stated: set[int] = set()
     for pn, W_, H_, chars, to_display in page_items(words, page, Wd, Hd):
         stated |= stated_scales_on_page(chars)
-        for d in _dimensions_on_page(pn, W_, H_, chars, to_display):
+        for d in _dimensions_on_page(pn, W_, H_, chars, to_display, units=units):
+            if str(d["text"]).startswith("0"):
+                continue
             x0, y0, x1, y1 = d["bbox"]
             box = Word(d["text"], x0, y0, x1, y1, 0.0, 0)
             confs = [w.conf for w in words if _overlap_share(box, w) >= SAME_WORD_SHARE]
             d["source"] = "ocr"
             d["ocr_conf"] = min(confs) if confs else None
+            if units != "mm":
+                d["units"] = units
             dims.append(d)
     return dims, stated
+
+
+def detail_scales(pdf_bytes: bytes, page: int, dpi: int | None = None, engine: Engine | None = None) -> set[int]:
+    """Detail scales („M 1:5", „1:10") the sheet writes — below the plan range `stated_scales_on_page` keeps. A sheet
+    that writes one is never read as centimetres: its millimetres at 1:10 look exactly like centimetres at 1:100."""
+    import re
+
+    from extractor.plan_area_annotations import _line_text, _lines
+    from extractor.plan_dimensions import _STANDARD_SCALES, MIN_SCALE_DENOM
+    small = re.compile(r"(?<![\d.,:/])1\s*:\s*(\d{1,2})(?![\d.,:])")
+    Wd, Hd, words = ocr_page(pdf_bytes, page, dpi, engine)
+    out: set[int] = set()
+    for _pn, _W, _H, chars, _ in page_items(words, page, Wd, Hd):
+        for line in _lines(chars):
+            for m in small.finditer(_line_text(line)):
+                n = int(m.group(1))
+                if n in _STANDARD_SCALES and n < MIN_SCALE_DENOM:
+                    out.add(n)
+    return out
 
 
 def words_record(words: Sequence[Word]) -> list[dict]:

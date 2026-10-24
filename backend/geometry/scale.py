@@ -37,7 +37,7 @@ import bisect
 import logging
 import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Iterable, Sequence
 
 from .provenance import HIGH, LOW, MEDIUM, PT_M, Scale, ScaleSource, blank
@@ -104,6 +104,7 @@ class ScaleContext:
     _strokes: dict[int, list] = field(default_factory=dict)
     _sigs: dict[int, object] = field(default_factory=dict)
     _ocr: dict[int, bool] = field(default_factory=dict)        # v4 ocr hook: page → OCR added strings / a scale
+    _ocr_scale: dict[int, Scale] = field(default_factory=dict)  # v4 ocr wiring: page → scale its OCR'd strings measure on their lines
 
     def strings(self) -> list[dict]:
         if self.dims is None:
@@ -147,6 +148,13 @@ class ScaleContext:
         if dims:
             self.dims = [d for d in self.strings() if int(d.get("page") or 0) != page] + dims
         self._stated.setdefault(page, set()).update(stated)
+        try:                                                        # v4 ocr wiring: the OCR'd strings on their lines
+            sc = _ocr_line_match(self, page, dims, stated)
+        except Exception:  # noqa: BLE001 — never at the cost of what OCR already gave
+            log.exception("OCR line match failed on page %s", page)
+            sc = None
+        if sc is not None:
+            self._ocr_scale[page] = sc
         self._ocr[page] = bool(dims or stated)
         return self._ocr[page]
 
@@ -223,6 +231,161 @@ def _lines(ctx: ScaleContext, page: int) -> Scale | None:
                      f"bet matmenys atitinka {_ratio(other.get('ismatuota') or s / PT_M)} — lapas tikriausiai spausdintas kitu dydžiu.")
         sc.details["stated_other"] = other
     return sc
+
+
+# ── 2b. OCR'd strings on their lines (v4 ocr wiring, SAMATU_OCR) ────────────
+# A sheet with no text layer (objektas_c: strings drawn as outlines; j4: all text as outlines; j3: a scan) gets its
+# strings from OCR (`_ocr_fill`). They have no hairline from plan_dimensions — that reader needs a text-layer string
+# to look under — so here each OCR'd string is matched to the lines it could be written on: the vector hairlines
+# PDFium finds (`plan_dimensions._page_lines_pdfium`) and the lines read off the RENDER under each string
+# (`text.raster_lines`; the only lines a scan has). Every (string, line) pair proposes value / length, and the scale
+# is the densest proposal by the source-3 rules (WALL_MIN_AGREE different strings, WALL_MIN_VALUES values, twice any
+# rival; a scale no drawing is made at needs twice that) — `plan_dimensions`' own 40 %-of-the-strings rule cannot be
+# used, because OCR also returns every room number, height and furniture size as a „string".
+# Readings: millimetres first; centimetres only when the millimetre reading is no plan's scale at all (j4: 1:8,5 as
+# mm → 1:87 as cm) and the sheet writes no detail scale (a 1:10 detail in mm looks exactly like 1:100 in cm).
+# A written scale (OCR'd „M 1:50") that the measurement contradicts by more than STATED_MISMATCH is MARKED and the
+# measurement wins — c writes 1:50 and measures ≈ 1:60 (a reduced print); j3, a scan of a reduced print, writes 1:40
+# and measures ≈ 1:64. When a written scale is contradicted, a measurement that is the densest but short of twice its
+# rival is still taken (LOW): j3's numbers are the contractor's tape readings, which scatter by a few per cent.
+OCR_LINES_NOTE = "skaičiai perskaityti iš lapo vaizdo"
+OCR_CM_NOTE = "matmenys centimetrais"
+STATED_MISMATCH = 0.05      # a written scale further than this from the measured one is contradicted
+OCR_LINE_SNAP_PT = 0.5      # a string's candidate lines this close in length are one line (vector + raster twins)
+
+
+def _ocr_props(dims: Sequence[dict], lines: dict) -> list[tuple[float, int]]:
+    from extractor.plan_dimensions import _line_candidates
+    props: list[tuple[float, int]] = []
+    for i, d in enumerate(dims):
+        try:
+            lengths = sorted({round(float(L) / OCR_LINE_SNAP_PT) * OCR_LINE_SNAP_PT
+                              for *_, L in _line_candidates(d, lines)})
+            v = float(d["value_m"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        props += [(v / L, i) for L in lengths if L > 0]
+    return props
+
+
+def _ocr_candidates(dims: Sequence[dict], line_sets: Sequence[tuple[str, dict]]) -> list[dict]:
+    """The densest proposal per line source: {scale, support, rival, values, lines, idx, props}."""
+    out = []
+    for src, lines in line_sets:
+        props = _ocr_props(dims, lines)
+        pk = _peak(props)
+        if pk is None:
+            continue
+        sc_, support, rival, idx = pk
+        out.append({"scale": sc_, "support": support, "rival": rival, "lines": src, "idx": idx, "props": props,
+                    "values": len({float(dims[i]["value_m"]) for i in idx}), "in_range": _in_plan_range(sc_)})
+    return out
+
+
+def _ocr_strong(c: dict) -> bool:
+    if not c["in_range"] or c["support"] < WALL_MIN_AGREE or c["values"] < WALL_MIN_VALUES:
+        return False
+    if c["support"] < WALL_PEAK_RATIO * c["rival"]:
+        return False
+    n = c["scale"] / PT_M
+    if not any(abs(n - st) / st <= STATED_SNAP for st in STANDARD) and (
+            c["support"] < 2 * WALL_MIN_AGREE or c["support"] < 1.5 * WALL_PEAK_RATIO * c["rival"]):
+        return False        # a scale no drawing is made at (a reduced print) needs twice the evidence (source 3's rule)
+    return True
+
+
+def _ocr_contradicts(c: dict, stated: Sequence[int]) -> bool:
+    """Rule for a written scale the strings contradict: the measurement is the densest proposal (more strings than
+    any rival), WALL_MIN_AGREE strings with WALL_MIN_VALUES values, more than STATED_MISMATCH from the written
+    scale, and at least twice as many strings as propose the written one."""
+    if len(stated) != 1 or not c["in_range"] or c["support"] < WALL_MIN_AGREE or c["values"] < WALL_MIN_VALUES:
+        return False
+    if c["support"] <= c["rival"]:
+        return False
+    w = stated[0]
+    if abs(c["scale"] / PT_M / w - 1) <= STATED_MISMATCH:
+        return False
+    lw = math.log(w * PT_M)
+    backing = {i for s, i in c["props"] if abs(math.log(s) - lw) <= math.log(1 + WALL_TOL)}
+    return c["support"] >= WALL_PEAK_RATIO * len(backing)
+
+
+def _ocr_scale(c: dict, dims: Sequence[dict], units: str, stated: Sequence[int], weak: bool) -> Scale:
+    n = c["scale"] / PT_M
+    m_per_pt = c["scale"]
+    sample = ", ".join(sorted({str(dims[i]["text"]) for i in c["idx"]})[:6])
+    text = f"{c['support']} matmenų eilutės ant matmenų linijų ({sample}); {OCR_LINES_NOTE}"
+    if units == "cm":
+        text += f"; {OCR_CM_NOTE}"
+    details = {"ocr": True, "units": units, "lines": c["lines"], "agree": c["support"], "rival": c["rival"],
+               "values": c["values"], "strings": len(dims)}
+    reason = None
+    if stated:
+        near = min(stated, key=lambda s: abs(n - s) / s)
+        details["stated"] = list(stated)
+        dev = n / near - 1
+        if abs(dev) <= STATED_SNAP:
+            m_per_pt = near * PT_M
+            text += f"; sutampa su užrašytu M {_ratio(near)}"
+        elif abs(dev) > STATED_MISMATCH:
+            text += f"; užrašytas mastelis neatitinka matmenų (≈ {_ratio(n)})"
+            reason = (f"Lape užrašytas M {_ratio(near)}, bet matmenys atitinka ≈ {_ratio(n)} — lapas tikriausiai "
+                      f"spausdintas kitu dydžiu. Patikrinkite mastelį, nubrėžę liniją ant žinomo matmens.")
+        else:
+            reason = (f"Lape užrašytas M {_ratio(near)}, matmenys atitinka {_ratio(n)} — patikrinkite mastelį, "
+                      f"nubrėžę liniją ant žinomo matmens.")
+    if weak and reason is None:
+        reason = "Matmenys tarpusavyje sutampa tik apytiksliai — patikrinkite mastelį, nubrėžę liniją ant žinomo matmens."
+    sc = Scale(m_per_pt=m_per_pt, source=ScaleSource.DIMENSION_LINES, source_text=text,
+               confidence=LOW if weak else MEDIUM, details=details)
+    sc.reason = reason
+    return sc
+
+
+def _ocr_line_match(ctx: "ScaleContext", page: int, dims_mm: Sequence[dict], stated: Iterable[int]) -> Scale | None:
+    """The scale a sheet's OCR'd strings measure on their lines (section doc above), or None."""
+    from extractor.plan_dimensions import _page_lines_pdfium
+    from text.ocr import detail_scales, dimension_strings
+    from text.raster_lines import sheet_dimension_lines
+    stated = sorted(set(stated))
+    dims_cm, _ = dimension_strings(ctx.pdf_bytes, page, units="cm")
+    if len(dims_mm) + len(dims_cm) < WALL_MIN_AGREE:
+        return None
+    try:
+        vector = _page_lines_pdfium(ctx.pdf_bytes, {page}).get(page) or {"h": [], "v": []}
+    except Exception:  # noqa: BLE001 — a raster sheet has no vector lines
+        vector = {"h": [], "v": []}
+    raster = sheet_dimension_lines(ctx.pdf_bytes, page, list(dims_mm) + list(dims_cm))
+    line_sets = [("raster", raster), ("vector", vector),
+                 ("union", {"h": raster["h"] + vector["h"], "v": raster["v"] + vector["v"]})]
+
+    def best(cands: list[dict], ok) -> dict | None:
+        good = [c for c in cands if ok(c)]
+        return max(good, key=lambda c: (c["support"], -c["rival"])) if good else None
+
+    mm = _ocr_candidates(dims_mm, line_sets)
+    c = best(mm, _ocr_strong)
+    if c is not None:
+        return _ocr_scale(c, dims_mm, "mm", stated, weak=False)
+    c = best(mm, lambda c: _ocr_contradicts(c, stated))
+    if c is not None:
+        return _ocr_scale(c, dims_mm, "mm", stated, weak=True)
+    # centimetres: only when the millimetre reading is no plan's scale at all, and no detail scale is written
+    if any(c["in_range"] and c["support"] >= WALL_MIN_AGREE for c in mm):
+        return None
+    cm = _ocr_candidates(dims_cm, line_sets)
+    c, weak = best(cm, _ocr_strong), False
+    if c is None:
+        c, weak = best(cm, lambda c: _ocr_contradicts(c, stated)), True
+    if c is None or detail_scales(ctx.pdf_bytes, page):
+        return None
+    return _ocr_scale(c, dims_cm, "cm", stated, weak=weak)
+
+
+def _ocr_lines(ctx: ScaleContext, page: int) -> Scale | None:
+    ctx.strings_on(page)                   # OCRs the sheet when it qualifies (flag on; `_ocr_fill`)
+    sc = ctx._ocr_scale.get(int(page))
+    return replace(sc, details=dict(sc.details)) if sc else None
 
 
 # ── 3. strings matched to the wall faces they measure ───────────────────────
@@ -564,7 +727,7 @@ def measured_scale(ctx: ScaleContext, page: int) -> Scale | None:
     """Sources 1–3 only: a scale this sheet's own content measures (or a person set)."""
     page = int(page)
     if page not in ctx._measured:
-        sc = _user(ctx, page) or _lines(ctx, page) or _walls(ctx, page)
+        sc = _user(ctx, page) or _lines(ctx, page) or _ocr_lines(ctx, page) or _walls(ctx, page)
         ctx._measured[page] = sc if sc else blank("")
     sc = ctx._measured[page]
     return sc if sc.found else None

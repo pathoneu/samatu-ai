@@ -21,6 +21,8 @@ detector_bench
 backend/data/samatu.db
 backend/data/pdf_store
 backend/data/cv_cache
+backend/data/models
+backend/data/ocr_cache
 backend/data/annotations
 backend/data/calibrations
 backend/data/demo-objektas-a-snapshot-20260714.json

@@ -42,6 +42,11 @@ COPY scripts/report_orphaned_files.py scripts/report_orphaned_files.py
 # Read-only report of which nightly DB backups a given retention would delete —
 # here so it also works on a deployment whose backups are on its local disk.
 COPY scripts/report_backup_retention.py scripts/report_backup_retention.py
+# OCR models (2026-10-24, backend/text/ocr.py, flag SAMATU_OCR default OFF): baked into the image so production
+# never downloads a model while a person waits (ocr.py refuses to in production). ~140 MB, SHA-256 checked.
+# --soft: if the model host is down the build still succeeds and OCR stays unavailable (logged on first use).
+COPY scripts/fetch_ocr_models.py scripts/fetch_ocr_models.py
+RUN python scripts/fetch_ocr_models.py --soft
 
 WORKDIR /app/backend
 
