@@ -234,7 +234,7 @@ def test_hook_gives_a_sheet_without_a_text_layer_a_scale_from_ocr_strings(monkey
     monkeypatch.setattr(ocr, "dimension_strings", lambda pdf, page, *a, **k: calls.append(page) or (
         [dict(d) for d in dims if d["page"] == page], set()))
     sc = scale_for_page(ScaleContext(blank_pdf), 1)
-    assert calls == [1]
+    assert set(calls) == {1}          # the millimetre and the centimetre reading of page 1
     assert sc.source == ScaleSource.DIMENSION_WALLS
     assert sc.m_per_pt / PT_M == pytest.approx(50, rel=0.01)
     assert OCR_NOTE in sc.source_text and sc.details.get("ocr") is True
@@ -300,7 +300,7 @@ def test_hook_replaces_a_few_layer_strings_with_the_ocr_read(monkeypatch):
         [dict(d) for d in dims if d["page"] == page], set()))
     ctx = ScaleContext(few)
     sc = scale_for_page(ctx, 1)
-    assert calls == [1]
+    assert set(calls) == {1}
     assert ctx.strings_on(1) and all(d.get("source") == "ocr" for d in ctx.strings_on(1))
     assert sc.source == ScaleSource.DIMENSION_WALLS and sc.m_per_pt / PT_M == pytest.approx(50, rel=0.01)
 
