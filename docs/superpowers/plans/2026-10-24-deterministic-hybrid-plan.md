@@ -3,6 +3,8 @@
 **Date:** 2026-10-24 · **Author:** manager (Fable 5.1) · **Status:** DRAFT for the founder's approval, nothing started
 **Branch:** work continues on `togal-v2`; `main` untouched; nothing pushed without the founder's OK.
 
+> **Phase 0 (c) result, 2026-10-24 (merge 8430bb0c):** gate G0 **FAILS on raster** — SAM 2.1 (b and l, local, MPS) from an honest click lands within 2 % of the table on 0/11 rooms (median error 94 %; whole-sheet masks, label glyphs, leaks through doors), with wall negatives 0/11, with a box 1/11; the **vector clause PASSES** (vector lane 3,8 % median on objektas_h and g, SAM ≥ 13 % at best). SAM 2 is therefore **not** the room source in §3.1; the raster path is decided by the founder after the deterministic raster spike (wall mask + door-gap bridging) — see `docs/superpowers/research/2026-10-24-sam2-room-mask-spike.md`. The objektas_a vector outlines run 7–23 % under the table (scale or table convention — under investigation in Phase 0 (a)).
+
 ## 0. Verdict in one paragraph
 
 For six months contractors have rejected the output. The founder's diagnosis: numbers were
