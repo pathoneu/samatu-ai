@@ -322,16 +322,23 @@ def narrow(project: dict, result: dict, pages, features: set[str]) -> tuple[dict
     geo = ((result.get("_meta") or {}).get("geometrija") or {}) if isinstance(result.get("_meta"), dict) else {}
     scope_pages = _plan_pages(pages, geo.get("grupes"))
     before = {_nr(r): r for r in (project.get("patalpos") or []) if isinstance(r, dict) and _nr(r)}
+    # rooms the read re-keyed to the drawing's numbers (free_reread.renumber_rooms): found under their stored key
+    renum = result.get("_perkeisti_numeriai") if isinstance(result.get("_perkeisti_numeriai"), dict) else {}
+    stored_key = {str(new): str(old) for old, new in renum.items()}
     rooms, in_scope, left_out = [], [], 0
     for r in result.get("patalpos") or []:
         if not isinstance(r, dict):
             rooms.append(r)
             continue
-        old = before.get(_nr(r))
+        old = before.get(_nr(r)) or before.get(stored_key.get(_nr(r), ""))
         page = _room_page(r)
         inside = scope_pages is None or (page is not None and page in scope_pages)
         if not inside and old is not None:
-            rooms.append(copy.deepcopy(old))
+            kept = copy.deepcopy(old)
+            for k in ("nr", "_vienetas", "_nr_brezinyje", "_modelio_nr"):     # the identity is the drawing's
+                if k in r:
+                    kept[k] = r[k]
+            rooms.append(kept)
             left_out += 1
             continue
         room = copy.deepcopy(r)
