@@ -803,10 +803,32 @@ def test_pozicijos_p7_legacy_skyrius_migration():
     assert "Pridėtiniai elementai" in skyrius_set
 
 
-def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
-    """P6: 4 hidroizoliacijos eilučių stack collapsed to 1 line per LT
-    contractor convention (Rangovas style: '1 vnt = vonia komplektas')."""
+def test_pozicijos_hidroizoliacija_two_rows_by_default():
+    """Founder decision 2026-10-24 (profile `hidro_rows = "two"`): „Grindų hidroizoliacija" m² = the wet
+    rooms' net floor, „Hidroizoliacinė juosta kampams" m = their gross perimeter."""
     parsed = {
+        "patalpos": [
+            {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
+            {"nr": "W1", "pavadinimas": "WC", "paskirtis": "wc",
+             "plotas_m2": 2.0, "perimetras_m": 5.5, "lubu_aukstis_m": 2.65,
+             "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
+        ],
+    }
+    out = _run_full_pipeline(parsed)
+    lines = {p["aprasymas"]: p for p in out["pozicijos"] if p["skyrius"] == "Hidroizoliacija"}
+    assert set(lines) == {"Grindų hidroizoliacija", "Hidroizoliacinė juosta kampams"}
+    assert lines["Grindų hidroizoliacija"]["vnt"] == "m2" and lines["Grindų hidroizoliacija"]["kiekis"] == 8.5
+    assert lines["Hidroizoliacinė juosta kampams"]["vnt"] == "m"
+    assert lines["Hidroizoliacinė juosta kampams"]["kiekis"] == 16.0
+
+
+def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
+    """P6 (profile option `hidro_rows = "one"`): 4 hidroizoliacijos eilučių stack collapsed to 1 line per
+    LT contractor convention (Rangovas style: '1 vnt = vonia komplektas')."""
+    parsed = {
+        "_overrides": {"profilis": {"hidro_rows": "one"}},
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
              "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
