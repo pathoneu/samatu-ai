@@ -87,6 +87,17 @@ def lt_aperture_1m2(monkeypatch):
     monkeypatch.setitem(conventions.LT_RANGOVAS, "aperture_no_deduct_max_m2", dataclasses.replace(p, default=1.0))
 
 
+@pytest.fixture(scope="module")
+def lt_aperture_1m2_module():
+    """`lt_aperture_1m2` for a module whose module-scoped fixtures compute the rooms once."""
+    import dataclasses
+    from rules import conventions
+    p = conventions.LT_RANGOVAS["aperture_no_deduct_max_m2"]
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setitem(conventions.LT_RANGOVAS, "aperture_no_deduct_max_m2", dataclasses.replace(p, default=1.0))
+        yield
+
+
 def pytest_configure(config):
     """Register custom marks so pytest doesn't warn on first use.
     `integration` marks real-PDF / real-API tests. Nothing deselects it: CI

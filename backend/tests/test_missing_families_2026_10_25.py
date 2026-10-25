@@ -183,3 +183,14 @@ def test_every_family_row_carries_a_legal_kilme():
     new = [r for r in out if r not in rows]
     assert new and all(r.get("_kilme") in ("drawing", "derived", "blank") for r in new)
     assert all(r.get("kiekis") is None for r in new if r["_kilme"] == "blank")
+
+
+def test_the_painted_reveals_ledger_still_ends_at_its_quantity():
+    from extractor.ledger import replay
+    rows = [{"skyrius": "Sienų glaistymas dažymas", "aprasymas": R.PAINT_REVEALS_LABEL, "vnt": "m", "kiekis": 20.0,
+             "contributions": [{"room_nr": "08", "value": 8.0, "included_because": "x"},
+                               {"room_nr": "01", "value": 12.0, "included_because": "x"}],
+             "roll_up": [{"op": "sum", "label": "Σ 2 patalpų", "value": 20.0}]}]
+    paint = R.tile_reveal_rows(rows, [_bath()])[0]
+    assert paint["kiekis"] == pytest.approx(17.0)
+    assert replay(paint["contributions"], paint["roll_up"]) == pytest.approx(17.0)

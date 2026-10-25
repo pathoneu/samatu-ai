@@ -562,12 +562,48 @@ def tile_reveal_rows(rows: list[dict], rooms: list[dict]) -> list[dict]:
     out = []
     for r in rows:
         if str(r.get("aprasymas") or "") == PAINT_REVEALS_LABEL and _num(r.get("kiekis")) is not None:
-            r = dict(r)
-            r["kiekis"] = round(max(0.0, float(r["kiekis"]) - tr["total"]), 2)
-            r["_assumption"] = ((r.get("_assumption") or "").rstrip() + " Be angokraščių plytelėmis išklotose sienose ("
-                                + _lt(tr["total"]) + " m — atskira eilutė).").strip()
+            r = _less_tiled_reveals(dict(r), tr)
         out.append(r)
     return out + [row]
+
+
+def _rooms_label(n: int) -> str:
+    tail, hundred = abs(n) % 10, abs(n) % 100
+    return f"Σ {n} " + ("patalpos" if (tail == 1 and hundred != 11) else "patalpų")
+
+
+def _less_tiled_reveals(r: dict, tr: dict) -> dict:
+    """The painted reveals row without the tiled ones — its room ledger too, so the chain still ends at
+    `kiekis` (a room's share drops by its tiled metres; a chain other than one Σ step is dropped, not bent)."""
+    r["kiekis"] = round(max(0.0, float(r["kiekis"]) - tr["total"]), 2)
+    r["_assumption"] = ((r.get("_assumption") or "").rstrip() + " Be angokraščių plytelėmis išklotose sienose ("
+                        + _lt(tr["total"]) + " m — atskira eilutė).").strip()
+    roll = r.get("roll_up")
+    contribs = r.get("contributions")
+    if not roll:
+        return r
+    if not (isinstance(contribs, list) and len(roll) == 1 and roll[0].get("op") == "sum"):
+        for k in ("contributions", "excluded", "roll_up", "contributions_sum_to_total"):
+            r.pop(k, None)
+        return r
+    less = {str(rm.get("nr") or ""): v for rm, v, _ in tr["per_room"]}
+    new = []
+    for c in contribs:
+        c = dict(c)
+        d = less.get(str(c.get("room_nr") or ""), 0.0)
+        if d:
+            c["value"] = round(float(c.get("value") or 0) - d, 2)
+            c["included_because"] = (str(c.get("included_because") or "") + " — be angų plytelėmis išklotose sienose").strip()
+        if float(c.get("value") or 0) > 0.004:
+            new.append(c)
+    total = round(sum(float(c["value"]) for c in new), 2)
+    if abs(total - r["kiekis"]) > 0.01:
+        for k in ("contributions", "excluded", "roll_up", "contributions_sum_to_total"):
+            r.pop(k, None)
+        return r
+    r["contributions"] = new
+    r["roll_up"] = [{"op": "sum", "label": _rooms_label(len(new)), "value": total}]
+    return r
 
 
 # ── large-format and mosaic tiles (tile specification text, the designer's legend quantities) ──
