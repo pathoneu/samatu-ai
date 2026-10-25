@@ -254,3 +254,26 @@ Kiekvienas: kontekstas vienu sakiniu · galimybės · ką siūlo vadovas (jei si
 - Diegimas — tik jums leidus. Kontrolinis sąrašas: **`docs/RUNBOOK.md` §8a** („Deploy checklist — a togal-v2 batch to `main`", W7-A M10): `scripts/safe_deploy_check.sh` prieš kiekvieną išsiuntimą (kad diegimas nenutrauktų vykstančio skaitymo), „Wait for CI" ir privalomi patikrinimai (jūsų veiksmai Railway / Vercel), patikra gamybos adresuose po diegimo.
 - Prieš diegimą jums reikia nustatyti gamybos aplinkoje: SMTP (14), `SAMATU_REQUIRE_EMAIL_VERIFIED` (15), `SAMATU_BACKUP_KEEP_DAYS` (16), CORS adresus (`SAMATU_CORS_ORIGINS`); mokėjimai lieka išjungti, kol nėra (20) ir (22).
 - Paskutiniai trys sujungimai (5d2d8732, 8f5006ae, 756e76e9) sujungimų žurnale dar neturi eilutės — vadovas ją įrašys kartu su priėmimo patikros rezultatu.
+
+---
+
+## 6. Kas pasikeitė po 2026-10-24 (v4 — deterministinis skaitymas)
+
+**Taisyklė, kurią pritaikėme:** nė vienas sąmatos skaičius nebeateina iš modelio „spėjimo" pagal paveikslą ir nė vienas — iš numatytosios reikšmės. Skaičius arba perskaitytas iš brėžinio (tekstas, vektorinės linijos, legenda, matmenys), arba išvestas iš perskaitytų faktų pagal įvardytą taisyklę, arba **tuščias su priežastimi** ir klausimu jums. Kiekviena eilutė nešiojasi savo kilmę.
+
+**Ką pamatysite kitaip nei 10-19:**
+1. **Brėžinys.** Patalpos vadinamos brėžinio numeriais (1-1 … 2-9), prie pervadintų kurį laiką matosi „buvo K2". Mastelis rodo, iš kur jis: „1:75 — iš plano matmenų (139 skaičiai)"; užrašytas, bet matmenų neatitinkantis mastelis pažymimas ir pralaimi. Naujas įrankis **„Skaičius" (N)**: brūkštelėkite liniją per užrašytą matmenį — mastelis nustatomas iš jo. Laisvas perskaitymas siūlomas pirma eilute, ne paslėptas po „Pranešimai".
+2. **Patikra.** Klausimų mažiau ir jie tik apie tai, ko brėžinys nepasako: lubų aukštis (vienas atsakymas visoms patalpoms), kurių patalpų sienų ilgiai neužrašyti, durys ir langai, beapvadinės durys, grindų danga, dažomos sienos. Kol į klausimą neatsakyta, su juo susijusios eilutės **lieka tuščios** — ne skaičiuojamos su numatytąja reikšme.
+3. **Sąmata.** Tuščia eilutė rodo brūkšnį, po juo — priežastį paprastais žodžiais ir mygtuką „Įrašyti". Medžiagų eilutės seka savo darbo eilutę. Šviestuvų, rozečių, santechnikos kiekiai ateina iš plano **legendos** kaip pasiūlymai, kuriuos patvirtinate (jie grubūs: nuo −38 % iki +50 % lyginant su rangovo eilutėmis). LED nišų ilgis — iš legendos (naujam skaitymui); seniems projektams po laisvo perskaitymo lieka tuščias.
+4. **Jūsų projekte (objektas_i).** Visos 17 patalpų sutapdintos ir apibrėžtos (ploto paklaida 0,1 %), 11 iš 17 perimetrų sudėti iš užrašytų matmenų, 15 langų ir balkono durys perskaityti. Lubų aukščio brėžinyje nėra — todėl sienų eilutės laukia vieno jūsų atsakymo.
+
+**Skaičiai, kuriuos reikia žinoti (korpusas iš 6 rangovo sąmatų):**
+- Eilučių, patenkančių į ±10 % nuo rangovo: 26 % prieš v4 → **8,7 %** dabar. Kritimas tyčinis: 40 eilučių sutapo tik dėl modelio spėjimo ar numatytosios reikšmės; dabar jos tuščios ir skaičiuojamos kaip klaidingos. Kas tuščia, tą matote — ir užpildote vienu atsakymu arba skaičiumi.
+- Kodėl likusios eilutės nesutampa: 47 % rangovo eilučių neturi mūsų atitikmens (šeimos, kurių neskaičiuojame; jo skaidymas; vienetai) — tai ne slenksčių ar prielaidų klausimas. Lubų aukštis NĖRA kliūtis (išmatuota: aukštis visoms patalpoms pajudina 1 eilutę).
+- Rastriniai (skenuoti) brėžiniai: patalpų atpažinimas iš rastro išbandytas dviem būdais (SAM 2 ir deterministinis) — abu nepraėjo vartų nematytuose lapuose; **nukelta**. Skenuoti lapai gauna OCR (mastelis, žymos, lentelė) ir rankinį kontūrą.
+
+**Jūsų sprendimai, jau priimti ir įgyvendinti:** hidroizoliacija dviem eilutėmis (jūsų taisyklė; rangovas rašo vieną), angų užskaita 3,0 m², rastro kelias nukeltas, 3b sujungtas žinant metrikos kritimą, Sonnet darbams be inžinerinio sprendimo.
+
+**Laukia jūsų:** (a) santechnikos prietaisai be legendos — tuščia ar modelio skaičius; (b) medžiagų specifikacijos skaitymas nebekainuoja — ar nustoti skaičiuoti veiksmą; (c) objektas_b vėdinimo eilutės (tiekėjo specifikacija, be plano) — ar jas skaičiuoti į vardiklį; (d) kada stumti į `main`.
+
+**Nepadaryta (po jūsų verdikto):** Pass-1 (modelis vis dar skaito lapus kaip paveikslus patalpoms/angoms/apžvalgoms — paskutinis pikselių kelias), GKP priedai iš lubų plano geometrijos, šviestuvų/rozečių skaičiavimas tiksliau nei legenda, LED iš legendos seniems projektams, Patikros tekstų smulkmenos, WebKit e2e sąveikos testai (Safari tikrinate rankomis).
