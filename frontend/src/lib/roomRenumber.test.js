@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renumberMap, renumberProject, carryIdentity } from './roomRenumber.js';
+import { renumberMap, renumberProject, carryIdentity, formerRoomKey, renumberedCount } from './roomRenumber.js';
 import { mergeFreeReread } from './freeReread.js';
 
 // A project read before the room identity came from the drawing: the model's keys K1/K2/D1 (v4 Phase 3a).
@@ -90,6 +90,23 @@ test('without a map the re-read merges exactly as before', () => {
   // the old by-number merge: every fresh room is new, the touched old ones stay as missing
   assert.equal(diff.added.length, 3);
   assert.equal(project._perkeisti_numeriai, undefined);
+});
+
+test('the re-read diff counts the renumbered rooms for „Kas pasikeitė"; none without a map', () => {
+  assert.equal(mergeFreeReread(stored(), answer(), 'T').diff.perkeisti_numeriai, 3);
+  const a = answer();
+  delete a._perkeisti_numeriai;
+  assert.equal(mergeFreeReread(stored(), a, 'T').diff.perkeisti_numeriai, undefined);
+});
+
+test('formerRoomKey: the old key until the room is checked, the oldest one, nothing without a map', () => {
+  const project = { _perkeisti_numeriai: { K2: '1-2', 2: '1-2', D1: '2-1' } };
+  assert.equal(formerRoomKey(project, { nr: '1-2', _modelio_nr: 'K2' }), 'K2');
+  assert.equal(formerRoomKey({ _perkeisti_numeriai: { K2: '1-2' } }, { nr: '1-2' }), 'K2', 'no _modelio_nr: the map alone');
+  assert.equal(formerRoomKey(project, { nr: '2-1', user_verified_at: '2026-10-25T10:00:00Z' }), null);
+  assert.equal(formerRoomKey(project, { nr: '1-3' }), null);
+  assert.equal(formerRoomKey({}, { nr: '1-2', _modelio_nr: 'K2' }), null, 'a model key alone is not a renumbering');
+  assert.equal(renumberedCount(project._perkeisti_numeriai), 2);
 });
 
 test('carryIdentity adds only the unit keys, only to renamed rooms, only when absent', () => {
