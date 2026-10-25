@@ -7099,7 +7099,8 @@ def recompute_interior(payload: RecomputePayload, request: Request):
     # Apimtis (2026-09-06): rooms / families / ceilings / openings he does not
     # do — enforced here so the sheet, the exports and the template agree.
     from extractor import scope as _scope
-    apimtis = _scope.normalize_apimtis((payload.rules_override or {}).get("apimtis"))
+    apimtis = _scope.normalize_apimtis(_scope.with_profile_defaults(
+        (payload.rules_override or {}).get("apimtis"), payload.rules_override))
     # ALWAYS: with no scope this clears a stale `_neskaiciuoti` mark, so a room
     # switched back on comes back (the mark rides on the stored room dicts).
     _scope.mark_rooms(payload.patalpos, apimtis)

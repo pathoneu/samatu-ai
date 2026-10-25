@@ -491,11 +491,25 @@ def test_rotband_is_a_stated_assumption_until_he_chooses():
     assert "pasirinkimas" in str(r.get("_assumption") or "").lower()
 
 
-def test_waterproofing_stays_one_line_and_carries_its_square_metres():
-    """The LT pro convention is ONE hidroizoliacija line per job (billed per wet
-    zone); a contractor who bills it in m² is checked against the line's own m²
-    detail by the row scorecard, not by a second row he might price twice."""
+def test_waterproofing_two_rows_by_default_and_out_with_the_tiles():
+    """Founder decision 2026-10-24: two rows (floor m², corner tape m) by default; a bathroom whose tiles
+    are not his leaves both."""
     out = _recompute()
+    assert _qty(out, "Grindų hidroizoliacija") == pytest.approx(6.0)
+    assert _qty(out, "Hidroizoliacinė juosta kampams") == pytest.approx(10.0)
+    off = _recompute({"patalpu_sritys_ne": {"03": ["plyteles"]}})
+    assert not _rows(off, "Grindų hidroizoliacija") and not _rows(off, "Hidroizoliacinė juosta")
+
+
+def test_waterproofing_stays_one_line_and_carries_its_square_metres():
+    """Profile option `hidro_rows = "one"` (his practice on 6 of 7 sąmatos): ONE hidroizoliacija line per
+    job (billed per wet zone); a contractor who bills it in m² is checked against the line's own m²
+    detail by the row scorecard, not by a second row he might price twice."""
+    body = {"patalpos": _rooms(), "rules_override": {"profilis": {"hidro_rows": "one"}},
+            "_ceiling_anchor": {"total_area_m2": 50.0, "label": "Iš viso", "page": 1}}
+    res = client.post("/recompute-interior", json=body)
+    assert res.status_code == 200, res.text
+    out = res.json()
     rows = [r for r in out["darbu_sarasas"] if str(r.get("aprasymas") or "").startswith("Hidroizoliacijos įrengimas")]
     assert len(rows) == 1
     assert str(rows[0].get("mato_vnt") or "").lower() in ("vnt", "kompl")

@@ -18,7 +18,7 @@ const NAV = 'inline-flex min-h-[44px] items-center gap-1 rounded-[2px] border '
   + 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60';
 
 export default function RoomSheetStrip({
-  title, progress, index, total, onPrev, onNext, hasPrev, hasNext, onQuestions = null, picker = null,
+  title, progress, index, total, onPrev, onNext, hasPrev, hasNext, onQuestions = null, picker = null, formerNr = null,
 }) {
   const { t } = useTranslation();
 
@@ -32,7 +32,15 @@ export default function RoomSheetStrip({
           {t('project.questions.backToQuestions')}
         </button>
       )}
-      <h1 className="text-[17px] font-semibold">{title}</h1>
+      <h1 className="text-[17px] font-semibold">
+        {title}
+        {/* the key the room wore before the drawing's number (v4 3a), until he checks it */}
+        {formerNr && (
+          <span className="ml-2 text-[14px] font-normal text-white/80" data-testid="room-former-nr">
+            {t('project.roomSheet.formerNr', { nr: formerNr })}
+          </span>
+        )}
+      </h1>
 
       <div className="flex min-w-[240px] flex-1 items-center gap-3">
         <span className="text-[14px] text-white/80">

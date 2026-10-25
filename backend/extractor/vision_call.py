@@ -31,6 +31,8 @@ from . import ledger as _ledger
 from . import run_usage as _run_usage
 from .universal_rules import FRAMELESS_DEFAULT_KEY, KARNIZAS_KEY, SKIRTING_WASTE, gkp_ceiling_areas_m2, kiekis_units, lt_num
 from . import scope as _scope
+from rules import rows as _rules_rows
+from rules.conventions import resolve_profile as _resolve_profile
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
 from . import row_provenance as _rp
@@ -3579,6 +3581,10 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         parsed["pozicijos"] = []
         return parsed
 
+    # Phase 2 (2026-10-25): the conventions profile this project runs under (explicit Prielaidos keys over
+    # the `lt_rangovas` defaults).
+    _profile = _resolve_profile(parsed.get("_overrides"))
+
     def _sum(field: str) -> float:
         return round(sum(float(r.get(field) or 0) for r in rooms), 2)
 
@@ -4138,6 +4144,11 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             # no `_grindjuosciu_duru_m`, gets).
             _baze, _duru = (r.get("_grindjuosciu_baze_m"),
                             r.get("_grindjuosciu_duru_m"))
+            # the work metres' own waste factor (profile `skirting_waste`; older rooms carry none → 1,10)
+            try:
+                _gw = float(r.get("_grindjuosciu_atliekos") or SKIRTING_WASTE)
+            except (TypeError, ValueError):
+                _gw = SKIRTING_WASTE
             _perim = r.get("perimetras_m")
             _terms = None
             if _baze is not None and _duru is not None and _perim is not None:
@@ -4145,7 +4156,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                     "perimetras": round(float(_perim), 2),
                     # `or 0.0` so a doorless room reads „0,00", never „−0,00".
                     "durys": -round(float(_duru), 2) or 0.0,
-                    f"atliekos {lt_num(round((SKIRTING_WASTE - 1) * 100), 0)} %": round(float(_baze) * (SKIRTING_WASTE - 1), 2),
+                    f"atliekos {lt_num(round((_gw - 1) * 100), 0)} %": round(float(_baze) * (_gw - 1), 2),
                 }
             _g_contribs.append(_ledger.contribution(
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
@@ -4703,7 +4714,21 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     hidro_m2 = _sum("hidroizoliacija_m2")
     n_wet_zones = sum(1 for r in rooms_pl
                       if _pask(r) in WET)
-    if hidro_m2 > 0 and n_wet_zones > 0:
+    # Phase 2 (2026-10-25), founder decision 2026-10-24: TWO rows by default — „Grindų hidroizoliacija"
+    # (m², the wet rooms' net floor) + „Hidroizoliacinė juosta kampams" (m, their gross perimeter). The
+    # one-row vnt form below stays as the profile option `hidro_rows = "one"` (his practice on 6 of 7
+    # sąmatos). Wet = vonia / wc / san purpose or a `wet_room_markers` name; a laundry never.
+    _hidro_two = _profile.get("hidro_rows") == "two"
+    if _hidro_two:
+        _wet_rooms = [r for r in rooms_pl
+                      if _rules_rows.is_wet_room(r, _pask(r), _profile.get("wet_room_markers"))]
+        for _row, _parts in _rules_rows.hidro_two_rows(_wet_rooms, kg_per_m2=WATERPROOFING_KG_PER_M2):
+            _hc = [_ledger.contribution(r, v, _row["vnt"], why) for r, v, why in _parts]
+            pozicijos.append(_family_ledger(
+                {"skyrius": SK_HI, "saltinis": SAL, **_row}, _hc,
+                _choice_excluded("plyteles", lambda r: _rules_rows.is_wet_room(
+                    r, _pask(r), _profile.get("wet_room_markers")))))
+    if not _hidro_two and hidro_m2 > 0 and n_wet_zones > 0:
         wet_perim = round(sum(float(r.get("perimetras_m") or 0) for r in rooms_pl
                               if _pask(r) in WET), 2)
         # Bendros medžiagos: 2 sluoksniai × 1.5 kg/m² + sandarinimo juostelė m
@@ -5326,6 +5351,12 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _consolidate_paint_pozicijos(parsed)
     _consolidate_led_niche_pozicijos(parsed)
     pozicijos = parsed["pozicijos"]
+    # v4 3b (2026-10-25): no row keeps a number a model guessed or a default invented — row_provenance. Before
+    # the granularity merge, so a merged row is blank whenever one of its members is.
+    _apply_row_provenance(parsed, pozicijos, rooms)
+    # Phase 2 (2026-10-25): his granularity — walls + ceilings paint in one row, wall + floor tiles in one
+    # row — when the profile says „merged" (default „split", rules/conventions.py LT_RANGOVAS).
+    pozicijos = _rules_rows.apply_granularity(pozicijos, _profile, _ledger)
 
     # Sprint §FIX-7 (2026-04-29): stable-sort by skyrius so all GKP/Plytelių/etc.
     # lines stay grouped even when generator interleaves emit order.
@@ -5361,8 +5392,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
     _attach_room_ledgers(pozicijos)
-    # v4 3b (2026-10-25): no row keeps a number a model guessed or a default invented — row_provenance
-    _apply_row_provenance(parsed, pozicijos, rooms)
+    _rp.stamp_remaining(pozicijos)          # rows the merge made carry their first member's class already
     parsed["pozicijos"] = pozicijos
 
     # 2026-06-11: per-pozicija confidence (class calibration + apdailos
@@ -5376,6 +5406,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # work row into ONE "Medžiagos" section at the end. Runs AFTER
     # apply_confidence so each material inherits its parent work's final tier.
     _extract_medziagos_section(parsed)
+    # R4 (Phase 2, 2026-10-25): every row's quantity rounded once, here, at the row boundary.
+    if _profile.get("rounding") == "row_boundary":
+        _rules_rows.round_rows_at_boundary(parsed.get("pozicijos") or [])
 
     # 2026-09-02 (Patikra P0): ONE id pass, dead last — every row is now in its
     # final section under its final label, so the hash is the row's durable name
@@ -7458,7 +7491,8 @@ def extract_interior(
         parsed["_overrides"] = rules_override
     # Apimtis chosen at upload (families, ceilings, walls with/without openings;
     # rooms are not known yet) — see extractor/scope.py.
-    _apimtis = _scope.normalize_apimtis((rules_override or {}).get("apimtis"))
+    _apimtis = _scope.normalize_apimtis(_scope.with_profile_defaults((rules_override or {}).get("apimtis"),
+                                                                     rules_override))
     _scope.mark_rooms(parsed.get("patalpos") or [], _apimtis)
     if _apimtis:
         parsed["_apimtis"] = _apimtis

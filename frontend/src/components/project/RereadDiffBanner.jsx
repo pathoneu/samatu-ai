@@ -121,10 +121,13 @@ export default function RereadDiffBanner({ project, onProjectChange }) {
   const rows = rowLines(diff.eilutes, t);
   const reads = (Array.isArray(diff.perskaityta) ? diff.perskaityta : [])
     .map((k) => t(`project.reread.reads.${k}`, { defaultValue: '' })).filter(Boolean);
-  const empty = roomsEmpty && nRows === 0;
+  // rooms the read gave the drawing's numbers (K2 → 1-2, lib/freeReread.mergeFreeReread)
+  const renumbered = Math.max(0, Number(diff.perkeisti_numeriai) || 0);
+  const empty = roomsEmpty && nRows === 0 && renumbered === 0;
   // What moved, as counts on the one line — the lists themselves are behind „Peržiūrėti".
   const summary = [
     nRows > 0 ? t('project.reread.chipRows', { count: nRows }) : (empty ? t('project.reread.chipNothing') : null),
+    renumbered > 0 && t('project.reread.chipRenumbered', { count: renumbered }),
     changed.length > 0 && t('project.reread.chipChanged', { count: changed.length }),
     kept.length > 0 && t('project.reread.chipKept', { count: kept.length }),
     added.length > 0 && t('project.reread.chipAdded', { count: added.length }),

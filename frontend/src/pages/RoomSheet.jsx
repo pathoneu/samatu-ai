@@ -57,6 +57,7 @@ import QuantityLine from '@/components/roomsheet/QuantityLine';
 import GeneralFactsPanel from '@/components/roomsheet/GeneralFactsPanel';
 import RoomScopeSwitch from '@/components/roomsheet/RoomScopeSwitch';
 import { isRoomIncluded, roomFamiliesOff, withRoomFamily, withRoomIncluded } from '@/lib/scope';
+import { formerRoomKey } from '@/lib/roomRenumber';
 import { ltPlural } from '@/lib/ltPlural';
 import { ltNumber } from '@/lib/ledger';
 import { pilotSession, recordPilot, releasePilotSession } from '@/lib/telemetry';
@@ -168,7 +169,10 @@ export default function RoomSheet() {
       .map((it) => {
         // merged-into lives on the stored room (the drawing-order list may be an older copy)
         const stored = (project?.patalpos || []).find((r) => String(r?.nr) === it.nr);
-        return stored?._sujungta_i && it.state !== 'merged' ? { ...it, state: 'merged', mergedInto: String(stored._sujungta_i) } : it;
+        // „buvo K2" beside a room the re-read gave the drawing's number, until it is checked (v4 3a)
+        const former = formerRoomKey(project, rooms.find((r) => String(r?.nr) === it.nr));
+        const item = former ? { ...it, formerNr: former } : it;
+        return stored?._sujungta_i && it.state !== 'merged' ? { ...item, state: 'merged', mergedInto: String(stored._sujungta_i) } : item;
       }),
     [rooms, project, roomNr],
   );
@@ -519,6 +523,7 @@ export default function RoomSheet() {
       <RoomSheetStrip
         onQuestions={() => navigate(`/project/${id}/patikra`)}
         title={roomTitle(room) || String(roomNr)}
+        formerNr={formerRoomKey(project, room)}
         progress={progress}
         index={idx + 1}
         total={rooms.length}
@@ -543,6 +548,7 @@ export default function RoomSheet() {
       <FreeRereadBanner
         project={project}
         className="mx-4 mt-3"
+        widthClass="self-stretch"
         onComplete={(next) => { setProject(next); setLastFix(null); setRipple(null); loadFacts(); }}
       />
       <RereadRoomNote project={project} roomNr={roomNr} />

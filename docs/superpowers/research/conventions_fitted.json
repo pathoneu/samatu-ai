@@ -1,0 +1,2656 @@
+{
+ "mode": "replay",
+ "projects": [
+  "objektas_a",
+  "objektas_b",
+  "objektas_c",
+  "objektas_d",
+  "objektas_g",
+  "objektas_h"
+ ],
+ "defaults": {
+  "aperture_no_deduct_max_m2": 1.0,
+  "skirting_door_deduct_m": 0.85,
+  "skirting_waste": 1.1,
+  "kampai": "visi",
+  "reveals_scope": {
+   "langai": true,
+   "lauko_durys": true,
+   "praejimai": true,
+   "vidaus_durys": false
+  },
+  "rotband_dalis": 30,
+  "hidro_rows": "two",
+  "rounding": "row_boundary",
+  "paint_rows": "split",
+  "tile_rows": "split"
+ },
+ "before_legacy": {
+  "objektas_a": {
+   "share": 41.5,
+   "within_10": 22,
+   "n_scored": 53
+  },
+  "objektas_b": {
+   "share": 9.0,
+   "within_10": 10,
+   "n_scored": 111
+  },
+  "objektas_c": {
+   "share": 22.2,
+   "within_10": 8,
+   "n_scored": 36
+  },
+  "objektas_d": {
+   "share": 36.0,
+   "within_10": 18,
+   "n_scored": 50
+  },
+  "objektas_g": {
+   "share": 35.0,
+   "within_10": 7,
+   "n_scored": 20
+  },
+  "objektas_h": {
+   "share": 20.8,
+   "within_10": 5,
+   "n_scored": 24
+  }
+ },
+ "defaults_scores": {
+  "objektas_a": {
+   "share": 39.6,
+   "within_10": 21,
+   "n_scored": 53
+  },
+  "objektas_b": {
+   "share": 8.1,
+   "within_10": 9,
+   "n_scored": 111
+  },
+  "objektas_c": {
+   "share": 19.4,
+   "within_10": 7,
+   "n_scored": 36
+  },
+  "objektas_d": {
+   "share": 34.0,
+   "within_10": 17,
+   "n_scored": 50
+  },
+  "objektas_g": {
+   "share": 35.0,
+   "within_10": 7,
+   "n_scored": 20
+  },
+  "objektas_h": {
+   "share": 20.8,
+   "within_10": 5,
+   "n_scored": 24
+  }
+ },
+ "sweep": {
+  "aperture_no_deduct_max_m2": [
+   {
+    "value": 1.0,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": 3.0,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 9.0,
+     "objektas_c": 19.4,
+     "objektas_d": 36.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.65
+   }
+  ],
+  "skirting_door_deduct_m": [
+   {
+    "value": 0.85,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": 0.9,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "drawn",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   }
+  ],
+  "skirting_waste": [
+   {
+    "value": 1.1,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": 1.0,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   }
+  ],
+  "kampai": [
+   {
+    "value": "visi",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "vertikalus_lubos",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 22.2,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 25.0
+    },
+    "mean": 26.68
+   },
+   {
+    "value": "vertikalus",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 40.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.35
+   },
+   {
+    "value": "isoriniai_angos",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.52
+   },
+   {
+    "value": "isoriniai",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.52
+   },
+   {
+    "value": "tik_lubos",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 40.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.35
+   }
+  ],
+  "reveals_scope": [
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 25.0
+    },
+    "mean": 26.86
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": false,
+     "praejimai": true,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.71
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": false,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 9.0,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.98
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": false,
+     "praejimai": false,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.71
+   },
+   {
+    "value": {
+     "langai": true,
+     "lauko_durys": false,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 9.0,
+     "objektas_c": 19.4,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.98
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 9.0,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.52
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 9.0,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 25.0
+    },
+    "mean": 26.22
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": false,
+     "praejimai": true,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": false,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": false,
+     "praejimai": false,
+     "vidaus_durys": true
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   },
+   {
+    "value": {
+     "langai": false,
+     "lauko_durys": false,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 16.7,
+     "objektas_d": 32.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.37
+   }
+  ],
+  "rotband_dalis": [
+   {
+    "value": 30,
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": 0,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   },
+   {
+    "value": 10,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   },
+   {
+    "value": 20,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   },
+   {
+    "value": 40,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   },
+   {
+    "value": 50,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   },
+   {
+    "value": 100,
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.85
+   }
+  ],
+  "hidro_rows": [
+   {
+    "value": "two",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "one",
+    "per_project": {
+     "objektas_a": 41.5,
+     "objektas_b": 9.0,
+     "objektas_c": 22.2,
+     "objektas_d": 36.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 27.43
+   }
+  ],
+  "rounding": [
+   {
+    "value": "row_boundary",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "legacy",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   }
+  ],
+  "paint_rows": [
+   {
+    "value": "split",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "merged",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 7.2,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 30.0,
+     "objektas_h": 20.8
+    },
+    "mean": 25.18
+   }
+  ],
+  "tile_rows": [
+   {
+    "value": "split",
+    "per_project": {
+     "objektas_a": 39.6,
+     "objektas_b": 8.1,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 35.0,
+     "objektas_h": 20.8
+    },
+    "mean": 26.17
+   },
+   {
+    "value": "merged",
+    "per_project": {
+     "objektas_a": 37.7,
+     "objektas_b": 7.2,
+     "objektas_c": 19.4,
+     "objektas_d": 34.0,
+     "objektas_g": 25.0,
+     "objektas_h": 20.8
+    },
+    "mean": 24.04
+   }
+  ]
+ },
+ "loo_per_param": {
+  "aperture_no_deduct_max_m2": {
+   "objektas_a": {
+    "chosen": 3.0,
+    "held_out": 39.6,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": 3.0,
+    "held_out": 9.0,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": 3.0,
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": 3.0,
+    "held_out": 36.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": 3.0,
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": 3.0,
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  },
+  "skirting_door_deduct_m": {
+   "objektas_a": {
+    "chosen": 0.85,
+    "held_out": 39.6,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": 0.85,
+    "held_out": 8.1,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": 0.85,
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": 0.85,
+    "held_out": 34.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": 0.85,
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": 0.85,
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  },
+  "skirting_waste": {
+   "objektas_a": {
+    "chosen": 1.1,
+    "held_out": 39.6,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": 1.1,
+    "held_out": 8.1,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": 1.1,
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": 1.1,
+    "held_out": 34.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": 1.1,
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": 1.1,
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  },
+  "kampai": {
+   "objektas_a": {
+    "chosen": "vertikalus_lubos",
+    "held_out": 37.7,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": "vertikalus_lubos",
+    "held_out": 8.1,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": "vertikalus",
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": "vertikalus_lubos",
+    "held_out": 32.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": "vertikalus_lubos",
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": "vertikalus",
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  },
+  "reveals_scope": {
+   "objektas_a": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "held_out": 39.6,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "held_out": 8.1,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "held_out": 34.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  },
+  "rotband_dalis": {
+   "objektas_a": {
+    "chosen": 30,
+    "held_out": 39.6,
+    "held_out_default": 39.6
+   },
+   "objektas_b": {
+    "chosen": 30,
+    "held_out": 8.1,
+    "held_out_default": 8.1
+   },
+   "objektas_c": {
+    "chosen": 30,
+    "held_out": 19.4,
+    "held_out_default": 19.4
+   },
+   "objektas_d": {
+    "chosen": 30,
+    "held_out": 34.0,
+    "held_out_default": 34.0
+   },
+   "objektas_g": {
+    "chosen": 30,
+    "held_out": 35.0,
+    "held_out_default": 35.0
+   },
+   "objektas_h": {
+    "chosen": 30,
+    "held_out": 20.8,
+    "held_out_default": 20.8
+   }
+  }
+ },
+ "kampai": {
+  "visi": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 475.79,
+     "pct": -3.559,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": 469.42,
+     "pct": -19.141,
+     "bucket": "within_25",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": 266.89,
+     "pct": 32.215,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": 131.87,
+     "pct": 6.7,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 317.33,
+     "pct": 135.548,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 473.12,
+     "pct": 14.574,
+     "bucket": "within_25",
+     "unit": "m"
+    }
+   ]
+  },
+  "vertikalus_lubos": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 379.99,
+     "pct": -22.978,
+     "bucket": "within_25",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": 366.62,
+     "pct": -36.848,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": 207.49,
+     "pct": 2.789,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": 94.27,
+     "pct": -23.724,
+     "bucket": "within_25",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 276.45,
+     "pct": 105.203,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 395.44,
+     "pct": -4.238,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ]
+  },
+  "vertikalus": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 221.0,
+     "pct": -55.204,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": 228.9,
+     "pct": -60.571,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": 118.44,
+     "pct": -41.326,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": 45.12,
+     "pct": -63.492,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 146.64,
+     "pct": 8.848,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 253.8,
+     "pct": -38.538,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ]
+  },
+  "isoriniai_angos": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 141.4,
+     "pct": -71.339,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": 102.8,
+     "pct": -82.292,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": 59.4,
+     "pct": -70.574,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": 37.6,
+     "pct": -69.577,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 108.56,
+     "pct": -19.418,
+     "bucket": "within_25",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 142.54,
+     "pct": -65.482,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ]
+  },
+  "isoriniai": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 15.2,
+     "pct": -96.919,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 22.56,
+     "pct": -83.254,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 19.74,
+     "pct": -95.22,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ]
+  },
+  "tik_lubos": {
+   "objektas_a": [
+    {
+     "his": 493.35,
+     "ours": 158.99,
+     "pct": -67.773,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 580.54,
+     "ours": 137.72,
+     "pct": -76.277,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 201.86,
+     "ours": 89.05,
+     "pct": -55.885,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 123.59,
+     "ours": 49.15,
+     "pct": -60.231,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 134.72,
+     "ours": 129.81,
+     "pct": -3.645,
+     "bucket": "within_10",
+     "unit": "m"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": 412.94,
+     "ours": 141.64,
+     "pct": -65.7,
+     "bucket": "way_off",
+     "unit": "m"
+    }
+   ]
+  }
+ },
+ "hidro": {
+  "two": {
+   "objektas_a": [
+    {
+     "his": 2.0,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 3.0,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 2.0,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 1.0,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 39.5,
+     "ours": null,
+     "pct": null,
+     "bucket": "missing",
+     "unit": "m2"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": null,
+     "ours": null,
+     "pct": null,
+     "bucket": "no_truth_qty",
+     "unit": "vnt"
+    }
+   ]
+  },
+  "one": {
+   "objektas_a": [
+    {
+     "his": 2.0,
+     "ours": 2.0,
+     "pct": 0.0,
+     "bucket": "within_10",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_b": [
+    {
+     "his": 3.0,
+     "ours": 3.0,
+     "pct": 0.0,
+     "bucket": "within_10",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_c": [
+    {
+     "his": 2.0,
+     "ours": 2.0,
+     "pct": 0.0,
+     "bucket": "within_10",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_d": [
+    {
+     "his": 1.0,
+     "ours": 1.0,
+     "pct": 0.0,
+     "bucket": "within_10",
+     "unit": "vnt"
+    }
+   ],
+   "objektas_g": [
+    {
+     "his": 39.5,
+     "ours": 51.09,
+     "pct": 29.342,
+     "bucket": "way_off",
+     "unit": "m2"
+    }
+   ],
+   "objektas_h": [
+    {
+     "his": null,
+     "ours": null,
+     "pct": null,
+     "bucket": "no_truth_qty",
+     "unit": "vnt"
+    }
+   ]
+  }
+ },
+ "reveals": [
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": true,
+    "praejimai": true,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 152.94,
+      "pct": 71.093,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 180.43,
+      "pct": 91.906,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 62.1,
+      "pct": 79.844,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 39.99,
+      "pct": 25.755,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 118.38,
+      "pct": 87.221,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": true,
+    "praejimai": true,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 104.81,
+      "pct": 17.25,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 114.83,
+      "pct": 22.134,
+      "bucket": "within_25",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 37.2,
+      "pct": 7.732,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 29.77,
+      "pct": -6.384,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 76.91,
+      "pct": 21.635,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": true,
+    "praejimai": false,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 152.94,
+      "pct": 71.093,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 180.43,
+      "pct": 91.906,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 62.1,
+      "pct": 79.844,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 39.99,
+      "pct": 25.755,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 106.29,
+      "pct": 68.101,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": true,
+    "praejimai": false,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 104.81,
+      "pct": 17.25,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 114.83,
+      "pct": 22.134,
+      "bucket": "within_25",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 37.2,
+      "pct": 7.732,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 29.77,
+      "pct": -6.384,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 64.82,
+      "pct": 2.515,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": false,
+    "praejimai": true,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 120.95,
+      "pct": 35.306,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 158.83,
+      "pct": 68.932,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 57.0,
+      "pct": 65.074,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 29.41,
+      "pct": -7.516,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 92.76,
+      "pct": 46.703,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": false,
+    "praejimai": true,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 72.82,
+      "pct": -18.537,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 93.23,
+      "pct": -0.84,
+      "bucket": "within_10",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 32.1,
+      "pct": -7.037,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 19.19,
+      "pct": -39.654,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 51.29,
+      "pct": -18.883,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": false,
+    "praejimai": false,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 120.95,
+      "pct": 35.306,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 158.83,
+      "pct": 68.932,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 57.0,
+      "pct": 65.074,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 29.41,
+      "pct": -7.516,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 80.67,
+      "pct": 27.582,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": true,
+    "lauko_durys": false,
+    "praejimai": false,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 72.82,
+      "pct": -18.537,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 93.23,
+      "pct": -0.84,
+      "bucket": "within_10",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 32.1,
+      "pct": -7.037,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 19.19,
+      "pct": -39.654,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 39.2,
+      "pct": -38.004,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": true,
+    "praejimai": true,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 80.12,
+      "pct": -10.37,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 87.2,
+      "pct": -7.254,
+      "bucket": "within_10",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 30.0,
+      "pct": -13.119,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 20.79,
+      "pct": -34.623,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 79.18,
+      "pct": 25.225,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": true,
+    "praejimai": true,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 31.99,
+      "pct": -64.213,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": 21.6,
+      "pct": -37.373,
+      "bucket": "way_off",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 5.1,
+      "pct": -85.23,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 10.57,
+      "pct": -66.761,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 37.71,
+      "pct": -40.361,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": true,
+    "praejimai": false,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 80.12,
+      "pct": -10.37,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 87.2,
+      "pct": -7.254,
+      "bucket": "within_10",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 30.0,
+      "pct": -13.119,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 20.79,
+      "pct": -34.623,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 67.09,
+      "pct": 6.105,
+      "bucket": "within_10",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": true,
+    "praejimai": false,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 31.99,
+      "pct": -64.213,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": 21.6,
+      "pct": -37.373,
+      "bucket": "way_off",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 5.1,
+      "pct": -85.23,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 10.57,
+      "pct": -66.761,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 25.62,
+      "pct": -59.481,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": false,
+    "praejimai": true,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 48.13,
+      "pct": -46.157,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 65.6,
+      "pct": -30.228,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 24.9,
+      "pct": -27.889,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 10.22,
+      "pct": -67.862,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 53.56,
+      "pct": -15.293,
+      "bucket": "within_25",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": false,
+    "praejimai": true,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 12.09,
+      "pct": -80.879,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": false,
+    "praejimai": false,
+    "vidaus_durys": true
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": 48.13,
+      "pct": -46.157,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": 65.6,
+      "pct": -30.228,
+      "bucket": "way_off",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": 24.9,
+      "pct": -27.889,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": 10.22,
+      "pct": -67.862,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": 41.47,
+      "pct": -34.414,
+      "bucket": "way_off",
+      "unit": "m"
+     }
+    ]
+   }
+  },
+  {
+   "scope": {
+    "langai": false,
+    "lauko_durys": false,
+    "praejimai": false,
+    "vidaus_durys": false
+   },
+   "rows": {
+    "objektas_a": [
+     {
+      "his": 89.39,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_b": [
+     {
+      "his": 94.02,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     },
+     {
+      "his": 34.49,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "b/m"
+     }
+    ],
+    "objektas_c": [
+     {
+      "his": 34.53,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_d": [
+     {
+      "his": 31.8,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ],
+    "objektas_g": [],
+    "objektas_h": [
+     {
+      "his": 63.23,
+      "ours": null,
+      "pct": null,
+      "bucket": "missing",
+      "unit": "m"
+     }
+    ]
+   }
+  }
+ ],
+ "fitted_in_sample": {
+  "aperture_no_deduct_max_m2": 3.0,
+  "skirting_door_deduct_m": 0.85,
+  "skirting_waste": 1.1,
+  "kampai": "vertikalus_lubos",
+  "reveals_scope": {
+   "langai": true,
+   "lauko_durys": true,
+   "praejimai": false,
+   "vidaus_durys": false
+  },
+  "rotband_dalis": 30,
+  "hidro_rows": "two",
+  "rounding": "row_boundary",
+  "paint_rows": "split",
+  "tile_rows": "split"
+ },
+ "after_in_sample": {
+  "objektas_a": {
+   "share": 37.7,
+   "within_10": 20,
+   "n_scored": 53
+  },
+  "objektas_b": {
+   "share": 9.0,
+   "within_10": 10,
+   "n_scored": 111
+  },
+  "objektas_c": {
+   "share": 22.2,
+   "within_10": 8,
+   "n_scored": 36
+  },
+  "objektas_d": {
+   "share": 34.0,
+   "within_10": 17,
+   "n_scored": 50
+  },
+  "objektas_g": {
+   "share": 35.0,
+   "within_10": 7,
+   "n_scored": 20
+  },
+  "objektas_h": {
+   "share": 29.2,
+   "within_10": 7,
+   "n_scored": 24
+  }
+ },
+ "loo": {
+  "objektas_a": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus_lubos",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 50,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 35.8,
+    "within_10": 19,
+    "n_scored": 53
+   }
+  },
+  "objektas_b": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus_lubos",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 50,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 8.1,
+    "within_10": 9,
+    "n_scored": 111
+   }
+  },
+  "objektas_c": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 30,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 19.4,
+    "within_10": 7,
+    "n_scored": 36
+   }
+  },
+  "objektas_d": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus_lubos",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 50,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 32.0,
+    "within_10": 16,
+    "n_scored": 50
+   }
+  },
+  "objektas_g": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus_lubos",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": false,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 30,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 35.0,
+    "within_10": 7,
+    "n_scored": 20
+   }
+  },
+  "objektas_h": {
+   "config": {
+    "aperture_no_deduct_max_m2": 3.0,
+    "skirting_door_deduct_m": 0.85,
+    "skirting_waste": 1.1,
+    "kampai": "vertikalus",
+    "reveals_scope": {
+     "langai": true,
+     "lauko_durys": true,
+     "praejimai": true,
+     "vidaus_durys": false
+    },
+    "rotband_dalis": 30,
+    "hidro_rows": "two",
+    "rounding": "row_boundary",
+    "paint_rows": "split",
+    "tile_rows": "split"
+   },
+   "held_out": {
+    "share": 20.8,
+    "within_10": 5,
+    "n_scored": 24
+   }
+  }
+ },
+ "scope_oracle": {
+  "objektas_a": {
+   "base_within_10": 20,
+   "oracle_within_10": 20,
+   "apimtis": {},
+   "share": 37.7
+  },
+  "objektas_b": {
+   "base_within_10": 10,
+   "oracle_within_10": 11,
+   "apimtis": {
+    "patalpu_sritys_ne": {
+     "15": [
+      "apdaila"
+     ]
+    },
+    "darbai_ne": []
+   },
+   "share": 9.9
+  },
+  "objektas_c": {
+   "base_within_10": 8,
+   "oracle_within_10": 8,
+   "apimtis": {},
+   "share": 22.2
+  },
+  "objektas_d": {
+   "base_within_10": 17,
+   "oracle_within_10": 17,
+   "apimtis": {},
+   "share": 34.0
+  },
+  "objektas_g": {
+   "base_within_10": 7,
+   "oracle_within_10": 7,
+   "apimtis": {},
+   "share": 35.0
+  },
+  "objektas_h": {
+   "base_within_10": 7,
+   "oracle_within_10": 7,
+   "apimtis": {},
+   "share": 29.2
+  }
+ },
+ "summary": {
+  "before_legacy_mean": 27.42,
+  "defaults_mean": 26.15,
+  "in_sample_mean": 27.85,
+  "loo_mean": 25.18,
+  "scope_oracle_mean": 28.0,
+  "seconds": 197
+ }
+}

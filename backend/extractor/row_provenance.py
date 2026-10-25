@@ -208,6 +208,7 @@ PERIMETER_ONLY = (
     "Grindjuosčių sumontavimas", "Grindjuosčių dažymas", "Lubų karnizo sumontavimas", "Lubų karnizo dažymas",
     "Silikonavimas tarp plytelių zonos", "Plytelių vidinių kampų silikonavimas", "Plytelių 45° pjovimas",
     "Plytelių grindjuosčių supjovimas", "Vonios sienų plytelių", "Virtuvės atatvaro plytelių", "Kitų sienų plytelių",
+    "Hidroizoliacinė juosta kampams",       # rules/rows.hidro_two_rows: the wet rooms' gross perimeter
 )
 HEIGHT_ONLY = (
     "Pastolių nuoma", "Lubų glaistymas/dažymas (virš 3", "Lubų glaistymas/dažymas (iki 3",

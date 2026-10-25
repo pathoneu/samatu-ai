@@ -231,3 +231,9 @@
   outline-offset: -1px;
   background: hsl(var(--primary) / 0.05);
 }
+
+/* NoticeFold, closed with a lead notice (the free re-read offer, or its done line): only the lead shows, the rest wait behind
+   the fold line below it (components/project/NoticeFold.jsx, lib/noticeFold.js LEAD_NOTICES). */
+.notice-fold-lead-only > :not([data-fold-lead]) {
+  display: none;
+}

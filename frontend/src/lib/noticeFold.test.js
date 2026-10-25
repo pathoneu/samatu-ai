@@ -24,6 +24,17 @@ test('the workspace notices above the panel have names too', () => {
   });
 });
 
+test('the free re-read offer leads the fold; the line counts only what it hides', async () => {
+  const { leadNotice } = await import('./noticeFold.js');
+  const ids = ['server-refresh-notice', 'free-reread-banner', 'reread-diff-banner'];
+  assert.equal(leadNotice(ids), 'free-reread-banner');
+  assert.deepEqual(foldLabel(ids, 'free-reread-banner'), { title: 'Dar pranešimai (2)', names: 'atnaujinta iš serverio · kas pasikeitė' });
+  // after the read its done line takes the same place
+  assert.equal(leadNotice(['read-rating', 'free-reread-done']), 'free-reread-done');
+  assert.equal(leadNotice(['read-rating', 'reminders-patikra']), null);
+  assert.equal(leadNotice([]), null);
+});
+
 test('the re-read change notice opens the fold when it arrives, not when the page loads with it', async () => {
   const { opensOnArrival } = await import('./noticeFold.js');
   assert.equal(opensOnArrival(null, ['free-reread-banner', 'reread-diff-banner']), false, 'first look');

@@ -257,11 +257,15 @@ def test_totals_equal_the_eval_replay(run):
     assert (by_nr["04"]["_dusas"], by_nr["07"]["_dusas"], by_nr["08"]["_dusas"]) == (False, False, True)
 
 
-def test_without_the_shower_attribution_the_eval_scored_the_type_default(run, monkeypatch):
-    """What closed the gap (2026-10-05): before the eval's tail ran
-    `mark_shower_rooms`, every wet room kept its type's shower zone — room 07's
-    waterproofing larger and „Hidroizoliacinė medžiaga" 97,44 kg against
-    production's 70,38. The only difference was that one step."""
+def test_without_the_shower_attribution_no_row_changes_under_the_two_row_default(run, monkeypatch):
+    """Founder decision 2026-10-24: the waterproofing default is two rows
+    („Grindų hidroizoliacija" m² = net floor area, „Hidroizoliacinė juosta
+    kampams" m = perimeter), neither of which reads the shower zone. So the eval
+    tail without `mark_shower_rooms` differs from production only in the
+    `_dusas` flags and room 07's `hidroizoliacija_m2` detail — every sąmata row,
+    „Hidroizoliacinė medžiaga" included, is identical. (Before the step ran in
+    the eval, 2026-10-05, the one-row form made that material row differ; see the
+    one-row test below.)"""
     from extractor import vision_call as vc
 
     prod = run["result"]
@@ -269,10 +273,29 @@ def test_without_the_shower_attribution_the_eval_scored_the_type_default(run, mo
     unmarked = _eval_tail(run, run["frozen"], replay=True)
     assert _metrics(run, unmarked) == _metrics(run, prod)
     assert _room_diffs(unmarked, prod) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
-    assert [r for r in _rows(unmarked) if r not in _rows(prod)] == \
-        [r for r in _rows(unmarked) if r[1] == "Hidroizoliacinė medžiaga (2 sluoksniai)"]
+    assert _rows(unmarked) == _rows(prod)
     eval_07 = next(r for r in unmarked["patalpos"] if r["nr"] == "07")
     assert next(r for r in prod["patalpos"] if r["nr"] == "07")["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
+
+
+def test_without_the_shower_attribution_the_one_row_form_scored_the_type_default(run, monkeypatch):
+    """What closed the gap (2026-10-05), under the one-row form
+    (`hidro_rows = "one"`, no longer the default since the founder decision of
+    2026-10-24): before the eval's tail ran `mark_shower_rooms`, every wet room
+    kept its type's shower zone — room 07's waterproofing larger and
+    „Hidroizoliacinė medžiaga" differing from production's. The only
+    difference was that one step."""
+    from extractor import vision_call as vc
+
+    one_row = {**copy.deepcopy(run["frozen"]), "_overrides": {"profilis": {"hidro_rows": "one"}}}
+    marked = _eval_tail(run, one_row, replay=True)
+    monkeypatch.setattr(vc, "mark_shower_rooms", lambda parsed: 0)
+    unmarked = _eval_tail(run, one_row, replay=True)
+    assert _room_diffs(unmarked, marked) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
+    changed = [r for r in _rows(unmarked) if r not in _rows(marked)]
+    assert changed and changed == [r for r in _rows(unmarked) if r[1] == "Hidroizoliacinė medžiaga (2 sluoksniai)"]
+    eval_07 = next(r for r in unmarked["patalpos"] if r["nr"] == "07")
+    assert next(r for r in marked["patalpos"] if r["nr"] == "07")["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
 
 
 def test_plain_recompute_misses_exactly_the_drawing_lanes(run):

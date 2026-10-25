@@ -15,100 +15,55 @@ import math
 import re
 from typing import Any
 
-
-# ═════════════════════════════════════════════════════════════════════════
-# UNIVERSAL TAISYKLĖS (industries standartai)
-# ═════════════════════════════════════════════════════════════════════════
-
-UNIVERSAL_RULES = {
-    # NRM2 Section 29: angos > 1m² atimamos iš dažomo ploto (LT default).
-    "openings_threshold_m2": 1.0,
-
-    # ─── Opening deduction standard (Sprint §2A.1, 2026-04-28) ─────────────
-    # Selects which international convention to apply for opening deductions
-    # and reveal (angokraštis) additions:
-    #   "LT"   — practical Lithuanian default. Every door/window deducted if
-    #            ≥ openings_threshold_m2; reveals added for EVERY opening.
-    #   "NRM2" — RICS New Rules of Measurement 2 (UK industry standard).
-    #            ≤ 0.5 m² → no deduction, no reveal.
-    #            0.5–3.0 m² → deduct one face; no reveal addition.
-    #            > 3.0 m² → deduct + measure reveals separately.
-    #   "VOB"  — DIN 18363 (German VOB Part C). Same as NRM2 but threshold = 2.5 m².
-    "paint_deduction_standard": "LT",
-    "nrm2_no_deduct_threshold_m2": 0.5,
-    "nrm2_reveal_threshold_m2": 3.0,
-    "vob_reveal_threshold_m2": 2.5,
-
-    # Standart angų dydžiai (m²)
-    # FORMULA CORRECTION (formula-validation.md §2.4):
-    "default_door_area_m2": 1.85,    # LT STR 2.02.09 typical 0.9×2.05m opening
-    # The reveal depth a door's paintable jambs get when the user has not set a
-    # wall thickness (Prielaidos „Sienos storis") — a GK partition. Feeds the
-    # door NET deduction below; the same number the reveal-area line uses.
-    "default_wall_thickness_m": 0.10,
-    # FORMULA CORRECTION (formula-validation.md §2.3): was 1.40 (US standard wrong)
-    "default_window_area_m2": 1.80,  # LT STR standard 1200×1500mm = 1.80 m²
-
-    # Vonios plytelinės juostos aukštis (default — vartotojas gali keisti)
-    "bathroom_tile_height_m": 2.0,
-
-    # Lubų aukštis defaults
-    "default_ceiling_height_m": 2.82,        # LT modernus
-    "soviet_era_ceiling_height_m": 2.50,     # Sovietmečio
-    "high_ceiling_threshold_m": 3.0,         # Virš 3m → atskira pozicija
-
-    # Glaistas Q lygiai (kg/m²/mm)
-    "skim_consumption": {
-        "Q1": 0.8,  # Under wallpaper
-        "Q2": 1.0,  # Under matte paint (STANDARD)
-        "Q3": 1.2,  # Under semi-gloss
-        "Q4": 1.5,  # Under gloss
-    },
-    "skim_default_thickness_mm": 1.5,
-
-    # Coverage rates (m²/L per coat)
-    "paint_coverage": {
-        "smooth_repaint": 11,        # Previously painted
-        "plastered_q2_q3": 8,        # NEW STANDART
-        "fresh_plaster": 4,
-        "ceiling_smooth": 11,
-        "primer": 7,                 # 0.15 L/m²
-    },
-    "default_coats": 2,
-    "first_coat_factor": 1.8,        # NE 2.0 — first coat absorbs more
-
-    # Drywall (gypsum board)
-    "drywall_sheet_area_m2": 3.0,    # 1200×2500mm = 3.0m²
-    "drywall_screws_per_sheet": 30,
-    "drywall_joint_compound_kg_per_m2": 0.4,
-    "drywall_thickness_walls_mm": 12.5,
-    "drywall_thickness_ceilings_mm": 9.5,
-
-    # Waste factors (% per material)
-    # 2026-05-06 audit: tile straight bumped 0.08 → 0.10 per NRM2 §28 + LT QS
-    # convention; 8% only for very simple rectangular rooms.
-    # Source: docs/formulas/2026-05-06-formula-audit.md §3-4.
-    # 2026-05-11 W1 audit: tiles_herringbone 0.18 → 0.13 (CLAUDE.md §3
-    # max 0.15 for herringbone; §1.7 specifies +12%). parquet_herringbone
-    # 0.20 → 0.16 (CLAUDE.md §1.6 +12-16%, picked upper for safety).
-    "waste_factors": {
-        "paint": 0.07,                # 5-10% standard
-        "drywall": 0.12,              # 10-15%
-        "tiles_straight": 0.10,       # 2026-05-06: was 0.08 (under-spec per NRM2)
-        "tiles_diagonal": 0.13,
-        "tiles_herringbone": 0.13,    # CLAUDE.md §1.7 +12%, §3 cap 10-15%
-        "laminate_straight": 0.10,
-        "laminate_diagonal": 0.13,
-        "parquet_herringbone": 0.16,  # CLAUDE.md §1.6 +12-16% range
-        # v3 W5-E E7: read only under SAMATU_WASTE_BY_PATTERN=1 (extractor/waste_pattern.py)
-        "tiles_hexagonal": 0.16,      # CLAUDE.md §1.7 +16%, §3 15-17%
-        "laminate_hexagonal": 0.16,   # CLAUDE.md §1.6 hexagonal +16%
-        "wallpaper": 0.10,            # CLAUDE.md §3 10-15% — read only under SAMATU_WALLPAPER_ROLLS=1 (E2)
-    },
-
-    # Wallpaper
-    "wallpaper_roll_usable_area_m2": 4.5,  # 0.53×10.05m gross, ~4-5 useful
-}
+# ── Phase 2 split (2026-10-25): the named conventions and the row-level formula helpers live in
+# backend/rules/ now; they are re-exported here so every caller and test imports them unchanged.
+from rules.conventions import (  # noqa: E402,F401 — re-exported
+    UNIVERSAL_RULES,
+    GKP_SHEET_WASTE,
+    SKIRTING_WASTE,
+    _NEVER_TALL_PASKIRTYS,
+    _TALL_CAPABLE_PASKIRTYS,
+    _TALL_THRESHOLD_M,
+    _SMALL_SERVICE_M2,
+    _LARGE_LIVING_M2,
+    ROOM_TYPE_RULES,
+    _SLOPE_FACTOR_TABLE,
+    WALL_WIDTH_TOL_M,
+    PASSAGE_MIN_W_M,
+    DOOR_LIKE_W_M,
+    WINDOW_MIN_W_M,
+    _PASSAGE_ROOMS,
+    DOOR_WIDTH_TOL_M,
+    FRAMELESS_MAX_W_M,
+    STANDARD_DOOR_W_M,
+    STANDARD_DOOR_H_M,
+    REVEALS_SCOPE_KINDS,
+    REVEALS_SCOPE_DEFAULT,
+    STANDARD_WINDOW_W_M,
+    STANDARD_WINDOW_H_M,
+    _STANDARD_DOOR_M,
+    _SYNTHETIC_PERIM_RECT_COEFF,
+    _UNKNOWN_TILE_BAND_M,
+    FULL_TILE_SHARE_MIN,
+    FULL_TILE_HEIGHT_RATIO,
+    FULL_TILE_AREA_RATIO,
+    WET_ROOM_PASKIRTYS,
+    TILE_BAND_DOOR_H_M,
+    _WINDOW_SILL_M,
+    CORNER_MIN_EDGE_M,
+)
+from rules.conventions import LT_RANGOVAS, profile_overrides, resolve_profile  # noqa: E402,F401
+from rules.rows import (  # noqa: E402,F401 — re-exported
+    calc_paint_liters,
+    is_high_ceiling,
+    calc_gkp_sheets,
+    gkp_sheet_count,
+    gkp_ceiling_areas_m2,
+    slope_factor,
+    stairwell_wall_area_m2,
+    calc_totals,
+    paint_coverage_for_class,
+)
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -120,139 +75,9 @@ UNIVERSAL_RULES = {
 # ═════════════════════════════════════════════════════════════════════════
 
 
-def calc_paint_liters(
-    area_m2: float,
-    coats: int = 2,
-    coverage_m2_per_liter: float | None = None,
-    *,
-    first_coat_factor: float | None = None,
-) -> float:
-    """Paint litrai per CLAUDE.md §1.10.
-
-    Formula: ``liters = area × effective_coats / coverage``.
-
-    For 2 coats the effective multiplier is **1.8** (not 2.0) because
-    the first coat absorbs more material — §1.10 explicitly: *"for 2
-    coats multiply by 1.8× (not 2.0×)"*. For 3+ coats we use ``(coats -
-    0.2)`` (each additional coat adds 1.0× since the surface is
-    sealed after coat 1).
-
-    Args:
-        area_m2: paintable surface area (m²).
-        coats: number of finish coats (NRM2 default 2).
-        coverage_m2_per_liter: m²/L per coat. Defaults to "plastered
-            Q2-Q3" = 8 m²/L per CLAUDE.md §1.10.
-        first_coat_factor: override the 1.8× multiplier for testing.
-
-    Returns:
-        Liters (float, NOT rounded — caller rounds up to container size).
-    """
-    if area_m2 <= 0 or coats <= 0:
-        return 0.0
-    cov = coverage_m2_per_liter or UNIVERSAL_RULES["paint_coverage"]["plastered_q2_q3"]
-    factor = first_coat_factor or UNIVERSAL_RULES["first_coat_factor"]
-    if coats == 1:
-        eff = 1.0
-    elif coats == 2:
-        eff = factor          # 1.8 (NOT 2.0)
-    else:
-        # First coat 1.0× absorption-equivalent, then (coats-1) at 1.0×
-        # minus a small first-coat saving of (2.0 - factor) = 0.2.
-        eff = float(coats) - (2.0 - factor)
-    return area_m2 * eff / cov
-
-
-def is_high_ceiling(h_m) -> bool:
-    """LT "virš 3 m" billing bucket — boundary-INCLUSIVE (H ≥ 3.00 m).
-
-    2026-07-04 fix (Rangovas B GKP height-split): drawings annotate nominal
-    heights (+3.000 → 3.00 m) and the contractor bills a 3.00 m ceiling in the
-    premium bucket — Rangovas B pasiūlymas item 2 puts the svetainė zone
-    (Vision-read at exactly 3.0 m) under "GKP ant lubų virš 3m" (68.28 m²),
-    and ceiling/upper-wall work at 3.0 m already needs staging. The previous
-    strict ``>`` silently dropped exactly-3.0 rooms into the standard bucket,
-    zeroing gkp_lubu_virs_3m on any project whose tall zone reads 3.0.
-    Epsilon guards float noise (2.9999999 from unit conversions)."""
-    try:
-        h = float(h_m or 0)
-    except (TypeError, ValueError):
-        return False
-    return h >= UNIVERSAL_RULES["high_ceiling_threshold_m"] - 1e-6
-
-
-def calc_gkp_sheets(wall_area_m2: float, waste_factor: float = 0.10) -> int:
-    """Gipso kartono lapai per CLAUDE.md §1.8.
-
-    Formula: ``sheets = ceil(wall_area / 3.0) × (1 + waste_factor)``,
-    rounded up to whole sheets.
-
-    1 sheet = 1.2 × 2.5 m = 3.0 m². Waste default +10% (NRM2 §27 + LT
-    convention; CLAUDE.md §1.8 says ×1.10).
-
-    Args:
-        wall_area_m2: total area to clad with GKP (m²).
-        waste_factor: waste multiplier (default 0.10).
-
-    Returns:
-        Whole-sheet count (int).
-    """
-    import math
-    if wall_area_m2 <= 0:
-        return 0
-    sheet_area = UNIVERSAL_RULES["drywall_sheet_area_m2"]
-    bare = math.ceil(wall_area_m2 / sheet_area)
-    return math.ceil(bare * (1.0 + waste_factor))
-
-
-# The „GKP lapai …" rows (vision_call.build_gkp_pozicijos) and the §6 #5 check
-# that re-derives them (sanity_checks.check_gk_sheets_math) share the two
-# functions below, so the check can never measure a row against another area or
-# another rounding than the row was built with. 2026-10-07: the check summed only
-# the standard-height ceilings, so every project with GKP ceilings above 3 m read
-# „GKP lapų skaičius nesutampa" against a correct row.
-GKP_SHEET_WASTE = 1.10
-# Grindjuostės: the billed length (perimetras − durys) + 10 % atliekų. ONE
-# factor for the work row, its material row and the ledger's „atliekos" term
-# (vision_call imports it), so the sentence can never disagree with the number.
-SKIRTING_WASTE = 1.10
-
-
-def gkp_sheet_count(area_m2: float) -> int:
-    """Boards on a „GKP lapai …" row: area / one 1,2 × 2,5 m sheet × 1,10 for
-    waste, rounded up once."""
-    if area_m2 <= 0:
-        return 0
-    return math.ceil(area_m2 / UNIVERSAL_RULES["drywall_sheet_area_m2"] * GKP_SHEET_WASTE)
-
-
-def gkp_ceiling_areas_m2(rooms) -> tuple[float, float]:
-    """(standard-height, above-3 m) GKP ceiling m² of the rooms in scope — each
-    summed and rounded to 0,01 m² exactly as the two „GKP lubų montavimas" rows
-    are. A room marked `_neskaiciuoti` (extractor/scope.py) is out of both."""
-    counted = [r for r in (rooms or []) if isinstance(r, dict) and not r.get("_neskaiciuoti")]
-
-    def _sum(field: str) -> float:
-        return round(sum(float(r.get(field) or 0) for r in counted), 2)
-
-    return _sum("gkp_lubu_standart_m2"), _sum("gkp_lubu_virs_3m_m2")
-
-
 # ═════════════════════════════════════════════════════════════════════════
 # PER PATALPOS TIPĄ — universal taisyklės
 # ═════════════════════════════════════════════════════════════════════════
-
-# Room types that are STRUCTURALLY never the tall open-plan zone (>3m ceilings
-# live in large living/kitchen voids, never in small wet rooms, closets, WCs,
-# garages, vestibules). Used by apply_height_plausibility_gate.
-_NEVER_TALL_PASKIRTYS = frozenset({
-    "vonia", "wc", "san", "drabuzine", "rubine", "skalbykla", "katiline",
-    "tamburas", "garazas", "sandeliukas",
-})
-# Room types that legitimately carry the tall ceiling (open-plan living).
-_TALL_CAPABLE_PASKIRTYS = frozenset({"gyvenamoji", "valgomasis", "virtuve", "holas"})
-_TALL_THRESHOLD_M = 3.0
-_SMALL_SERVICE_M2 = 14.0     # a "small" service room
-_LARGE_LIVING_M2 = 25.0      # a living room big enough to be the tall zone
 
 
 def apply_height_plausibility_gate(rooms: list) -> list:
@@ -338,72 +163,6 @@ def apply_height_plausibility_gate(rooms: list) -> list:
         corrections.append({"action": "clamp", "room": r.get("pavadinimas"),
                             "from": old, "to": modal_h})
     return corrections
-
-
-ROOM_TYPE_RULES = {
-    # paskirtis: (sienos_dažomos, lubų_tipas, grindys, plytelės_sienos_iki, plytelės_grindys)
-    "gyvenamoji":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "miegamoji":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "valgomasis":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "virtuve":     {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0.6, "tile_floor": True,    # backsplash 0.6m…
-                    "kitchen_counter_length_m": 3.0},                                                                        # …along the counter, not the whole room (2026-09-23)
-    "vonia":       {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
-    "wc":          {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
-    "san":         {"walls_paint": 1.0, "ceiling_type": "pakabinamos", "floor": "tile", "tile_walls_to_m": 2.0, "tile_floor": True},
-    "koridorius":  {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "holas":       {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "rubine":      {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "drabuzine":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "katiline":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
-    "skalbykla":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
-    "tamburas":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
-    "tambūras":    {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "tile", "tile_walls_to_m": 0,  "tile_floor": True},
-    # 2026-07-04: tile_floor flipped False → True. Both contractor-validated
-    # fixtures tile the garage floor: Objektas A bills 10.10 m² (notes p105
-    # grindys; GT previously needed a per-room tile_floor_override to hit
-    # truth) and Rangovas B bills garage tiling explicitly (pasiūlymas items
-    # 40-43: laiptų garaže įrengimas, plytelių pripjovimas prie trapo garaže,
-    # aliuminio kampas ant plytelių garaže, garažo plytelės). ``floor`` stays
-    # "concrete" deliberately — no screed (Rangovas B screed 182.62 m² truth
-    # excludes the garage slab), no baseboards, no soft covering. Per-room
-    # tile_floor_override still wins for genuinely raw-slab garages.
-    "garazas":     {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": True},
-    "sandėliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "sandeliukas": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    # Sprint §2A.3: stairwell. Multi-height walls (max_height_m + num_steps),
-    # painted walls + GKP/painted ceiling typical. Tile floor for safety.
-    "laiptine":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
-    "laiptinė":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
-    # ── 2026-08-23 vocabulary sweep ──────────────────────────────────────
-    # Five values the Vision schema (prompt.py RoomType enum) is allowed to
-    # emit had NO entry here, so `ROOM_TYPE_RULES.get(paskirtis) or
-    # ROOM_TYPE_RULES["gyvenamoji"]` silently gave them living-room finishes.
-    # For `kabinetas` / `techpatalpa` that fallback is defensible and both
-    # appear in the benchmark corpus (Objektas A 104 "Darbo kambarys",
-    # objektas_b 13 "Tech. patalpa/skalbykla"), so their entries below are
-    # BYTE-EQUAL to gyvenamoji — this is documentation of the existing
-    # behaviour, not a new claim about technical rooms. Revisit `techpatalpa`
-    # (raw slab floor? unpainted?) only against contractor evidence.
-    "kabinetas":   {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    "techpatalpa": {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "parquet", "tile_walls_to_m": 0,   "tile_floor": False},
-    # `terasa` / `lodzija` are OUTSIDE the thermal envelope. Billing them as
-    # painted GKP rooms with a parquet floor (the old fallback) fabricates
-    # interior finishing for a balcony — the single worst over-bill this sweep
-    # found. walls_paint 0 + betonas ceiling also trips the
-    # `ceiling_unfinished` gate below, so an exterior room contributes no
-    # paint at all. Exterior deck tiling is a separate trade, not interior
-    # takeoff → tile_floor False.
-    "terasa":      {"walls_paint": 0.0, "ceiling_type": "betonas", "floor": "concrete", "tile_walls_to_m": 0, "tile_floor": False},
-    # Sauna: wood-lined walls and ceiling (no putty, no paint), tiled floor,
-    # and a wet room for waterproofing purposes. `medis` is NOT a Vision
-    # lubu_tipas value — it can only arrive from this table, which is what
-    # keeps the ceiling-unfinished gate from firing on any read ceiling.
-    "pirtis":      {"walls_paint": 0.0, "ceiling_type": "medis", "floor": "tile",    "tile_walls_to_m": 0,   "tile_floor": True},
-    # Pool hall: tiled and wet, but deliberately NOT part of the bathroom
-    # family — the santechnika lane bills one klozetas + rėmas per
-    # vonia/wc/san room, and a pool is not a toilet.
-    "baseinas":    {"walls_paint": 1.0, "ceiling_type": "gkp", "floor": "tile",    "tile_walls_to_m": 2.0, "tile_floor": True},
-}
 
 
 # ── Words the contractor reads (2026-10-06) ──────────────────────────────────
@@ -533,14 +292,17 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     if _t > 0:
         for rt in rules:
             rules[rt]["wall_thickness_m"] = _t
-    # Apimtis (2026-09-06): walls measured without deducting the openings.
-    if (prefs.get("apimtis") or {}).get("sienos_angos") == "neatimti":
+    # Apimtis (2026-09-06): walls measured without deducting the openings. The profile's `scope_defaults`
+    # (Phase 2) fill the keys the project did not choose.
+    from .scope import with_profile_defaults
+    _ap = with_profile_defaults(prefs.get("apimtis"), prefs) or {}
+    if _ap.get("sienos_angos") == "neatimti":
         for rt in rules:
             rules[rt]["deduct_openings"] = False
     # Corner bead on the room's own (concave) corners: the „Ką skaičiuoti"
     # choice first; otherwise the Setup Wizard checkbox, which promised this
     # for months and was never read by the calculator.
-    _kampai = (prefs.get("apimtis") or {}).get("kampai")
+    _kampai = _ap.get("kampai")
     if _kampai in ("tik_isoriniai", "su_vidiniais"):
         for rt in rules:
             rules[rt]["count_inner_corners"] = _kampai == "su_vidiniais"
@@ -603,7 +365,19 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
         except (ValueError, TypeError):
             pass
 
+    # Phase 2 (2026-10-25): the conventions profile keys this project set explicitly (rules/conventions.py
+    # LT_RANGOVAS) — read by calc_room_quantities; absent = every default, byte-identical to before.
+    _prof = profile_overrides(prefs)
+    if _prof:
+        rules["_profilis"] = _prof
+
     return rules
+
+
+def _room_profile(rules: dict | None) -> dict:
+    """The explicit profile overrides a calc_room_quantities call carries ({} = defaults)."""
+    p = (rules or {}).get("_profilis") if isinstance(rules, dict) else None
+    return p if isinstance(p, dict) else {}
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -612,57 +386,6 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
 # Reference: CLAUDE.md §3 (slope factor table reused for interior).
 # LT pavienių namų projects often have mansardiniai stogai → sloped ceilings.
 # Without these, plain S_ceiling = floor_area underestimates 15-40%.
-
-# Slope factor table (CLAUDE.md §3, copied for interior reuse).
-# factor = 1 / cos(angle). Linear interp between known points.
-_SLOPE_FACTOR_TABLE = {
-    0:  1.000,
-    5:  1.004,
-    10: 1.015,
-    15: 1.035,
-    20: 1.064,
-    25: 1.103,
-    30: 1.155,
-    35: 1.221,
-    40: 1.305,
-    45: 1.414,
-    50: 1.556,
-    55: 1.743,
-    60: 2.000,
-}
-
-
-def slope_factor(angle_deg: float) -> float:
-    """Compute roof/ceiling slope factor = 1 / cos(angle).
-
-    Linear-interpolates between table values for accuracy + smoothness.
-    Clamped to [0, 60] degrees (steeper = exotic, table edge).
-    """
-    if angle_deg <= 0:
-        return 1.0
-    a = max(0.0, min(60.0, float(angle_deg)))
-    # Use math.cos for precision, table only as reference / sanity check.
-    rad = math.radians(a)
-    return 1.0 / math.cos(rad)
-
-
-def stairwell_wall_area_m2(perimeter_m: float, max_height_m: float,
-                            num_steps: int = 0,
-                            stair_run_m: float = 0.0,
-                            stair_rise_m: float = 0.0) -> float:
-    """Wall area for a stairwell room.
-
-    Formula: perim × max_height − Σ(stair triangles).
-    Each step cuts a small triangle: 0.5 × run × rise out of one wall.
-    The full staircase = num_steps × triangle_area.
-
-    Returns m². If steps unknown, falls back to plain perim × max_height.
-    """
-    gross = max(0.0, perimeter_m * max_height_m)
-    if num_steps <= 0 or stair_run_m <= 0 or stair_rise_m <= 0:
-        return round(gross, 2)
-    triangle = 0.5 * stair_run_m * stair_rise_m * num_steps
-    return round(max(0.0, gross - triangle), 2)
 
 
 def room_aukstas_from_nr(nr) -> int:
@@ -960,7 +683,7 @@ def classify_room_name(pavadinimas: str | None,
 # OPENING DEDUCTION HELPERS (Sprint §2A.1, NRM2 / VOB / LT)
 # ═════════════════════════════════════════════════════════════════════════
 
-def _opening_should_deduct(area_m2: float, standard: str) -> bool:
+def _opening_should_deduct(area_m2: float, standard: str, threshold: float | None = None) -> bool:
     """True if a single opening (door/window) of given area should be
     subtracted from this room's wall area under the given standard.
 
@@ -969,7 +692,8 @@ def _opening_should_deduct(area_m2: float, standard: str) -> bool:
     """
     if standard in ("NRM2", "VOB"):
         return area_m2 >= UNIVERSAL_RULES["nrm2_no_deduct_threshold_m2"]
-    return area_m2 >= UNIVERSAL_RULES["openings_threshold_m2"]
+    # `threshold` — the profile's `aperture_no_deduct_max_m2` when the project set it (LT standard only)
+    return area_m2 >= (UNIVERSAL_RULES["openings_threshold_m2"] if threshold is None else threshold)
 
 
 _DOOR_KINDS = ("duris", "pasleptos_duris")
@@ -1010,20 +734,7 @@ REMOVED_OPENINGS_KEY = "_angos_pasalintos"  # element: openings he emptied on th
 USER_OPENINGS_KEY = "_angos_user_at"     # room: he corrected the doors and windows on the room sheet (lib/roomSheet.js)
 DRAWN_KEY = "_nupiesta"                 # element: what the drawing shows in its opening — „langas" (glazing) / „durys" (swing)
 KIND_BY_DRAWING_KEY = "_tipas_pagal_brezini"  # element: its kind follows the drawing (a listed window stood in a drawn door)
-WALL_WIDTH_TOL_M = 0.25                 # a Vision-read size against the wall's gap
-PASSAGE_MIN_W_M = 1.3                   # wider than a door
-DOOR_LIKE_W_M = (0.7, 1.3)              # an opening to the outside this wide with no window left is a door
-WINDOW_MIN_W_M = 0.5                    # narrower, an opening to the outside is no window's (room_facts offers none)
-_PASSAGE_ROOMS = {"gyvenamoji", "virtuve", "valgomasis", "koridorius", "holas", "tamburas", "kabinetas", "laiptai"}
-DOOR_WIDTH_TOL_M = 0.16
-FRAMELESS_MAX_W_M = 1.3                 # wider than this an interior „door" is a passage or a double leaf, not a frame
-STANDARD_DOOR_W_M = 0.9
-STANDARD_DOOR_H_M = 2.1
 REVEALS_SCOPE_KEY = "_angokrasciu_apimtis"   # room: which openings' reveals the finisher does — his choice or the default
-REVEALS_SCOPE_KINDS = ("langai", "lauko_durys", "praejimai", "vidaus_durys")
-REVEALS_SCOPE_DEFAULT = {"langai": True, "lauko_durys": True, "praejimai": True, "vidaus_durys": False}
-STANDARD_WINDOW_W_M = 1.2
-STANDARD_WINDOW_H_M = 1.5
 
 
 def _nr_key(nr: str) -> tuple:
@@ -1920,6 +1631,11 @@ def settle_reveals_scope(rooms: list[dict], overrides: dict | None = None) -> di
     raw = (overrides or {}).get("angokrasciai_apimtis") if isinstance(overrides, dict) else None
     scope = dict(REVEALS_SCOPE_DEFAULT)
     chosen = False
+    # Phase 2 (2026-10-25): the profile's `reveals_scope` replaces the default when the project set it;
+    # his own Prielaidos choice above still wins over both.
+    prof_scope = profile_overrides(overrides).get("reveals_scope")
+    if isinstance(prof_scope, dict):
+        scope.update({k: bool(v) for k, v in prof_scope.items() if k in REVEALS_SCOPE_KINDS})
     if isinstance(raw, dict):
         for k in REVEALS_SCOPE_KINDS:
             if k in raw:
@@ -1990,10 +1706,36 @@ def prepare_rooms_for_calc(rooms: list[dict], overrides: dict | None = None, doo
             r[KARNIZAS_KEY] = karnizas
     out["karnizas"] = karnizas
     return out
-_STANDARD_DOOR_M = (0.9, 2.1)   # the LT interior door opening when a room's elementai carry no size
 
 
-def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, standard: str) -> float:
+def skirting_door_widths_m(room: dict, n_doors: int, mode=0.85) -> float:
+    """What the room's doors take off its skirting length (profile `skirting_door_deduct_m`).
+
+    A number: that many metres per door (`n_doors`, the calculator's own count) — 0,85 is the engine's
+    long-standing value, 0,90 the founder's rule. „drawn": each listed door's own width (units ×
+    plotis), 0,9 m for a door with no readable width, and the standard 0,9 m for the doors `n_doors`
+    counts beyond the listed ones. A door listed in both rooms it joins is a gap in both skirtings."""
+    if mode != "drawn":
+        try:
+            per = float(mode)
+        except (TypeError, ValueError):
+            per = 0.85
+        return n_doors * per
+    total, listed = 0.0, 0
+    for el in room.get("elementai") or []:
+        if not isinstance(el, dict) or (el.get("tipas") or "").lower() not in _DOOR_KINDS:
+            continue
+        k = _el_units(el)            # a shared door interrupts the skirting on BOTH sides
+        if k <= 0:
+            continue
+        w = _el_width_m(el)
+        total += k * (w if w and 0.3 <= w <= 4.0 else STANDARD_DOOR_W_M)
+        listed += k
+    return total + max(0, int(n_doors) - listed) * STANDARD_DOOR_W_M
+
+
+def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, standard: str,
+                          threshold: float | None = None) -> float:
     """What the room's doors take out of the paintable wall: each opening's
     area LESS the jambs and head that get painted, (w + 2h) × wall thickness.
 
@@ -2027,7 +1769,7 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
             continue
         sized += k
         area = w * h
-        if _opening_should_deduct(area, standard):
+        if _opening_should_deduct(area, standard, threshold):
             total += k * max(0.0, area - (w + 2 * h) * t)
     # Doors without a size: the mean door area the reader derived for the room
     # (`door_area_m2`, from elements that carried sizes elsewhere) or the
@@ -2038,7 +1780,7 @@ def _door_net_deduction_m2(room: dict, n_doors: int, wall_thickness_m: float, st
     except (TypeError, ValueError):
         fallback_area = w * h
     for _ in range(max(0, int(n_doors) - sized)):
-        if _opening_should_deduct(fallback_area, standard):
+        if _opening_should_deduct(fallback_area, standard, threshold):
             total += max(0.0, fallback_area - (w + 2 * h) * t)
     return round(total, 3)
 
@@ -2096,7 +1838,6 @@ def _resolve_deduction_standard(rules: dict | None) -> str:
 # inline_label (trusted) and null/unknown (unclassifiable) are both left alone —
 # acting only on a positive synthetic signal bounds false positives (a missed
 # correction is safe; inflating a real-perimeter room is not).
-_SYNTHETIC_PERIM_RECT_COEFF = 4.69
 # Perimeters somebody STATED — the plan's dimension strings, the eksplikacija,
 # the user — are never floored: below 4·√A they say the AREA label is the odd
 # one out, not the perimeter.
@@ -2113,7 +1854,6 @@ _SYNTHETIC_AREA_SOURCES = ("wall_dim_calc", "default_fallback")
 # a room-type default is available. 2.0 m ≈ a standard bathroom tile line —
 # well below a typical 2.7–2.82 m ceiling, so a dominant-share room of unknown
 # height is NOT mistaken for full-tile-to-ceiling (which would zero its paint).
-_UNKNOWN_TILE_BAND_M = 2.0
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -2140,10 +1880,6 @@ _UNKNOWN_TILE_BAND_M = 2.0
 # `resolve_wall_tile_read()`. Every branch consumes the same `is_full_tile`,
 # so an absent optional Vision field can no longer silently switch the
 # double-billing rule on and off.
-FULL_TILE_SHARE_MIN = 0.8        # ≥80% of the perimeter = tile dominates
-FULL_TILE_HEIGHT_RATIO = 0.95    # band ≥95% of H = tiled to the ceiling
-FULL_TILE_AREA_RATIO = 0.95      # elevation path: tile m² ≥95% of wall m²
-WET_ROOM_PASKIRTYS = ("vonia", "wc", "san")
 
 
 def is_full_tile_walls(tile_share: float, tile_height_m: float,
@@ -2188,10 +1924,6 @@ def elevation_says_no_tile(room: dict) -> bool:
 # A door is 2,1 m high (0,9 × 2,1 standard, see the door-deduction note in
 # calc_room_quantities). A tile band that reaches this height contains the
 # doors of a tiled wall; a lower band contains the part of them below its top.
-TILE_BAND_DOOR_H_M = 2.1
-
-
-_WINDOW_SILL_M = 0.9          # where a window starts above the floor when the drawing does not say
 
 
 def _openings_in_tile_band_m2(room: dict, band_h_m: float, tile_share: float) -> float:
@@ -2439,9 +2171,6 @@ FLOOR_COVERINGS: dict[str, tuple[str, bool]] = {
 }
 
 
-CORNER_MIN_EDGE_M = 0.10      # an edge shorter than this is a drawing artefact (a jog), not a wall
-
-
 def ring_corner_counts(ring, m_per_unit: float | None = None) -> tuple[int, int]:
     """(inner, outer) corners of a room's outline seen from INSIDE the room: a convex vertex is where two
     walls meet (vidinis kampas), a reflex one a wall edge sticking into the room (išorinis kampas). Straight
@@ -2488,17 +2217,18 @@ def experiment_corners_from_outline() -> bool:
     return _experiment_corners
 
 
-def room_outline_corners(room: dict) -> tuple[int, int] | None:
+def room_outline_corners(room: dict, from_outline: bool = False) -> tuple[int, int] | None:
     """(inner, outer) corner counts the calculator takes from an outline instead of the 4-corner default:
     a merged room's, stored by the merge route in `_sujungimas` (a rebuild reads numbers, not geometry);
-    under the eval experiment any room with a wall outline. None → the default."""
+    under the eval experiment — or when the profile's corner convention bills vertical corners only
+    (`from_outline`, Phase 2) — any room with a wall outline. None → the default."""
     m = room.get("_sujungimas") if isinstance(room.get("_sujungimas"), dict) else None
     if m is not None:
         vi, isr = m.get("kampai_vidiniai"), m.get("kampai_isoriniai")
         if isinstance(vi, int) and not isinstance(vi, bool) and isinstance(isr, int) and not isinstance(isr, bool) \
                 and vi >= 0 and isr >= 0 and vi + isr >= 3:
             return vi, isr
-    if experiment_corners_from_outline():
+    if from_outline or experiment_corners_from_outline():
         from .dimension_sum import WALL_OUTLINES
         ring = room.get("polygon_pct")
         k = room.get("_konturas") if isinstance(room.get("_konturas"), dict) else {}
@@ -2648,8 +2378,10 @@ def calc_room_quantities(room: dict,
     door_area = float(room.get("door_area_m2") or UNIVERSAL_RULES["default_door_area_m2"])
     window_area = float(room.get("window_area_m2") or UNIVERSAL_RULES["default_window_area_m2"])
 
-    doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard) else 0
-    windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard) else 0
+    prof = _room_profile(rules)
+    aperture_thr = prof.get("aperture_no_deduct_max_m2")     # None = the LT rule in UNIVERSAL_RULES
+    doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard, aperture_thr) else 0
+    windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard, aperture_thr) else 0
     # Apimtis (2026-09-06): „sienų plotas be angų" — the contractor measures
     # straight through the openings (cut-outs are waste and cutting labour), so
     # nothing is deducted from the wall area in any branch below.
@@ -2731,7 +2463,7 @@ def calc_room_quantities(room: dict,
     # so the presence/absence of an optional Vision field can no longer flip
     # the double-billing rule (a fully tiled wet room billed as tile AND as
     # paint). See resolve_wall_tile_read() for the priority order.
-    doors_deduction = _door_net_deduction_m2(room, n_doors, wall_thickness_m, standard)
+    doors_deduction = _door_net_deduction_m2(room, n_doors, wall_thickness_m, standard, aperture_thr)
     if not rt_rules.get("deduct_openings", True):
         doors_deduction = 0.0          # apimtis: „sienų plotas be angų" — see the openings block above
     wall_area_available = max(0.0, walls_gross - doors_deduction)
@@ -3258,7 +2990,7 @@ def calc_room_quantities(room: dict,
         # A merged room („Sujungti", 2026-10-16) — and, only under the eval experiment, any room with a wall
         # outline — counts its corners off the outline: convex vertices are inner corners (two walls meet),
         # reflex ones outer (a wall edge sticks into the room: real bead, in both corner modes).
-        outline_corners = room_outline_corners(room)
+        outline_corners = room_outline_corners(room, from_outline=prof.get("kampai", "visi") != "visi")
         outer_corners_m = 0.0
         if outline_corners is not None:
             inner_corners_m = outline_corners[0] * H if count_inner_corners else 0.0
@@ -3283,6 +3015,24 @@ def calc_room_quantities(room: dict,
         # wall-ceiling line of the room — the brief bills the corners only)
         hole_corners_m = hole_corners * H
         kampai += hole_corners_m + outer_corners_m
+        # Phase 2 (2026-10-25): the profile's corner convention keeps only the terms it bills; the dropped
+        # ones are zeroed in the room's term fields too, so the ledger's addends still sum to kampu_metrai.
+        _kc = prof.get("kampai", "visi")
+        if _kc != "visi":
+            perim_term = perim - hole_walls_m
+            if _kc in ("isoriniai", "isoriniai_angos", "tik_lubos"):
+                inner_corners_m = 0.0
+                pusiniai_m = 0.0
+                count_partition_corners = False
+            if _kc in ("isoriniai", "vertikalus", "vertikalus_lubos", "tik_lubos"):
+                opening_reveals_m = 0.0
+            if _kc == "tik_lubos":
+                outer_corners_m = 0.0
+                hole_corners_m = 0.0
+            kampai = (inner_corners_m + opening_reveals_m
+                      + (pusiniai_m if count_partition_corners else 0.0)
+                      + (perim_term if _kc in ("vertikalus_lubos", "tik_lubos") else 0.0)
+                      + hole_corners_m + outer_corners_m)
     else:
         inner_corners_m = 0.0
         opening_reveals_m = 0.0
@@ -3383,14 +3133,17 @@ def calc_room_quantities(room: dict,
     # FORMULA CORRECTION (formula-validation.md §2.8): + 10% waste
     # Sprint §38 (2026-04-29): also skip on concrete floors (garažas, parter)
     # — no plinth where there's no finished surface.
-    door_widths_total = n_doors * 0.85
+    # Phase 2 (2026-10-25): what a door takes off and the work row's waste are profile parameters
+    # (`skirting_door_deduct_m` 0,85 per door / 0,90 / „drawn" widths; `skirting_waste` 1,10 / 1,00).
+    door_widths_total = skirting_door_widths_m(room, n_doors, prof.get("skirting_door_deduct_m", 0.85))
+    skirting_waste = float(prof.get("skirting_waste", SKIRTING_WASTE))
     floor_type_for_grindjuostes = floor_type
     grindjuostes_base = (
         max(0, perim - door_widths_total)
         if (not tile_floor and floor_type_for_grindjuostes != "concrete" and walls_paint_factor > 0)
         else 0
     )
-    grindjuostes = grindjuostes_base * SKIRTING_WASTE  # +10% waste (NRM2 §27)
+    grindjuostes = grindjuostes_base * skirting_waste  # +10% waste (NRM2 §27) unless the profile says net
     # …and which predicate zeroed it, for the same reason as the walls one
     # above: „Šios patalpos grindjuosčių sąmatoje nėra" restates the outcome
     # instead of naming the input the contractor would go and change.
@@ -3485,7 +3238,9 @@ def calc_room_quantities(room: dict,
         # does not contain must not be shown as if it did.
         "kampai_pusiniai_m": round(
             pusiniai_m if count_partition_corners else 0.0, 2),
-        "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0 else 0.0, 2),
+        "kampai_perimetras_m": round(perim - hole_walls_m if walls_paint_factor > 0
+                                     and prof.get("kampai", "visi") in ("visi", "vertikalus_lubos", "tik_lubos")
+                                     else 0.0, 2),
         "kampai_skyliu_m": round(hole_corners_m, 2),
         "kampai_isoriniai_m": round(outer_corners_m, 2),
         "angokrasciu_gkp_m": round(angokrasciu_m, 2),
@@ -3505,6 +3260,8 @@ def calc_room_quantities(room: dict,
         "_grindjuosciu_baze_m": round(grindjuostes_base, 2),
         "_grindjuosciu_duru_m": round(
             door_widths_total if grindjuostes_base > 0 else 0.0, 2),
+        # the waste factor this room's work metres carry (profile `skirting_waste`; the ledger reads it)
+        "_grindjuosciu_atliekos": skirting_waste,
         # The predicate that left this room out of the grindjuosčių lines, or
         # None when it is in them. Same contract as `_walls_unpainted_reason`.
         "_grindjuosciu_praleista": grindjuosciu_praleista,
@@ -3534,89 +3291,3 @@ def calc_room_quantities(room: dict,
     }
 
 
-def calc_totals(rooms: list[dict]) -> dict:
-    """Suminiai kiekiai per visą projektą.
-
-    Accepts rooms from either:
-    - Vision output (patalpos items) with fields: dazymo_plotas_m2, kampu_metrai,
-      grindjuosciu_m, lubu_tipas, etc.
-    - calc_room_quantities output with fields: dazymo_plotas_m2, kampai_m,
-      gkp_lubu_standart_m2, gkp_lubu_virs_3m_m2, grindjuostes_m, etc.
-
-    Returns dict in Vision santrauka format (field names with _total suffix).
-    """
-    totals = {
-        "dazymo_plotas_total_m2": 0.0,
-        "kampai_m_total": 0.0,
-        "angokrasciu_gkp_m_total": 0.0,
-        "pasleptu_duru_staktu_m_total": 0.0,
-        "nisu_metrai_total": 0.0,
-        "gkp_lubu_m2_total": 0.0,
-        "gkp_lubu_virs_3m_m2_total": 0.0,
-        "pvc_grindys_m2_total": 0.0,
-        "plyteles_grindys_m2_total": 0.0,
-        "plyteles_sienos_m2_total": 0.0,
-        "isliginamasis_m2_total": 0.0,
-        "grindjuosciu_m_total": 0.0,
-        "silikonavimas_m_total": 0.0,
-        "hidroizoliacijos_vnt": 0,
-    }
-
-    for r in rooms:
-        totals["dazymo_plotas_total_m2"] += r.get("dazymo_plotas_m2", 0)
-        # kampai: accept both Vision field name and calc_room_quantities field name
-        totals["kampai_m_total"] += r.get("kampu_metrai", 0) or r.get("kampai_m", 0)
-        totals["angokrasciu_gkp_m_total"] += r.get("angokrasciu_gkp_m", 0)
-        totals["pasleptu_duru_staktu_m_total"] += r.get("pasleptu_duru_staktu_m", 0)
-        totals["nisu_metrai_total"] += r.get("nisu_metrai", 0)
-        totals["pvc_grindys_m2_total"] += r.get("pvc_grindys_m2", 0)
-        totals["plyteles_grindys_m2_total"] += r.get("plyteles_grindys_m2", 0)
-        totals["plyteles_sienos_m2_total"] += r.get("plyteles_sienos_m2", 0)
-        totals["isliginamasis_m2_total"] += r.get("isliginamasis_m2", 0)
-        # grindjuosciu: accept both Vision field name and calc_room_quantities field name
-        totals["grindjuosciu_m_total"] += r.get("grindjuosciu_m", 0) or r.get("grindjuostes_m", 0)
-        totals["silikonavimas_m_total"] += r.get("silikonavimas_m", 0)
-
-        # GKP lubos: prefer calc_room_quantities outputs when present
-        # (they handle partial high-ceiling rooms via high_ceiling_area_m2);
-        # fall back to the lubu_tipas + lubu_aukstis_m heuristic on bare
-        # Vision rooms that never went through calc_room_quantities.
-        precomputed_std = r.get("gkp_lubu_standart_m2")
-        precomputed_high = r.get("gkp_lubu_virs_3m_m2")
-        if precomputed_std is not None or precomputed_high is not None:
-            totals["gkp_lubu_m2_total"] += float(precomputed_std or 0)
-            totals["gkp_lubu_virs_3m_m2_total"] += float(precomputed_high or 0)
-        else:
-            lubu_tipas = r.get("lubu_tipas", "gkp")
-            lubu_aukstis = float(r.get("lubu_aukstis_m", 2.82))
-            plotas = float(r.get("plotas_m2", 0))
-            if lubu_tipas in ("gkp", "tempiamos"):
-                if is_high_ceiling(lubu_aukstis):
-                    totals["gkp_lubu_virs_3m_m2_total"] += plotas
-                else:
-                    totals["gkp_lubu_m2_total"] += plotas
-
-        # Hidroizoliacija count
-        paskirtis = (r.get("paskirtis") or "").lower()
-        if paskirtis in ("vonia", "wc", "san", "katiline", "skalbykla"):
-            totals["hidroizoliacijos_vnt"] += 1
-
-    return {k: round(v, 2) if isinstance(v, float) else v for k, v in totals.items()}
-
-
-def paint_coverage_for_class(paint_class: int) -> tuple[float, float]:
-    """Return (walls_coverage_m2_per_l, ceiling_coverage_m2_per_l) for a Q-class.
-
-    Class 1 = previously painted smooth (Q1 finish)
-    Class 2 = plastered Q2-Q3 (matte paint)
-    Class 3 = fresh plaster (Q4, lots of absorption)
-
-    Sourced from UNIVERSAL_RULES["paint_coverage"] — single source of truth.
-    """
-    pc = UNIVERSAL_RULES["paint_coverage"]
-    walls_key = {
-        1: "smooth_repaint",
-        2: "plastered_q2_q3",
-        3: "fresh_plaster",
-    }.get(paint_class, "plastered_q2_q3")
-    return float(pc[walls_key]), float(pc["ceiling_smooth"])

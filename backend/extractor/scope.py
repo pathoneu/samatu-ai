@@ -48,7 +48,7 @@ from typing import Any, Iterable, Sequence
 __all__ = [
     "FAMILIES", "ROOM_FAMILIES", "LUBOS_CHOICES", "SIENOS_ANGOS_CHOICES", "ROTBAND_CHOICES", "KAMPAI_CHOICES",
     "ROTBAND_DEFAULT_SHARE", "EXCLUDED_BECAUSE", "CEILING_NOT_OURS", "COMPUTED_ROOM_FIELDS",
-    "FAMILY_ROOM_FIELDS", "normalize_apimtis", "section_family", "is_room_excluded",
+    "FAMILY_ROOM_FIELDS", "normalize_apimtis", "with_profile_defaults", "section_family", "is_room_excluded",
     "room_families_off", "family_on_in_room", "mark_rooms", "rooms_in_scope",
     "excluded_quantity", "EXCLUDED_QUANTITIES_KEY", "MERGED_INTO_KEY", "MERGED_BECAUSE",
     "is_absorbed", "is_excluded_by_choice", "excluded_because",
@@ -153,6 +153,20 @@ def normalize_apimtis(raw: Any) -> dict | None:
             and out["lubos"] in (None, "dazomos") and out["sienos_angos"] in (None, "atimti")
             and out["rotband"] in (None,) and out["rotband_dalis"] is None and out["kampai"] is None):
         return None
+    return out
+
+
+def with_profile_defaults(raw: Any, overrides: Any) -> dict | None:
+    """The project's scope with the profile's `scope_defaults` (rules/conventions.py LT_RANGOVAS, Phase 2)
+    under it: every key the project chose stays his; a key he did not choose takes the profile default.
+    None when neither says anything — exactly what `normalize_apimtis` received before the profile."""
+    from rules.conventions import profile_overrides
+    defaults = profile_overrides(overrides).get("scope_defaults") if isinstance(overrides, dict) else None
+    own = raw if isinstance(raw, dict) else None
+    if not isinstance(defaults, dict) or not defaults:
+        return raw
+    out = dict(defaults)
+    out.update(own or {})
     return out
 
 
