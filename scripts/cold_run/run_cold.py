@@ -221,6 +221,76 @@ def scales_from_dims(dims: list[dict]) -> dict:
     return per
 
 
+# What a fresh paid reading carries from the model besides the room list (Phase 3c moves these readers onto the
+# text layer; the row builder blanks every quantity that rests on them without a legal source — row_provenance).
+MODEL_ROOM_KEYS = ("paskirtis", "lubu_tipas", "elementai", "plyteles_sienos_aukstis_m")
+PROJECT_KEYS = ("_apimtis", "_overrides", "detected_symbols_summary", "_door_types", "_sanitary_prietaisai",
+                "puslapiai", "_plyteliu_specs")
+
+
+def samata(lane_parsed: dict, blob: dict | None, scan: dict, pdf_bytes: bytes) -> dict:
+    """The sąmata the paid reading builds today on these rooms (v4 3b): production's model readings carried
+    in by the room's old key (`_modelio_nr`), the project-level text scans, the height step, the per-room
+    engine and the row builder. Every row with its `_kilme`; no model call."""
+    from extractor import row_provenance as rp
+    from extractor.vision_call import _build_pozicijos_from_rooms, _recompute_per_room_via_python
+
+    parsed = copy.deepcopy(lane_parsed)
+    by_old = {str(r.get("nr")): r for r in (blob or {}).get("patalpos") or [] if isinstance(r, dict)}
+    for r in parsed.get("patalpos") or []:
+        old = by_old.get(str(r.get("_modelio_nr") or r.get("nr")))
+        if old:
+            for k in MODEL_ROOM_KEYS:
+                if k in old and k not in r:
+                    r[k] = copy.deepcopy(old[k])
+    for k in PROJECT_KEYS:
+        if blob and k in blob:
+            parsed[k] = copy.deepcopy(blob[k])
+    meta = (blob or {}).get("_meta") or {}
+    parsed["_meta"] = {k: meta.get(k) for k in ("fixtures_status", "fixtures_counts", "fixtures_raised") if k in meta}
+    parsed["_autoriaus_kiekiai"] = scan.get("figures") or []
+    try:
+        from extractor.symbol_legend import scan_symbol_legend
+        parsed["_symbol_legend"] = scan_symbol_legend(pdf_bytes)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from extractor.door_schedule import scan_door_schedule
+        parsed["_duru_ziniarastis"] = scan_door_schedule(pdf_bytes)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from extractor.vector_symbols import scan_vector_symbols
+        parsed["_vector_symbols"] = scan_vector_symbols(pdf_bytes)
+    except Exception:  # noqa: BLE001
+        pass
+    from extractor import scope as _scope
+
+    rp.fill_heights_from_read(parsed["patalpos"], parsed)
+    # his „ką skaičiuoti" exactly as extract_interior applies it (Step 2.9 → 2.95)
+    rules = {**(parsed.get("_overrides") or {})}
+    if parsed.get("_apimtis") and not rules.get("apimtis"):
+        rules["apimtis"] = parsed["_apimtis"]
+    parsed = _recompute_per_room_via_python(parsed, rules)
+    parsed["_overrides"] = rules
+    apimtis = _scope.normalize_apimtis(rules.get("apimtis"))
+    _scope.mark_rooms(parsed.get("patalpos") or [], apimtis)
+    if apimtis:
+        parsed["_apimtis"] = apimtis
+        _scope.apply_ceiling_choice(parsed.get("patalpos") or [], apimtis)
+    parsed = _build_pozicijos_from_rooms(parsed)
+    if apimtis:
+        parsed["pozicijos"] = _scope.filter_rows_by_families(parsed.get("pozicijos"), apimtis)
+    rows = [{"skyrius": p.get("skyrius"), "aprasymas": p.get("aprasymas"), "vnt": p.get("vnt"),
+             "kiekis": p.get("kiekis"), "kilme": p.get(rp.KILME_KEY), "priezastis": p.get(rp.REASON_KEY)}
+            for p in parsed.get("pozicijos") or []]
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[str(r["kilme"])] = counts.get(str(r["kilme"]), 0) + 1
+    return {"rows": rows, "kilme": counts, "illegal": [r["aprasymas"] for r in rows
+                                                      if r["kilme"] in rp.ILLEGAL and r["kiekis"] is not None]}
+
+
 def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> dict:
     pdf_bytes = pdf_path.read_bytes()
     res: dict = {"codename": codename, "bytes": len(pdf_bytes), "timings": {}}
@@ -309,6 +379,7 @@ def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> d
             lane = run_lane(pdf_bytes, app_rooms, blob.get("puslapiai") or [], scan)
             res["app"].update({"lane": geo_summary(lane["geo"]), "rooms": room_rows(lane["parsed"]),
                                "timings": lane["timings"]})
+            res["app"]["samata"] = samata(lane["parsed"], blob, scan, pdf_bytes)      # v4 3b
 
     # ── project-level deterministic scans ──
     t = time.time()
@@ -381,6 +452,10 @@ def main() -> int:
                 print(f"  {variant:6s}: rooms {len(rr)} | placed by badge/label "
                       f"{sum(1 for r in rr if r.get('vieta') in ('zenkliukas', 'plotas_uzrasas'))} | "
                       f"outlined {sum(1 for r in rr if r.get('outline_m2'))} | keys {[r.get('nr') for r in rr]}")
+        sam = (res.get("app") or {}).get("samata")
+        if sam:
+            print(f"  sąmata (app): rows {len(sam['rows'])} | by class {sam['kilme']} | model/default with a number: "
+                  f"{sam['illegal'] or 'none'}")
     return 0
 
 
