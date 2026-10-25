@@ -52,7 +52,7 @@ REVEALS_GRID = [dict(zip(REVEALS_KINDS, bits)) for bits in itertools.product((Tr
 # (`_overrides.apimtis`, ROTBAND_DEFAULT_SHARE = 30 % today). Founder-fixed parameters (hidro_rows,
 # rounding) and the score-neutral granularity are scored for the report but never chosen by the fit.
 FIT_GRID: dict[str, list] = {
-    "aperture_no_deduct_max_m2": [1.0, 3.0],
+    "aperture_no_deduct_max_m2": [3.0, 1.0],
     "skirting_door_deduct_m": [0.85, 0.90, "drawn"],
     "skirting_waste": [1.10, 1.00],
     "kampai": ["visi", "vertikalus_lubos", "vertikalus", "isoriniai_angos", "isoriniai", "tik_lubos"],
@@ -65,7 +65,7 @@ REPORT_ONLY: dict[str, list] = {
     "paint_rows": ["split", "merged"],
     "tile_rows": ["split", "merged"],
 }
-DEFAULTS = {"aperture_no_deduct_max_m2": 1.0, "skirting_door_deduct_m": 0.85, "skirting_waste": 1.10,
+DEFAULTS = {"aperture_no_deduct_max_m2": 3.0, "skirting_door_deduct_m": 0.85, "skirting_waste": 1.10,
             "kampai": "visi", "reveals_scope": {"langai": True, "lauko_durys": True, "praejimai": True,
                                                 "vidaus_durys": False},
             "rotband_dalis": 30, "hidro_rows": "two", "rounding": "row_boundary",

@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -299,6 +300,8 @@ def test_kampai_increases_with_ceiling_height(client, project, nr):
                 f"{h_lo} m -> {k_lo} m but {h_hi} m -> {k_hi} m")
 
 
+# the closed form below deducts both doors under the older 1,0 m² LT rule (default 3,0 m² since 2026-10-25)
+@pytest.mark.usefixtures("lt_aperture_1m2")
 def test_opening_counts_survive_a_ceiling_edit(client):
     """The mechanism, in closed form. CLAUDE.md §1.3 + calc_room_quantities:
 

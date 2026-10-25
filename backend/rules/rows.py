@@ -383,3 +383,385 @@ def round_rows_at_boundary(rows: list[dict]) -> list[dict]:
         if isinstance(r.get("medziagos_kiekis"), (int, float)) and not isinstance(r.get("medziagos_kiekis"), bool):
             r["medziagos_kiekis"] = round_qty(r["medziagos_kiekis"], r.get("medziagos_vnt"))
     return rows
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# Phase 2b (2026-10-25): the families his sąmatos bill that the engine did not emit
+# ═════════════════════════════════════════════════════════════════════════
+# docs/superpowers/research/2026-10-25-missing-families.md. Every row here takes its number from a drawing
+# fact (the vector symbol counter, the tile specification text, the designer's legend quantities, the
+# openings the plan shows) or from his own Prielaidos choice, through a named convention — else it stays in
+# the sąmata blank with a sentence that says what to check (plan R7). Each row carries `_kilme`
+# (extractor/row_provenance.py vocabulary; written here as strings so rules/ imports nothing from extractor/).
+from .conventions import (  # noqa: E402
+    LARGE_TILE_MIN_MM, MOSAIC_MAX_SIDE_MM, REVEALS_SCOPE_DEFAULT, REVEALS_SCOPE_KINDS, _WINDOW_SILL_M,
+)
+
+KILME_DRAWING, KILME_DERIVED, KILME_BLANK = "drawing", "derived", "blank"
+_SK_GD_SIENOS = "Sienų glaistymas dažymas"
+SK_PL = "Plytelių klijavimas"
+SK_PR = "Pridėtiniai elementai"
+
+DIF_MONT = "Difūzorių montavimas (vėdinimo taškai)"
+DIF_APD = "Difūzorių apdirbimas (priglaistomas)"
+DIF_MONT_KITI = "Difūzorių montavimas (apvalūs ir kiti, ne plyšiniai)"
+DIF_MONT_PLYS = "Plyšinių difūzorių montavimas"
+DIF_APD_KITI = "Difūzorių apdirbimas (apvalūs ir kiti, ne plyšiniai)"
+DIF_APD_PLYS = "Plyšinių difūzorių apdirbimas"
+TILE_REVEALS_LABEL = "Angokraščių klijavimas plytelėmis"
+PAINT_REVEALS_LABEL = "Angokraščių glaistymas-dažymas"
+LARGE_TILE_LABEL = "Didžiaformačių plytelių klijavimas (≥ 600×1200 mm)"
+MOSAIC_LABEL = "Mozaikos klijavimas"
+EXTRA_SKIM_LABEL = "Papildomas sienų glaistymas (Q4 — visas paviršius)"
+DEMOLITION_LABEL = "Demontavimo darbai (pertvaros, apdaila)"
+_WALL_PAINT_RE = _re.compile(r"^Sienų glaistymas/dažymas( \((iki|virš) 3 ?m aukščio\))?$")
+
+
+def _lt(v: float) -> str:
+    return f"{float(v):.2f}".replace(".", ",")
+
+
+def _blank_row(row: dict, reason: str) -> dict:
+    """The row stays, without a number (row_provenance.blank's shape): „—" on screen, the reason says what to check."""
+    row.update({"kiekis": None, "saltinis": "checklist", "confidence": "low", "_kilme": KILME_BLANK,
+                "_tuscia_priezastis": reason, "_assumption": reason})
+    return row
+
+
+def _num(v) -> float | None:
+    if isinstance(v, bool):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# ── diffusers by kind (vector_symbols per legend row) ──────────────────────
+def _diffuser_kinds(parsed: dict) -> tuple[int, int, list[str], list[str]] | None:
+    """(others, slot, others' labels, slot labels) from the vector counter's legend rows, or None."""
+    vs = parsed.get("_vector_symbols") if isinstance(parsed.get("_vector_symbols"), dict) else {}
+    d = vs.get("difuzoriai") if isinstance(vs.get("difuzoriai"), dict) else {}
+    per = d.get("per_label") if isinstance(d.get("per_label"), dict) else None
+    if not d.get("defined") or not per:
+        return None
+    slot = {k: int(v or 0) for k, v in per.items() if "plysin" in _fold(k)}
+    other = {k: int(v or 0) for k, v in per.items() if "plysin" not in _fold(k)}
+    ns, no = sum(slot.values()), sum(other.values())
+    if ns <= 0 or no <= 0:
+        return None
+    fmt = lambda m: [f"„{k}“ × {v}" for k, v in m.items() if v]  # noqa: E731
+    return no, ns, fmt(other), fmt(slot)
+
+
+def diffuser_rows_by_kind(rows: list[dict], parsed: dict) -> list[dict]:
+    """His sąmatos bill round and slot diffusers on separate rows; the legend names the kinds and the vector
+    counter counts each. The two all-diffuser rows (count from the drawing) become two rows per kind; their sum
+    is the same count. Nothing changes when the legend has one kind only or the count is not the drawing's."""
+    kinds = _diffuser_kinds(parsed)
+    if kinds is None:
+        return rows
+    no, ns, lab_o, lab_s = kinds
+    out: list[dict] = []
+    for r in rows:
+        label = str(r.get("aprasymas") or "")
+        k = _num(r.get("kiekis"))
+        if label in (DIF_MONT, DIF_APD) and r.get("saltinis") == "simboliai_brezinyje" and k == no + ns:
+            base = {kk: v for kk, v in r.items() if kk not in ("position_id", "contributions", "excluded")}
+            names = (DIF_MONT_KITI, DIF_MONT_PLYS) if label == DIF_MONT else (DIF_APD_KITI, DIF_APD_PLYS)
+            for name, n, labs in ((names[0], no, lab_o), (names[1], ns, lab_s)):
+                row = dict(base, aprasymas=name, kiekis=n, _kilme=KILME_DRAWING)
+                row["_assumption"] = ("Suskaičiuota iš brėžinio ženklų pagal legendą: " + "; ".join(labs)
+                                      + ". Patikrinkite vėdinimo (lubų) plane.")
+                out.append(row)
+            continue
+        out.append(r)
+    return out
+
+
+# ── tile-clad reveals (openings in rooms whose wall tiles reach the opening's top) ──
+def _scope(room: dict) -> dict:
+    raw = room.get("_angokrasciu_apimtis")
+    out = dict(REVEALS_SCOPE_DEFAULT)
+    if isinstance(raw, dict):
+        out.update({k: bool(raw[k]) for k in REVEALS_SCOPE_KINDS if k in raw})
+    return out
+
+
+def tile_reveals(rooms: list[dict]) -> dict | None:
+    """Σ (W + 2H) of the openings (the room's reveals scope) whose top the room's wall tiles reach, per room.
+    None when no room has wall tiles. `missing` names rooms with such an opening of unread size."""
+    tiled = [r for r in rooms if isinstance(r, dict)
+             and ((_num(r.get("plyteles_sienos_aukstis_m")) or 0) > 0 or r.get("_walls_full_tile"))]
+    if not tiled:
+        return None
+    per_room: list[tuple[dict, float, str]] = []
+    missing: list[str] = []
+    for room in tiled:
+        h_room = _num(room.get("lubu_aukstis_m")) or 0.0
+        band = h_room if room.get("_walls_full_tile") else (_num(room.get("plyteles_sienos_aukstis_m")) or 0.0)
+        scope = _scope(room)
+        total, parts, unread = 0.0, [], False
+        for el in room.get("elementai") or []:
+            if not isinstance(el, dict):
+                continue
+            tipas = str(el.get("tipas") or "").lower()
+            tipas = {"door": "duris", "hidden_door": "pasleptos_duris", "window": "langas"}.get(tipas, tipas)
+            if tipas in ("langas", "stoglangis"):
+                kind = "langai"
+            elif tipas in ("duris", "pasleptos_duris") and el.get("_exterior"):
+                kind = "lauko_durys"
+            elif tipas in ("duris", "pasleptos_duris") and el.get("_praejimas"):
+                kind = "praejimai"
+            else:
+                continue
+            if not scope.get(kind):
+                continue
+            try:
+                n = int(el.get("kiekis") if el.get("kiekis") is not None else 1)
+            except (TypeError, ValueError):
+                n = 1
+            if n <= 0:
+                continue
+            w, h = (_num(el.get("plotis_mm")) or 0) / 1000.0, (_num(el.get("aukstis_mm")) or 0) / 1000.0
+            if w <= 0 or h <= 0:
+                unread = True
+                continue
+            top = (_WINDOW_SILL_M + h) if kind == "langai" else h
+            if band + 1e-9 < top and not room.get("_walls_full_tile"):
+                continue
+            total += n * (w + 2 * h)
+            parts.append(f"{n} × ({_lt(w)} + 2 × {_lt(h)})")
+        if unread:
+            missing.append(str(room.get("nr") or room.get("pavadinimas") or "?"))
+        if total > 0:
+            per_room.append((room, round(total, 4), " + ".join(parts)))
+    return {"per_room": per_room, "missing": missing, "total": round(sum(v for _, v, _ in per_room), 4)}
+
+
+def tile_reveal_rows(rows: list[dict], rooms: list[dict]) -> list[dict]:
+    """One „Angokraščių klijavimas plytelėmis" row (m, W + 2H, CLAUDE.md §1.2): reveals in tiled walls are
+    tiled, not painted — the painted reveals row (when it has a number) loses the same metres."""
+    tr = tile_reveals(rooms)
+    if tr is None or (not tr["per_room"] and not tr["missing"]):
+        return rows
+    row = {"skyrius": SK_PL, "aprasymas": TILE_REVEALS_LABEL, "vnt": "m"}
+    if tr["missing"]:
+        rooms_s = ", ".join(tr["missing"])
+        _blank_row(row, f"Patalpose {rooms_s} plytelėmis išklotoje sienoje yra anga, kurios matmenys neperskaityti — "
+                        f"įrašykite angos plotį ir aukštį patalpos lape"
+                        + (f" (perskaitytos angos sudaro {_lt(tr['total'])} m)" if tr["total"] else "") + ".")
+        return rows + [row]
+    row.update({"kiekis": round(tr["total"], 2), "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
+                "_kilme": KILME_DERIVED,
+                "_assumption": ("Angos plytelėmis išklotose sienose (plytelės siekia angos viršų), W + 2H: "
+                                + "; ".join(f"{r.get('nr')} {r.get('pavadinimas') or ''}: {s}".strip()
+                                            for r, _, s in tr["per_room"]) + "."),
+                "contributions": [{"room_nr": str(r.get("nr") or ""), "room_name": r.get("pavadinimas"),
+                                   "value": round(v, 2), "note": s} for r, v, s in tr["per_room"]]})
+    out = []
+    for r in rows:
+        if str(r.get("aprasymas") or "") == PAINT_REVEALS_LABEL and _num(r.get("kiekis")) is not None:
+            r = _less_tiled_reveals(dict(r), tr)
+        out.append(r)
+    return out + [row]
+
+
+def _rooms_label(n: int) -> str:
+    tail, hundred = abs(n) % 10, abs(n) % 100
+    return f"Σ {n} " + ("patalpos" if (tail == 1 and hundred != 11) else "patalpų")
+
+
+def _less_tiled_reveals(r: dict, tr: dict) -> dict:
+    """The painted reveals row without the tiled ones — its room ledger too, so the chain still ends at
+    `kiekis` (a room's share drops by its tiled metres; a chain other than one Σ step is dropped, not bent)."""
+    r["kiekis"] = round(max(0.0, float(r["kiekis"]) - tr["total"]), 2)
+    r["_assumption"] = ((r.get("_assumption") or "").rstrip() + " Be angokraščių plytelėmis išklotose sienose ("
+                        + _lt(tr["total"]) + " m — atskira eilutė).").strip()
+    roll = r.get("roll_up")
+    contribs = r.get("contributions")
+    if not roll:
+        return r
+    if not (isinstance(contribs, list) and len(roll) == 1 and roll[0].get("op") == "sum"):
+        for k in ("contributions", "excluded", "roll_up", "contributions_sum_to_total"):
+            r.pop(k, None)
+        return r
+    less = {str(rm.get("nr") or ""): v for rm, v, _ in tr["per_room"]}
+    new = []
+    for c in contribs:
+        c = dict(c)
+        d = less.get(str(c.get("room_nr") or ""), 0.0)
+        if d:
+            c["value"] = round(float(c.get("value") or 0) - d, 2)
+            c["included_because"] = (str(c.get("included_because") or "") + " — be angų plytelėmis išklotose sienose").strip()
+        if float(c.get("value") or 0) > 0.004:
+            new.append(c)
+    total = round(sum(float(c["value"]) for c in new), 2)
+    if abs(total - r["kiekis"]) > 0.01:
+        for k in ("contributions", "excluded", "roll_up", "contributions_sum_to_total"):
+            r.pop(k, None)
+        return r
+    r["contributions"] = new
+    r["roll_up"] = [{"op": "sum", "label": _rooms_label(len(new)), "value": total}]
+    return r
+
+
+# ── large-format and mosaic tiles (tile specification text, the designer's legend quantities) ──
+_SIZE_RE = _re.compile(r"(\d{2,4}(?:[.,]\d)?)\s*(cm|mm)?\s*[x×х*]\s*(\d{2,4}(?:[.,]\d)?)\s*(cm|mm)?", _re.IGNORECASE)
+
+
+def _sizes_mm(text: str) -> list[tuple[float, float]]:
+    out = []
+    for m in _SIZE_RE.finditer(str(text or "")):
+        a, b = float(m.group(1).replace(",", ".")), float(m.group(3).replace(",", "."))
+        unit = (m.group(2) or m.group(4) or "").lower()
+        k = 10.0 if unit == "cm" else 1.0
+        out.append(tuple(sorted((a * k, b * k))))
+    return out
+
+
+def _is_large(sz: tuple[float, float]) -> bool:
+    return sz[0] >= LARGE_TILE_MIN_MM[0] and sz[1] >= LARGE_TILE_MIN_MM[1]
+
+
+def tile_format_facts(parsed: dict) -> dict:
+    """What the drawing's text says about large-format and mosaic tiles: {large: [...], mosaic: [...]},
+    each item {size, page, text, m2 (the designer's area for it, or None)}."""
+    large, mosaic = [], []
+    for s in parsed.get("_plyteliu_specs") or []:
+        if not isinstance(s, dict):
+            continue
+        text = " ".join(str(s.get(k) or "") for k in ("size_mm", "raw_excerpt"))
+        label = _fold(s.get("format_label"))
+        szs = _sizes_mm(text)
+        if "mozaik" in label or "mozaik" in _fold(s.get("raw_excerpt")) or any(x[1] <= MOSAIC_MAX_SIDE_MM for x in szs):
+            mosaic.append({"size": None, "page": s.get("page"), "text": s.get("raw_excerpt"), "m2": None})
+        big = [x for x in szs if _is_large(x)]
+        if big or "didziaformat" in label:
+            large.append({"size": big[0] if big else None, "page": s.get("page"), "text": s.get("raw_excerpt"),
+                          "m2": None})
+    for a in parsed.get("_autoriaus_kiekiai") or []:
+        if not isinstance(a, dict):
+            continue
+        lab = str(a.get("label") or "")
+        unit = _fold(a.get("unit"))
+        val = _num(a.get("value"))
+        big = [x for x in _sizes_mm(lab) if _is_large(x)]
+        if big:
+            # only an area the designer writes in m² is that format's area; a piece count is not turned into m²
+            # (it may hold spares, and a legend number is not always a count)
+            m2 = val if val and unit in ("m2", "m²") else None
+            large.append({"size": big[0], "page": a.get("page"), "text": lab, "m2": m2,
+                          "pieces": val if unit in ("vnt", "vnt.") else None})
+        if "mozaik" in _fold(lab):
+            mosaic.append({"size": None, "page": a.get("page"), "text": lab,
+                           "m2": val if val and unit in ("m2", "m²") else None})
+    return {"large": large, "mosaic": mosaic}
+
+
+def _fmt_size(sz) -> str:
+    return f"{int(round(sz[1]))}×{int(round(sz[0]))} mm" if sz else "didžiaformatės"
+
+
+def tile_format_rows(rows: list[dict], parsed: dict) -> list[dict]:
+    if not any(_TILE_ROW.match(str(r.get("aprasymas") or "")) for r in rows):
+        return rows                                   # no tiling in this project's sąmata at all
+    facts = tile_format_facts(parsed)
+    add: list[dict] = []
+    has_large = any(str(r.get("aprasymas") or "").startswith("Didžiaformačių plytelių") for r in rows)
+    if facts["large"] and not has_large:
+        row = {"skyrius": SK_PL, "aprasymas": LARGE_TILE_LABEL, "vnt": "m2"}
+        with_m2 = [f for f in facts["large"] if f.get("m2")]
+        if with_m2:
+            parts = [f"„{f['text']}“ (lapas {f['page']}): {_lt(f['m2'])} m²" for f in with_m2]
+            row.update({"kiekis": round(sum(f["m2"] for f in with_m2), 2), "saltinis": "brezinio_tekstas",
+                        "confidence": "medium", "_kilme": KILME_DRAWING,
+                        "_assumption": "Didžiaformačių plytelių plotas iš brėžinio teksto: " + "; ".join(parts)
+                                       + ". Tai dalis aukščiau suskaičiuoto plytelių ploto — papildomas darbas "
+                                         "didelėms plytelėms, ne antras plotas."})
+        else:
+            f = facts["large"][0]
+            pcs = next((x for x in facts["large"] if x.get("pieces")), None)
+            _blank_row(row, f"Brėžinyje nurodytas plytelių formatas {_fmt_size(f['size'])} (lapas {f['page']}), "
+                            f"bet ne jų plotas"
+                            + (f" (legendoje „{pcs['text']}“ — {int(pcs['pieces'])} vnt.)" if pcs else "")
+                            + " — įrašykite, kiek m² klijuojama šiuo formatu (tai dalis bendro plytelių ploto).")
+        add.append(row)
+    has_mosaic = any(str(r.get("aprasymas") or "").startswith("Mozaik") for r in rows)
+    if facts["mosaic"] and not has_mosaic:
+        row = {"skyrius": SK_PL, "aprasymas": MOSAIC_LABEL, "vnt": "m2"}
+        with_m2 = [f for f in facts["mosaic"] if f.get("m2")]
+        if with_m2:
+            row.update({"kiekis": round(sum(f["m2"] for f in with_m2), 2), "saltinis": "brezinio_tekstas",
+                        "confidence": "medium", "_kilme": KILME_DRAWING,
+                        "_assumption": "Mozaikos kiekis iš brėžinio teksto: "
+                                       + "; ".join(f"„{f['text']}“ (lapas {f['page']})" for f in with_m2) + "."})
+        else:
+            f = facts["mosaic"][0]
+            _blank_row(row, f"Brėžinyje minima mozaika (lapas {f['page']}), bet ne jos plotas — įrašykite, kiek m² "
+                            "klijuojama mozaika (išklotinės).")
+        add.append(row)
+    return rows + add
+
+
+# ── an extra skim coat (his Q4 choice over the painted walls) ──
+def extra_skim_row(rows: list[dict], parsed: dict) -> list[dict]:
+    walls = [r for r in rows if _WALL_PAINT_RE.match(str(r.get("aprasymas") or ""))]
+    if not walls:
+        return rows
+    ov = parsed.get("_overrides") if isinstance(parsed.get("_overrides"), dict) else {}
+    q = str(ov.get("glaistimo_lygis") or ov.get("glaistas_q_lygis") or "").strip().upper()
+    row = {"skyrius": walls[0].get("skyrius") or _SK_GD_SIENOS, "aprasymas": EXTRA_SKIM_LABEL, "vnt": "m2"}
+    if q != "Q4":
+        _blank_row(row, "Ar sienos glaistomos papildomu sluoksniu (Q4 — visas paviršius, 3–5 mm), brėžinys nenurodo — "
+                        "jei taip, Prielaidose pasirinkite glaistymo lygį Q4 arba įrašykite plotą.")
+        return rows + [row]
+    nums = [_num(r.get("kiekis")) for r in walls]
+    if any(v is None for v in nums):
+        _blank_row(row, "Kiekis seka sienų glaistymo / dažymo plotą — kol jis tuščias, šios eilutės kiekio nėra.")
+        return rows + [row]
+    row.update({"kiekis": round(sum(nums), 2), "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
+                "_kilme": KILME_DERIVED, "susijes_darbas": walls[0].get("aprasymas"),
+                "_assumption": "Jūsų pasirinktas glaistymo lygis Q4 — visas dažomų sienų paviršius glaistomas dar "
+                               f"vienu sluoksniu: {_lt(sum(nums))} m² (sienų glaistymo / dažymo plotas)."})
+    return rows + [row]
+
+
+# ── demolition (a demolition sheet in the set) ──
+_DEMOLITION_SHEET_RE = _re.compile(r"demont|griaun|griov|isardom|ardom", _re.IGNORECASE)
+
+
+def demolition_sheets(parsed: dict) -> list[int]:
+    pages = parsed.get("puslapiai") or parsed.get("page_classification") or []
+    return [int(p.get("nr")) for p in pages if isinstance(p, dict) and p.get("nr") is not None
+            and _DEMOLITION_SHEET_RE.search(_fold(p.get("pavadinimas")))]
+
+
+def demolition_row(rows: list[dict], parsed: dict) -> list[dict]:
+    sheets = demolition_sheets(parsed)
+    row = {"skyrius": SK_PR, "aprasymas": DEMOLITION_LABEL, "vnt": "m2"}
+    if sheets:
+        s = ", ".join(str(x) for x in sheets)
+        _blank_row(row, f"Komplekte yra demontavimo planas (lapas {s}) — demontuojamų pertvarų ir apdailos plotą "
+                        "įrašykite pagal jį.")
+    else:
+        _blank_row(row, "Demontavimo plano komplekte nėra — jei kas nors demontuojama (pertvaros, senos dangos), "
+                        "įrašykite plotą.")
+    return rows + [row]
+
+
+def phase2b_families(rows: list[dict], parsed: dict, rooms: list[dict], profile: dict) -> list[dict]:
+    """The Phase 2b families over the built rows (after row provenance, before the granularity merge). Pure
+    except for returning a new list (rows it changes are copies). `profile` = conventions.resolve_profile(...)."""
+    out = list(rows)
+    if profile.get("difuzoriai_rows", "by_kind") == "by_kind":
+        out = diffuser_rows_by_kind(out, parsed)
+    if profile.get("plyteliu_angokrasciai", "auto") == "auto":
+        out = tile_reveal_rows(out, rooms)
+    if profile.get("didziaformates_rows", "auto") == "auto":
+        out = tile_format_rows(out, parsed)
+    if profile.get("papildomas_glaistymas", "auto") == "auto":
+        out = extra_skim_row(out, parsed)
+    if profile.get("demontavimas_rows", "auto") == "auto":
+        out = demolition_row(out, parsed)
+    return out

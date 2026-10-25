@@ -262,6 +262,12 @@ class Convention:
         return globals()[self.name]
 
 
+# Phase 2b (2026-10-25): a tile is large-format from this size up (short side, long side, mm) — the format
+# his sąmatos bill on their own „Didžiaformačių“ rows (1200 × 1200, 1200 × 600) — and mosaic below this side.
+LARGE_TILE_MIN_MM = (600, 1200)
+MOSAIC_MAX_SIDE_MM = 50
+
+
 _SOURCES: dict[str, str] = {
     "UNIVERSAL_RULES": "CLAUDE.md §1 / §3 + docs/superpowers/research/formula-validation.md; per-key notes in the dict",
     "GKP_SHEET_WASTE": "CLAUDE.md §1.8 (sheets × 1,10); shared with sanity_checks.check_gk_sheets_math",
@@ -296,6 +302,8 @@ _SOURCES: dict[str, str] = {
     "TILE_BAND_DOOR_H_M": "CLAUDE.md §2 door height 2,1 m",
     "_WINDOW_SILL_M": "engineering default — sill height when the drawing does not say",
     "CORNER_MIN_EDGE_M": "engineering default — a shorter edge is a drawing jog, not a wall",
+    "LARGE_TILE_MIN_MM": "his sąmatos' large-format rows (1200 × 1200, 1200 × 600 mm; objektas_a, objektas_b) — Phase 2b",
+    "MOSAIC_MAX_SIDE_MM": "trade usage: mosaic tesserae are ≤ 50 mm (Phase 2b)",
 }
 
 CONVENTIONS: dict[str, Convention] = {name: Convention(name, src) for name, src in _SOURCES.items()}
@@ -329,8 +337,10 @@ class Param:
 KAMPAI_CONVENTIONS = ("visi", "vertikalus_lubos", "vertikalus", "isoriniai_angos", "isoriniai", "tik_lubos")
 
 LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
-    Param("aperture_no_deduct_max_m2", 1.0, (1.0, 3.0),
-          "LT practice (UNIVERSAL_RULES openings_threshold_m2); 3,0 m² = founder's alternative (plan §1 rule 2)",
+    Param("aperture_no_deduct_max_m2", 3.0, (3.0, 1.0),
+          "rangovo taisyklė, 2026-10-25 (founder decision; plan §1 rule 2) — 3,0 m²; the fit (2026-10-25-conventions-fit.md "
+          "§2) never contradicts it and every leave-one-out fold chooses it. 1,0 m² = the older LT practice "
+          "(UNIVERSAL_RULES openings_threshold_m2), kept as an option",
           "An opening smaller than this is not deducted from the wall face (≥ the value is deducted)."),
     Param("skirting_door_deduct_m", 0.85, (0.85, 0.90, "drawn"),
           "engine default since 2026-04 (0,85 m per door); 0,90 = founder's rule (plan §1 rule 3); "
@@ -378,6 +388,31 @@ LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
     Param("tile_rows", "split", ("split", "merged"),
           "his sąmatos merge wall + floor tiles on 5 of 6 projects (phase-0 §2); split kept as default",
           "„merged“: one „Sienų ir grindų plytelių klijavimas“ row instead of wall / floor rows."),
+    # ── Phase 2b (2026-10-25): families his sąmatos bill that the engine did not emit. Each is ON when the
+    # drawing gives the fact („auto"); without the fact the row stays in the sąmata, blank, with a sentence
+    # that says what to check (R7). „off" leaves the row out. docs/superpowers/research/2026-10-25-missing-families.md
+    Param("difuzoriai_rows", "by_kind", ("by_kind", "one"),
+          "his sąmatos bill round and slot diffusers on separate rows (objektas_b, objektas_h); the drawing's "
+          "legend names the kinds and the vector counter counts each (extractor/vector_symbols.py)",
+          "„by_kind“: when the legend has slot („plyšinis“) and other diffusers, one montavimas + one apdirbimas "
+          "row per kind; „one“: the two rows of all diffusers."),
+    Param("plyteliu_angokrasciai", "auto", ("auto", "off"),
+          "his „(nišos) angokraščiai“ tile rows (objektas_a, objektas_b); CLAUDE.md §1.2 reveal length 2H + W",
+          "Reveals of the openings (the reveals scope) in rooms whose wall tiles reach the opening's top are tiled, "
+          "not painted: one „Angokraščių klijavimas plytelėmis“ row (m), and the painted reveals row loses them."),
+    Param("didziaformates_rows", "auto", ("auto", "off"),
+          "his „Didžiaformačių plytelių klijavimas“ / „Mozaikos klijavimas“ rows (objektas_a, b, g, h); the tile "
+          "specification text (extractor/plyteliu_specifikacija.py) and the designer's legend quantities",
+          "A large-format (≥ 600 × 1200 mm) or mosaic tile named on the drawing → its own row; the m² it covers is "
+          "the designer's only when the drawing states it for that format, else blank with the format and sheet."),
+    Param("papildomas_glaistymas", "auto", ("auto", "off"),
+          "his „Papildomas sienų glaistymas“ (objektas_r2 395,19 m²); CLAUDE.md §1.11 — Q4 is a full-surface skim",
+          "„auto“: an extra skim coat row over the painted walls when the project's putty level is Q4 (his "
+          "Prielaidos choice) — its m² follow the wall paint row; else blank with what to check."),
+    Param("demontavimas_rows", "auto", ("auto", "off"),
+          "his „demontavimas“ rows (objektas_b); a demolition sheet („Demontuojamų pertvarų planas“) in the set",
+          "One „Demontavimo darbai“ row: it names the demolition sheet when the set has one; the lengths / areas "
+          "are not read (no reader) — blank, with the sheet to look at."),
     Param("scope_defaults", None, (None,),
           "extractor/scope.py `_apimtis` (2026-09-06) — the contractor's habitual scope as a profile default; "
           "phase-0 §2: he leaves out floors / tiles / plumbing / electrical on some jobs by choice",

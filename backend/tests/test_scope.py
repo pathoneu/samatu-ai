@@ -11,6 +11,10 @@ import copy
 import os
 
 import pytest
+
+# These tests check how a door / window is deducted under the older 1,0 m² LT rule (the `lt_rangovas`
+# default is 3,0 m² since 2026-10-25 — rangovo taisyklė; see conftest.lt_aperture_1m2).
+pytestmark = pytest.mark.usefixtures("lt_aperture_1m2")
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("SAMATU_AUTH_DISABLED", "1")

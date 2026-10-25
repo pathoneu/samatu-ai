@@ -21,6 +21,10 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
+# These tests check how a door / window is deducted under the older 1,0 m² LT rule (the `lt_rangovas`
+# default is 3,0 m² since 2026-10-25 — rangovo taisyklė; see conftest.lt_aperture_1m2).
+pytestmark = pytest.mark.usefixtures("lt_aperture_1m2")
+
 from extractor.universal_rules import (  # noqa: E402
     calc_room_quantities,
     UNIVERSAL_RULES,

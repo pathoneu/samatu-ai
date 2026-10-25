@@ -51,6 +51,8 @@ from rules.conventions import (  # noqa: E402,F401 — re-exported
     TILE_BAND_DOOR_H_M,
     _WINDOW_SILL_M,
     CORNER_MIN_EDGE_M,
+    LARGE_TILE_MIN_MM,
+    MOSAIC_MAX_SIDE_MM,
 )
 from rules.conventions import LT_RANGOVAS, profile_overrides, resolve_profile  # noqa: E402,F401
 from rules.rows import (  # noqa: E402,F401 — re-exported
@@ -2379,7 +2381,9 @@ def calc_room_quantities(room: dict,
     window_area = float(room.get("window_area_m2") or UNIVERSAL_RULES["default_window_area_m2"])
 
     prof = _room_profile(rules)
-    aperture_thr = prof.get("aperture_no_deduct_max_m2")     # None = the LT rule in UNIVERSAL_RULES
+    # the profile's threshold: the project's own choice, else the `lt_rangovas` default (3,0 m², rangovo taisyklė
+    # 2026-10-25). Only the LT standard reads it; NRM2 / VOB keep their own 0,5 m² rule.
+    aperture_thr = prof.get("aperture_no_deduct_max_m2", LT_RANGOVAS["aperture_no_deduct_max_m2"].default)
     doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard, aperture_thr) else 0
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard, aperture_thr) else 0
     # Apimtis (2026-09-06): „sienų plotas be angų" — the contractor measures
