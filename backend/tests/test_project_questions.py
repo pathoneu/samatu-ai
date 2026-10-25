@@ -65,7 +65,9 @@ def test_the_height_is_asked_once_for_every_room_that_assumes_it():
 def test_a_height_nobody_wrote_anywhere_says_what_it_is_computed_with():
     out = build_questions({"patalpos": [_quiet("01", lubu_aukstis_saltinis="default_fallback", lubu_aukstis_m=2.7)]})
     q = _q(out, "aukstis")
-    assert "neradau" in q["why"] and "2,70 m" in q["why"]
+    assert q["why"] == ("Lubų aukščio brėžinyje neradau. Kol neįrašysite, sienų kiekių neskaičiuoju — jų eilutės lieka "
+                        "tuščios. Įprastas aukštis 2,70 m — įrašykite tikrą.")
+    assert q["proposed"] == 2.7
 
 
 def test_perimeters_the_plan_does_not_state_come_as_one_list_with_the_numbers_in_use():
