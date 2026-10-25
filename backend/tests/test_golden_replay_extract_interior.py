@@ -35,10 +35,11 @@ machine: the real client class and every socket refuse while the stub is in.
       (the plumbing plan lists a bathtub there, no shower) kept the shower zone
       — „Hidroizoliacinė medžiaga" 97,44 kg in the eval against production's
       70,38; the test without the step holds that difference exactly.
-    · plain `--recompute` does not run the drawing lanes (audit round 13):
-      exactly the metrics in `LANES_MOVE` differ — on 2026-10-05 e.g. combined
-      paint 473,18 → 441,26 m², angokraščiai 47,40 → 76,91 m — and the rest
-      (walls and ceilings are anchored to the designer's legend and table) agree.
+    · plain `--recompute` runs the drawing lanes too since v4 Phase 3c-1
+      (2026-10-25, extractor/drawing_lanes.py — the function production calls):
+      no metric differs from production any more. Until then exactly the
+      metrics in the old `LANES_MOVE` set differed (on 2026-10-05 e.g. combined
+      paint 473,18 → 441,26 m², angokraščiai 47,40 → 76,91 m).
     · run on production's own output, the eval (plain or with the replay)
       changes nothing: its tail reproduces production's numbers.
 
@@ -72,23 +73,18 @@ DEFAULT_PDF = REPO_ROOT / "docs/superpowers/fixtures/2026-09-05-batch-2/objektas
 EXPECTED_CALLS = {"pass1": 3, "zoom": 9, "doors": 1, "door_type": 3, "fixtures": 3}
 _GONE_READERS = ("adjacency", "niche")
 EXPECTED_SKIPPED = {"positioned_marker_lane_skipped", "apdailos_skipped"}
-# The metrics plain --recompute gets wrong on objektas_h because it does not run the
-# drawing lanes (perimeters added from the strings, outlines, openings as drawn, floor
-# coverings). When a lane starts or stops moving one, update this set — and say why.
-# 2026-10-06: `led_nisos_m` left it — the lanes moved the LED metres only through the
-# room-type estimate (perimeter × a ratio), which is no longer billed until he accepts it
-# (niche_inference.LED_ESTIMATE_OPT_IN); the read niche metres do not depend on a lane.
-LANES_MOVE = {
-    "dazymo_walls_plus_ceilings_combined_m2", "plyteles_grindys_total_m2",
-    "plyteles_sienos_total_m2", "kampu_metrai_m",   # rotband left it: blank until he chooses a share (v4 3b)
-    "plyteles_sienos_grindys_combined_m2", "pvc_grindys_m2", "grindjuostes_total_m",
-    "plyteliu_grindjuostes_m", "pasleptu_duru_staktos_m", "angokrasciu_m",
-}
+# The metrics plain --recompute got wrong on objektas_h while it did not run the drawing lanes.
+# Since v4 Phase 3c-1 (2026-10-25) every --recompute runs them through the function production
+# calls (extractor/drawing_lanes.py), so the set is empty — a metric appearing here again means
+# the eval and the paid reading have parted ways.
+LANES_MOVE: set[str] = set()
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
 # nothing, and not a step the eval runs.
 # v4 3b: the Vision adjacency pass is gone — the frozen extract still carries what it wrote, the eval leaves it
+# v4 3c-1: the model's own room height and its label, kept aside by text/heights.py (`_lubu_aukstis_modelio`) —
+# evidence no quantity reads; production keeps Pass-1's figure, the frozen extract only the height it ended with
 ROOM_KEYS_NOT_REPLAYED = {"_lubu_aukstis_sklaida", "_adjacency", "_adjacency_confidence", "_exterior_wall_count",
-                          "n_partition_walls"}
+                          "n_partition_walls", "_lubu_aukstis_modelio", "_lubu_aukstis_modelio_saltinis"}
 # The voter's per-element record (`_vote.elementai`, 2026-09-30) is newer than the frozen
 # extract; the eval never votes again. Provenance only — the voted values are compared.
 VOTE_KEYS_NOT_REPLAYED = {"elementai", "n_partition_walls"}
@@ -206,6 +202,10 @@ def test_no_reader_fails_quietly(run):
     assert not codes & {"room_calc_failed", "pozicijos_build_failure", "doors_page_unread", "doors_unattributed",
                         "adjacency_unread"}
     assert result["_meta"]["adjacency"]["status"] == "skipped"     # no Vision adjacency pass (v4 3b)
+    # v4 3c-1: the drawing's lanes ran inside the reading, cost nothing and say what they took
+    lanes = result["_meta"]["braizinio_skaitymas"]
+    assert lanes["modelio_kvietimai"] == 0 and lanes["kaina_eur"] == 0.0 and lanes["sekundes"]["geometrija"] >= 0
+    assert result["_meta"]["aukstis_tekstas"]["status"] == "nothing_written"   # objektas_h writes no ceiling height
     assert result["pozicijos"]
 
 

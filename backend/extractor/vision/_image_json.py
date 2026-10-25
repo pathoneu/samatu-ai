@@ -1,4 +1,4 @@
-"""Two helpers the remaining Vision readers (height_extractor, schedule_extractor — Phase 3c) share. They lived
+"""Two helpers the remaining Vision reader (schedule_extractor — Phase 3c; the height reader was deleted in 3c-1) uses. They lived
 in `dimension_extractor`, deleted in v4 Phase 3b (dimension strings come from the text layer)."""
 from __future__ import annotations
 

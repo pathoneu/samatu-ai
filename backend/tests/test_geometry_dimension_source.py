@@ -53,7 +53,9 @@ def test_the_one_source_reads_every_page_and_the_slanted_string():
 def test_paid_and_free_paths_call_the_geometry_reading_the_same_way():
     """Neither path hands the reading strings of its own: both leave `dims`
     to the one source (the paid path's text scan is for the other lanes)."""
-    for rel in ("extractor/vision_call.py", "api/free_reread.py"):
+    # the paid reading calls the lane through extractor/drawing_lanes.py since v4 Phase 3c-1 (the eval's tail too)
+    assert "run_drawing_lanes(parsed, pdf_bytes" in (BACKEND / "extractor/vision_call.py").read_text(encoding="utf-8")
+    for rel in ("extractor/drawing_lanes.py", "api/free_reread.py"):
         calls = _apply_geometry_calls(rel)
         assert calls, rel
         for c in calls:

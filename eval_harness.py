@@ -1847,9 +1847,6 @@ def _infer_slug_from_run_name(name: str) -> str | None:
     return max(hits, key=len) if hits else None
 
 
-GEOMETRY_LANE = False        # set by --geometry
-
-
 # ── The person's answers (v4, 2026-10-25) ──────────────────────────────────────
 # After Phase 3b no sąmata row carries a model or default number: where the drawing's
 # text writes no ceiling height the wall rows are blank and the app asks the person one
@@ -2005,15 +2002,18 @@ def print_answers_block(*, his_missing: dict[str, dict[str, int]] | None = None)
                   + "; ".join(f"{k} {v}" for k, v in sorted(m.items(), key=lambda kv: -kv[1])))
 
 
-# ── --replay-geometry (audit round 13) ─────────────────────────────────────────
+# ── the drawing's lanes in the tail (audit round 13 → v4 Phase 3c-1) ────────────
 # The €0 lanes that read the drawing's text layer and vector geometry run in the
-# paid pipeline right after the room table merge (vision_call Steps 2.44–2.44d)
-# and their output is FROZEN into ai_extract.json — or, for an extract older
-# than a lane, missing. A change to one of them was invisible here. The replay
-# runs them again on the frozen extract, after taking back what older versions
-# of them left on it. Not the default, and never accepted as the baseline: the
-# founder decides after reading the numbers with and without it.
-REPLAY_GEOMETRY = False      # set by --replay-geometry
+# paid pipeline right after the room table merge (extractor/drawing_lanes.py:
+# Steps 2.44–2.44d and the text heights) and their output is FROZEN into
+# ai_extract.json — or, for an extract older than a lane, missing. Until
+# 2026-10-25 only `--replay-geometry` ran them again, and the plain pass scored
+# the frozen lane output (eval-answers §4: „no drawn perimeter" was the largest
+# cause of blank rows on the plain pass, absent on the replay). Since Phase 3c-1
+# every `--recompute` runs them, through the SAME function the paid reading
+# calls, after taking back what older lane versions froze into the extract.
+# `--replay-geometry` is kept as a no-op alias (it is what the plain pass does).
+REPLAY_GEOMETRY = True       # always on; `--replay-geometry` / `--geometry` are accepted no-ops
 REPLAY_REPORT: dict[str, dict] = {}      # slug → what the replay changed (printed per project)
 
 # What the replay compares, room by room, before and after.
@@ -2191,53 +2191,33 @@ def _reapply_stored_zoom(parsed: dict) -> int:
 
 
 def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
-    """--replay-geometry: run the paid pipeline's €0 drawing lanes again on a
-    frozen extract, in production's order (vision_call.extract_interior):
-
-      2.44   one text-layer scan → the designer's own figures and the walls /
-             floors anchors billed from them, the plan's stated height, and —
-             only when no room table merged — the area-label lane and its
-             ceiling anchor;
-      2.44b  rectangle pairs from the dimension strings (plan_dimensions);
-      2.44c  raster outlines from the walls (wall_outline);
-      2.44d  the geometry lane (outlines, perimeters added from the strings,
-             wall openings, floor coverings);
-      then   what reads the lanes' output before the calc: the polygon
-             prepass (Step 2.45), each room's stored zoom answer applied again
-             (2.5 — it may not overrule a value a lane read) and niche
-             inference (2.88); the door schedule and vector symbols (2.43 /
-             2.44) are scanned again by the tail below even when the extract
-             carries them. These run before the tail's marker lane and height
-             gate, not after them as in production — no stored zoom answer in
-             the corpus changes a height.
+    """Run the paid pipeline's €0 drawing lanes again on a frozen extract,
+    through the function production calls (extractor/drawing_lanes.py —
+    Steps 2.44 → 2.44d with the text heights before and after the geometry
+    lane), then what reads the lanes' output before the calc: the polygon
+    prepass and each room's stored zoom answer applied again (Step 2.5 — it
+    may not overrule a value a lane read, and it writes no height since
+    Phase 3c-1). The door schedule and vector symbols (2.43 / 2.44) are
+    scanned again by the tail below even when the extract carries them.
 
     Before that `_undo_lane_state` takes back what older lane versions froze
     into the extract. What it cannot give back: the replay starts from the
-    STORED rooms, so a value a later step stored (zoom, the height precedence)
-    is its starting point where the run kept no earlier figure — objektas_g:
-    areas a zoom moved before the area-label backfill; a room the name map gave
-    a height keeps it, as the model's own label at Step 2.44 is not stored.
-    tests/test_golden_replay_extract_interior.py holds this sequence to what
-    production computes on objektas_h. The plain --recompute is unchanged;
-    this only runs with the flag. A project whose PDF is not on disk is scored
-    without the replay, and says so."""
+    STORED rooms, so a value a later step stored (zoom) is its starting point
+    where the run kept no earlier figure — objektas_g: areas a zoom moved
+    before the area-label backfill. tests/test_golden_replay_extract_interior.py
+    holds this sequence to what production computes on objektas_h. A project
+    whose PDF is not on disk is scored without the lanes, and says so."""
     pdf_rel = (REGISTRY.get(slug) or {}).get("pdf_path") if slug else None
     pdf_path = REPO_ROOT / pdf_rel if pdf_rel else None
     report: dict[str, Any] = {"changed_rooms": {}, "lanes": {}, "undone": [], "skipped": None}
     REPLAY_REPORT[slug or "?"] = report
     if pdf_path is None or not pdf_path.exists():
         report["skipped"] = f"{pdf_rel or 'no project PDF in the registry'} not on disk"
-        print(f"  · geometry replay skipped: {report['skipped']} — scored without it")
+        print(f"  · drawing lanes skipped: {report['skipped']} — scored without them")
         return parsed
     pdf = pdf_path.read_bytes()
     vc = importlib.import_module("extractor.vision_call")
-    from extractor.geometry_lane import apply_geometry
-    from extractor.row_provenance import fill_heights_from_read
-    from extractor.plan_area_annotations import (
-        apply_height_statements, lane_warnings, most_common_page, plan_pages_from_classification,
-        reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
-    from extractor.plan_dimensions import apply_dimension_strings
-    from extractor.wall_outline import apply_wall_outlines
+    from extractor.drawing_lanes import run_drawing_lanes
 
     def snapshot() -> dict[str, dict]:
         return {str(r.get("nr")): {k: r.get(k) for k in _REPLAY_ROOM_FIELDS}
@@ -2249,61 +2229,24 @@ def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
                       "ceiling": (parsed.get("_ceiling_anchor") or {}).get("total_area_m2")}
     report["undone"] = _undo_lane_state(parsed)
     lanes = report["lanes"]
-    rooms = parsed.get("patalpos") or []
     meta = parsed.setdefault("_meta", {})
-
-    # Step 2.44 — exactly as vision_call runs it (one scan, then each consumer).
-    try:
-        scan = scan_text_layer(pdf, pages=text_pages_from_classification(parsed.get("puslapiai") or []) or None)
-        parsed["_autoriaus_kiekiai"] = scan["figures"]
-        parsed.pop("_walls_anchor", None)
-        wa = vc._walls_anchor_from_figures(scan["figures"])
-        if wa:
-            parsed["_walls_anchor"] = wa
-        parsed.pop("_floor_anchors", None)
-        fa = vc._floor_anchors_from_figures(scan["figures"])
-        if fa:
-            parsed["_floor_anchors"] = fa
-        # A stated height reaches the one room it belongs to (2026-10-05:
-        # `_tie_statement` — never an element's stamp, never every room), when
-        # that room's STORED label is a default. At Step 2.44 a room still
-        # carries the model's own label, and whether that was a default for a
-        # room the name map later gave a height (`per_room`) is not stored — so
-        # such a room keeps its height here.
-        hs = apply_height_statements(rooms, scan.get("heights") or [])
-        meta["plan_height_statement"] = {k: v for k, v in hs.items() if k != "rooms"} | {"rooms": len(hs.get("rooms") or [])}
-        lanes["plan height"] = hs.get("status")
-        plan_pages = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
-        annotations = [a for a in scan["annotations"] if not plan_pages or a["page"] in plan_pages]
-        if int(meta.get("eksplikacija_merged_rooms") or 0) == 0 and rooms:
-            lane = reconcile_rooms_with_annotations(rooms, annotations)
-            meta["plan_area_lane"] = lane
-            if lane.get("status") == "applied":
-                parsed.setdefault("warnings", []).extend(lane_warnings(lane, rooms))
-                if not parsed.get("_ceiling_anchor") and float(lane.get("sum_m2") or 0) > 0:
-                    parsed["_ceiling_anchor"] = {"total_area_m2": float(lane["sum_m2"]),
-                                                 "label": "plano užrašų suma",
-                                                 "page": most_common_page(annotations)}
-            lanes["area labels"] = lane.get("status")
-        else:
-            lanes["area labels"] = "not run (room table merged)"
-        dl = apply_dimension_strings(rooms, list(scan.get("dimensions") or []), annotations)
-        meta["plan_dimension_lane"] = dl
-        lanes["rectangle pairs"] = dl.get("status")
-        wl = apply_wall_outlines(rooms, pdf, list(scan.get("dimensions") or []), annotations)
-        meta["wall_outline_lane"] = wl
-        lanes["raster outlines"] = wl.get("status")
-    except Exception as exc:  # noqa: BLE001 — loud, but the project is still scored
-        lanes["text scan"] = f"FAILED: {exc!r}"
-        print(f"  ⚠ geometry replay: the text-layer lanes failed: {exc!r}")
-    g = apply_geometry(parsed, pdf)                     # never raises; a failure is its status
+    out = run_drawing_lanes(parsed, pdf)                # never raises; a failed lane prints why
+    if out.get("scan") is None:
+        lanes["text scan"] = "FAILED (see the line above)"
+    lanes["area labels"] = (meta.get("plan_area_lane") or {}).get("status") or "not run (room table merged)"
+    lanes["rectangle pairs"] = (meta.get("plan_dimension_lane") or {}).get("status")
+    lanes["raster outlines"] = (meta.get("wall_outline_lane") or {}).get("status")
+    g = out.get("geometry") or {}
     lanes["geometry"] = (f"{g.get('status')} — {len(g.get('konturai') or [])} outlines, "
                          f"{len(g.get('perimetrai_sudeti') or [])} summed, "
                          f"{len(g.get('perimetrai_tusti') or [])} estimates, "
                          f"{len((g.get('grindu_dangos') or {}).get('perskaityta') or {})} floors")
+    h = out.get("heights") or {}
+    lanes["heights from the text"] = (f"project {((h.get('projektas') or {}).get('value_m'))} "
+                                      f"({(h.get('projektas') or {}).get('kaip')}), rooms {h.get('pagal_taisykle')}, "
+                                      f"without {len(h.get('be_aukscio') or [])}")
     parsed = vc._apply_polygon_prepass(parsed)          # returns new room dicts
     lanes["zoom applied"] = _reapply_stored_zoom(parsed)
-    lanes["heights from the drawing"] = fill_heights_from_read(parsed.get("patalpos") or [], parsed)   # production Step 2.885 (v4 3b)
     for key in ("_duru_ziniarastis", "_vector_symbols"):
         parsed.pop(key, None)                           # the tail below scans them again
 
@@ -2340,137 +2283,83 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     """Re-run the deterministic (zero-API) tail of the pipeline on a saved
     extract's primitives:
 
-      1. positioned ceiling-altitude markers → per-room heights (needs the
-         source PDF; skipped when it is not on disk),
-      2. height salvage from warnings[] (same gate as production — only when
-         the model structured no per-room heights),
-      3. height plausibility gate,
-      4. the shower attribution from the stored plumbing list
+      1. the drawing's lanes (`_replay_geometry_lanes` → extractor/drawing_lanes.py:
+         text scan, rectangle pairs, raster outlines, ceiling heights from the
+         text, the geometry lane) — needs the source PDF; without it the
+         heights are still taken off the model (text/heights.py) and the
+         project is scored on the frozen geometry, which is printed,
+      2. the symbol legend, door schedule and vector symbols (PDF),
+      3. the shower attribution from the stored plumbing list
          (vision_call.mark_shower_rooms — production's fixture-reader step),
-      5. per-room recompute (calc_room_quantities via primitives),
-      6. santrauka recompute,
-      7. pozicijos rebuild.
+      4. heights from the drawing only (row_provenance.fill_heights_from_read,
+         production Step 2.885), then the person's answers,
+      5. per-room recompute, santrauka recompute, pozicijos rebuild.
 
     This is exactly what a saved run would produce under the CURRENT
-    formula code — the honest way to measure formula fixes against
-    already-paid-for Vision reads without any API spend."""
+    code — the honest way to measure fixes against already-paid-for Vision
+    reads without any API spend."""
     vc = importlib.import_module("extractor.vision_call")
-    if REPLAY_GEOMETRY:      # --replay-geometry: the paid pipeline's €0 drawing lanes first
-        parsed = _replay_geometry_lanes(parsed, slug)
-    rooms = parsed.get("patalpos") or []
+    from extractor.row_provenance import fill_heights_from_read
+    parsed = _replay_geometry_lanes(parsed, slug)
 
-    # Step 1 reads the text layer of the ceiling plan, so unlike the rest of
-    # the tail it needs the source PDF. The fixture PDFs are untracked (client
-    # names + pricing), so a checkout without them must still rescore — it
-    # just measures the other steps. Silence here would be dishonest, so the
-    # skip is printed.
+    # The fixture PDFs are untracked (client names + pricing), so a checkout
+    # without them must still rescore — it just measures the other steps.
+    # Silence here would be dishonest, so the skip is printed.
     pdf_rel = (REGISTRY.get(slug) or {}).get("pdf_path") if slug else None
-    if pdf_rel:
-        pdf_path = REPO_ROOT / pdf_rel
-        if pdf_path.exists():
+    pdf_path = REPO_ROOT / pdf_rel if pdf_rel else None
+    if pdf_path is not None and pdf_path.exists():
+        # The symbol-legend scan (2026-07-29): it reads the text layer only and
+        # gates un-anchored symbol counts in the pozicijos rebuild below.
+        try:
+            from extractor.symbol_legend import scan_symbol_legend
+            parsed["_symbol_legend"] = scan_symbol_legend(pdf_path.read_bytes())
+            leg = parsed["_symbol_legend"]
+            print(f"  ⤴ symbol legend: text_layer_ok="
+                  f"{leg.get('text_layer_ok')} difuzoriai_defined="
+                  f"{(leg.get('difuzoriai') or {}).get('defined')}")
+        except Exception as exc:
+            print(f"  ⚠ symbol-legend scan failed during rescore: {exc}")
+        # The drawing's door schedule (2026-09-23, Step 2.43 in production): frame type and the
+        # door list's reconciliation with the table. Zero API, needs the PDF.
+        if "_duru_ziniarastis" not in parsed:
             try:
-                from extractor.height_markers import (
-                    apply_positioned_marker_heights)
-                parsed = apply_positioned_marker_heights(
-                    parsed, pdf_path.read_bytes())
-                lane = parsed.get("_height_marker_lane") or {}
-                if lane.get("ok"):
-                    ch = lane.get("changed") or []
-                    print(f"  ⤴ height markers ({lane.get('method')}): "
-                          f"{len(ch)} raised, {len(lane.get('confirmed') or [])} "
-                          f"confirmed" + (f" — {ch}" if ch else ""))
-                elif lane:
-                    print(f"  · height-marker lane inactive: {lane.get('reason')}")
+                from extractor.door_schedule import scan_door_schedule
+                parsed["_duru_ziniarastis"] = scan_door_schedule(pdf_path.read_bytes())
+                print(f"  ⤴ durų žiniaraštis: {parsed['_duru_ziniarastis'].get('status')} — "
+                      f"{parsed['_duru_ziniarastis'].get('sakinys')}")
             except Exception as exc:
-                print(f"  ⚠ height-marker lane failed during rescore: {exc}")
-            # Same contract for the symbol-legend scan (2026-07-29): it reads
-            # the text layer only, runs in production right after the marker
-            # lane, and gates un-anchored symbol counts in the pozicijos
-            # rebuild below. Mirrored here so the free rescore measures the
-            # same pipeline production runs.
+                print(f"  ⚠ door schedule scan failed during rescore: {exc}")
+        # Symbols counted from the drawing's own paths (2026-09-24, Step 2.44 in production): the
+        # diffuser rows take this count. Zero API, needs the PDF.
+        if "_vector_symbols" not in parsed:
             try:
-                from extractor.symbol_legend import scan_symbol_legend
-                parsed["_symbol_legend"] = scan_symbol_legend(
-                    pdf_path.read_bytes())
-                leg = parsed["_symbol_legend"]
-                print(f"  ⤴ symbol legend: text_layer_ok="
-                      f"{leg.get('text_layer_ok')} difuzoriai_defined="
-                      f"{(leg.get('difuzoriai') or {}).get('defined')}")
+                from extractor.vector_symbols import scan_vector_symbols
+                parsed["_vector_symbols"] = scan_vector_symbols(pdf_path.read_bytes())
+                _vs = parsed["_vector_symbols"].get("difuzoriai") or {}
+                print(f"  ⤴ ženklai iš brėžinio: difuzoriai {_vs.get('count')} — {_vs.get('sakinys')}")
             except Exception as exc:
-                print(f"  ⚠ symbol-legend scan failed during rescore: {exc}")
-            # The geometry lane (2026-09-19, Step 2.44d in production): room
-            # outlines from the vector walls and perimeters ADDED from the
-            # plan's dimension strings. Zero API, needs the PDF. Behind
-            # --geometry so a run can be scored with and without it.
-            if GEOMETRY_LANE:
-                try:
-                    from extractor.geometry_lane import apply_geometry
-                    g = apply_geometry(parsed, pdf_path.read_bytes())
-                    print(f"  ⤴ geometry lane: {g.get('status')} — kontūrai {g.get('konturai')}, "
-                          f"atviros erdvės {g.get('atviros_erdves')}, perimetrai sudėti "
-                          f"{g.get('perimetrai_sudeti')}, tušti su įverčiu {g.get('perimetrai_tusti')}, "
-                          f"angose nupiešta {g.get('nupiesta')} ({g.get('seconds')} s)")
-                except Exception as exc:
-                    print(f"  ⚠ geometry lane failed during rescore: {exc}")
-            # The drawing's door schedule (2026-09-23, Step 2.43 in production): frame type and the
-            # door list's reconciliation with the table. Zero API, needs the PDF; a cache written
-            # before the scan existed gets it here, the way production's free re-read gives it.
-            if "_duru_ziniarastis" not in parsed:
-                try:
-                    from extractor.door_schedule import scan_door_schedule
-                    parsed["_duru_ziniarastis"] = scan_door_schedule(pdf_path.read_bytes())
-                    print(f"  ⤴ durų žiniaraštis: {parsed['_duru_ziniarastis'].get('status')} — "
-                          f"{parsed['_duru_ziniarastis'].get('sakinys')}")
-                except Exception as exc:
-                    print(f"  ⚠ door schedule scan failed during rescore: {exc}")
-            # Symbols counted from the drawing's own paths (2026-09-24, Step 2.44 in production): the
-            # diffuser rows take this count. Zero API, needs the PDF; scanned when the cache lacks it.
-            if "_vector_symbols" not in parsed:
-                try:
-                    from extractor.vector_symbols import scan_vector_symbols
-                    parsed["_vector_symbols"] = scan_vector_symbols(pdf_path.read_bytes())
-                    _vs = parsed["_vector_symbols"].get("difuzoriai") or {}
-                    print(f"  ⤴ ženklai iš brėžinio: difuzoriai {_vs.get('count')} — {_vs.get('sakinys')}")
-                except Exception as exc:
-                    print(f"  ⚠ vector symbol scan failed during rescore: {exc}")
-        else:
-            print(f"  · height-marker lane skipped: {pdf_rel} not on disk")
-
-    if rooms and not (parsed.get("lubu_auksciai") or {}):
-        from extractor.height_markers import salvage_heights_from_warnings
-        salvaged = salvage_heights_from_warnings(parsed.get("warnings") or [], rooms)
-        for r in rooms:
-            h = salvaged.get(r.get("pavadinimas"))
-            if h is None:
-                continue
-            old = float(r.get("lubu_aukstis_m") or 0)
-            # Upward-only, same spirit as production's asymmetric guard:
-            # salvage exists because "Vision saw a non-default height".
-            if h > old:
-                r["lubu_aukstis_m"] = float(h)
-                r["lubu_aukstis_saltinis"] = "warning_salvage_rescore"
-
-    try:
-        from extractor.universal_rules import apply_height_plausibility_gate
-        apply_height_plausibility_gate(rooms)
-    except Exception as exc:
-        print(f"  ⚠ plausibility gate failed during rescore: {exc}")
+                print(f"  ⚠ vector symbol scan failed during rescore: {exc}")
+    else:
+        # No drawing: the model's heights still come off (text/heights.py with no PDF reads only the
+        # room table's height column), exactly as no height would be read on it.
+        from text.heights import apply_text_heights
+        apply_text_heights(parsed, None)
 
     # The shower attribution (Step 2.866 in production, 2026-10-03): which rooms
     # the plumbing plan shows a shower in, settled from the plumbing reader's own
     # list. Production runs it once, at the fixture-reader step after the lanes,
     # and the calculation reads the flags off the rooms; a frozen extract older
-    # than it carries the list but no flags, so the eval scored every wet room on
-    # its type alone (objektas_h „Hidroizoliacinė medžiaga" 97,44 kg against
-    # production's 70,38). Same function, same stored list — what production
-    # computes; on an extract production already marked it gives the same flags
-    # again. No list or no plumbing reading: nothing changes.
+    # than it carries the list but no flags. Same function, same stored list.
     try:
         n_marked = vc.mark_shower_rooms(parsed)
         if n_marked:
             print(f"  ⤴ shower attribution (plumbing list): {n_marked} room(s) decided")
     except Exception as exc:
         print(f"  ⚠ shower attribution failed during rescore: {exc}")
+
+    # Heights from the drawing only (production Step 2.885, v4 3b): a room the text gave no height takes the
+    # height read in the other rooms, else none.
+    fill_heights_from_read(parsed.get("patalpos") or [], parsed)
 
     # The person's answers (v4 re-base, 2026-10-25): what a person would type when the app asks —
     # applied through the Prielaidos height path, after every height producer and before the
@@ -3521,29 +3410,21 @@ def main() -> int:
                     help="alias for --totals-only (spec compatibility)")
     ap.add_argument("--recompute", action="store_true",
                     help="with --rescore or --totals-only: re-run the "
-                         "deterministic tail (height salvage + plausibility "
-                         "gate + per-room recompute + santrauka + pozicijos) "
+                         "deterministic tail (the drawing's lanes incl. the text "
+                         "heights + per-room recompute + santrauka + pozicijos) "
                          "on the saved primitives before scoring — measures "
                          "CURRENT formula code against saved Vision reads, no "
                          "API. WITHOUT it, --totals-only scores the numbers "
                          "frozen in ai_extract.json and cannot see a fix or a "
                          "regression")
     ap.add_argument("--geometry", action="store_true",
-                    help="with --recompute: also run the geometry lane (outlines "
-                         "from the vector walls, perimeters added from the plan's "
-                         "dimension strings) on the fixture PDF before the "
-                         "recompute — zero API. Compare a run with and without it.")
+                    help="no-op since 2026-10-25: every --recompute runs the drawing's lanes "
+                         "(extractor/drawing_lanes.py) — kept so old command lines still run")
     ap.add_argument("--replay-geometry", action="store_true",
-                    help="with --recompute: run the paid pipeline's zero-cost drawing "
-                         "lanes again on each frozen extract before the recompute, in "
-                         "production's order — the plan text scan (designer's figures, "
-                         "walls/floors anchors, stated height, area labels when no table "
-                         "merged), rectangle pairs, raster outlines, the geometry lane, "
-                         "then the polygon prepass, niche inference, door schedule and "
-                         "vector symbols — after taking back what older lane versions "
-                         "froze into the extract. Prints per project what changed. A "
-                         "project without its PDF is scored without it. Not the default; "
-                         "never accepted as the baseline.")
+                    help="no-op alias since 2026-10-25 (v4 Phase 3c-1): every --recompute runs the "
+                         "paid pipeline's zero-cost drawing lanes again on each frozen extract, through "
+                         "the function the paid reading calls, after taking back what older lane "
+                         "versions froze into it — prints per project what changed")
     ap.add_argument("--no-answers", action="store_true",
                     help="do not apply ground_truth/<slug>/answers.json (the person's answers: the\n                         ceiling height a person would type when the app asks) — reproduces the\n                         instrument as it was before the 2026-10-25 re-base")
     ap.add_argument("--estimate-exterior", action="store_true",
@@ -3602,20 +3483,11 @@ def main() -> int:
                     help="override the --gate tolerance in percentage points")
     args = ap.parse_args()
     gate_mode = _gate_mode(args)
-    global GEOMETRY_LANE
-    GEOMETRY_LANE = bool(args.geometry)
+    if args.geometry or args.replay_geometry:
+        print("  · --geometry / --replay-geometry: no-op since 2026-10-25 — every --recompute runs the "
+              "drawing's lanes (extractor/drawing_lanes.py), the same function the paid reading calls")
     global ANSWERS
     ANSWERS = not args.no_answers
-    global REPLAY_GEOMETRY
-    REPLAY_GEOMETRY = bool(args.replay_geometry)
-    if REPLAY_GEOMETRY:
-        if not args.recompute:
-            raise SystemExit("--replay-geometry needs --recompute (it runs before the live tail)")
-        if args.geometry:
-            raise SystemExit("--replay-geometry already runs the geometry lane — drop --geometry")
-        if args.accept_baseline:
-            raise SystemExit("--replay-geometry is not the default eval: its numbers are never "
-                             "accepted as the baseline (compare them with --gate instead)")
 
     if args.model:
         # FAIL LOUDLY on any cache-reading mode: --replay reuses a saved
@@ -3664,9 +3536,6 @@ def main() -> int:
 
     if args.blind_once:
         # Its one scoring per release candidate is of the default pipeline.
-        if args.geometry or getattr(args, "replay_geometry", False):
-            raise SystemExit("--blind-once scores the default pipeline only — "
-                             "drop --geometry / --replay-geometry")
         return run_blind_once(GROUND_TRUTH_ROOT / "registry.yaml")
 
     # Every single-project mode prints per-metric detail — exactly what a

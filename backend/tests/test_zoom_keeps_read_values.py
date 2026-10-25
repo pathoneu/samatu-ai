@@ -43,12 +43,16 @@ def test_a_read_height_keeps_its_value_and_label(label):
     assert any(c.startswith("lubu_aukstis (zoom)") for c in room["_zoom_changes"])
 
 
-@pytest.mark.parametrize("label", [None, "", "section_average", "default_fallback", "height_gate_clamped", "per_room"])
-def test_an_assumed_or_unlabelled_height_takes_the_zoom_and_says_so(label):
+@pytest.mark.parametrize("label", [None, "", "nera", "section_average", "default_fallback", "height_gate_clamped",
+                                   "per_room"])
+def test_a_zoom_height_is_kept_beside_the_room_never_applied(label):
+    """v4 Phase 3c-1: the crop's height is the model's reading — the height is the drawing's text, his entry or
+    the one question (text/heights.py). The figure is kept as evidence and the change log says it was left."""
     room = {"nr": "03", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": label}
-    assert _apply_zoom_refinements(room, {"confidence_zoom": "high", "lubu_aukstis_m": 3.0}) is True
-    assert room["lubu_aukstis_m"] == 3.0
-    assert room["lubu_aukstis_saltinis"] == ZOOM_SOURCE, "the label follows the value"
+    assert _apply_zoom_refinements(room, {"confidence_zoom": "high", "lubu_aukstis_m": 3.0}) is False
+    assert room["lubu_aukstis_m"] == 2.82 and room["lubu_aukstis_saltinis"] == label
+    assert room["_lubu_aukstis_zoom_m"] == 3.0
+    assert any(c.startswith("lubu_aukstis (zoom)") for c in room["_zoom_changes"])
 
 
 def test_an_unlabelled_perimeter_takes_the_zoom_and_says_so():

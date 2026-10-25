@@ -266,7 +266,15 @@ def samata(lane_parsed: dict, blob: dict | None, scan: dict, pdf_bytes: bytes) -
         pass
     from extractor import scope as _scope
 
+    # the heights the drawing's text writes (v4 3c-1, text/heights.py — the paid reading's reader), then Step 2.885
+    from text.heights import apply_text_heights
+    heights = apply_text_heights(parsed, pdf_bytes, statements=scan.get("heights"))
     rp.fill_heights_from_read(parsed["patalpos"], parsed)
+    room_heights = [{"nr": r.get("nr"), "m": r.get("lubu_aukstis_m"), "saltinis": r.get("lubu_aukstis_saltinis"),
+                     "kaip": (r.get("aukstis_saltinis") or {}).get("kaip"),
+                     "lapas": (r.get("aukstis_saltinis") or {}).get("lapas"),
+                     "tekstas": (r.get("aukstis_saltinis") or {}).get("tekstas")}
+                    for r in parsed.get("patalpos") or []]
     # his „ką skaičiuoti" exactly as extract_interior applies it (Step 2.9 → 2.95)
     rules = {**(parsed.get("_overrides") or {})}
     if parsed.get("_apimtis") and not rules.get("apimtis"):
@@ -288,7 +296,8 @@ def samata(lane_parsed: dict, blob: dict | None, scan: dict, pdf_bytes: bytes) -
     for r in rows:
         counts[str(r["kilme"])] = counts.get(str(r["kilme"]), 0) + 1
     return {"rows": rows, "kilme": counts, "illegal": [r["aprasymas"] for r in rows
-                                                      if r["kilme"] in rp.ILLEGAL and r["kiekis"] is not None]}
+                                                      if r["kilme"] in rp.ILLEGAL and r["kiekis"] is not None],
+            "heights": {k: v for k, v in heights.items() if k != "patalpos"}, "room_heights": room_heights}
 
 
 def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> dict:

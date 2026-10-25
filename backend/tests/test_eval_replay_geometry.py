@@ -147,18 +147,20 @@ def test_a_project_without_its_drawing_is_scored_without_the_replay(eh, tmp_path
         same = eh._replay_geometry_lanes(parsed, "synthetic_missing")
     assert same is parsed and same["patalpos"][0]["perimetras_saltinis"] == "plano_matmenys"     # untouched
     assert "not on disk" in eh.REPLAY_REPORT["synthetic_missing"]["skipped"]
-    assert "geometry replay skipped" in out.getvalue()
+    assert "drawing lanes skipped" in out.getvalue()
 
 
-@pytest.mark.parametrize("argv, message", [
-    (["--totals-only", "--replay-geometry"], "needs --recompute"),
-    (["--totals-only", "--recompute", "--replay-geometry", "--geometry"], "drop --geometry"),
-    (["--totals-only", "--recompute", "--replay-geometry", "--accept-baseline"], "never accepted as the baseline"),
+@pytest.mark.parametrize("argv", [
+    ["--totals-only", "--recompute", "--replay-geometry"],
+    ["--totals-only", "--recompute", "--geometry"],
+    ["--totals-only", "--recompute"],
 ])
-def test_the_flag_refuses_what_it_cannot_mean(eh, monkeypatch, argv, message):
+def test_the_old_flags_are_no_ops(eh, monkeypatch, capsys, argv):
+    """v4 Phase 3c-1: the plain --recompute runs the drawing's lanes; the flags that used to switch them on are
+    accepted and change nothing (they say so)."""
     monkeypatch.setattr(sys, "argv", ["eval_harness.py", *argv])
-    monkeypatch.setattr(eh, "run_totals_only_multi", lambda *a, **k: pytest.fail("the eval must not run"))
-    monkeypatch.setattr(eh, "REPLAY_GEOMETRY", False)       # main() sets the module flags; put them back after
-    monkeypatch.setattr(eh, "GEOMETRY_LANE", False)
-    with pytest.raises(SystemExit, match=message):
-        eh.main()
+    ran = []
+    monkeypatch.setattr(eh, "run_totals_only_multi", lambda *a, **k: ran.append(k) or 0)
+    eh.main()
+    assert len(ran) == 1
+    assert ("no-op" in capsys.readouterr().out) == (len(argv) == 3)

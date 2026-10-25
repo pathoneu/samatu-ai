@@ -277,6 +277,17 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
     except Exception as exc:  # noqa: BLE001
         log.warning("free-reread vector symbol scan failed for %s: %r", project.get("id"), exc)
     figures = read_figures_and_heights(parsed, pdf_bytes, project.get("id"))
+    # the ceiling heights the drawing's text writes (v4 Phase 3c-1, text/heights.py — the paid reading's own
+    # reader): a model height a stored room still carries comes off, his entries stay; then a room the text gave
+    # no height takes the height read in the other rooms (Step 2.885). Rides on the rooms through the browser's
+    # usual merge (a room he verified keeps its facts).
+    try:
+        from extractor.row_provenance import fill_heights_from_read
+        from text.heights import apply_text_heights
+        apply_text_heights(parsed, pdf_bytes)
+        fill_heights_from_read(parsed.get("patalpos") or [], parsed)
+    except Exception as exc:  # noqa: BLE001 — heights are never the reason a re-read fails
+        log.warning("free-reread text heights failed for %s: %r", project.get("id"), exc)
     # the wall and partition types the legends name (Pathon v3 W5-D, D9) — evidence beside the walls fact
     from extractor.wall_types import read_wall_types
     walls = read_wall_types(pdf_bytes)

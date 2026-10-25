@@ -244,3 +244,21 @@ def test_figures_never_fail_the_read(monkeypatch):
     monkeypatch.setenv(fr.FIGURES_FLAG, "1")
     monkeypatch.setattr(pa, "scan_text_layer", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
     assert fr.read_figures_and_heights({"patalpos": []}, b"%PDF", "p") == {}
+
+
+# ── v4 Phase 3c-1: the heights the drawing's text writes, with the paid reading's own reader ──────────────────────
+
+def test_the_reread_reads_heights_from_the_text_and_takes_the_models_off(tmp_path, monkeypatch):
+    """A stored room's model height comes off (kept aside as `_lubu_aukstis_modelio`), his entry stays; the
+    synthetic sheets write no height, so the other room takes the height read elsewhere — his (Step 2.885)."""
+    _isolate(tmp_path, monkeypatch)
+    blob = _blob()
+    blob["patalpos"][0].update({"lubu_aukstis_m": 3.4, "lubu_aukstis_saltinis": "per_room"})
+    blob["patalpos"][1].update({"lubu_aukstis_m": 2.95, "lubu_aukstis_saltinis": "user_override"})
+    _store(blob=blob)
+    out = TestClient(app).post("/api/projects/p1/free-reread").json()
+    r1, r2 = out["patalpos"]
+    assert (r1["lubu_aukstis_m"], r1["lubu_aukstis_saltinis"]) == (2.95, "kaip_kitose")
+    assert r1["_lubu_aukstis_modelio"] == 3.4
+    assert (r2["lubu_aukstis_m"], r2["lubu_aukstis_saltinis"]) == (2.95, "user_override")
+    assert out["_meta"]["aukstis_tekstas"]["be_aukscio"] == ["01"]

@@ -312,11 +312,10 @@ def test_page_classifier_refusal_raises_model_stopped(monkeypatch):
 # ── extractor/vision/*: raise ModelStopped, never cache a refused answer ─────
 
 def _vision_readers():
-    # v4 3b (2026-10-25): the room-geometry readers are deleted; the two Phase 3c reduces to text remain
-    from extractor.vision import height_extractor, schedule_extractor
+    # v4 3b (2026-10-25): the room-geometry readers are deleted; 3c-1 deleted the height reader (heights are read
+    # from the text, text/heights.py) — the schedule reader remains
+    from extractor.vision import schedule_extractor
     return [
-        ("height_extractor", height_extractor.extract_ceiling_height,
-         height_extractor.parse_height_payload, {}),
         ("schedule_extractor", schedule_extractor.extract_schedule,
          schedule_extractor.parse_schedule_payload, {}),
     ]

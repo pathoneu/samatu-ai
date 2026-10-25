@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 
-from extractor.height_fusion import HEIGHT_SECTION_TIPAI, height_scan_pages
 from extractor.page_classifier import (
     CANONICAL_TIPAI,
     PageType,
@@ -71,30 +70,8 @@ def test_dead_height_lookup_names_now_resolve_to_section():
     assert canonical_tipas("pjuvis") == "section"
 
 
-def test_height_section_tipai_are_all_canonical():
-    """Whatever this tuple lists must be matchable — that was the bug."""
-    for tipas in HEIGHT_SECTION_TIPAI:
-        assert tipas in CANONICAL_TIPAI
-
-
-def test_height_scan_routes_a_formerly_dead_alias():
-    """End-to-end: an extract labelling its pjūvis "cross_section" used to
-    be ignored by the height scan. It must now sort first, ahead of the
-    ceiling plan, exactly as a "section" would."""
-    ai = {"puslapiai": [
-        {"nr": 1, "tipas": "floor_plan"},
-        {"nr": 2, "tipas": "ceiling_plan"},
-        {"nr": 3, "tipas": "cross_section"},
-    ]}
-    assert height_scan_pages(ai, max_pages=6)[0] == 3
-
-
-def test_height_scan_still_prefers_plain_section():
-    ai = {"puslapiai": [
-        {"nr": 1, "tipas": "floor_plan"},
-        {"nr": 2, "tipas": "section"},
-    ]}
-    assert height_scan_pages(ai, max_pages=6)[0] == 2
+# (height_fusion.py, its HEIGHT_SECTION_TIPAI and height_scan_pages were deleted with the model's height
+# reader, v4 Phase 3c-1 — the text reader text/heights.py routes by canonical_tipas directly.)
 
 
 # ── normalisation is total and fails open ─────────────────────────────────

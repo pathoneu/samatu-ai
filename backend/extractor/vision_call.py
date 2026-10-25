@@ -581,7 +581,8 @@ READ_SOURCES = {
     "perimetras_saltinis": ("plano_matmenys", "matmenu_eilutes", "eksplikacija", "sienu_konturas",
                             "konturo_ivertis", "atviros_erdves_ivertis", "user_override", "manual"),
     "plotas_saltinis": ("eksplikacija", "plano_uzrasas", "user_override", "manual"),
-    "lubu_aukstis_saltinis": ("ceiling_plan_marker", "plano_uzrasas", "user_override", "manual"),
+    "lubu_aukstis_saltinis": ("ceiling_plan_marker", "plano_uzrasas", "patalpu_lentele", "projekto_aukstis",
+                              "user_override", "manual"),
 }
 ZOOM_SOURCE = "zoom"          # a perimeter or height the zoomed re-read replaced
 
@@ -631,20 +632,14 @@ def _apply_zoom_refinements(room: dict, zoom: dict) -> bool:
             changed = True
 
     if zoom.get("lubu_aukstis_m") is not None:
+        # v4 Phase 3c-1: a crop's height is the model's reading — kept beside the room as evidence, never applied.
+        # The height is the drawing's text (text/heights.py), his entry, or the one question.
         old = room.get("lubu_aukstis_m")
         new = float(zoom["lubu_aukstis_m"])
-        if room.get("lubu_aukstis_saltinis") in READ_SOURCES["lubu_aukstis_saltinis"]:
-            # the altitude printed inside the room, the plan's storey height or his
-            # own — a marker may only raise a height, and a crop's guess never does
-            room["_lubu_aukstis_zoom_m"] = new
-            if abs(new - (old or 0)) > 0.05:
-                room.setdefault("_zoom_changes", []).append(
-                    f"lubu_aukstis (zoom): {new} — paliktas {old}")
-        elif abs(new - (old or 0)) > 0.05:
-            room["lubu_aukstis_m"] = new
-            room["lubu_aukstis_saltinis"] = ZOOM_SOURCE
-            room.setdefault("_zoom_changes", []).append(f"lubu_aukstis: {old} → {new}")
-            changed = True
+        room["_lubu_aukstis_zoom_m"] = new
+        if abs(new - (old or 0)) > 0.05:
+            room.setdefault("_zoom_changes", []).append(
+                f"lubu_aukstis (zoom): {new} — paliktas {old}")
 
     if zoom.get("plyteles_sienos_aukstis_m") is not None:
         room["plyteles_sienos_aukstis_m"] = float(zoom["plyteles_sienos_aukstis_m"])
@@ -1967,6 +1962,27 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
 
 # Vision's own labels for a room height it says it READ (prompt.py schema) — its `default_fallback` is not one
 _VISION_READ_HEIGHTS = ("section_pjuvis", "ceiling_plan_annotation")
+
+
+def _model_height_resolved(room: dict, parsed: dict) -> bool:
+    """Did the reading MODEL resolve this room's height itself (its own voted height with a read label, or its
+    per-room name / number map)? What the old Step 2.45 called `per_room` — used since v4 Phase 3c-1 only to pick
+    the rooms the zoom pass re-reads, never as a height (text/heights.py keeps the model's figure aside)."""
+    from extractor.feature_flags import get_flags
+    if not get_flags()["per_room_ceiling"]:
+        return False
+    src = str(room.get("_lubu_aukstis_modelio_saltinis") or "").strip().lower()
+    if src in _VISION_READ_HEIGHTS and room.get("_lubu_aukstis_modelio") is not None:
+        return True
+    by_name = parsed.get("_lubu_auksciai_modelio") or {}
+    by_nr = parsed.get("_lubu_auksciai_by_nr_modelio") or {}
+    if not by_name and not by_nr:
+        # the old step mined the model's warning texts for heights when it gave no map (objektas_h: „Vonios
+        # kambarys 1/2" — exactly the two rooms production did not zoom)
+        from extractor.height_markers import salvage_heights_from_warnings
+        by_name = salvage_heights_from_warnings(parsed.get("warnings") or [], parsed.get("patalpos") or []) or {}
+    nr = str(room.get("nr") or "").strip()
+    return bool((room.get("pavadinimas") and room.get("pavadinimas") in by_name) or (nr and nr in by_nr))
 
 
 def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
@@ -6515,136 +6531,13 @@ def extract_interior(
     except Exception as exc:  # noqa: BLE001
         print(f"[extractor] room identity marking failed (non-fatal): {exc}")
 
-    # Step 2.44: plan-area annotations lane (2026-09-06, item 3 of the €0
-    # generalisation work). Only when NO room table merged: the designer's own
-    # room areas written on the lubų/grindų planas („37.86 m²" standing alone
-    # in each room) are read from the text layer and become the table —
-    # confirming Vision's rooms, correcting a near miss, FLAGGING a room no
-    # label supports (objektas_g's invented third bathroom), and anchoring the
-    # ceiling quantity to their sum. See extractor/plan_area_annotations.py.
-    try:
-        from .plan_area_annotations import (
-            apply_height_statements, lane_warnings, most_common_page, plan_pages_from_classification,
-            reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
-        # ONE pass over the text layer (pypdfium2; renders skipped): the room-area
-        # labels for the lane below and — 3c — the designer's own legend totals
-        # („Glaistoma dažoma 202 m²"), shown beside ours on the check sheet, never
-        # used as a value.
-        _t0 = time.time()
-        _text_pages = text_pages_from_classification(parsed.get("puslapiai") or [])
-        _scan = scan_text_layer(pdf_bytes, pages=_text_pages or None)
-        parsed["_autoriaus_kiekiai"] = _scan["figures"]
-        # The painted-wall area the drawing states (sienų apdailos plano
-        # legenda) — the walls' anchor, see `_walls_anchor_from_figures`.
-        parsed.pop("_walls_anchor", None)
-        _wa = _walls_anchor_from_figures(_scan["figures"])
-        if _wa:
-            parsed["_walls_anchor"] = _wa
-        # …and the floor plan's own grindjuostės / plytelių grindjuostės /
-        # laminatas totals — the floors' anchors, `_floor_anchors_from_figures`.
-        parsed.pop("_floor_anchors", None)
-        _fa = _floor_anchors_from_figures(_scan["figures"])
-        if _fa:
-            parsed["_floor_anchors"] = _fa
-        parsed.setdefault("_meta", {})["text_layer_scan_s"] = round(time.time() - _t0, 2)
-        # A height the plan states for ONE room („Lubų aukštis H=2700", or a stamp
-        # beside the room's own label inside its outline) for that room when it
-        # carries only our default — read, not assumed; a room's own reader wins.
-        # A stamp on an element („Kondicionierius h=2600 mm") or one no room
-        # claims sets nothing (2026-10-05, plan_area_annotations._tie_statement).
-        _hs = apply_height_statements(parsed.get("patalpos") or [], _scan.get("heights") or [])
-        parsed["_meta"]["plan_height_statement"] = {k: v for k, v in _hs.items() if k != "rooms"} | {"rooms": len(_hs.get("rooms") or [])}
-        _merged_rooms = int((parsed.get("_meta") or {}).get("eksplikacija_merged_rooms") or 0)
-        if _merged_rooms == 0 and parsed.get("patalpos"):
-            _plan_pages = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
-            _ann = [a for a in _scan["annotations"] if not _plan_pages or a["page"] in _plan_pages]
-            _lane = reconcile_rooms_with_annotations(parsed["patalpos"], _ann)
-            parsed.setdefault("_meta", {})["plan_area_lane"] = _lane
-            if _lane.get("status") == "applied":
-                parsed.setdefault("warnings", []).extend(lane_warnings(_lane, parsed["patalpos"]))
-                if not parsed.get("_ceiling_anchor") and float(_lane.get("sum_m2") or 0) > 0:
-                    parsed["_ceiling_anchor"] = {
-                        "total_area_m2": float(_lane["sum_m2"]),
-                        "label": "plano užrašų suma",
-                        "page": most_common_page(_ann),
-                    }
-            _emit({"event": "plan_area_lane", "status": _lane.get("status"),
-                   "geometry": _lane.get("geometry"), "candidates": _lane.get("candidates"),
-                   "confirmed": len(_lane.get("confirmed") or []),
-                   "adopted": len(_lane.get("adopted") or []),
-                   "unconfirmed": len(_lane.get("unconfirmed") or [])})
-        # Step 2.44b: perimeters from the plan's DIMENSION STRINGS (2026-09-10,
-        # founder: „perskaityti skaičius ir padaryti matematiką"). Runs for
-        # table projects too — their plans still state the walls; a table
-        # perimeter (none in the corpus) is marked `eksplikacija` and skipped.
-        try:
-            from .plan_dimensions import apply_dimension_strings
-            # Dimensions from EVERY text page: the page classifier can call
-            # the floor plan something else (run 2 of objektas_g: not one of
-            # its 8 rooms matched because the dimensioned sheet was filtered
-            # out). A string pairs only when its dimension LINE spans the
-            # room's label, so a far-off sheet cannot pair and the filter
-            # would only ever lose walls. Labels stay restricted to plan
-            # pages, as in the area lane.
-            _plan_pages_d = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
-            _dims = list(_scan.get("dimensions") or [])
-            _anns = [a for a in _scan["annotations"] if not _plan_pages_d or a["page"] in _plan_pages_d]
-            _dl = apply_dimension_strings(parsed.get("patalpos") or [], _dims, _anns)
-            parsed.setdefault("_meta", {})["plan_dimension_lane"] = _dl
-            _emit({"event": "plan_dimension_lane", "status": _dl.get("status"),
-                   "dimensions": _dl.get("dimensions"), "lines": _dl.get("lines"),
-                   "confirmed": len(_dl.get("confirmed") or []),
-                   "corrected": len(_dl.get("corrected") or []),
-                   "unmatched": len(_dl.get("unmatched") or [])})
-        except Exception as exc:  # noqa: BLE001
-            print(f"[extractor] plan-dimension lane failed: {exc}")
-        # Step 2.44c: room OUTLINES from the wall geometry (2026-09-13, the
-        # founder's „pažymėta vieta, iš kur kas ištraukta" made precise). The
-        # page rendered without text and hairlines is the walls; a fill from
-        # the room's own area label, checked against the printed m², gives the
-        # sheet its frame and the perimeter where nobody stated one
-        # (extractor/wall_outline.py; research 2026-09-13).
-        try:
-            from .wall_outline import apply_wall_outlines
-            _t1 = time.time()
-            _plan_pages_w = set(plan_pages_from_classification(parsed.get("puslapiai") or []))
-            _wl = apply_wall_outlines(
-                parsed.get("patalpos") or [], pdf_bytes, list(_scan.get("dimensions") or []),
-                [a for a in _scan["annotations"] if not _plan_pages_w or a["page"] in _plan_pages_w])
-            _wl["seconds"] = round(time.time() - _t1, 1)
-            parsed.setdefault("_meta", {})["wall_outline_lane"] = _wl
-            _emit({"event": "wall_outline_lane", "status": _wl.get("status"),
-                   "traced": len(_wl.get("traced") or []),
-                   "corrected": len(_wl.get("corrected") or []),
-                   "unmatched": len(_wl.get("unmatched") or []),
-                   "seconds": _wl["seconds"]})
-        except Exception as exc:  # noqa: BLE001
-            print(f"[extractor] wall-outline lane failed: {exc}")
-        # Step 2.44d: geometry READ from the drawing (2026-09-19, after the
-        # founder's first production run of objektas_h: every perimeter was a
-        # square guess, every outline Vision's box). Rooms are located by
-        # their number badges, the sheets of one plan are laid over each
-        # other, outlines come from the vector walls, and a perimeter is the
-        # SUM of the strings written along those walls — the outline only
-        # assigns and checks. What the drawing does not state stays blank,
-        # with the reason and the outline's estimate (extractor/geometry_lane.py).
-        try:
-            from .geometry_lane import apply_geometry
-            # No strings of our own: the lane reads them from its one source
-            # (every page, slanted strings too), exactly as the free re-read
-            # does — the text scan above covers classified pages only and no
-            # slanted string (audit 2026-09-30, geometry-lanes-2).
-            _gl = apply_geometry(parsed, pdf_bytes)
-            _emit({"event": "geometry_lane", "status": _gl.get("status"),
-                   "konturai": len(_gl.get("konturai") or []),
-                   "atviros_erdves": len(_gl.get("atviros_erdves") or []),
-                   "perimetrai_sudeti": len(_gl.get("perimetrai_sudeti") or []),
-                   "perimetrai_tusti": len(_gl.get("perimetrai_tusti") or []),
-                   "seconds": _gl.get("seconds")})
-        except Exception as exc:  # noqa: BLE001
-            print(f"[extractor] geometry lane failed: {exc}")
-    except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
-        print(f"[extractor] plan-area lane failed: {exc}")
+    # Steps 2.44 → 2.44d + the text heights (v4 Phase 3c-1): the drawing's €0 lanes — the text-layer scan
+    # (designer's figures, walls / floors anchors, area labels when no table merged), rectangle pairs, raster
+    # outlines, ceiling heights from the text, the geometry lane (outlines, scale with provenance, perimeters added
+    # from the strings, openings as drawn, floor coverings) — in ONE function the eval's tail calls too
+    # (extractor/drawing_lanes.py). No model call; seconds per step in `_meta.braizinio_skaitymas`.
+    from .drawing_lanes import run_drawing_lanes
+    run_drawing_lanes(parsed, pdf_bytes, emit=_emit)
 
     # Step 2.45: Schedule-table anchoring for window/door dimensions (Sprint 2).
     # Each room.elementai item with tipas in (langas, stoglangis, duris, pasleptos_duris)
@@ -6751,127 +6644,9 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] bbox validation failed: {exc}")
 
-    # Step 2.4.5: deterministic ceiling-height fallback.
-    # Vision sometimes misses tall ceilings (>3 m) annotated as `+3.000` on
-    # section / ceiling-plan pages, defaulting to ~2.80 m and skewing every
-    # wall-paint quantity downstream.
-    #
-    # 2026-05-11 W1 audit: the prior "section_pages + (1,)" coverage was
-    # wrong for real LT projects — pjūviai routinely sit on back pages
-    # (verified empirically against the interior corpus), not p1. And
-    # page_classifier may not see those back pages at all (cost-gated
-    # to first N pages). Scanner is cheap text extraction; scan ALL
-    # pages, let best_ceiling_candidate filter to [2.0, 4.5] m range.
-    #
-    # Override threshold tightened 0.30 → 0.15 (asymmetric "going up"):
-    # if Vision said 2.80 and marker says 3.00, diff 0.20 — used to be
-    # ignored, now overrides correctly. Soviet 2.50m default protected
-    # by `cand_m > 2.95` guard.
-    try:
-        from extractor.height_markers import (
-            best_ceiling_candidate,
-            scan_page_height_markers,
-        )
-        from extractor.height_markers import (
-            marker_is_on_mm_grid as _hm_on_grid,
-        )
-        # Scan every page. Filter to plausible ceiling values happens in
-        # height_markers.MIN_CEILING_M / MAX_CEILING_M. Cost: ~50ms/page
-        # in pdfplumber for text extraction (no Vision call).
-        try:
-            import pdfplumber as _pp
-            import io as _io
-            with _pp.open(_io.BytesIO(pdf_bytes)) as _doc:
-                num_pages = len(_doc.pages)
-        except Exception:
-            num_pages = 0
-        scan_pages = tuple(range(1, num_pages + 1)) if num_pages else (1,)
-        markers = scan_page_height_markers(pdf_bytes, page_nrs=scan_pages)
-        if not markers:
-            _emit({
-                "event": "no_height_markers",
-                "reason": "text_layer_empty_or_flattened_or_no_markers",
-                "scan_pages_count": len(scan_pages),
-            })
-        candidate = best_ceiling_candidate(markers)
-        if candidate is not None:
-            cand_m = candidate["value_m"]
-            section_h = parsed.get("lubu_aukstis_m")
-            # Asymmetric guard: only override "going up" to a clearly
-            # taller value (>2.95m). Prevents trampling legitimate
-            # Soviet-era 2.50m readings with a stray +2.40 beam marker.
-            should_override = (
-                section_h is None
-                or (cand_m > 2.95 and float(section_h) < cand_m - 0.15)
-            )
-            if section_h is not None and abs(float(section_h) - cand_m) < 0.005:
-                # Pass-1 and the printed marker agree: the project height is the drawing's (v4 3b)
-                parsed["_lubu_aukstis_saltinis"] = _rp.PROJECT_HEIGHT_FROM_TEXT
-            if should_override:
-                parsed["lubu_aukstis_m"] = cand_m
-                parsed["_lubu_aukstis_saltinis"] = _rp.PROJECT_HEIGHT_FROM_TEXT
-                warnings_list = list(parsed.get("warnings") or [])
-                marker_raw = candidate["raw"]
-                # 2026-08-03: a marker off the millimetre grid was never an
-                # elevation (romainiai's 3.706 m came from the phone number
-                # +37068794842). The regex boundary guard in height_markers
-                # already drops that token; this is the second, value-side
-                # layer — it does NOT reject (a 2 825 mm slab is legal), it
-                # raises the warning to WARN so the user is told to check
-                # rather than being handed a silent hallucination.
-                on_grid = _hm_on_grid(cand_m)
-                warnings_list.append({
-                    "code": "ceiling_height_from_section_marker",
-                    "severity": "info" if on_grid else "warn",
-                    "message": (
-                        f"Lubų aukštis paimtas iš pjūvio žymeklio „{marker_raw}“: "
-                        f"{lt_num(cand_m)} m (psl. {candidate['page']}). Patikrinkite "
-                        f"pjūvyje; jei aukštis kitas, pakeiskite jį per mygtuką "
-                        f"„Nustatymai“."
-                        + ("" if on_grid else
-                           " Dėmesio: reikšmė nėra apvalūs milimetrai — gal tai "
-                           "ne aukščio žymuo (pvz., telefono numeris ar brėžinio "
-                           "kodas).")
-                    ),
-                })
-                parsed["warnings"] = warnings_list
-                _emit({
-                    "event": "ceiling_height_from_marker",
-                    "value_m": cand_m,
-                    "raw": candidate["raw"],
-                    "page": candidate["page"],
-                    "previous": section_h,
-                })
-    except Exception as exc:
-        print(f"[extractor] height marker scan failed: {exc}")
-
-    # Step 2.4.6: POSITIONED ceiling-altitude markers (2026-07-29).
-    #
-    # Step 2.4.5 above reduces a whole sheet to ONE number (the largest
-    # plausible marker) and Vision reduces the same sheet the other way
-    # ("+2800 visos kitos patalpos"). Both throw away the pairing the drawing
-    # states explicitly: each altitude is PRINTED INSIDE a room. Objektas A room
-    # 101 is bracketed by two `+3400` on the lubų planas; three production
-    # Vision runs read it 2.8 / 2.8 / 3.4 — a coin flip on 42.5 m² of high
-    # wall. Reading the printed markers by position returns 3.4 on all three,
-    # deterministically, with no Vision call.
-    #
-    # Two lanes, in order: point-in-polygon when the rooms carry outlines,
-    # else proximity to the room NUMBER printed on the same sheet. The second
-    # exists because the first is often starved — on Objektas A exactly 1 of 11
-    # rooms has any geometry, so the frame gate scored 1/1 and the lane sat
-    # inert on the corpus's richest marker sheet.
-    #
-    # Marker-sourced heights OUTRANK Vision's per-room map: the marker is
-    # printed text at a position, read the same way every time; the model's
-    # holistic read of the same sheet demonstrably is not. The lane may only
-    # RAISE or confirm a height, never lower one. Rooms with no marker keep
-    # whatever they had and are DISCLOSED (lt_rules.apply_lt_sanity).
-    try:
-        from extractor.height_markers import apply_positioned_marker_heights
-        parsed = apply_positioned_marker_heights(parsed, pdf_bytes, emit=_emit)
-    except Exception as exc:
-        print(f"[extractor] positioned height marker lane failed: {exc}")
+    # Steps 2.4.5 / 2.4.6 (the section marker checked against Pass-1's height, the ceiling-plan altitudes that
+    # could only RAISE a model height) are gone (v4 Phase 3c-1, 2026-10-25): heights are read text-first inside
+    # the drawing lanes above (text/heights.py) and the model's height is never applied.
 
     # Step 2.42: symbol-LEGEND anchors (deterministic, $0). Records which
     # symbol families the drawing actually DEFINES, so an un-anchored Vision
@@ -6911,105 +6686,11 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] vector symbol scan failed (non-fatal): {exc}")
 
-    # Step 2.45: Apply per-room ceiling heights when Vision provided them
-    # (Sprint 0 Fix 4, gated by ENABLE_PER_ROOM_CEILING).
-    #
-    # 2026-05-11 W2: Vision sometimes only reads room *numbers* from the
-    # lubų plan annotations (e.g. "102=+3400") and can't map them to
-    # eksplikacija names. Accept lubu_auksciai_by_nr as a second source
-    # and merge into lubu_auksciai via patalpa.nr lookup.
-    #
-    # 2026-05-11 W2 (afternoon): even with imperative prompt iteration,
-    # Vision still narrates height info in warnings[] text on 2/5 corpus
-    # PDFs (projektas_3 "švarus lubų aukštis 300cm", projektas_4(2)
-    # "3200mm visose voniose"). Add a regex salvage pass that mines
-    # warning text for height patterns and merges them into
-    # lubu_auksciai when the model didn't structure them itself.
-    try:
-        per_room_heights = dict(parsed.get("lubu_auksciai") or {})
-        per_room_by_nr = parsed.get("lubu_auksciai_by_nr") or {}
-        rooms_raw = parsed.get("patalpos") or []
-        # Map numeric keys → room names via patalpa.nr; merge so any name
-        # the model emitted directly via lubu_auksciai wins (model already
-        # did the mapping reliably).
-        if per_room_by_nr:
-            for room in rooms_raw:
-                room_nr = str(room.get("nr") or "").strip()
-                if not room_nr:
-                    continue
-                h_for_nr = per_room_by_nr.get(room_nr) or per_room_by_nr.get(int(room_nr) if room_nr.isdigit() else None)
-                if h_for_nr is None:
-                    continue
-                name = room.get("pavadinimas")
-                if name and name not in per_room_heights:
-                    per_room_heights[name] = float(h_for_nr)
-            parsed["lubu_auksciai"] = per_room_heights
-
-        # Salvage from narrative warnings[]: when prompt iteration didn't
-        # fully prevent Vision from describing heights in free text, we
-        # mine the text for known patterns and apply them deterministically.
-        if not per_room_heights and rooms_raw:
-            from extractor.height_markers import salvage_heights_from_warnings
-            salvaged = salvage_heights_from_warnings(
-                parsed.get("warnings") or [], rooms_raw
-            )
-            if salvaged:
-                per_room_heights.update(salvaged)
-                parsed["lubu_auksciai"] = per_room_heights
-                _emit({
-                    "event": "lubu_auksciai_salvaged_from_warnings",
-                    "salvaged_count": len(salvaged),
-                    "rooms": list(salvaged.keys()),
-                })
-        section_avg = float(parsed.get("lubu_aukstis_m") or 2.82)
-        rooms_raw = _apply_per_room_heights(
-            rooms_raw, per_room_heights, section_avg, name_key="pavadinimas"
-        )
-        # Re-assert the POSITIONED-marker heights and tag them, so the UI shows
-        # 🟢 (read directly off the drawing) rather than the generic per_room
-        # tag. This runs AFTER `_apply_per_room_heights` on purpose: that pass
-        # is name-keyed, so two rooms sharing a name (Objektas A has two "Berniuko
-        # kambarys") would otherwise both take whichever value landed in the
-        # name map last. The marker is tied to a room NUMBER — re-asserting it
-        # here makes the lane immune to that collapse. It returns fresh dicts,
-        # but `_height_marker_m` survives the copy.
-        for room in rooms_raw:
-            if room.get("_height_source") != "positioned_marker":
-                continue
-            marker_h = room.get("_height_marker_m")
-            if marker_h is not None:
-                room["lubu_aukstis_m"] = float(marker_h)
-            room["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
-        parsed["patalpos"] = rooms_raw
-        _emit({
-            "event": "per_room_ceiling_applied",
-            "rooms_with_per_room": sum(
-                1 for r in rooms_raw if r.get("lubu_aukstis_saltinis") == "per_room"
-            ),
-            "source_count_by_nr": len(per_room_by_nr),
-            "source_count_by_name": len(parsed.get("lubu_auksciai") or {}),
-        })
-    except Exception as exc:
-        print(f"[extractor] per-room ceiling height apply failed: {exc}")
-
-    # Re-bind `rooms` to the persisted list so the Pass-2 zoom loop below mutates
-    # the SAME room dicts that live in parsed["patalpos"]. _apply_per_room_heights
-    # reassigns parsed["patalpos"] to a new list; without this rebind the zoom
-    # loop wrote per-room ceiling heights onto a stale earlier binding and the
-    # recovery was silently lost (every room fell back to the section average).
+    # Step 2.45 (the reading model's per-room height maps `lubu_auksciai` / `lubu_auksciai_by_nr`, the heights
+    # salvaged from its warning texts) and the height-plausibility gate that moved its tall heights between rooms
+    # are gone (v4 Phase 3c-1): the text reader keeps the maps aside as `_lubu_auksciai_modelio` — evidence,
+    # never applied — and a height the drawing writes is not moved by a heuristic.
     rooms = parsed.get("patalpos") or rooms
-
-    # 2026-06-11: deterministic height-plausibility gate. Vision sometimes puts
-    # the tall ceiling on small wet rooms (Rangovas B: 3.5 m on a 6.8 m² vonia)
-    # while the large svetainė gets the default — inverting the iki/virš-3m split.
-    try:
-        from .universal_rules import apply_height_plausibility_gate
-        _hc = apply_height_plausibility_gate(rooms)
-        if _hc:
-            parsed.setdefault("_meta", {})["height_gate_corrections"] = _hc
-            _emit({"event": "height_gate_applied", "corrections": _hc})
-    except Exception as exc:
-        print(f"[extractor] height plausibility gate failed: {exc}")
 
     # Step 2.5: PASS-2 ZOOM — per-room high-res re-read for accurate dimensions.
     # User decision (2026-04-27): always-on best-path approach. Per kambarį
@@ -7046,7 +6727,11 @@ def extract_interior(
         # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
         # zoom-once regression where 10/11 objektas_a rooms got a uniform 2.82 m.)
         # (2026-09-29: the room's own voted height keeps Vision's label — resolved the same way.)
-        if (r.get("lubu_aukstis_saltinis") or "section_average") not in ("per_room", *_VISION_READ_HEIGHTS):
+        # v4 Phase 3c-1: the zoom no longer sets a height (text/heights.py reads them from the text) and the model's
+        # height is taken off the room before this step; which rooms are zoomed is still decided by the model's
+        # own reading, exactly as before, so the reading asks the model no more and no fewer crops.
+        # (Follow-up for the manager: with heights off the zoom, this condition could go — fewer paid crops.)
+        if not _model_height_resolved(r, parsed):
             return False
         return True
 

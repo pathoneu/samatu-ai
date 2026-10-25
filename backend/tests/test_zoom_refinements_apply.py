@@ -79,28 +79,27 @@ def test_objektas_a_null_height_envelope_applies_nothing():
 
 # ── The apply-path works: a real zoom-read height IS applied ──────────────────
 
-def test_zoom_applies_real_ceiling_height():
-    """When the zoom DOES return a ceiling height (non-null, non-low confidence),
-    `_apply_zoom_refinements` applies it. Refutes the hypothesis that a threshold
-    or confidence gate silently drops zoom-read heights."""
+def test_a_zoom_ceiling_height_is_kept_as_evidence_never_applied():
+    """v4 Phase 3c-1: a zoom's height is the model's reading — kept beside the room (`_lubu_aukstis_zoom_m`) and
+    logged as left, never applied; the height is the drawing's text (text/heights.py), his entry or the question."""
     room = _objektas_a_room()
+    before = room.get("lubu_aukstis_m")
     zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
-    zoom["lubu_aukstis_m"] = 3.0  # zoom read a real height this time
-    changed = _apply_zoom_refinements(room, zoom)
-    assert changed is True
-    assert room["lubu_aukstis_m"] == 3.0
-    assert any("lubu_aukstis" in c for c in room["_zoom_changes"])
+    zoom["lubu_aukstis_m"] = 3.0
+    _apply_zoom_refinements(room, zoom)
+    assert room["lubu_aukstis_m"] == before
+    assert room["_lubu_aukstis_zoom_m"] == 3.0
+    assert any(c.startswith("lubu_aukstis (zoom)") for c in room["_zoom_changes"])
 
 
-def test_zoom_applies_height_when_room_had_none():
-    """old height is None → (old or 0) guard must not crash and must apply."""
+def test_a_zoom_height_on_a_room_with_none_stays_none():
+    """old height is None → the (old or 0) guard must not crash, and nothing is applied."""
     room = _objektas_a_room()
     room["lubu_aukstis_m"] = None
     zoom = copy.deepcopy(OBJEKTAS_A_ROOM_101_ZOOM)
     zoom["lubu_aukstis_m"] = 2.8
-    changed = _apply_zoom_refinements(room, zoom)
-    assert changed is True
-    assert room["lubu_aukstis_m"] == 2.8
+    _apply_zoom_refinements(room, zoom)
+    assert room["lubu_aukstis_m"] is None and room["_lubu_aukstis_zoom_m"] == 2.8
 
 
 # ── Gates / thresholds behave as documented ──────────────────────────────────
