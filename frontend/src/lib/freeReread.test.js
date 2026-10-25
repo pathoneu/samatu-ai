@@ -109,8 +109,8 @@ test('what the banner says afterwards: the project as it stands after the read',
   const { project } = mergeFreeReread(base(), result(), 'T');
   // 01 keeps its facts (verified); 02's walls are added up from the strings — but 02's perimeter is HIS
   // (user_override), so the merge keeps his number: it counts as typed by him, not as the drawing's
-  assert.deepEqual(freeRereadState(project), { count: 3, konturai: 2, perimetrai: 0, jusu: 1, dangos: 2 });
-  assert.deepEqual(freeRereadState(null), { count: 0, konturai: 0, perimetrai: 0, jusu: 0, dangos: 0 });
+  assert.deepEqual(freeRereadState(project), { count: 3, konturai: 2, perimetrai: 0, jusu: 1, dangos: 2, numeriai: 0 });
+  assert.deepEqual(freeRereadState(null), { count: 0, konturai: 0, perimetrai: 0, jusu: 0, dangos: 0, numeriai: 0 });
 });
 
 test('walls an earlier read took from the dimensions still count — a second read does not say „0"', () => {
@@ -124,7 +124,7 @@ test('walls an earlier read took from the dimensions still count — a second re
     { nr: '05', perimetras_saltinis: 'konturo_ivertis', polygon_source: 'sienu_konturas' },
   ];
   assert.deepEqual(freeRereadState({ v8_rooms: rooms, patalpos: [] }),
-    { count: 5, konturai: 4, perimetrai: 3, jusu: 1, dangos: 3 });
+    { count: 5, konturai: 4, perimetrai: 3, jusu: 1, dangos: 3, numeriai: 0 });
   // a project with only `patalpos` reads those
   assert.equal(freeRereadState({ patalpos: rooms.slice(0, 2) }).count, 2);
 });

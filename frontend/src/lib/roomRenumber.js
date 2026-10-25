@@ -106,3 +106,24 @@ export function carryIdentity(rooms, fresh, rawMap) {
     return Object.keys(add).length ? { ...r, ...add } : r;
   });
 }
+
+/**
+ * The key a room wore before the re-read gave it the drawing's number („K2" for 1-2) — said once in Patikra
+ * („buvo K2") until he checks the room; null when the project carries no map, the room was not renumbered, or he
+ * has checked it. `_modelio_nr` (the oldest key — renumberRooms keeps the first) when the map knows it, else a key
+ * the map sends to the room.
+ */
+export function formerRoomKey(project, room) {
+  if (!isObj(room) || room.user_verified_at) return null;
+  const map = renumberMap(project?._perkeisti_numeriai);
+  const nr = key(room.nr);
+  if (!nr || !Object.keys(map).length) return null;
+  const model = key(room._modelio_nr);
+  if (model && model !== nr && map[model] === nr) return model;
+  return Object.keys(map).find((k) => map[k] === nr) || null;
+}
+
+/** How many rooms the map gave the drawing's numbers (distinct new keys). */
+export function renumberedCount(rawMap) {
+  return new Set(Object.values(renumberMap(rawMap))).size;
+}

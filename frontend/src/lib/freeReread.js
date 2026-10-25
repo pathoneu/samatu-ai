@@ -19,7 +19,7 @@
  */
 
 import { mergeReextractRooms } from './mergeReextract.js';
-import { carryIdentity, renumberMap, renumberProject } from './roomRenumber.js';
+import { carryIdentity, renumberedCount, renumberMap, renumberProject } from './roomRenumber.js';
 
 /**
  * Project-level reads the free re-read returns beside the rooms (api/free_reread.py): the door schedule, the
@@ -91,7 +91,11 @@ export function mergeFreeReread(rawBase, result, now = new Date().toISOString())
   const stored = Array.isArray(base.v8_rooms) && base.v8_rooms.length ? base.v8_rooms : base.patalpos;
   const merged = mergeReextractRooms(stored, fresh, now);
   const rooms = carryIdentity(merged.rooms, fresh, renumber);
-  const { diff } = merged;
+  // „Kas pasikeitė" counts the rooms that took the drawing's numbers („17 patalpų gavo brėžinio numerius")
+  const renumbered = renumberedCount(renumber);
+  const diff = renumbered
+    ? { ...(merged.diff || { changed: [], kept: [], added: [], removed: [] }), perkeisti_numeriai: renumbered }
+    : merged.diff;
   const project = {
     ...base,
     patalpos: rooms,
@@ -136,6 +140,8 @@ export function freeRereadState(project) {
     perimetrai: count((r) => FROM_DIMENSIONS.has(String(r.perimetras_saltinis || ''))),
     jusu: count((r) => TYPED_BY_HIM.has(String(r.perimetras_saltinis || ''))),
     dangos: count((r) => r.grindu_danga_saltinis === 'grindu_planas'),
+    // rooms this read gave the drawing's numbers (K2 → 1-2, v4 3a; mergeFreeReread puts the count on the diff)
+    numeriai: Math.max(0, Number(project?._reread_diff?.perkeisti_numeriai) || 0),
   };
 }
 
@@ -147,7 +153,9 @@ export function freeRereadState(project) {
 export function freeRereadDoneText(state, t) {
   const n = (k) => Math.max(0, Number(state?.[k]) || 0);
   const [konturai, perimetrai, jusu, dangos] = [n('konturai'), n('perimetrai'), n('jusu'), n('dangos')];
-  if (!konturai && !perimetrai && !dangos) return t('project.freeReread.doneNothing');
+  // „17 patalpų gavo brėžinio numerius (buvę numeriai parodyti prie patalpų)." — after the rest, when any
+  const numeriai = n('numeriai') ? ` ${t('project.freeReread.doneRenumbered', { count: n('numeriai') })}` : '';
+  if (!konturai && !perimetrai && !dangos) return t('project.freeReread.doneNothing') + numeriai;
   const walls = perimetrai
     ? t('project.freeReread.donePart.perimetrai', { n: perimetrai })
       + (jusu ? t('project.freeReread.doneTyped', { n: jusu }) : '')
@@ -157,5 +165,5 @@ export function freeRereadDoneText(state, t) {
     walls,
     dangos ? t('project.freeReread.donePart.dangos', { n: dangos }) : '',
   ].filter(Boolean);
-  return t('project.freeReread.done', { count: n('count'), parts: parts.join(', ') });
+  return t('project.freeReread.done', { count: n('count'), parts: parts.join(', ') }) + numeriai;
 }
