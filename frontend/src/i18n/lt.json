@@ -1248,6 +1248,8 @@
       "add1": "Pridėti 1",
       "aiOriginal": "iš brėžinio: {{value}}",
       "enterPrice": "įveskite",
+      "blankEnter": "Įrašyti",
+      "blankEnterAria": "Įrašyti kiekį: {{name}}",
       "openSourceTitle": "Atidaryti šaltinį psl. {{page}}",
       "edit": "Redaguoti",
       "beVat": "Be PVM",

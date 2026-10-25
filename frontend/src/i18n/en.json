@@ -1199,6 +1199,8 @@
       "add1": "Add 1",
       "aiOriginal": "from the drawing: {{value}}",
       "enterPrice": "enter",
+      "blankEnter": "Enter",
+      "blankEnterAria": "Enter the quantity: {{name}}",
       "openSourceTitle": "Open source p. {{page}}",
       "edit": "Edit",
       "beVat": "Excl. VAT",
