@@ -81,7 +81,8 @@ CONCEPTS: list[Concept] = [
     Concept("gkp_lubos", _rx(r"GKP.*ant lubų|gipso ?kartono lub"),
             _rx(r"GKP lubų montavimas"),
             "Jo skirstymas pagal karkaso aukštį = mūsų standartinis/virš 3 m."),
-    Concept("nisos_pertvarose", _rx(r"niš\w*\s+pertvarose"),
+    # 2026-10-25 (Phase 2b, wording): objektas_d writes the same work as „Nišos įrengimas duše".
+    Concept("nisos_pertvarose", _rx(r"niš\w*\s+pertvarose|niš\w*\s+įrengimas\s+duš"),
             _rx(r"Nišų pertvarose įrengimas"), "checklist"),
     Concept("nisos_led_dazymas", _rx(r"niš\w*.*(glaistymas|dažymas)"),
             _rx(r"LED nišų (glaistymas|dažymas)")),
@@ -113,7 +114,8 @@ CONCEPTS: list[Concept] = [
             parts=("sviestuvai_apd", "difuzoriai_apd")),
     Concept("difuzoriai_apd", _rx(r"difūzori\w*\s+apdirbimas"),
             _rx(r"Difūzorių (apdirbimas|montavimas ir apdirbimas)")),
-    Concept("sviestuvai_mont", _rx(r"šviestuv\w*\s+montavimas"),
+    # `,?` 2026-10-25 (Phase 2b, wording): objektas_d „Priglaistomų gipsinių šviestuvų, montavimas".
+    Concept("sviestuvai_mont", _rx(r"šviestuv\w*,?\s+montavimas"),
             _rx(r"šviestuvų montavimas")),
     Concept("sviestuvai_apd", _rx(r"šviestuv\w*\s+apdirbimas"),
             _rx(r"Šviestuvų apdirbimas")),
@@ -168,16 +170,22 @@ CONCEPTS: list[Concept] = [
     Concept("dazymas_lubos", _rx(r"^(?!.*\bsien)(?=.*\blub).*glaistymas ?/ ?dažymas"), None,
             "jo eilutė tik luboms, be aukščio",
             parts=("dazymas_lubos_iki", "dazymas_lubos_virs")),
-    Concept("dazymas_virs", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(virš|aukščiau)).*glaistymas ?/ ?dažymas"), None,
+    # App side 2026-10-25 (Phase 2b, wording): the profile's merged row („Sienų, lubų glaistymas/dažymas",
+    # paint_rows = merged, rules/rows.PAINT_MERGED_LABEL) was read by no concept; the two height parents read
+    # it, the all-in parent pools them.
+    Concept("dazymas_virs", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(virš|aukščiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"^Sienų, lubų glaistymas/dažymas \(virš"),
             "sienos + lubos virš 3 m (objektas_a)",
             parts=("dazymas_sienos_virs", "dazymas_lubos_virs")),
-    Concept("dazymas_iki", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(\biki\b|žemiau)).*glaistymas ?/ ?dažymas"), None,
+    Concept("dazymas_iki", _rx(r"^(?=.*\bsien)(?=.*\blub)(?=.*(\biki\b|žemiau)).*glaistymas ?/ ?dažymas"),
+            _rx(r"^Sienų, lubų glaistymas/dažymas(?! \(virš)"),
             "sienos + lubos iki 3 m (objektas_a)",
             parts=("dazymas_sienos_iki", "dazymas_lubos_iki")),
     Concept("dazymas", _rx(r"glaistymas ?/ ?dažymas|glaistymas/dažymas"), None,
             "viskas vienoje eilutėje (objektas_b, objektas_h): sudedamos visos keturios mūsų eilutės, "
             "kurių jis neišskyrė atskirai",
-            parts=("dazymas_sienos_iki", "dazymas_sienos_virs", "dazymas_lubos_iki", "dazymas_lubos_virs")),
+            parts=("dazymas_sienos_iki", "dazymas_sienos_virs", "dazymas_lubos_iki", "dazymas_lubos_virs",
+                   "dazymas_iki", "dazymas_virs")),
     # `beapva\w*din` — objektas_b nr 19 is typed "beapvasdinėms".
     Concept("duru_angos", _rx(r"beapva\w*din"), _rx(r"beapvadinėms durims")),
     Concept("dazymo_kampai", _rx(r"dažymo kampų|glaistymo kampų statym"),
@@ -191,7 +199,11 @@ CONCEPTS: list[Concept] = [
             "jis skirsto pagal formatą (120×60/120×120/90×90), mes pagal vietą"),
     Concept("lentyneles", _rx(r"lentynėl"), _rx(r"Lentynėlių iš plytelių")),
     Concept("nuolydis", _rx(r"nuolydžio formavimas"), _rx(r"Nuolydžio formavimas")),
-    Concept("hidroizoliacija", _rx(r"hidroizoliacij"), _rx(r"Hidroizoliacijos įrengimas")),
+    # App side 2026-10-25 (Phase 2b, wording): the founder's two-row default („Grindų hidroizoliacija" m²,
+    # „Hidroizoliacinė juosta kampams" m) was read by no concept. His vnt row stays incomparable with both
+    # (unit), his m² row (objektas_g) now meets our floor m².
+    Concept("hidroizoliacija", _rx(r"hidroizoliacij"),
+            _rx(r"Hidroizoliacijos įrengimas|^Grindų hidroizoliacija$|^Hidroizoliacinė juosta kampams$")),
     Concept("skyliu_grezimas", _rx(r"skyl\w*\s+(gręžimas|pjovimas)\s+plytel|skyl\w*\s+gręžimas"),
             _rx(r"Skylių gręžimas")),
     Concept("latakai", _rx(r"latak"), _rx(r"latako montavimas")),
@@ -248,8 +260,10 @@ CONCEPTS: list[Concept] = [
     # bidet shower we emit — before 2026-09-05 it paired with „Bidė dušiuko".
     Concept("bide_remas", _rx(r"bidė rėmo"), None, "potinkinis bidė rėmas — neemit'inam"),
     Concept("bide", _rx(r"bide\w*\s+dušiuk|bidė"), _rx(r"Bidė dušiuko"), "checklist"),
-    Concept("wc_remas", _rx(r"WC rėmo"), _rx(r"WC rėmo montavimas")),
-    Concept("klozetas", _rx(r"klozeto montavimas"), _rx(r"Klozeto montavimas")),
+    # „WC ir bide rėmo" 2026-10-25 (Phase 2b, wording): objektas_b bills the WC frame under that name.
+    Concept("wc_remas", _rx(r"WC (ir bid\w+ )?rėmo"), _rx(r"WC rėmo montavimas")),
+    # „Klozeto/ bide montavimas" 2026-10-25 (Phase 2b, wording): objektas_b.
+    Concept("klozetas", _rx(r"klozeto(\s*/\s*bid\w+)? montavimas"), _rx(r"Klozeto montavimas")),
     Concept("praustuve", _rx(r"praustuv\w*\s+montavimas"), _rx(r"Praustuvės montavimas")),
     Concept("gyvatukas", _rx(r"gyvatuk"), _rx(r"Gyvatuko montavimas")),
     Concept("skalb_sifonas", _rx(r"skalbimo mašinos sifon"),

@@ -458,3 +458,40 @@ def test_the_detail_never_stands_in_for_metres():
                      | {"_detail_m2": 12.4}],
                     concepts=table)
     assert sc.rows[0].bucket == "missing"
+
+
+# ── Phase 2b (2026-10-25): his wordings the frozen table did not read — mapping only, never a looser hit ──
+@pytest.mark.parametrize("his, key", [
+    ("Nišos įrengimas duše", "nisos_pertvarose"),
+    ("Priglaistomų gipsinių šviestuvų, montavimas", "sviestuvai_mont"),
+    ("WC ir bide rėmo montavimas", "wc_remas"),
+    ("WC ir bide rėmo montavimas suleidžiant į sieną", "wc_remas"),
+    ("Klozeto/ bide montavimas", "klozetas"),
+])
+def test_his_wordings_map_to_the_family_we_emit(his, key):
+    table = load_concepts()
+    assert next(c.key for c in table if c.contractor.search(his)) == key
+
+
+def test_a_mapped_wording_with_a_blank_row_of_ours_is_missing_not_a_hit():
+    sc = score_rows([_c("1", "Klozeto/ bide montavimas", "vnt", 5)],
+                    [_a("Klozeto montavimas", "vnt", None, saltinis="checklist")])
+    assert sc.buckets["missing"] == 1 and sc.buckets["within_10"] == 0 and sc.buckets["unmapped"] == 0
+
+
+def test_two_row_waterproofing_is_read_and_his_vnt_row_stays_incomparable():
+    ours = [_a("Grindų hidroizoliacija", "m2", 17.67), _a("Hidroizoliacinė juosta kampams", "m", 38.7)]
+    vnt = score_rows([_c("1", "Hidroizoliacijos įrengimas", "vnt", 2)], ours)
+    assert vnt.rows[0].bucket == "missing" and "unit" in vnt.rows[0].reason
+    m2 = score_rows([_c("1", "Hidroizoliacija", "m2", 17.5)], ours)
+    assert m2.rows[0].bucket == "within_10" and m2.rows[0].app_quantity == pytest.approx(17.67)
+
+
+def test_the_profile_merged_paint_row_is_read_by_his_all_in_row():
+    ours = [_a("Sienų, lubų glaistymas/dažymas", "m2", 400.0),
+            _a("Sienų, lubų glaistymas/dažymas (virš 3 m aukščio)", "m2", 20.0)]
+    sc = score_rows([_c("1", "Sienų, lubų glaistymas/dažymas", "m2", 410.0)], ours)
+    assert sc.rows[0].bucket == "within_10" and sc.rows[0].app_quantity == pytest.approx(420.0)
+    split = score_rows([_c("1", "Sienų, lubų glaistymas/dažymas (iki 3 m)", "m2", 400.0),
+                        _c("2", "Sienų, lubų glaistymas/dažymas (virš 3 m)", "m2", 20.0)], ours)
+    assert [r.bucket for r in split.rows] == ["within_10", "within_10"]
