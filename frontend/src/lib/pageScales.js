@@ -26,8 +26,8 @@ const roomsOf = (project) => project?.v8_rooms || project?.patalpos || [];
  * The project's effective scales. `durable` defaults to the stored map; the viewer passes its live state
  * (it owns the scales between saves).
  */
-export function effectivePageScales(project, durable = project?.pageScalesDurable) {
-  return mergePageScales(autoPageScalesFromRooms(roomsOf(project)), laneScalesOf(project), durable || {});
+export function effectivePageScales(project, durable = project?.pageScalesDurable, lane = laneScalesOf(project)) {
+  return mergePageScales(autoPageScalesFromRooms(roomsOf(project)), lane, durable || {});
 }
 
 /**

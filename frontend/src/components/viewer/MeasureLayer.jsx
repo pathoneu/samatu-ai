@@ -41,6 +41,9 @@ const SECOND_CLICK_MS = 700;
 // An alignment guide catches within this many screen px of a vertex's x or y (A6 [#56]).
 const ALIGN_TOL_PX = 5;
 
+// A drag shorter than this (screen px) is a click, not the „Skaičius" line (lib/scaleLine MIN_DRAG_PX).
+const MIN_DRAG_PX = 8;
+
 const EMPTY_DRAFT = { points: [], committed: false };
 
 /**
@@ -94,6 +97,9 @@ export default function MeasureLayer({
   // How Plotas / Perimetras draw (W5-A A11): 'free' (corner by corner) | 'rect' (two corners) | 'arc' (the next
   // segment is an arc through a point on it).
   drawShape = 'free',
+  // The „Skaičius" line he dragged over a written dimension, kept on the sheet until he confirms or undoes it:
+  // {a, b (PDF points), state: 'reading' | 'ok' | 'blank'} | null — drawn whatever tool is armed.
+  scaleLineMark = null,
 }) {
   const svgRef = useRef(null);
   const decimals = display?.decimals ?? 2;
@@ -177,7 +183,7 @@ export default function MeasureLayer({
       }
     }
     // Nothing to snap to: line up with a point already placed (this drawing's corners, his measurements' points).
-    if (!snapped && snapEnabled && (POLY_TOOLS.has(tool) || tool === 'calibrate')) {
+    if (!snapped && snapEnabled && (POLY_TOOLS.has(tool) || tool === 'calibrate' || tool === 'scaleLine')) {
       const vertices = [...draft.points, ...snapPolygons.flatMap((p) => p.points)];
       const g = alignGuide(raw, vertices, ALIGN_TOL_PX / (adapter?.scale || 1));
       if (g) { point = g.point; snapped = true; snapKind = 'align'; guideList = g.guides; }
@@ -271,8 +277,10 @@ export default function MeasureLayer({
 
     const { point } = applySnap(eventToPdf(e), e);
 
-    if (tool === 'calibrate') {
+    if (tool === 'calibrate' || tool === 'scaleLine') {
       if (!calibA) {
+        // „Skaičius" is a drag: the release (handlePointerUp) is the line's other end, so the pointer is held
+        if (tool === 'scaleLine') { try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ } }
         setCalibA(point);
       } else if (Math.hypot(point.x - calibA.x, point.y - calibA.y) <= SNAP_TOL_PX / (adapter?.scale || 1)) {
         // Second click landed ON the first one (audit P1: a double-click armed
@@ -363,6 +371,18 @@ export default function MeasureLayer({
       onBoxSelect?.({ ids: marksInBox(measurements, pageNr, a, z, mode), a, b: z, mode, add: b.add, pageNr });
       return;
     }
+    // „Skaičius": released far from where it was pressed -> the line is drawn; near -> a click, the second click ends it
+    if (tool === 'scaleLine' && calibA) {
+      const end = applySnap(eventToPdf(e), e).point;
+      const dragPx = Math.hypot(end.x - calibA.x, end.y - calibA.y) * (adapter?.scale || 1);
+      if (dragPx >= MIN_DRAG_PX) {
+        onCalibrate?.(pageNr, calibA, end);
+        setCalibA(null);
+        setCursor(null);
+        setSnapPt(null); setSnapKind(null);
+      }
+      return;
+    }
     if (tool !== 'lasso' || !lasso) return;
     const loop = lasso.px;
     const prev = [...selectedSet];
@@ -375,7 +395,7 @@ export default function MeasureLayer({
       ids = lassoSelect(measurements, pageNr, loop.map((p) => adapter.toPdf(p)));
     }
     onSelect?.(lasso.add ? [...new Set([...prev, ...ids])] : ids);
-  }, [tool, lasso, box, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect, onBoxSelect]);
+  }, [tool, lasso, box, selectedSet, eventToPdf, measurements, pageNr, adapter, onSelect, onBoxSelect, calibA, setCalibA, applySnap, onCalibrate]);
 
   const handleDoubleClick = useCallback((e) => {
     if (!POLY_TOOLS.has(tool)) return;
@@ -591,7 +611,8 @@ export default function MeasureLayer({
         />
       )}
 
-      {tool === 'calibrate' && (
+      {scaleLineMark && <ScaleLineMark mark={scaleLineMark} adapter={adapter} />}
+      {(tool === 'calibrate' || tool === 'scaleLine') && (
         <CalibrationLayer
           calibA={calibA}
           cursor={cursor}
@@ -846,6 +867,23 @@ function DraftLayer({ tool, draft, cursor, adapter, scale, snapPt, snapKind = nu
 // Calibration draft: a distinct 2-point line in the tool-at-work orange (visually separate from the
 // measurement drafts; red is for errors only). First point A is fixed; a rubber-band follows the
 // cursor until the second click, which is handled upstream via onCalibrate.
+// The „Skaičius" line left on the sheet while the answer is read and until it is confirmed: solid once the string
+// under it was read, dashed while waiting or when nothing was found - never colour alone (the state is also in the
+// notice and in the scale chip).
+function ScaleLineMark({ mark, adapter }) {
+  const a = adapter.toViewport(mark.a);
+  const b = adapter.toViewport(mark.b);
+  const found = mark.state === 'ok';
+  return (
+    <g pointerEvents="none" data-scale-line-mark={mark.state}>
+      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={paint({ stroke: EDITING })} strokeWidth={STROKE_PX + 1}
+        strokeDasharray={found ? undefined : '6 4'} />
+      <circle cx={a.x} cy={a.y} r={4} style={paint({ fill: EDITING })} />
+      <circle cx={b.x} cy={b.y} r={4} style={paint({ fill: EDITING })} />
+    </g>
+  );
+}
+
 function CalibrationLayer({ calibA, cursor, adapter, snapPt, snapKind = null }) {
   const a = calibA ? adapter.toViewport(calibA) : null;
   const c = cursor ? adapter.toViewport(cursor) : null;

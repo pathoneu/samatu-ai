@@ -10,7 +10,7 @@ import { legendCursorHint } from './legendReview.js';
 
 /** Every mode that has a hint. Rest (no tool) has none: the drawing stays quiet. */
 export const CURSOR_HINT_MODES = [
-  'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'calibrate', 'scalecheck',
+  'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'calibrate', 'scaleLine', 'scalecheck',
   'room', 'findSimilar', 'legend', 'outlineEdit', 'split', 'merge', 'subtract', 'fill',
 ];
 
@@ -68,6 +68,8 @@ export function cursorHintFor(state = {}) {
       return `${countType.label}: spustelėkite elementą (pažymėta ${countType.n}) · ant žymės — pašalinti`;
     case 'calibrate':
       return calibPoint ? 'Spustelėkite žinomo ilgio pabaigą' : 'Spustelėkite žinomo ilgio pradžią';
+    case 'scaleLine':
+      return calibPoint ? 'Tempkite iki matmens pabaigos ir paleiskite' : 'Spauskite matmens pradžioje ir tempkite išilgai skaičiaus';
     case 'scalecheck':
       return calibPoint ? 'Spustelėkite atkarpos pabaigą' : 'Spustelėkite atkarpos, kurios ilgį žinote, pradžią';
     case 'room':
