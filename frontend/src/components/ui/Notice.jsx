@@ -69,7 +69,7 @@ export default function Notice({
         )}
         {meta && !metaAction && <span className="basis-full text-meta text-muted-foreground" data-notice-meta>{meta}</span>}
         {meta && metaAction && (
-          <span className="flex basis-full flex-wrap items-center gap-x-2">
+          <span className="flex basis-full flex-nowrap items-center gap-x-1">
             <span className="text-meta text-muted-foreground" data-notice-meta>{meta}</span>
             {metaAction}
           </span>

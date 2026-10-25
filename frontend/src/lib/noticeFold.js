@@ -43,7 +43,7 @@ export function leadNotice(testIds) {
 export function foldLabel(testIds, lead = null) {
   const rest = lead ? testIds.filter((id) => id !== lead) : testIds;
   const names = rest.map((id) => NOTICE_NAMES[id] || null).filter(Boolean);
-  return { title: `${lead ? 'Dar pranešimai' : 'Pranešimai'} (${rest.length})`, names: names.join(' · ') };
+  return { title: `${lead ? 'Dar pranešimai' : 'Pranešimai'} (${rest.length})`, names: names.join(' · '), count: rest.length };
 }
 
 // A notice that answers what he just did (the re-read's „Kas pasikeitė" with its „Atšaukti") opens the fold
