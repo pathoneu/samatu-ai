@@ -21,6 +21,7 @@ import { Loader2, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 import Notice from '@/components/ui/Notice';
+import { NoticeFoldMore } from '@/components/project/NoticeFold';
 import { fetchFreeRereadStatus, runFreeReread } from '@/lib/freeRereadApi';
 import { freeRereadDoneText, freeRereadState } from '@/lib/freeReread';
 import { flushProjectSaves, getProject, updateProject } from '@/lib/projectStore';
@@ -28,7 +29,9 @@ import { recordPilot } from '@/lib/telemetry';
 
 const dismissedKey = (id) => `pathon_free_reread_later_${id}`;
 
-export default function FreeRereadBanner({ project, onComplete, className = '' }) {
+// widthClass: 'w-full' in a block column (the panel's notices); a flex column with side margins passes 'self-stretch'
+// — w-full plus mx-4 ran 16 px past the right edge in Patikra and cut off the ✕ (2026-10-25)
+export default function FreeRereadBanner({ project, onComplete, className = '', widthClass = 'w-full' }) {
   const { t } = useTranslation();
   const id = project?.id;
   const [offer, setOffer] = useState(false);
@@ -52,7 +55,14 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
     // run added, which read „0" for walls an earlier read had already taken from the dimensions; only the parts
     // with something in them are said (freeRereadDoneText)
     return (
-      <Notice tone="info" icon={ScanLine} className={className} data-testid="free-reread-done">
+      <Notice
+        tone="info"
+        icon={ScanLine}
+        className={className}
+        data-testid="free-reread-done"
+        // in a NoticeFold this line leads it and carries its „Dar pranešimai (N)" (lib/noticeFold LEAD_NOTICES)
+        action={<NoticeFoldMore notice="free-reread-done" />}
+      >
         <p>{freeRereadDoneText(done, t)}</p>
       </Notice>
     );
@@ -92,9 +102,12 @@ export default function FreeRereadBanner({ project, onComplete, className = '' }
       oneLine
       tone="info"
       icon={false}
-      className={`w-full ${className}`}
+      className={`${widthClass} ${className}`}
       title={t('project.freeReread.titleLine')}
       meta={t('project.freeReread.keeps')}
+      // in a NoticeFold the offer leads it — the fold's „Dar pranešimai (N)" rides on this second line, never a
+      // line of its own under it (2026-10-25 walk: folded, the offer's button was out of reach)
+      metaAction={<NoticeFoldMore notice="free-reread-banner" />}
       onDismiss={busy ? null : later}
       dismissLabel={t('project.freeReread.later')}
       data-testid="free-reread-banner"

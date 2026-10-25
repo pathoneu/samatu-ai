@@ -8,6 +8,7 @@
  *   oneLine with compact: never wraps (short words + an action that fit the 340 px panel, B2-B); icon={false}
  *   meta    with oneLine: a second line at the 12 px meta size under the first (what must stay visible, B2-B)
  *           drops the leading icon when the action carries one
+ *   metaAction  with meta: a control on the second line beside it (a fold's „Dar pranešimai (2)", NoticeFoldMore)
  *   title   the first line, semibold ink; children follow at the 14 px interface size
  *   action  buttons/links at the right; onDismiss adds the ✕ with `dismissLabel` (named, never hover-only)
  *
@@ -26,7 +27,8 @@ export const NOTICE_TONES = Object.keys(TONES);
 
 export default function Notice({
   tone = 'info', icon = null, title = null, children = null, action = null,
-  onDismiss = null, dismissLabel = 'Uždaryti', compact = false, oneLine = false, meta = null, className = '', ...rest
+  onDismiss = null, dismissLabel = 'Uždaryti', compact = false, oneLine = false, meta = null, metaAction = null,
+  className = '', ...rest
 }) {
   const t = TONES[tone] || TONES.info;
   const Icon = icon === false ? null : (icon || t.Icon);
@@ -65,7 +67,13 @@ export default function Notice({
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
-        {meta && <span className="basis-full text-meta text-muted-foreground" data-notice-meta>{meta}</span>}
+        {meta && !metaAction && <span className="basis-full text-meta text-muted-foreground" data-notice-meta>{meta}</span>}
+        {meta && metaAction && (
+          <span className="flex basis-full flex-wrap items-center gap-x-2">
+            <span className="text-meta text-muted-foreground" data-notice-meta>{meta}</span>
+            {metaAction}
+          </span>
+        )}
       </div>
     );
   }

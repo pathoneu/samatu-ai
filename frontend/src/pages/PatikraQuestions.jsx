@@ -583,7 +583,7 @@ export default function PatikraQuestions() {
       {/* two or more of these fold into one „Pranešimai (N)" line that names them (v3 W6-A: at 1280×720
           they pushed the first question below the panel); what the last answer moved stays outside */}
       <NoticeFold className="mx-4 mt-3">
-        <FreeRereadBanner project={project} className="mx-4 mt-3" onComplete={(next) => { setProject(next); loadQuestions(); }} />
+        <FreeRereadBanner project={project} className="mx-4 mt-3" widthClass="self-stretch" onComplete={(next) => { setProject(next); loadQuestions(); }} />
         {/* after the paid read: 👍 / 👎 + one line, once (C10) */}
         <ReadRating project={project} className="mx-4 mt-3" />
         {/* what is commonly forgotten, and two outlines over each other (v3 W5-E) — notices, never rows */}
