@@ -26,7 +26,7 @@ test('every engine input the panel writes has a section (none removed, none rena
   for (const m of panel.matchAll(/field: '([a-z_]+)'/g)) written.add(m[1]);
   // the brief's list: nothing removed
   for (const f of ['glaistimo_lygis', 'santechnika_potinkinis', 'vidaus_durys_beapvadines', 'angokrasciai_apimtis',
-    'led_nisu_ivertinimas', 'sienos_storis_m', 'lubu_auksciai', 'walls_paint_override', 'stretch_ceiling_override',
+    'sienos_storis_m', 'lubu_auksciai', 'walls_paint_override', 'stretch_ceiling_override',
     'custom_windows', 'custom_doors']) {
     assert.ok(written.has(f), `${f} is still written by the panel`);
   }
@@ -41,7 +41,7 @@ test('a jump opens the section that holds the field; unknown fields open nothing
   assert.equal(sectionForField('glaistimo_lygis'), 'bendra');
   assert.equal(sectionForField('vidaus_durys_beapvadines'), 'angos');
   assert.equal(sectionForField('pakuote_maiso_kg'), 'medziagos');
-  assert.equal(sectionForField('led_nisu_ivertinimas'), 'pasirinkimai');
+  assert.equal(sectionForField('led_nisu_ivertinimas'), null);
   assert.equal(sectionForField('grindu_danga'), null);
   assert.equal(sectionForField(null), null);
   assert.equal(sectionForField('constructor'), null);

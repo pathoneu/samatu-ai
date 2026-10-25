@@ -24,7 +24,6 @@ export const SECTION_OF_FIELD = Object.freeze({
   [BAG_KEY]: 'medziagos',
   [BUCKET_KEY]: 'medziagos',
   santechnika_potinkinis: 'pasirinkimai',
-  led_nisu_ivertinimas: 'pasirinkimai',
 });
 
 /** The section a jump („Atidaryti nustatymus", an engine message) should open, or null. */
