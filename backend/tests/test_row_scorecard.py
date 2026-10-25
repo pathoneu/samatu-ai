@@ -346,8 +346,11 @@ def test_the_frozen_concept_table_loads_and_is_frozen():
     # (walls only — objektas_g; ceilings only; combined per height band —
     # objektas_a; everything in one row — objektas_b/h). Greedy single-row
     # pairing had scored his walls-only row against walls + ceilings.
-    assert len(concepts) == 89, (
-        f"the frozen concept table now has {len(concepts)} entries, not 89 — "
+    # 89 → 91 on 2026-10-25 (Phase 2b): two families the engine now emits — „Papildomas sienų glaistymas"
+    # (his Q4 choice, else blank) and „Demontavimo darbai" (blank; names the demolition sheet). Neither moves
+    # a row of his into a hit on the corpus (docs/superpowers/research/2026-10-25-missing-families.md).
+    assert len(concepts) == 91, (
+        f"the frozen concept table now has {len(concepts)} entries, not 91 — "
         "adding a concept changes what the scorecard measures; report it as a "
         "mapping change and re-baseline before updating this number")
     assert len({c.key for c in concepts}) == len(concepts), "duplicate key"

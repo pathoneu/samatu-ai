@@ -138,6 +138,12 @@ CONCEPTS: list[Concept] = [
             "jo 'apdirbimas GKP' = mūsų GKP struktūra; dažymas — atskiras konceptas"),
 
     # ── Sienų lubų glaistymas dažymas ───────────────────────────────────────
+    # Phase 2b (2026-10-25): families the engine now emits (rules/rows.phase2b_families)
+    Concept("papildomas_glaistymas", _rx(r"papildom\w*\s+(sienų\s+)?glaistym"),
+            _rx(r"^Papildomas sienų glaistymas"), "Q4 — jo pasirinkimas Prielaidose; kitaip tuščia"),
+    Concept("demontavimas",
+            _rx(r"demontav\w*\s+(pertvar|sien|apdail|grind|plytel)|pertvar\w*\s+demont|griovim"),
+            _rx(r"^Demontavimo darbai"), "tuščia — demontavimo plano skaitytuvo nėra"),
     Concept("rotband", _rx(r"lyginimas sausu|rotband"), _rx(r"Rotband")),
     # 2026-09-06 — the paint family in HIS words. We always emit four rows:
     # Sienų / Lubų × (iki 3 m | virš 3 m) (the height suffix is absent when a
@@ -315,7 +321,8 @@ CONCEPTS: list[Concept] = [
             "vienkartinė eilutė"),
     Concept("grindu_betonavimas_prie_langu", _rx(r"grindų betonavimas prie langų"), None,
             "langų iki grindų pločių suma — kai langai nuskaitomi"),
-    Concept("mozaika", _rx(r"mozaik"), None, "mozaikos plotas iš išklotinių"),
+    # app side 2026-10-25 (Phase 2b): emitted when the drawing's text names mosaic (rules/rows.tile_format_rows)
+    Concept("mozaika", _rx(r"mozaik"), _rx(r"^Mozaikos klijavimas"), "mozaikos plotas iš išklotinių"),
     Concept("aliuminio_uzbaigimai",
             _rx(r"aliumini\w*\s+plytelių užbaigim|aliuminio apdailinio kampo"), None,
             "plytelių užbaigimo profiliai — kampų ilgis"),

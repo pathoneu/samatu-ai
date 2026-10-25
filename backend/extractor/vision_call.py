@@ -5354,6 +5354,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # v4 3b (2026-10-25): no row keeps a number a model guessed or a default invented — row_provenance. Before
     # the granularity merge, so a merged row is blank whenever one of its members is.
     _apply_row_provenance(parsed, pozicijos, rooms)
+    # v4 phase2b families (2026-10-25): diffusers by kind, tile-clad reveals, large-format / mosaic tiles, an
+    # extra skim coat, demolition — rules/rows.phase2b_families, each a profile parameter (conventions.py)
+    pozicijos = _rules_rows.phase2b_families(pozicijos, parsed, rooms, _profile)
     # Phase 2 (2026-10-25): his granularity — walls + ceilings paint in one row, wall + floor tiles in one
     # row — when the profile says „merged" (default „split", rules/conventions.py LT_RANGOVAS).
     pozicijos = _rules_rows.apply_granularity(pozicijos, _profile, _ledger)

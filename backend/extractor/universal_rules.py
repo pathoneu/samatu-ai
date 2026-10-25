@@ -51,6 +51,8 @@ from rules.conventions import (  # noqa: E402,F401 — re-exported
     TILE_BAND_DOOR_H_M,
     _WINDOW_SILL_M,
     CORNER_MIN_EDGE_M,
+    LARGE_TILE_MIN_MM,
+    MOSAIC_MAX_SIDE_MM,
 )
 from rules.conventions import LT_RANGOVAS, profile_overrides, resolve_profile  # noqa: E402,F401
 from rules.rows import (  # noqa: E402,F401 — re-exported
