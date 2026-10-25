@@ -14,7 +14,6 @@ _FALSY = {"0", "false", "no", "off"}
 _FLAG_DEFINITIONS = {
     "per_room_ceiling":      ("ENABLE_PER_ROOM_CEILING", True),          # Sprint 0 Fix 4 → default ON 2026-05-06 (per-room aukštis virš 3m extraction)
     "paint_class_inference": ("ENABLE_PAINT_CLASS_INFERENCE", False),    # Sprint 0 Fix 5
-    "verify_pass":           ("ENABLE_VERIFY_PASS", False),              # Sprint 3
     # Sprint 4 Block B: activated default-on after wall_adjacency
     # validated on P1+P3+P5 (grindjuostės ratio drops to 0.5-0.6 m/m²
     # from 0.98 broken double-count). Override with ENABLE_POLYGON_PREPASS=0
@@ -34,7 +33,10 @@ _FLAG_DEFINITIONS = {
     # zero regression on read-from-table projects (verified: objektas_a, objektas_b,
     # romainiai → 0 rooms fire). Recovers no-eksplikacija paint: objektas_c
     # -20.3%→-13.5%, objektas_d -14.0%→-5.4%. Disable: ENABLE_PERIMETER_FLOOR_SYNTHETIC=0
-    "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", True),
+    # 2026-10-25 (v4 3b): OFF — a perimeter guessed from the area is a default (plan R7). The code that reads
+    # this flag (universal_rules._perimeter_floor_enabled) belongs to the rules worker to delete; until then the
+    # flag is off and the rows that rest on such a room are blank (extractor/row_provenance.py).
+    "perimeter_floor_synthetic": ("ENABLE_PERIMETER_FLOOR_SYNTHETIC", False),
     # 2026-06-09: run the high-variance Pass-1 (+ adjacency) N times and
     # median-vote into one consensus extraction. Stabilises kampai (the
     # pusiniai term survives a single adjacency-bail run) and wires the

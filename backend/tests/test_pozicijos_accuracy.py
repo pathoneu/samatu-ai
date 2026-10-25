@@ -18,8 +18,8 @@ def _parsed(rooms):
 
 
 def _room(elementai, **kw):
-    r = {"paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-         "lubu_aukstis_m": 2.7, "elementai": elementai}
+    r = {"paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+         "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": elementai}
     r.update(kw)
     r.update(calc_room_quantities(r))
     return r
@@ -48,6 +48,7 @@ def test_basin_count_uses_praustuves_symbol():
              _room([], paskirtis="san", plotas_m2=4.0)]
     parsed = _parsed(rooms)
     parsed["detected_symbols_summary"] = {"praustuves": 3}
+    parsed["_meta"] = {"fixtures_status": "ok"}      # the plumbing reader's count (v4 3b)
     out = _build_pozicijos_from_rooms(parsed)
     # Label-agnostic on purpose: the 2026-07-29 potinkinė/virštinkinė split
     # renamed this line into a pair, but RC1's claim is about the COUNT SOURCE
@@ -67,8 +68,10 @@ def test_rotband_share_calibrated_to_contractor_30pct():
     # 460.71 m² total wall area = 30.1% (NOT 50%). The old 0.50 default was
     # calibrated against a since-corrected buggy walls_paint (277.33). Assert
     # the share is ~0.30 of walls_paintable, behaviourally.
-    rooms = [_room([], plotas_m2=40.0, perimetras_m=26.0, lubu_aukstis_m=2.7)]
-    out = _build_pozicijos_from_rooms(_parsed(rooms))
+    rooms = [_room([], plotas_m2=40.0, perimetras_m=26.0, perimetras_saltinis="plano_matmenys", lubu_aukstis_m=2.7, lubu_aukstis_saltinis="plano_uzrasas")]
+    parsed = _parsed(rooms)
+    parsed["_apimtis"] = {"rotband": "dalis", "rotband_dalis": 30}   # v4 3b: the share is his choice
+    out = _build_pozicijos_from_rooms(parsed)
     walls_paint = round(sum(float(r.get("walls_paintable_m2") or 0) for r in rooms), 2)
     # WORK rows only — the Rotband bags are their own "Medžiagos" row since
     # 2026-09-02 and carry the product name too.
@@ -81,7 +84,7 @@ def test_rotband_share_calibrated_to_contractor_30pct():
 
 # ── RC8 ────────────────────────────────────────────────────────────────
 def test_kampai_emitted_as_single_line():
-    rooms = [_room([], perimetras_m=20.0)]
+    rooms = [_room([], perimetras_m=20.0, perimetras_saltinis="plano_matmenys")]
     out = _build_pozicijos_from_rooms(_parsed(rooms))
     kampai_lines = [p for p in out["pozicijos"] if "kamp" in p["aprasymas"].lower()
                     and p.get("skyrius") == "Sienų glaistymas dažymas"]

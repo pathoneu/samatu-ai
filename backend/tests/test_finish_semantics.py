@@ -11,7 +11,7 @@ from extractor.vision_call import _build_pozicijos_from_rooms
 
 def _room(**kw):
     r = {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-         "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.8,
+         "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": []}
     r.update(kw)
     return r
@@ -73,7 +73,7 @@ def test_apdailos_low_confidence_propagates():
 # ── low-confidence apdailos must not override structural no-paint default ──
 def test_low_conf_apdailos_does_not_paint_garage():
     base = {"nr": "1", "pavadinimas": "Garažas", "paskirtis": "garazas",
-            "plotas_m2": 44.0, "perimetras_m": 27.0, "lubu_aukstis_m": 2.82,
+            "plotas_m2": 44.0, "perimetras_m": 27.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
             "elementai": [], "sienu_apdailos_breakdown": {"dazymas_share": 1.0}}
     # low-confidence guess → garage stays unpainted (structural default 0)
     low = calc_room_quantities({**base, "_apdailos_confidence": "low"})
@@ -89,9 +89,9 @@ def test_silikonavimas_includes_tiled_non_wet_rooms():
     # A skalbykla (not in WET set) marked substantially tiled by apdailos.
     rooms = [
         {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "elementai": []},
+         "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []},
         {"nr": "2", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla", "plotas_m2": 9.0,
-         "perimetras_m": 12.0, "lubu_aukstis_m": 2.7, "elementai": [],
+         "perimetras_m": 12.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": [],
          "sienu_apdailos_breakdown": {"plyteles_share": 0.7, "dazymas_share": 0.3}},
     ]
     for r in rooms:

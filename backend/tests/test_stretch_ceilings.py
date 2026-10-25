@@ -26,7 +26,7 @@ from extractor.vision_call import (
 
 def _room(nr, **kw):
     r = {"nr": nr, "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
-         "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "elementai": []}
+         "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "ceiling_plan_marker", "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
     # The per-room material fields the extraction pipeline computes on top of
@@ -147,7 +147,7 @@ def test_all_rooms_stretch_leaves_no_zero_quantity_ghost_rows():
 
 
 def test_absent_override_is_byte_identical_to_before():
-    rooms = [_room("101"), _room("102", lubu_aukstis_m=3.4)]
+    rooms = [_room("101"), _room("102", lubu_aukstis_m=3.4, lubu_aukstis_saltinis="ceiling_plan_marker")]
     a = _build_pozicijos_from_rooms(_parsed([dict(r) for r in rooms]))["pozicijos"]
     b = _build_pozicijos_from_rooms(_parsed(
         [dict(r) for r in rooms], {"stretch_ceiling_override": {}}))["pozicijos"]
@@ -158,7 +158,7 @@ def test_absent_override_is_byte_identical_to_before():
 
 def test_high_ceiling_tier_also_loses_the_flagged_room():
     """The virš-3m tier must drop the ceiling too, not only the iki-3m one."""
-    rooms = [_room("101", lubu_aukstis_m=3.6), _room("102")]
+    rooms = [_room("101", lubu_aukstis_m=3.6, lubu_aukstis_saltinis="ceiling_plan_marker"), _room("102")]
     base = _build_pozicijos_from_rooms(_parsed([dict(r) for r in rooms]))["pozicijos"]
     out = _build_pozicijos_from_rooms(_parsed(
         [dict(r) for r in rooms], {"stretch_ceiling_override": {"101": 1}},

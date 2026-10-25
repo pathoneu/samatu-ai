@@ -243,7 +243,7 @@ def test_a_label_with_no_glyph_beside_it_is_undefined():
 
 def _parsed(vision_count, vector=None):
     p = {"patalpos": [{"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
-                       "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "lubu_tipas": "gkp", "elementai": [],
+                       "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "lubu_tipas": "gkp", "elementai": [],
                        "confidence": "high"}],
          "santrauka": {}, "detected_symbols_summary": {"difuzoriai": vision_count},
          "_symbol_legend": {"text_layer_ok": True, "difuzoriai": {"defined": True}}}
@@ -273,24 +273,24 @@ def test_when_both_readers_agree_the_row_is_green():
     assert [r["confidence"] for r in _rows(out, "Difūzorių montavimas (vėdinimo")] == ["zalia"]
 
 
-def test_a_defined_symbol_with_no_instance_found_keeps_the_vision_count():
+def test_a_defined_symbol_with_no_instance_found_asks():
+    # v4 3b: Pass-1's count is no source — with no instance on the paths the checklist row asks
     vec = {"defined": True, "count": 0, "sakinys": "…"}
     out = _build_pozicijos_from_rooms(_parsed(4, vec))
-    row = _rows(out, "Difūzorių montavimas (vėdinimo")[0]
-    assert row["kiekis"] == 4 and "_assumption" not in row
+    assert [r["kiekis"] for r in _rows(out, "difūzor")] == [None]
 
 
 def test_the_count_from_the_paths_stands_even_when_vision_read_nothing():
     vec = {"defined": True, "count": 3, "sakinys": "Difuzoriai suskaičiuoti … — iš viso 3."}
     out = _build_pozicijos_from_rooms(_parsed(0, vec))
     assert [r["kiekis"] for r in _rows(out, "Difūzorių montavimas (vėdinimo")] == [3]
-    assert [r for r in out["pozicijos"] if r.get("skyrius") == "Ventiliacijos darbai"], "the duct fallback follows the count"
+    vent = [r for r in out["pozicijos"] if r.get("skyrius") == "Ventiliacijos darbai"]
+    assert vent and all(r["kiekis"] is None for r in vent), "the duct rows follow the count, blank (v4 3b)"
 
 
-def test_without_the_scan_nothing_changes():
+def test_without_the_scan_the_reading_count_is_not_billed():
     out = _build_pozicijos_from_rooms(_parsed(6))
-    row = _rows(out, "Difūzorių montavimas (vėdinimo")[0]
-    assert row["kiekis"] == 6 and row["confidence"] == "geltona" and "_assumption" not in row
+    assert [r["kiekis"] for r in _rows(out, "difūzor")] == [None]
 
 
 # ── the pdfminer debug-logging patch ────────────────────────────────────────────────────────────────

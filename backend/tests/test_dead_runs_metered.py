@@ -218,11 +218,7 @@ def _paid_then_raise(monkeypatch):
     monkeypatch.setenv("ENABLE_PARALLEL_VOTING", "1")
     monkeypatch.setenv("VOTING_N", "3")
     monkeypatch.delenv("SAMATU_VOTING_MODELS", raising=False)
-    import extractor.vision.adjacency_extractor as ax
     import extractor.vision.extraction_voter as ev
-    monkeypatch.setattr(ax, "extract_adjacency",
-                        lambda **_k: types.SimpleNamespace(_meta=dict(_ADJ)))
-    monkeypatch.setattr(ax, "apply_adjacency_to_rooms", lambda *_a, **_k: {})
 
     def _boom(_runs):
         raise RuntimeError("vote blew up after everything was paid")
@@ -230,7 +226,7 @@ def _paid_then_raise(monkeypatch):
 
 
 _PASS1 = {"model": _MODEL, "input_tokens": 10_000, "output_tokens": 1_000}
-_PAID_SUM = (5_000 + 3 * 10_000 + 2_000, 800 + 3 * 1_000 + 300)
+_PAID_SUM = (5_000 + 3 * 10_000, 800 + 3 * 1_000)   # no adjacency pass since v4 3b
 
 
 def test_non_stream_run_that_raises_records_what_it_paid(tmp_path, monkeypatch):
@@ -244,7 +240,7 @@ def test_non_stream_run_that_raises_records_what_it_paid(tmp_path, monkeypatch):
     assert row["kind"] == "extract-interior-failed"
     assert (row["input_tokens"], row["output_tokens"]) == _PAID_SUM
     assert row["cost_eur"] == pytest.approx(
-        round(_cost_eur(_EKS, _PASS1, _PASS1, _PASS1, _ADJ), 4))
+        round(_cost_eur(_EKS, _PASS1, _PASS1, _PASS1), 4))
 
 
 def test_stream_worker_exception_records_what_it_paid(tmp_path, monkeypatch):

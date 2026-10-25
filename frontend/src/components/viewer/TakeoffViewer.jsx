@@ -25,7 +25,6 @@ import { ChevronUp, ChevronDown, PanelLeft, Search, Printer, Download, History, 
 import { engineOptions, makeViewerPlugins } from '@/lib/viewerEngine/embedEngine';
 import { ROOM_POLYGON_FILLS_DEFAULT_VISIBLE, roomPageOf, roomTypeWord } from '@/lib/roomZones';
 import { displayRotationFor, normalizeRotation, rotatePctPoint } from '@/lib/viewerEngine/pageRotation';
-import { clickToFill } from '@/lib/clickToFillApi';
 import { fetchHoleAt } from '@/lib/roomOutlineApi';
 import { fetchPageGeometry } from '@/lib/pageGeometryApi';
 import { makeCountType, makeMeasurement, countTypesFromMeasurements, measurementValue, newMeasurementId } from '@/lib/measurements';
@@ -933,15 +932,9 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     sutapdinimas: project?._meta?.geometrija?.sutapdinimas || null,
     onPreview: onRoomToolPreview,
     onCommit: onRoomToolCommit,
-    // No vector walls on the sheet: the raster click-fill is the fallback, shown first like every proposal.
-    onRasterPreview: onRoomPolygonFill ? async (nr, where) => {
-      const data = await clickToFill({ projectId, pageNr: where.page, clickXPct: where.x_pct, clickYPct: where.y_pct, sensitivity: 0.7, pdfBlob });
-      const pw = Number(data?.page_width_pdf);
-      const ph = Number(data?.page_height_pdf);
-      const ring = Array.isArray(data?.polygon_pdf) && pw > 0 && ph > 0 ? data.polygon_pdf.map(([x, y]) => [x / pw, y / ph]) : null;
-      return ring && ring.length >= 3 ? { ring, data } : null;
-    } : null,
-    onRasterCommit: onRoomPolygonFill ? (nr, data) => onRoomPolygonFill(nr, data) : null,
+    // No vector walls on the sheet: no raster flood fill any more (v4 3b, 2026-10-25) — he draws the outline.
+    onRasterPreview: null,
+    onRasterCommit: null,
     // The room he just outlined becomes the selected one, so he sees it (the drawing stays where it is).
     onCommitted: (nr) => applyRoomSelection({ focused: String(nr), extra: [] }),
   });
@@ -1524,38 +1517,10 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     // Zoom-independent by construction (points, not CSS px).
     const rot = displayRotationFor(pageRotation ?? 0);
     const [mx, my] = rotatePctPoint(x / pageWidth, y / pageHeight, rot);
-    if (fillBusy) return;   // one request at a time
-    setFillBusy(true);
-    try {
-      const data = await clickToFill({
-        projectId,
-        pageNr: pageIndex + 1,
-        clickXPct: mx,
-        clickYPct: my,
-        sensitivity: 0.7,
-        pdfBlob,
-      });
-      const saved = onRoomPolygonFill?.(fillFor, data);
-      // The AREA stays table-read (eksplikacija beats a traced polygon for
-      // accuracy) — say so, or redrawing "because the area looked wrong"
-      // reads as a silent no-op. (final-regression finding 2, 2026-07-28)
-      toast.success(`Patalpos ${fillFor} kontūras pažymėtas`, {
-        description: 'Plotas ir kiekiai lieka iš eksplikacijos — kontūro pataisymas naudojamas žymėjimui ir tikslumo mokymui.',
-        ...undoAction(saved),
-      });
-      setFillFor(null);
-    } catch (e) {
-      // Audit P0 (2026-07-12): failure used to be console-only + silent disarm
-      // — the user concluded the feature is broken. Surface a human message
-      // and KEEP fill mode armed so they can try another spot right away.
-      console.warn('[click-to-fill] failed:', e?.message);
-      toast.error(
-        `Nepavyko automatiškai apvesti patalpos ${fillFor} šioje vietoje.`,
-        { description: 'Spustelėkite kitą tašką patalpos viduje arba pažymėkite kontūrą ranka (Esc — atšaukti).' },
-      );
-    } finally {
-      setFillBusy(false);
-    }
+    // The pixel flood fill on a click (POST /api/click-to-fill) is gone — v4 3b, 2026-10-25.
+    void mx; void my;
+    toast.info(`Patalpos ${fillFor} kontūrą apveskite įrankiu „Patalpa“ arba nubrėžkite ranka.`);
+    setFillFor(null);
   };
 
   // Double-click (Pathon v3 W5-A A1, design §5 Select: „room → edit outline; measurement → edit"): at rest or

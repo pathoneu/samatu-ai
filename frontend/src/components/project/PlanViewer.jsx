@@ -4,9 +4,8 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import {
   ArrowLeft, ArrowRight, BookOpen, Check, Crosshair, Loader2, Maximize2, Minus, Plus,
-  Search, SidebarClose, SidebarOpen, Target, Trash2, Wand2, Zap,
+  Search, SidebarClose, SidebarOpen, Target, Trash2, Zap,
 } from 'lucide-react';
-import { clickToFill } from '@/lib/clickToFillApi';
 import { pageTypeColor, pageTypeLabel } from '@/lib/pageTypes';
 import {
   clampPlanScale,
@@ -373,40 +372,9 @@ export default function PlanViewer({
     }
   };
 
-  const runFillFromClick = async (event) => {
-    if (!fillMode || !pdfFile || !renderedSize) return;
-    const pageEl = event.currentTarget;
-    const rect = pageEl.getBoundingClientRect();
-    const xPct = (event.clientX - rect.left) / rect.width;
-    const yPct = (event.clientY - rect.top) / rect.height;
-    if (xPct < 0 || xPct > 1 || yPct < 0 || yPct > 1) return;
-    setFillLoading(true);
-    setFillError(null);
-    setFillResult(null);
-    try {
-      const data = await clickToFill({
-        projectId: fillProjectIdRef.current,
-        pageNr: pageNumber,
-        clickXPct: xPct,
-        clickYPct: yPct,
-        sensitivity: 0.7,
-        // First click sends PDF; subsequent clicks rely on server cache.
-        pdfBlob: fillPdfUploaded ? null : pdfFile,
-      });
-      setFillPdfUploaded(true);
-      setFillResult(data);
-    } catch (err) {
-      // Show friendly LT message + the raw backend detail in parens so
-      // the user can copy/paste it when reporting bugs.
-      const friendly = err.userMessage || 'Nepavyko užpildyti.';
-      const raw = err.rawDetail ? ` (${String(err.rawDetail).slice(0, 80)})` : '';
-      setFillError(friendly + raw);
-      // If server lost cache (TTL expired), allow re-upload on next click.
-      if ((err.userMessage || '').includes('cache')) setFillPdfUploaded(false);
-    } finally {
-      setFillLoading(false);
-    }
-  };
+  // The pixel flood fill on a click („Kontūras paspaudus“, POST /api/click-to-fill) is gone — v4 3b,
+  // 2026-10-25: a room outline comes from the drawing's vector walls or his own polygon.
+  const runFillFromClick = () => {};
 
   const runTemplateCount = async (event) => {
     if (!symbolPickMode || !pdfFile || !renderedSize) return;
@@ -677,30 +645,6 @@ export default function PlanViewer({
             <Maximize2 className="w-4 h-4 inline mr-1.5" />
             Plotis
           </button>
-          {/* Manual room-contour correction (core): visible when a room is
-              focused. Click inside the room → flood-fill → Išsaugoti persists
-              it as that room's accurate polygon. */}
-          {focusedRoom?.nr && (
-            <button
-              type="button"
-              onClick={() => {
-                setFillMode(v => !v);
-                setFillError(null);
-                setFillResult(null);
-                if (symbolPickMode) setSymbolPickMode(false);
-              }}
-              className={`h-9 px-3 rounded-md border text-sm ${
-                fillMode
-                  ? 'border-violet-500 bg-violet-500/10 text-violet-300'
-                  : 'border-viewer-chrome-border bg-viewer-chrome hover:bg-viewer-chrome-hover'
-              } disabled:opacity-50`}
-              disabled={fillLoading || !pdfFile}
-              title={`Taisyti patalpos ${focusedRoom.nr} kontūrą — spustelėkite patalpos viduje`}
-            >
-              <Wand2 className="w-4 h-4 inline mr-1.5" />
-              {fillMode ? `Spustelėkite patalpos ${focusedRoom.nr} viduje` : 'Kontūras paspaudus'}
-            </button>
-          )}
           {fillLoading && (
             <span className="inline-flex items-center gap-1.5 text-sm text-viewer-chrome-foreground/65">
               <Loader2 className="w-4 h-4 animate-spin" /> Užpildoma...

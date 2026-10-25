@@ -35,11 +35,14 @@ from rules import rows as _rules_rows
 from rules.conventions import resolve_profile as _resolve_profile
 from .position_id import assign_position_ids
 from .universal_rules import normalize_paskirtis
-from .niche_inference import (
-    HELD_ESTIMATE_KEY, INFERRED_SOURCE, LED_ESTIMATE_ROOM_SENTENCE, billed_estimate_m,
-    estimate_accepted, estimated_niche_m, led_estimate_disclosure, led_estimate_waiting,
-    led_estimate_waiting_row, led_estimated_rooms,
+from . import row_provenance as _rp
+from .row_provenance import (
+    DUCTS_FIXING_LT, DUCTS_INSULATION_LT, DUCTS_LT, LED_NO_LEGEND_LT, RUBBISH_LT, led_legend_length, protection_lt,
 )
+
+# `_source` of the niche lengths the deleted room-type estimator (niche_inference, 2026-06-05 → 2026-10-25)
+# wrote into `elementai`; a stored project may still carry them — they are never counted.
+_INFERRED_NICHE_SOURCE = "statistical_inference"
 
 log = logging.getLogger(__name__)
 
@@ -98,13 +101,6 @@ def _pdf_native_enabled() -> bool:
     blocks. ON by default since the 2026-07-04 lock-in; see
     _pdf_native_mode for the override semantics."""
     return _pdf_native_mode()[0]
-
-
-def _zoom_agentic_enabled() -> bool:
-    """EXPERIMENT gate (SAMATU_ZOOM_AGENTIC=1): route the Pass-2 zoom re-read
-    through the model-driven crop loop (extractor.agentic_crop) instead of
-    the fixed-bbox crop. Default OFF — zero behavior change."""
-    return _env_flag("SAMATU_ZOOM_AGENTIC")
 
 
 def _mixed_voting_models() -> list[str] | None:
@@ -219,21 +215,6 @@ def _note_doors_unread(parsed: dict, doors_result: dict) -> None:
                     "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
         "_page_errors": errors,
     })
-
-
-def _meter_niche_call(parsed: dict, nl: Any) -> None:
-    """Roll ONE niche_locator.extract_niches call's tokens into
-    ``parsed["_meta"]["extra_calls"]`` (2026-07-04 — the last unmetered paid
-    sub-call). ``nl`` is the returned ``NicheList``; its ``_meta`` carries
-    ``{model, input_tokens, output_tokens, ...}`` on a cache MISS, or
-    ``{model, cache:"hit"}`` (no tokens) on a HIT.
-
-    Delegates to _append_extra_call, so a cache HIT (model present, tokens
-    absent) contributes €0 and never raises. Pure token CAPTURE — niche
-    detection output is untouched."""
-    if nl is None:
-        return
-    _append_extra_call(parsed, getattr(nl, "_meta", None), reader="niche")
 
 
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
@@ -430,29 +411,6 @@ _CONSISTENCY_LT: dict[str, tuple[str, str]] = {
         "per mygtuką „Nustatymai“.",
     ),
 }
-
-
-def perimeter_warning(fr: dict) -> dict:
-    """The Patikrinimai row for one room `vision.perimeter_validator` flagged —
-    a perimeter no closed outline of that area can have. LT, not English: it
-    renders verbatim and is counted/expanded by default (2026-08 loudness
-    pass). The list prints the room's number in front (`patalpa_nr`), so the
-    message names it by its name only (2026-10-06)."""
-    name = str(fr.get("room_name") or "").strip()
-    return {
-        "level": "WARN",
-        "code": "perimeter_out_of_bounds",
-        "field": "perimetras_m",
-        "patalpa_nr": fr["room_nr"],
-        "message": (f"{name + ': ' if name else ''}Perimetras {lt_num(fr['perim_m'], 1)} m "
-                    f"neįmanomas {lt_num(fr['area_m2'], 1)} m² plotui"),
-        "expected": f"{lt_num(fr['lower_bound_m'], 1)}–{lt_num(fr['upper_bound_m'], 1)} m",
-        "actual": f"{lt_num(fr['perim_m'], 1)} m",
-        "hint": ("Patikrinkite patalpos matmenis ir brėžinio mastelį — perimetras "
-                 "nesiderina su plotu. Perimetrą galima pataisyti Patikros "
-                 "žingsnyje, šios patalpos lape."),
-        "source": "perimeter_validator",
-    }
 
 
 # Load ANTHROPIC_API_KEY from backend/.env if not already in environment
@@ -1102,6 +1060,9 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # key that starts with `_sa` (SQLAlchemy state), so that spelling
             # never reached the browser (2026-09-08, an hour of debugging).
             "_only_while": p.get("_only_while"),
+            # v4 3b: where the number comes from (row_provenance) and, for a blank row, what to check
+            "_kilme": p.get("_kilme"),
+            "_tuscia_priezastis": p.get("_tuscia_priezastis"),
             # The m² (and tape metres) behind a line billed per zone — the row
             # scorecard checks his m² row against `_detail_m2` (2026-09-10).
             "_detail_m2": p.get("_detail_m2"),
@@ -1462,24 +1423,19 @@ def _calc_lubu_karnizas_m(perim: float, paskirtis: str = "", evidence: bool | No
     return round(perim * CORNICE_LENGTH_WASTE, 2)
 
 
-def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> float:
-    """LED nišų (užuolaidų niches) bendras ilgis. CLAUDE.md §1.5.
+def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = False) -> float:
+    """The LED niche length the READING saw in this room (Pass-1 / a stored blob), summed. CLAUDE.md §1.5.
 
-    ilgis_m = TOTAL niche length in this room across all segments.
-    kiekis is NOT used as a multiplier for nisa_LED (semantics were
-    ambiguous and Vision occasionally returned kiekis=3, ilgis_m=15
-    meaning "3 segments totaling 15 m" — which got multiplied to 45 m).
+    2026-10-25 (v4 3b): a SIGNAL only — it decides whether the LED niche rows appear at all; their quantity
+    is the drawing's legend (row_provenance.led_legend_length) or blank. Lengths the deleted room-type
+    estimator wrote are never counted (`include_estimates` stays for old callers and is ignored).
 
-    Fallback path (no ilgis_m, only plotis_mm) keeps kiekis as a multiplier
-    because plotis_mm is per-window and naturally pairs with a count.
-
-    `include_estimates=False` leaves out the niches `niche_inference`
-    estimated from the room type — billed only once he accepts the estimate
-    (2026-10-06, see `refresh_led_metres`).
+    ilgis_m = TOTAL niche length in this room across all segments (never × kiekis); without it,
+    (plotis_mm + 0,40 m) × kiekis.
     """
     total = 0.0
     for el in (elementai or []):
-        if not include_estimates and el.get("_source") == INFERRED_SOURCE:
+        if el.get("_source") == _INFERRED_NICHE_SOURCE:
             continue
         if (el.get("tipas") or "").lower() == "nisa_led":
             ilgis = float(el.get("ilgis_m") or 0)
@@ -1493,20 +1449,12 @@ def _calc_nisu_metrai_m(elementai: list, include_estimates: bool = True) -> floa
     return round(total, 2)
 
 
-def refresh_led_metres(room: dict, overrides: dict | None) -> None:
-    """The room's billed LED niche metres (`nisu_metrai`) and the estimate held
-    back from them (`_nisu_ivertinta_m`, absent when nothing is held back).
-    2026-10-06: a length estimated from the room type waits for his „Priimti
-    įvertinimą" in Nustatymai (`niche_inference.estimate_accepted`). One
-    function for the extraction and both recompute paths, so the three agree."""
-    accepted = estimate_accepted(overrides)
-    elementai = room.get("elementai") or []
-    room["nisu_metrai"] = _calc_nisu_metrai_m(elementai, include_estimates=accepted)
-    held = 0.0 if accepted else estimated_niche_m(room)
-    if held > 0:
-        room[HELD_ESTIMATE_KEY] = held
-    else:
-        room.pop(HELD_ESTIMATE_KEY, None)
+def refresh_led_metres(room: dict, overrides: dict | None = None) -> None:
+    """The room's LED niche signal (`nisu_metrai`, see `_calc_nisu_metrai_m`). One function for the extraction
+    and both recompute paths, so the three agree. The held-back estimate of 2026-10-06 is gone with its
+    estimator; a stored room loses the key."""
+    room["nisu_metrai"] = _calc_nisu_metrai_m(room.get("elementai") or [])
+    room.pop("_nisu_ivertinta_m", None)
 
 
 def _calc_hidroizoliacija_m2(room: dict, perim: float) -> float:
@@ -1766,21 +1714,8 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
         annotate_tile_elevation_evidence(parsed)
     except Exception as exc:
         print(f"[extractor] tile elevation evidence annotation failed: {exc}")
-    # Same recompute-time contract for the LED enumerated-exclusion gate
-    # (2026-08-04): when a persisted warning ENUMERATES which rooms have LED
-    # niches, statistically-inferred niches in the other rooms are fabrications
-    # and must not survive any recompute — fresh extraction, eval rescore, or a
-    # user edit. Placed here (not only at inference time) so the two objektas_c
-    # bathrooms already baked into saved extracts get cleaned too. Fails
-    # closed: no enumerating warning → drops nothing. Never raises.
-    try:
-        from .niche_inference import drop_unenumerated_inferred_niches
-        n_led_dropped = drop_unenumerated_inferred_niches(parsed)
-        if n_led_dropped:
-            print(f"[extractor] LED gate: dropped {n_led_dropped} inferred "
-                  f"niche(s) outside the enumerated rooms")
-    except Exception as exc:
-        print(f"[extractor] LED enumerated-exclusion gate failed: {exc}")
+    # (The LED enumerated-exclusion gate of 2026-08-04 went with the room-type niche estimator, 2026-10-25:
+    # an estimated niche is never counted now — `_calc_nisu_metrai_m`.)
     # ── Unlabelled rooms get a class from their NAME (2026-08-23) ────────
     # A room with no `paskirtis` at all used to fall straight onto the
     # gyvenamoji defaults — painted walls, parquet floor, no tile, no
@@ -1808,6 +1743,10 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             **room,
             **counts,
         }
+        if not isinstance(room.get("_sujungimas"), dict):
+            # v4 3b: the partition-wall count the deleted Vision adjacency pass stored is a model reading — a
+            # stored project computes as a fresh read does now (only a merge he made states its partition ends)
+            calc_input.pop("n_partition_walls", None)
         # 2. Compute deterministic per-room quantities
         room.pop("_calc_failed", None)
         try:
@@ -2815,6 +2754,9 @@ def _extract_medziagos_section(parsed: dict) -> None:
             kept.append(p)                # already extracted (defensive)
             continue
         parent = (p.get("aprasymas") or "").strip()
+        if p.get(_IS_MATERIAL_LINE) and p.get("kiekis") is None:
+            # v4 3b: goods bought for a blank work row are unknown with it — not a shopping-list line
+            continue
         if p.get(_IS_MATERIAL_LINE):
             # This row is the goods. Drop any self-copy it still carries and
             # move it whole — never emit a second row for the same purchase.
@@ -2861,6 +2803,8 @@ def _extract_medziagos_section(parsed: dict) -> None:
                 "vnt": m_vnt,
                 "kiekis": m_kiekis,
                 "saltinis": _MEDZIAGOS_SALTINIS,
+                # a consumption norm over its work row's quantity (v4 3b)
+                _rp.KILME_KEY: _rp.DERIVED,
                 # Which work this belongs to — the UI renders it as muted
                 # subtext, and it is what makes a bare "Gruntas" line readable.
                 "susijes_darbas": parent,
@@ -2942,6 +2886,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         return
 
     from .universal_rules import is_high_ceiling as _is_high
+    _read_h = _rp.read_heights(rooms, parsed)
 
     def _room_virs_3m_paint(r: dict) -> tuple[float, float]:
         """(walls, ceiling) m² of a room's paint that belongs above 3 m.
@@ -2960,6 +2905,10 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         large soffit borrow the ceiling's headroom."""
         w = float(r.get("walls_paintable_m2") or 0)
         c = _ceiling_paint_m2(r, stretch_nrs)
+        if _rp.height_class(r, parsed, _read_h) not in (_rp.DRAWING, _rp.DERIVED):
+            # v4 3b: a height the drawing did not give puts nothing above 3 m — the ceiling's m² stay whole on
+            # one line, and the walls (which rest on the height) are blank anyway
+            return 0.0, 0.0
         if _is_high(r.get("lubu_aukstis_m")):
             return w, c
         xw = min(float(r.get("extra_walls_virs_3m_m2") or 0), w)
@@ -3142,6 +3091,10 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         base = {"skyrius": SK_GD, "vnt": "m2", "saltinis": SAL,
                 "_consolidated": True,
                 "_medziagos": _medziagos(surf, share), "_detalus": detalus}
+        # v4 3b: a surface billed at the drawing's own total (the wall-finish legend, the room table's „Iš
+        # viso") is read off the drawing, whatever the rooms' inputs are
+        if (_sienos_meta if surf == "Sienų" else _lubos_meta)["source"] == "anchor":
+            base[_rp.KILME_KEY] = _rp.DRAWING
         if provenance:
             base["_confidence_reason"] = provenance
         out: list[dict] = []
@@ -3443,6 +3396,164 @@ def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
         summ["low"] = summ["info"]
 
 
+# ── v4 3b: row provenance (2026-10-25) ────────────────────────────────────────
+# Which per-room field puts a room behind a row that carries no ledger of its own (the ledger's
+# contributions name the rooms otherwise).
+_ROW_ROOM_FIELD = (
+    ("Sienų glaistymas/dažymas", "walls_paintable_m2"), ("Sienų šlifavimas", "walls_paintable_m2"),
+    ("Sienų lyginimas Knauf Rotband", "walls_paintable_m2"), ("Dažymo kampų montavimas", "kampu_metrai"),
+    ("Grindjuosčių", "grindjuosciu_m"), ("Lubų karnizo", "lubu_karnizo_m"),
+    ("Vonios sienų plytelių", "plyteles_sienos_m2"), ("Virtuvės atatvaro plytelių", "plyteles_sienos_m2"),
+    ("Kitų sienų plytelių", "plyteles_sienos_m2"), ("Plytelių grindjuosčių", "plyteles_grindys_m2"),
+)
+_WET_ROWS = ("Silikonavimas tarp plytelių zonos", "Plytelių vidinių kampų silikonavimas", "Plytelių 45° pjovimas")
+# the frame-type sources the drawing's text or he settled (universal_rules.settle_frameless_default)
+_FRAMELESS_READ = ("jusu", "ziniarastis", "ziniarastis_misrus", "pastaba")
+_FRAMELESS_ROW = "Durų angų paruošimas beapvadinėms durims"
+_GKP_ROWS = ("GKP lubų montavimas",)
+_GKP_WITH_ROWS = ("GKP siūlių glaistymas",)
+# follows a GKP row in the shopping list but is counted per wet room, not per m² of GKP
+_NOT_A_FOLLOWER = ("Reviziniai dureliai",)
+
+
+def _rooms_behind(p: dict, rooms: list[dict]) -> list[str]:
+    nrs = [str(c.get("room_nr") or "") for c in (p.get("contributions") or []) if isinstance(c, dict)]
+    if nrs:
+        return nrs
+    label = str(p.get("aprasymas") or "")
+    nr = lambda r: str(r.get("nr") or "").strip()  # noqa: E731
+    if label.startswith("Pastolių nuoma"):
+        return [nr(r) for r in rooms if _room_virs_3m_paint(r) > 0]
+    if label.startswith(_WET_ROWS):
+        return [nr(r) for r in rooms if _pask(r) in ("vonia", "wc", "san")]
+    for prefix, field in _ROW_ROOM_FIELD:
+        if label.startswith(prefix):
+            return [nr(r) for r in rooms if float(r.get(field) or 0) > 0]
+    return []
+
+
+def _gate_gkp_ceilings(pozicijos: list[dict], rooms: list[dict]) -> None:
+    """GKP ceilings only where the drawing marks the ceiling: an altitude printed in the room on the ceiling
+    plan (`ceiling_plan_marker`). Pass-1's ceiling type and the room-type default are no source; with any GKP
+    room unmarked the rows are blank and say so, the rooms' ceiling area offered in the sentence."""
+    rows = [p for p in pozicijos if isinstance(p, dict) and str(p.get("aprasymas") or "").startswith(_GKP_ROWS)
+            and isinstance(p.get("kiekis"), (int, float))]
+    if not rows:
+        return
+    behind = [r for r in rooms
+              if float(r.get("gkp_lubu_standart_m2") or 0) + float(r.get("gkp_lubu_virs_3m_m2") or 0) > 0]
+    unmarked = [r for r in behind if str(r.get("lubu_aukstis_saltinis") or "") != "ceiling_plan_marker"]
+    if not unmarked:
+        for p in rows:
+            _rp.tag(p, _rp.DRAWING)
+        return
+    area = round(sum(float(r.get("ceiling_paintable_m2") or r.get("plotas_m2") or 0) for r in rooms), 2)
+    names = [str(r.get("nr") or "").strip() for r in unmarked]
+    reason = ("Kurios patalpos turi GKP lubas, brėžinys nenurodo — lubų plane altitudės nėra patalpose "
+              f"{', '.join(names[:8])}{'…' if len(names) > 8 else ''}. Įrašykite GKP lubų plotą; "
+              f"visų patalpų lubų plotas — {_rp.lt2(area)} m².")
+    for p in pozicijos:
+        if isinstance(p, dict) and str(p.get("aprasymas") or "").startswith(_GKP_ROWS + _GKP_WITH_ROWS) \
+                and isinstance(p.get("kiekis"), (int, float)):
+            _rp.blank(p, reason)
+
+
+def _gate_frameless(pozicijos: list[dict], parsed: dict) -> None:
+    """The frameless-door preparation only when his answer, the door schedule or a governing note on the
+    drawing says the interior doors are frameless — never from the plan's symbols alone."""
+    prep = (parsed.get("_paruosimas") or {}).get("frameless") or {}
+    src = str(prep.get("source") or "")
+    for p in pozicijos:
+        if not isinstance(p, dict) or not str(p.get("aprasymas") or "").startswith(_FRAMELESS_ROW):
+            continue
+        if not isinstance(p.get("kiekis"), (int, float)):
+            continue
+        if src in _FRAMELESS_READ:
+            _rp.tag(p, _rp.DRAWING)
+            continue
+        try:
+            text_read = int(((parsed.get("_door_types") or {}).get("reader_beapvadines")) or 0) > 0
+        except (TypeError, ValueError):
+            text_read = False
+        if text_read:
+            # the door-type reader found frameless doors written in the drawing's text (tags, annotations) —
+            # a reader of text from the sheet image, which Phase 3c moves onto the text layer
+            _rp.tag(p, _rp.MODEL_3C)
+            continue
+        said = str(prep.get("sakinys") or "").strip()
+        _rp.blank(p, ((said + " ") if said else "")
+                  + "Ar vidaus durys beapvadinės, brėžinio tekstas nenurodo — pasirinkite per mygtuką „Nustatymai“ "
+                    "(Vidaus durys); kol nepasirinkote, kiekio neskaičiuoju.")
+
+
+_PLUMBING_SECTIONS = ("Santechnikos darbai", "Plytelių klijavimas", "GKP montavimas")
+_COUNT_FROM_ROOM_TYPE_LT = ("Kiek jų yra, santechnikos plane neperskaityta — pagal patalpų paskirtį būtų {n} vnt. "
+                            "Įrašykite kiekį pagal santechnikos planą.")
+_COUNT_FROM_GLYPHS_LT = ("Kiekis — iš plano ženklų, kurių brėžinio tekstas nepatvirtina. Suskaičiuokite įrankiu "
+                         "„Ženklai“ arba įrašykite kiekį pagal planą.")
+
+
+def _gate_defaults(pozicijos: list[dict], parsed: dict) -> None:
+    """The fact-defaults (a share, a count by room type, a count per shower) and Pass-1's glyph counts
+    become blank rows that say what to write (v4 3b). His own choices and the plumbing reader's counts
+    (a 3c reader) stay."""
+    overrides = parsed.get("_overrides") if isinstance(parsed.get("_overrides"), dict) else {}
+    plumbing = plumbing_reading(parsed) is not None
+    for p in pozicijos:
+        if not isinstance(p, dict) or p.get(_rp.KILME_KEY):
+            continue
+        k = p.get("kiekis")
+        if not isinstance(k, (int, float)) or isinstance(k, bool):
+            continue
+        label = str(p.get("aprasymas") or "")
+        sal = str(p.get("saltinis") or "")
+        sk = str(p.get("skyrius") or "")
+        if label.startswith("Sienų lyginimas Knauf Rotband"):
+            if p.get("_rotband_source") != "pasirinkimas":
+                _rp.blank(p, "Kokią sienų dalį lyginate Rotband (mūro ir betono sienos), brėžinys nenurodo — "
+                             "nustatykite Patikros žingsnyje, skiltyje „Ką skaičiuoti“; kol nenustatyta, "
+                             "kiekio neskaičiuoju.")
+            continue
+        if label.startswith("Didžiaformačių plytelių"):
+            if overrides.get("didzformat_share") is None:
+                _rp.blank(p, "Kiek plytelių didžiaformačių, brėžinys nurodo tik formatą, ne plotą — įrašykite "
+                             "didžiaformačių plytelių plotą.")
+            else:
+                _rp.tag(p, _rp.DERIVED)
+            continue
+        if label.startswith("Slenksniai"):
+            _rp.blank(p, "Kiek slenksčių, brėžinys nenurodo — įrašykite (paprastai po vieną durims tarp "
+                         "skirtingų grindų dangų).")
+            continue
+        if label.startswith("Lentynėlių iš plytelių"):
+            if overrides.get("lentyneliu_per_vonia") is not None and sal == "project_assumption":
+                _rp.tag(p, _rp.DERIVED)          # his number per shower × the showers the plan counts
+            else:
+                _rp.blank(p, "Kiek lentynėlių dušuose, brėžinys nenurodo — įrašykite kiekį pagal išklotines.")
+            continue
+        if label.startswith("Skylių gręžimas plytelėse") and sal != "simboliai_brezinyje":
+            _rp.blank(p, "Kiek skylių gręžti, santechnikos plane neperskaityta — įrašykite pagal prietaisų kiekį.")
+            continue
+        if sal == "paskirtis_default":
+            _rp.blank(p, _COUNT_FROM_ROOM_TYPE_LT.format(n=int(k) if float(k).is_integer() else k))
+            continue
+        if sal == "simboliai_brezinyje":
+            if plumbing and sk in _PLUMBING_SECTIONS:
+                _rp.tag(p, _rp.MODEL_3C)          # the plumbing reader's count — Phase 3c reduces it to text
+            else:
+                _rp.blank(p, _COUNT_FROM_GLYPHS_LT)
+
+
+def _apply_row_provenance(parsed: dict, pozicijos: list[dict], rooms: list[dict]) -> None:
+    """Blank every row whose number has no legal source and stamp every row's `_kilme` (row_provenance)."""
+    _gate_gkp_ceilings(pozicijos, rooms)
+    _gate_frameless(pozicijos, parsed)
+    _gate_defaults(pozicijos, parsed)
+    _rp.gate_room_inputs(pozicijos, rooms, parsed, rooms_for=lambda p: _rooms_behind(p, rooms))
+    _rp.blank_followers(pozicijos, skip_prefixes=_NOT_A_FOLLOWER)
+    _rp.stamp_remaining(pozicijos)
+
+
 def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     """Build the kiekių žiniaraštis (pozicijos[]) from per-room Python-computed
     aggregates (2026-04-28 deterministic refactor).
@@ -3574,11 +3685,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         def _shower_why(r: dict) -> str:
             return SHOWER_READ_SENTENCE if r.get(SHOWER_KEY) is True else SHOWER_ASSUMED_SENTENCE
 
-        # …and a niche length estimated from the room type says so in the room
-        # (only while the estimate is billed — waiting for his answer it is not, 2026-10-06)
-        def _led_why(r: dict) -> str:
-            return LED_ESTIMATE_ROOM_SENTENCE if billed_estimate_m(r) > 0 else "LED nišos lubose"
-
+        # (LED niche rows carry the legend as their own anchor step — no per-room ledger, 2026-10-25.)
         rules: list[tuple[str, object, str, str, object]] = [
             ("Sienų lyginimas Knauf Rotband", None, "m2", "Dalis dažomų sienų", lambda r: _pask(r) is not None),
             ("Angokraščių glaistymas-dažymas", _field("angokrasciu_gkp_m"), "m", "Angokraščiai aplink langus ir lauko duris", None),
@@ -3586,9 +3693,6 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             ("Durų angų paruošimas beapvadinėms durims", _hidden_door_reveal, "m", "Beapvadinės durys — anga paruošiama (2 × aukštis + plotis)", None),
             ("Lubų karnizo sumontavimas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
             ("Lubų karnizo dažymas", _field("lubu_karnizo_m"), "m", "Karnizas palei lubų perimetrą", None),
-            ("Nišų formavimas GKP konstrukcijoje", _field("nisu_metrai"), "m", _led_why, None),
-            ("LED nišų glaistymas", _field("nisu_metrai"), "m", _led_why, None),
-            ("LED nišų dažymas", _field("nisu_metrai"), "m", _led_why, None),
             ("GKP lubų montavimas (standartinis aukštis)", _field("gkp_lubu_standart_m2"), "m2", "GKP lubos", None),
             ("GKP lubų montavimas (virš 3 m aukščio)", _field("gkp_lubu_virs_3m_m2"), "m2", "GKP lubos virš 3 m", None),
             ("GKP siūlių glaistymas + armavimo juostelė",
@@ -4058,7 +4162,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 r, _gm, "m", "Grindjuostės montuojamos", terms=_terms))
         if _gj_meta["source"] == "anchor":
             _g_roll = _floor_anchor_steps(_gj_meta, _FLOOR_ANCHOR_NOTE)
-            _g_reason = {"_confidence_reason": _gj_meta["provenance"]}
+            _g_reason = {"_confidence_reason": _gj_meta["provenance"], _rp.KILME_KEY: _rp.DRAWING}
         else:
             _g_roll = [_ledger.sum_step(_g_contribs,
                                         _ledger.rooms_label(len(_g_contribs)))]
@@ -4100,44 +4204,35 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
              "vnt": "m", "kiekis": karnizas_total, "saltinis": SAL},
         ])
 
-    nisu_total = _sum("nisu_metrai")
-    if nisu_total > 0:
-        # 2026-10-03 (audit vision-pipeline-1): metres the niche locator did not
-        # read but `niche_inference` estimated from the room type are billed on
-        # all three rows below. They are never shown green, and every row says
-        # which rooms carry an estimate and that it was not measured.
-        _led_est = led_estimated_rooms(rooms)
-        _led_flags = led_estimate_disclosure(_led_est, nisu_total)
-        # rangovas audit 2026-04-29: separate STRUCTURAL framing line (GKP karkasą
-        # formuoja prieš glaistymą; tai 3/5 jo projektų atskira eilutė).
-        pozicijos.extend([
+    # LED niches (2026-10-25, v4 3b): the length the drawing's own legend states („LED juosta; šviesos
+    # šaltinis – 24,00 m"), read from the text layer (plan_area_annotations, family „led"). Pass-1's niche
+    # lengths and the room-type estimate are no source any more (row_provenance): with no legend figure the
+    # rows stay, blank, while the reading saw niches at all — a signal raises the question, never a number.
+    _led = led_legend_length(parsed)
+    nisu_signal = _sum("nisu_metrai") > 0
+    nisu_total = _led["m"] if _led else 0.0
+    if _led or nisu_signal:
+        _niche_rows = [
             {"skyrius": SK_GKP, "aprasymas": "Nišų formavimas GKP konstrukcijoje",
              "vnt": "m", "kiekis": nisu_total, "saltinis": SAL,
              "medziagos_aprasymas": "GKP profiliai + savisriegiai",
              "medziagos_kiekis": round(nisu_total * NICHE_PROFILE_M_PER_M, 2),  # ~2.5 m profilio per ilgiui
-             "medziagos_vnt": "m", **_led_flags},
+             "medziagos_vnt": "m"},
             {"skyrius": SK_GD, "aprasymas": "LED nišų glaistymas",
-             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
             {"skyrius": SK_GD, "aprasymas": "LED nišų dažymas",
-             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL, **_led_flags},
-        ])
-        # v3 W5-E E3, flag SAMATU_NICHE_DEPTH (default off → nothing): with a typed niche depth for every
-        # niche room, the two finishing rows are billed in m² = Σ m × gylis × 3 (CLAUDE.md §1.5)
-        from . import niche_depth as _niche
-        if _niche.enabled():
-            _na = _niche.niche_area(rooms, parsed.get("_overrides"), lambda r: r.get("nisu_metrai"))
-            if _na:
-                for _p in pozicijos[-2:]:
-                    _p["vnt"], _p["kiekis"] = "m2", _na[0]
-                    _why = ("Nišų vidus (viršus ir du šonai): " + "; ".join(_na[1])
-                            + f" — iš viso {lt_num(_na[0])} m².")
-                    _p["_confidence_reason"] = " ".join(x for x in (_p.get("_confidence_reason"), _why) if x)
-    # 2026-10-06: rooms where no niche length was read and the room-type estimate
-    # waits for his answer — one blank row naming them with the estimate for each
-    # (niche_inference.LED_ESTIMATE_OPT_IN). Emitted with or without read metres.
-    _led_waiting_row = led_estimate_waiting_row(led_estimate_waiting(rooms))
-    if _led_waiting_row:
-        pozicijos.append({"skyrius": SK_GKP, **_led_waiting_row})
+             "vnt": "m", "kiekis": nisu_total, "saltinis": SAL},
+        ]
+        for _p in _niche_rows:
+            if _led:
+                _p["_assumption"] = _led["sakinys"]
+                _p["_confidence_reason"] = _led["sakinys"]
+                _p["saltinis"] = "brezinio_legenda"
+                _rp.tag(_p, _rp.DRAWING)
+                _ledger.attach(_p, [], [], [_ledger.step("anchor", "Brėžinio legenda", nisu_total, _led["sakinys"])])
+            else:
+                _rp.blank(_p, LED_NO_LEGEND_LT)
+        pozicijos.extend(_niche_rows)
 
     # ════════════════════════════════════════════════════════════════════════
     # GKP MONTAVIMAS (~5-9 lines)
@@ -4548,7 +4643,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 {"skyrius": SK_PL,
                  "aprasymas": "Plytelių grindjuosčių supjovimas ir suklijavimas",
                  "vnt": "m", "kiekis": _pg_meta["base"], "saltinis": SAL,
-                 "confidence": "high",
+                 "confidence": "high", _rp.KILME_KEY: _rp.DRAWING,
                  "_confidence_reason": _pg_meta["provenance"],
                  "_assumption": (
                      "Ilgis — iš grindų plano legendos. Patalpų skaičiai šalia — "
@@ -4723,7 +4818,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 _lam_row["_assumption"] = (f"Grindų dangos atliekos {_waste.pct_label(_fw)} % — brėžinyje parašytas "
                                            f"klojimo raštas ({_waste.PATTERN_LT[_waste.pattern_of_texts(_waste.room_floor_text(r) for r in rooms if float(r.get('pvc_grindys_m2') or 0) > 0)]}).")
         if _lam_meta["source"] == "anchor":
-            _lam_row["_confidence_reason"] = _lam_meta["provenance"]
+            _lam_row["_confidence_reason"] = _lam_meta["provenance"]; _lam_row[_rp.KILME_KEY] = _rp.DRAWING
             _lam_row = _ledger.attach(_lam_row, _lam_contribs, _lam_excluded,
                                       _floor_anchor_steps(_lam_meta, _FLOOR_ANCHOR_NOTE))
         else:
@@ -4991,7 +5086,14 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "vnt": "vnt", "kiekis": pakabinami_n,
             "saltinis": "simboliai_brezinyje", "confidence": "medium",
         })
-    if led_juostu_m > 0:
+    if _led:
+        # v4 3b: the LED strip length the legend states (the same reading the LED niche rows take)
+        el_lines.append(_rp.tag({
+            "skyrius": SK_EL, "aprasymas": "LED juostos pajungimas",
+            "vnt": "m", "kiekis": _led["m"], "saltinis": "brezinio_legenda",
+            "_assumption": _led["sakinys"],
+        }, _rp.DRAWING))
+    elif led_juostu_m > 0:
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "LED juostos pajungimas",
             "vnt": "m", "kiekis": round(led_juostu_m, 2),
@@ -5028,6 +5130,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         difuzoriai_n = difuzoriai_vector_n
         difuzoriai_anchored = True
         difuzoriai_unanchored_n = 0
+    else:
+        # v4 3b (2026-10-25): Pass-1's count of the glyphs is a model reading — the checklist row below asks
+        difuzoriai_n = 0
 
     if difuzoriai_n > 0:
         # rangovas always lists 2 lines per difuzorius: montavimas + apdirbimas
@@ -5037,11 +5142,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
             "skyrius": SK_EL, "aprasymas": "Difūzorių montavimas (vėdinimo taškai)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
             "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
+            _rp.KILME_KEY: _rp.DRAWING,
         })
         el_lines.append({
             "skyrius": SK_EL, "aprasymas": "Difūzorių apdirbimas (priglaistomas)",
             "vnt": "vnt", "kiekis": difuzoriai_n,
             "saltinis": "simboliai_brezinyje", "confidence": difuzoriai_conf, **_dif_extra,
+            _rp.KILME_KEY: _rp.DRAWING,
         })
     else:
         # HONESTY CHECKLIST (2026-07-25): the symbol reader persistently finds
@@ -5085,62 +5192,23 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         ),
     })
 
-    # Sprint §40 (2026-04-29): HVAC ortakiai — rangovas audit v2 top gap.
-    # 40% premium projektų turi ortakius (D100/125/160 mm). Vision prompt'as
-    # papildytas detect'inti ortakių žymėjimus brėžiniuose; jei rasta — emit
-    # per-diameter line items. Heuristic fallback: jei `difuzoriai_n > 0` BET
-    # ortakių symbols nedetected, emit estimated D125 (most common).
     SK_VENT = "Ventiliacijos darbai"
-    ortakiai_d100 = float(symbols.get("ortakiai_d100_m") or 0)
-    ortakiai_d125 = float(symbols.get("ortakiai_d125_m") or 0)
-    ortakiai_d160 = float(symbols.get("ortakiai_d160_m") or 0)
-    ortakiai_total = ortakiai_d100 + ortakiai_d125 + ortakiai_d160
-
-    if ortakiai_total == 0 and difuzoriai_n > 0:
-        # Heuristic fallback: average duct run per diffuser ≈ 4-6 m.
-        # Use D125 as default (most common single-family residential).
-        ortakiai_d125 = round(difuzoriai_n * 5.0, 1)
-        ortakiai_total = ortakiai_d125
-
-    if ortakiai_d100 > 0:
-        pozicijos.append({
-            "skyrius": SK_VENT, "aprasymas": "Ortakių D100 mm montavimas",
-            "vnt": "m", "kiekis": ortakiai_d100,
-            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d100_m") else "skaiciuota_is_brezinio",
-            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D100",
-            "medziagos_kiekis": round(ortakiai_d100 * DUCT_WASTE, 1),  # 5% atliekos
-            "medziagos_vnt": "m",
-        })
-    if ortakiai_d125 > 0:
-        pozicijos.append({
-            "skyrius": SK_VENT, "aprasymas": "Ortakių D125 mm montavimas",
-            "vnt": "m", "kiekis": ortakiai_d125,
-            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d125_m") else "skaiciuota_is_brezinio",
-            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D125",
-            "medziagos_kiekis": round(ortakiai_d125 * DUCT_WASTE, 1),
-            "medziagos_vnt": "m",
-        })
-    if ortakiai_d160 > 0:
-        pozicijos.append({
-            "skyrius": SK_VENT, "aprasymas": "Ortakių D160 mm montavimas",
-            "vnt": "m", "kiekis": ortakiai_d160,
-            "saltinis": "simboliai_brezinyje" if symbols.get("ortakiai_d160_m") else "skaiciuota_is_brezinio",
-            "medziagos_aprasymas": "Cinkuoti spiralinio tipo ortakiai D160",
-            "medziagos_kiekis": round(ortakiai_d160 * DUCT_WASTE, 1),
-            "medziagos_vnt": "m",
-        })
-    if ortakiai_total > 0:
-        # rangovas paaiškina: ortakių izoliacija + tvirtinimas — atskiros eilutės
-        pozicijos.append({
-            "skyrius": SK_VENT, "aprasymas": "Ortakių izoliacija (akmens vata + AlMg folija)",
-            "vnt": "m", "kiekis": round(ortakiai_total * 0.7, 1),  # ~70% (in slabs only)
-            "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
-        })
-        pozicijos.append({
-            "skyrius": SK_VENT, "aprasymas": "Ortakių tvirtinimas (kabykės, rankės)",
-            "vnt": "vnt", "kiekis": round(ortakiai_total / 1.5),  # ~1 fix per 1.5 m
-            "saltinis": "skaiciuota_is_brezinio", "confidence": "medium",
-        })
+    # Ducts (2026-10-25, v4 3b): no drawing in the corpus or in his uploads draws a duct run with a length —
+    # Pass-1's `ortakiai_*_m` was a model figure and the fallback „5 m of D125 per diffuser" a constant. The
+    # three rows stay where the drawing shows ventilation at all (diffusers counted, or the reading saw duct
+    # marks), blank, each saying what to fill in; the diameter is his to write.
+    _vent_signal = (difuzoriai_n > 0
+                    or any(float(symbols.get(k) or 0) > 0 for k in ("ortakiai_d100_m", "ortakiai_d125_m", "ortakiai_d160_m")))
+    ortakiai_total = 0.0
+    if _vent_signal:
+        pozicijos.extend([
+            _rp.blank({"skyrius": SK_VENT, "aprasymas": "Ortakių montavimas — suveskite ilgį", "vnt": "m"},
+                      DUCTS_LT),
+            _rp.blank({"skyrius": SK_VENT, "aprasymas": "Ortakių izoliacija (akmens vata + AlMg folija) — suveskite ilgį",
+                       "vnt": "m"}, DUCTS_INSULATION_LT),
+            _rp.blank({"skyrius": SK_VENT, "aprasymas": "Ortakių tvirtinimas (kabykės, rankės) — suveskite kiekį",
+                       "vnt": "vnt"}, DUCTS_FIXING_LT),
+        ])
     if sviestuvai_n > 0:
         # Same pair pattern for šviestuvai — rangovas lists montavimas separately
         # from apdirbimas (gipsiniai). We already emit montavimas + skylės
@@ -5215,7 +5283,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # diffusers and 30 m of ducts, but they are grounds to ask the user
         # whether a duct needs boxing in. Hence `difuzoriai_raw` — the count
         # BEFORE the anchoring gate — and not the billable one.
-        if ortakiai_total > 0 or difuzoriai_raw > 0:
+        if _vent_signal or difuzoriai_raw > 0:
             pozicijos.append(_checklist(
                 SK_GKP, "Dėžutės montavimas ortakiams paslėpti — suveskite kiekį",
                 "vnt", "vėdinimo planas — ortakių trasos po lubomis (garažas, techninės patalpos)"))
@@ -5263,23 +5331,17 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
 
     bendras_plotas = parsed.get("bendras_plotas_m2") or sum(float(r.get("plotas_m2") or 0) for r in rooms)
     if bendras_plotas > 0:
-        # Šiukšlių išvežimas — rangovas convention: m³ (volume of waste).
-        # Empirical ratio ~0.075 m³/m² for full vidaus apdaila.
-        # 2026-05-27 calibration (Objektas A fixture): 12 m³ / 165,61 m² = 0,0725.
-        # Anksčiau 0,06 davė 9,9 m³ (under by -17%).
-        siuksliu_m3 = max(1.0, round(bendras_plotas * 0.075, 1))
-        # Both of these were also billing themselves twice (m³ of waste as
-        # "Konteineris + transportas", m² of masking as "PE plėvelė + dažymo
-        # juostos"). They are services with their consumable inside the price —
-        # the contractor quotes them all-in — so the copy is dropped and the
-        # line stays here, priced once, rather than moving to Medžiagos.
+        # 2026-10-25 (v4 3b): the waste volume (it was floor area × 0,075, a factor fitted to one sąmata) and
+        # the protected area (it was the whole floor) are not on the drawing — both rows stay, blank, and say
+        # what to write; the floor area is offered in the sentence, not billed. The site clean-up is one lump.
+        # They are services with their consumable inside the price — never a Medžiagos row.
         pozicijos.extend([
-            {"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)",
-             "vnt": "m3", "kiekis": siuksliu_m3, "saltinis": "skaiciuota_is_brezinio"},
-            {"skyrius": SK_PR, "aprasymas": "Statybvietės sutvarkymas po darbų",
-             "vnt": "kompl", "kiekis": 1, "saltinis": SAL},
-            {"skyrius": SK_PR, "aprasymas": "Apsauginės dangos / juostos darbų metu",
-             "vnt": "m2", "kiekis": round(bendras_plotas, 2), "saltinis": SAL},
+            _rp.blank({"skyrius": SK_PR, "aprasymas": "Šiukšlių išvežimas (statybinės atliekos)", "vnt": "m3"},
+                      RUBBISH_LT),
+            _rp.tag({"skyrius": SK_PR, "aprasymas": "Statybvietės sutvarkymas po darbų",
+                     "vnt": "kompl", "kiekis": 1, "saltinis": SAL}, _rp.DERIVED),
+            _rp.blank({"skyrius": SK_PR, "aprasymas": "Apsauginės dangos / juostos darbų metu", "vnt": "m2"},
+                      protection_lt(bendras_plotas)),
         ])
 
     # 2026-06-06: collapse the per-coat glaistymas/dažymas split into the
@@ -5289,6 +5351,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     _consolidate_paint_pozicijos(parsed)
     _consolidate_led_niche_pozicijos(parsed)
     pozicijos = parsed["pozicijos"]
+    # v4 3b (2026-10-25): no row keeps a number a model guessed or a default invented — row_provenance. Before
+    # the granularity merge, so a merged row is blank whenever one of its members is.
+    _apply_row_provenance(parsed, pozicijos, rooms)
     # Phase 2 (2026-10-25): his granularity — walls + ceilings paint in one row, wall + floor tiles in one
     # row — when the profile says „merged" (default „split", rules/conventions.py LT_RANGOVAS).
     pozicijos = _rules_rows.apply_granularity(pozicijos, _profile, _ledger)
@@ -5327,6 +5392,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     pozicijos.sort(key=lambda p: SKYRIUS_ORDER.get(p.get("skyrius", "Pridėtiniai elementai"), 999))
 
     _attach_room_ledgers(pozicijos)
+    _rp.stamp_remaining(pozicijos)          # rows the merge made carry their first member's class already
     parsed["pozicijos"] = pozicijos
 
     # 2026-06-11: per-pozicija confidence (class calibration + apdailos
@@ -5625,6 +5691,7 @@ def _cut_off_answers(meta) -> int:
 # Without it the corner metres are short by that whole term: objektas_a fell
 # from 465,58 to ~370 m (true 493,35) on 2026-10-07, when the answer was cut
 # off, and nothing on screen said so.
+ADJACENCY_REMOVED = "geometrija"   # v4 3b: no Vision adjacency pass; partition walls come from the drawing
 PARTITION_WALLS_UNREAD_CODE = "adjacency_unread"
 PARTITION_WALLS_UNREAD_MESSAGE = (
     "Kaimyninių patalpų sienų nustatyti nepavyko, todėl pertvarų kampai (sienų "
@@ -5641,7 +5708,9 @@ def _warn_partition_walls_unread(parsed: dict) -> bool:
     reader's own reason stays on the stored warning (`_reason`), off the
     screen. Returns whether it warned."""
     note = (parsed.get("_meta") or {}).get("adjacency")
-    if not isinstance(note, dict) or note.get("status") == "applied":
+    if not isinstance(note, dict) or note.get("status") == "applied" or note.get("reason") == ADJACENCY_REMOVED:
+        # v4 3b: there is no Vision pass to fail any more — partition walls come from the geometry (the rules
+        # worker's corner convention decides what an unread partition means)
         return False
     for r in parsed.get("patalpos") or []:
         try:
@@ -5868,55 +5937,9 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
             }
         return failed
 
-    # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
-    # hash), applied to every run's rooms. Best-effort — failure leaves
-    # n_partition_walls unset, exactly the pre-voting production behaviour —
-    # but never silently: what became of the pass is recorded on the run's
-    # `_meta.adjacency`, and extract_interior warns when the rooms were left
-    # without partition walls (2026-10-07: a cut-off answer cost objektas_a
-    # ~18 % of its corner metres with no word on screen).
-    floor_b64, floor_idx = _resolve_floor_b64(pages, runs)
-    adj = None
-    adj_note: dict = {"status": "skipped", "reason": "no_floor_page"}
-    if floor_b64:
-        try:
-            from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
-            adj = extract_adjacency(image_b64=floor_b64, client=client)
-            # T3 (2026-07-28 telemetry audit): this pass is a real, paid Vision
-            # call made once per extraction, and its usage was captured on the
-            # result but never merged into extra_calls — so every stored
-            # cost_eur silently omitted it. Appending to runs[0]["_meta"] is
-            # deliberate: the voted meta is built as {**runs[0]["_meta"], ...}
-            # below, and the 1-run path returns runs[0] itself, so a single
-            # append reaches BOTH exit paths exactly once. A cache-hit adjacency
-            # carries no tokens and _append_extra_call no-ops on it (correct —
-            # a cache hit costs nothing).
-            _append_extra_call(runs[0], getattr(adj, "_meta", None),
-                               reader="adjacency")
-            n_set = 0
-            for p in runs:
-                summary = apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
-                n_set += (summary or {}).get("n_rooms_matched", 0)
-            print(f"[voting] adjacency on page {floor_idx}: matched rooms across runs={n_set}")
-            _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
-            adj_note = {"status": "applied" if n_set else "no_room_matched",
-                        "page": floor_idx, "rooms_matched": n_set}
-            _n_cut = _cut_off_answers(getattr(adj, "_meta", None))
-            if _n_cut:   # it fitted only on the larger try
-                adj_note["cut_off_answers"] = _n_cut
-        except Exception as exc:
-            print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
-            # a refused / cut-off / unreadable answer was still billed — both
-            # answers when the cut-off retry ran (`_meta` on the exception)
-            _append_extra_call(runs[0], getattr(exc, "_meta", None), reader="adjacency")
-            _why = getattr(exc, "error", None)   # ModelStopped: "cut_off" / "refused:<category>"
-            adj_note = {"status": "failed", "page": floor_idx,
-                        "reason": (_why if isinstance(_why, str) and _why
-                                   else f"{type(exc).__name__}: {str(exc)[:200]}")}
-            _n_cut = _cut_off_answers(getattr(exc, "_meta", None))
-            if _n_cut:
-                adj_note["cut_off_answers"] = _n_cut
-    runs[0].setdefault("_meta", {})["adjacency"] = adj_note
+    # Adjacency (the Vision pass that counted each room's partition walls) is gone — v4 3b, 2026-10-25: which
+    # walls a room shares comes from the drawing's geometry (extractor/wall_adjacency.py, the geometry lane).
+    runs[0].setdefault("_meta", {})["adjacency"] = {"status": "skipped", "reason": ADJACENCY_REMOVED}
 
     def _attach_vote_meta(meta: dict) -> None:
         """Record per-round provenance: model/tokens/cost split (each round
@@ -6772,8 +6795,12 @@ def extract_interior(
                 section_h is None
                 or (cand_m > 2.95 and float(section_h) < cand_m - 0.15)
             )
+            if section_h is not None and abs(float(section_h) - cand_m) < 0.005:
+                # Pass-1 and the printed marker agree: the project height is the drawing's (v4 3b)
+                parsed["_lubu_aukstis_saltinis"] = _rp.PROJECT_HEIGHT_FROM_TEXT
             if should_override:
                 parsed["lubu_aukstis_m"] = cand_m
+                parsed["_lubu_aukstis_saltinis"] = _rp.PROJECT_HEIGHT_FROM_TEXT
                 warnings_list = list(parsed.get("warnings") or [])
                 marker_raw = candidate["raw"]
                 # 2026-08-03: a marker off the millimetre grid was never an
@@ -7014,19 +7041,11 @@ def extract_interior(
             return False
         return True
 
-    # EXPERIMENT (SAMATU_ZOOM_AGENTIC=1): route zoom through the model-driven
-    # crop loop instead of the fixed-bbox re-read. Same inputs (room dict) and
-    # same ZoomResult output schema → _apply_zoom_refinements untouched.
-    _zoom_agentic_on = _zoom_agentic_enabled()
-    _agentic_render_cache: dict = {}   # (page, dpi) → PIL image, shared across rooms
-    _agentic_rooms_meta: list[dict] = []
-
     _zoomable = [r for r in rooms
                  if r.get("bbox_pct") and r.get("puslapio_nr")
                  and not _can_skip_zoom(r)]
     _emit({"event": "zoom_started", "total": len(_zoomable),
-           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r)),
-           "agentic": _zoom_agentic_on})
+           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r))})
     for idx, room in enumerate(rooms, start=1):
         bbox = room.get("bbox_pct")
         page_nr = room.get("puslapio_nr")
@@ -7036,35 +7055,21 @@ def extract_interior(
         if _can_skip_zoom(room):
             zoom_count_skipped += 1
             continue
-        if _zoom_agentic_on:
-            from .agentic_crop import agentic_zoom_room
-            zoom_count_attempted += 1
-            _emit({
-                "event": "zoom_room_started",
-                "idx": zoom_count_attempted,
-                "total": len(_zoomable),
-                "room_nr": room.get("nr"),
-                "pavadinimas": room.get("pavadinimas"),
-            })
-            zoom_result, _zmeta = agentic_zoom_room(
-                client, pdf_bytes, room, render_cache=_agentic_render_cache)
-            _agentic_rooms_meta.append({"room_nr": room.get("nr"), **_zmeta})
-        else:
-            cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
-            if not cropped:
-                continue
-            zoom_count_attempted += 1
-            _emit({
-                "event": "zoom_room_started",
-                "idx": zoom_count_attempted,
-                "total": len(_zoomable),
-                "room_nr": room.get("nr"),
-                "pavadinimas": room.get("pavadinimas"),
-            })
-            zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
-            # Roll this zoom call's tokens into extra_calls (was discarded before
-            # 2026-07-04) — even a null/parse-fail result still billed tokens.
-            _append_extra_call(parsed, _zmeta, reader="zoom")
+        cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
+        if not cropped:
+            continue
+        zoom_count_attempted += 1
+        _emit({
+            "event": "zoom_room_started",
+            "idx": zoom_count_attempted,
+            "total": len(_zoomable),
+            "room_nr": room.get("nr"),
+            "pavadinimas": room.get("pavadinimas"),
+        })
+        zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
+        # Roll this zoom call's tokens into extra_calls (was discarded before
+        # 2026-07-04) — even a null/parse-fail result still billed tokens.
+        _append_extra_call(parsed, _zmeta, reader="zoom")
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -7125,30 +7130,8 @@ def extract_interior(
     parsed["_meta"]["zoom_skipped_via_eksplikacija"] = zoom_count_skipped
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
-    if _zoom_agentic_on:
-        # Cost metering (2026-07-04): roll every agentic-zoom room's per-turn
-        # tokens into extra_calls so the single per-extraction usage_event prices
-        # them (each room's meta already carries its own model + summed tokens).
-        for _m in _agentic_rooms_meta:
-            _append_extra_call(parsed, _m, reader="zoom")
-        # Provenance for the agentic-zoom experiment: per-room loop stats
-        # (crops, turns, tokens, refusals/aborts) + aggregates.
-        parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
-            "rooms": _agentic_rooms_meta,
-            "crops_served_total": sum(m.get("crops_served", 0)
-                                      for m in _agentic_rooms_meta),
-            "api_turns_total": sum(m.get("api_turns", 0)
-                                   for m in _agentic_rooms_meta),
-            "input_tokens_total": sum(m.get("input_tokens", 0)
-                                      for m in _agentic_rooms_meta),
-            "output_tokens_total": sum(m.get("output_tokens", 0)
-                                       for m in _agentic_rooms_meta),
-            "aborted_rooms": [m["room_nr"] for m in _agentic_rooms_meta
-                              if m.get("outcome") not in ("ok",)],
-        }
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
-          f"{zoom_count_applied} applied, {zoom_elapsed}s"
-          + (" [agentic]" if _zoom_agentic_on else ""))
+          f"{zoom_count_applied} applied, {zoom_elapsed}s")
 
     # Step 2.85: APDAILOS READER (2026-05-27).
     # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
@@ -7389,113 +7372,21 @@ def extract_interior(
         parsed.setdefault("_meta", {})["fixtures_status"] = "error"
         _emit({"event": "fixtures_error", "message": str(exc)})
 
-    # Step 2.87: NICHE LOCATOR (wired into prod 2026-06-05, multi-page
-    # backfill added 2026-06-05 evening).
-    # Targeted Vision pass on the ceiling_plan page + conditional
-    # backfill from secondary pages (lubu mazgai sections, apsvietimo
-    # planas) when the primary's LED-room coverage is sparse.
-    #
-    # Verified Objektas A: -5.44% → -0.99% (primary alone). Secondary pages
-    # would over-extract (light-wiring rectangles mis-read as LED), so
-    # the COVERAGE_GATE skips them when primary already covers many
-    # rooms. Objektas B: -54.75% → -51.60% (primary 4 rooms < gate,
-    # backfill kicks in, helps marginally — locator-limited beyond that).
+    # Steps 2.87 / 2.88 (the Vision niche locator and the room-type niche estimate) are gone (v4 3b,
+    # 2026-10-25): the LED niche rows take the length the drawing's legend states, else stay blank.
+
+    # Step 2.885: HEIGHTS FROM THE DRAWING ONLY (v4 3b, 2026-10-25). Every height producer has run (text
+    # markers, the plan's statement, his entries, Pass-1, zoom). A room whose height the drawing's text did not
+    # give takes the height read in the other rooms („imu tokį pat kaip kitose", the existing question); with
+    # no height read anywhere it keeps none — its wall rows are blank until he answers „Kokio aukščio lubos?".
+    # Pass-1's own figure is kept on the room as `_lubu_aukstis_modelio`, never used.
     try:
-        from .vision.niche_locator import (
-            extract_niches, fold_niches_into_rooms, NicheList,
-        )
-
-        def _is_niche_candidate(p: dict) -> bool:
-            tipas = (p.get("tipas") or "").lower()
-            if tipas == "ceiling_plan":
-                return True
-            title = (p.get("pavadinimas") or "").lower()
-            return ("lub" in title) or ("apšviet" in title) or ("apsviet" in title)
-
-        def _render_one_page(page_nr: int) -> str | None:
-            imgs = convert_from_bytes(
-                pdf_bytes, dpi=200, fmt="jpeg",
-                first_page=page_nr, last_page=page_nr,
-            )
-            if not imgs:
-                return None
-            buf = io.BytesIO()
-            imgs[0].save(buf, format="JPEG", quality=85)
-            return base64.b64encode(buf.getvalue()).decode("ascii")
-
-        page_classifications = parsed.get("puslapiai") or []
-        candidates = [p for p in page_classifications if _is_niche_candidate(p)]
-        # Primary = first ceiling_plan, else first candidate
-        candidates.sort(key=lambda p: (
-            0 if (p.get("tipas") or "").lower() == "ceiling_plan" else 1,
-            int(p.get("nr", 999)),
-        ))
-        page_nrs = [int(p.get("nr")) for p in candidates]
-        if not page_nrs:
-            _emit({"event": "niche_locator_skipped",
-                   "reason": "no candidate page (no ceiling_plan / lub / apšviet)"})
-        else:
-            _emit({"event": "niche_locator_started", "pages": page_nrs})
-            combined = NicheList()
-            covered: set[str] = set()
-            COVERAGE_GATE = 5  # rooms with non-zero LED before backfill skips
-            # Primary pass
-            primary_pg = page_nrs[0]
-            image_b64 = _render_one_page(primary_pg)
-            if image_b64:
-                nl_p = extract_niches(image_b64=image_b64)
-                _meter_niche_call(parsed, nl_p)  # roll primary-page tokens into cost
-                for n in nl_p.niches:
-                    if n.type in ("ceiling_led", "wall_led") and (n.length_mm or 0) > 0:
-                        covered.add(str(n.room_nr))
-                    combined.niches.append(n)
-                # Backfill secondaries only when primary coverage is sparse
-                if len(covered) < COVERAGE_GATE:
-                    for page_nr in page_nrs[1:]:
-                        img = _render_one_page(page_nr)
-                        if not img:
-                            continue
-                        nl_s = extract_niches(image_b64=img)
-                        _meter_niche_call(parsed, nl_s)  # roll secondary-page tokens into cost
-                        for n in nl_s.niches:
-                            is_led = n.type in ("ceiling_led", "wall_led")
-                            if (not is_led) or (str(n.room_nr) not in covered):
-                                combined.niches.append(n)
-                fold_niches_into_rooms(parsed.get("patalpos") or [], combined)
-                parsed.setdefault("_meta", {})["niche_locator_pages"] = page_nrs
-                parsed["_meta"]["niche_locator_primary_covered"] = len(covered)
-                parsed["_meta"]["niche_locator_count"] = len(combined.niches)
-                _emit({
-                    "event": "niche_locator_completed",
-                    "primary_page": primary_pg,
-                    "primary_rooms_covered": len(covered),
-                    "total_niches_kept": len(combined.niches),
-                    "backfill_ran": len(covered) < COVERAGE_GATE,
-                })
-            else:
-                _emit({"event": "niche_locator_skipped",
-                       "reason": f"failed to render primary page {primary_pg}"})
-    except Exception as exc:
-        print(f"[extractor] niche_locator failed (non-fatal): {exc}")
-        _meter_niche_call(parsed, exc)  # a refused / cut-off answer was still billed
-        _emit({"event": "niche_locator_error", "message": str(exc)})
-
-    # Step 2.88: STATISTICAL NICHE INFERENCE (2026-06-05).
-    # For rooms where the niche_locator returned nothing but the room
-    # paskirtis empirically has LED (corridor 0.55, wet rooms 0.27,
-    # etc.), inject a fallback estimate based on perim × ratio.
-    # See backend/extractor/niche_inference.py for the per-paskirtis
-    # table and the validated impact on objektas_b (-52% → -18%).
-    try:
-        from .niche_inference import infer_missing_niches
-        n_inferred = infer_missing_niches(parsed.get("patalpos") or [])
-        if n_inferred:
-            parsed.setdefault("_meta", {})["niche_inference_rooms"] = n_inferred
-            _emit({"event": "niche_inference_completed",
-                   "rooms_inferred": n_inferred})
-    except Exception as exc:
-        print(f"[extractor] niche inference failed (non-fatal): {exc}")
-        _emit({"event": "niche_inference_error", "message": str(exc)})
+        _n_h = _rp.fill_heights_from_read(parsed.get("patalpos") or [], parsed)
+        if _n_h:
+            parsed.setdefault("_meta", {})["aukstis_is_brezinio"] = _n_h
+            _emit({"event": "heights_from_drawing", "rooms_changed": _n_h})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] height fill failed (non-fatal): {exc}")
 
     # ─── LAST DATA PRODUCERS — everything below Step 2.9 is math + validators ──
     # ORDERING INVARIANT (2026-07-29): any step that WRITES a calculator input
@@ -7769,31 +7660,8 @@ def extract_interior(
     except Exception as exc:
         print(f"[extractor] consistency_checker failed (non-fatal): {exc}")
 
-    # Step 4.066 (2026-06-01): permanent geometric perimeter validation.
-    # Pure-Python check that each room's perimetras_m is consistent with
-    # its plotas_m2 via the isoperimetric bound. Emits structured warnings
-    # for any room with impossible perimeter; downstream code MAY trigger
-    # re-extraction. Today: just surface the report on parsed for audit;
-    # no automated re-extraction (would require the rich dimension_extractor
-    # to be wired into production — separate work item).
-    try:
-        from .vision.perimeter_validator import validate_extract
-        perim_report = validate_extract(parsed)
-        parsed["_perimeter_validation"] = perim_report
-        if perim_report["n_needs_reextraction"] > 0:
-            existing = parsed.get("warnings") or []
-            for fr in perim_report["flagged_rooms"]:
-                # LT, not English: this row renders verbatim in the banner and
-                # is now counted/expanded by default (2026-08 loudness pass).
-                existing.append(perimeter_warning(fr))
-            parsed["warnings"] = existing
-            print(f"[extractor] perimeter_validator flagged "
-                  f"{perim_report['n_needs_reextraction']}/{perim_report['n_total']} rooms")
-        else:
-            print(f"[extractor] perimeter_validator: all "
-                  f"{perim_report['n_total']} rooms within bounds")
-    except Exception as exc:
-        print(f"[extractor] perimeter_validator failed (non-fatal): {exc}")
+    # (Step 4.066, the isoperimetric check of Pass-1's perimeters, is gone with them — v4 3b, 2026-10-25: a
+    # perimeter the drawing did not give is not checked, it is not used; the rows that rest on it are blank.)
 
     # Step 4.1: Emit `lt_sanity: {warnings, summary}` mirror for frontend
     # SanityWarningsBanner.jsx. Builder is shared with /recompute-interior and
@@ -7881,24 +7749,6 @@ def extract_interior(
     if rules_override is not None:
         parsed["_overrides"] = rules_override
 
-    # Step 6.5: Optional verify pass (gated by ENABLE_VERIFY_PASS).
-    # Runs Opus on the Pass-1 result, asks "what would you disagree with?".
-    # Result is ADVISORY — never auto-applied; surfaced to UI as suggestions.
-    # When the flag is OFF (default), this returns empty corrections fast.
-    try:
-        from .verify_pass import run_verify_pass
-        verify = run_verify_pass(
-            rooms=parsed.get("patalpos") or [],
-            pozicijos=parsed.get("pozicijos") or [],
-        )
-        parsed["_verify_pass"] = {
-            "corrections": verify.corrections,
-            "error": verify.error,
-        }
-    except Exception as exc:
-        # Never break extraction over an advisory pass.
-        parsed["_verify_pass"] = {"corrections": [], "error": str(exc)}
-
     # Step 7: Finalize
     elapsed = round(time.time() - t0, 1)
     if "_meta" in parsed:
@@ -7910,26 +7760,3 @@ def extract_interior(
     parsed["status"] = "ok"
 
     return parsed
-
-
-def vision_polygon_at_click(project_id: str, page_idx: int,
-                            click_xy_pct: list[float]) -> dict:
-    """Sprint 2 G1 hook. Returns a stub polygon centered at click + low
-    confidence; Sprint 4 wires the real Pass-2 zoom Vision call.
-
-    The stub MUST return a valid 4-vertex CW polygon so frontend integration
-    can proceed. Mocked in tests via patch().
-    """
-    cx, cy = click_xy_pct
-    # 20% page-width square as a placeholder room outline
-    half = 0.10
-    return {
-        "polygon_pct": [
-            [max(0.0, cx - half), max(0.0, cy - half)],
-            [max(0.0, cx - half), min(1.0, cy + half)],
-            [min(1.0, cx + half), min(1.0, cy + half)],
-            [min(1.0, cx + half), max(0.0, cy - half)],
-        ],
-        "room_name_guess": None,
-        "confidence": "low",
-    }

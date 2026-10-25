@@ -8,7 +8,7 @@ or the copy drifting from the original went unseen. Here the real function
 runs on the fixture PDF with production's defaults (native PDF Pass-1, three
 voting rounds, every reader) and the harness's rules; the Anthropic client is
 `tests/golden_replay.StubAnthropic`, which answers each reader from the stored
-run and says which answers are stored verbatim (adjacency, niches, zoom),
+run and says which answers are stored verbatim (zoom),
 rebuilt from the stored extract (Pass-1 rounds, doors, door types, fixtures)
 or synthetic (`golden_replay.OBJEKTAS_H_SYNTHETIC`). No call leaves the
 machine: the real client class and every socket refuse while the stub is in.
@@ -18,8 +18,8 @@ machine: the real client class and every socket refuse while the stub is in.
     failed, no build-failure row. Two steps report „skipped", as on the stored
     run: the positioned-marker lane (the drawing prints no altitudes) and the
     apdailos reader (it has no finish sheet).
-(b) Every reader ran on its stub — 3 Pass-1 rounds, 1 adjacency, 9 zoom,
-    1 doors, 3 door-type, 3 fixtures, 2 niche calls; none unexpected, none
+(b) Every reader ran on its stub — 3 Pass-1 rounds, 9 zoom,
+    1 doors, 3 door-type, 3 fixtures (no adjacency or niche call since v4 3b); none unexpected, none
     left over — its answer reached the extract, and the billed calls the run
     records (`_meta.extra_calls`, `voting_models`) are the stored run's, call
     for call.
@@ -68,7 +68,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SLUG = "objektas_h"
 DEFAULT_PDF = REPO_ROOT / "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.pdf"
 
-EXPECTED_CALLS = {"pass1": 3, "adjacency": 1, "zoom": 9, "doors": 1, "door_type": 3, "fixtures": 3, "niche": 2}
+# v4 3b (2026-10-25): the adjacency pass and the niche locator are gone — they are not asked any more
+EXPECTED_CALLS = {"pass1": 3, "zoom": 9, "doors": 1, "door_type": 3, "fixtures": 3}
+_GONE_READERS = ("adjacency", "niche")
 EXPECTED_SKIPPED = {"positioned_marker_lane_skipped", "apdailos_skipped"}
 # The metrics plain --recompute gets wrong on objektas_h because it does not run the
 # drawing lanes (perimeters added from the strings, outlines, openings as drawn, floor
@@ -78,16 +80,18 @@ EXPECTED_SKIPPED = {"positioned_marker_lane_skipped", "apdailos_skipped"}
 # (niche_inference.LED_ESTIMATE_OPT_IN); the read niche metres do not depend on a lane.
 LANES_MOVE = {
     "dazymo_walls_plus_ceilings_combined_m2", "plyteles_grindys_total_m2",
-    "plyteles_sienos_total_m2", "kampu_metrai_m", "rotband_lyginimas_m2",
+    "plyteles_sienos_total_m2", "kampu_metrai_m",   # rotband left it: blank until he chooses a share (v4 3b)
     "plyteles_sienos_grindys_combined_m2", "pvc_grindys_m2", "grindjuostes_total_m",
     "plyteliu_grindjuostes_m", "pasleptu_duru_staktos_m", "angokrasciu_m",
 }
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
 # nothing, and not a step the eval runs.
-ROOM_KEYS_NOT_REPLAYED = {"_lubu_aukstis_sklaida"}
+# v4 3b: the Vision adjacency pass is gone — the frozen extract still carries what it wrote, the eval leaves it
+ROOM_KEYS_NOT_REPLAYED = {"_lubu_aukstis_sklaida", "_adjacency", "_adjacency_confidence", "_exterior_wall_count",
+                          "n_partition_walls"}
 # The voter's per-element record (`_vote.elementai`, 2026-09-30) is newer than the frozen
 # extract; the eval never votes again. Provenance only — the voted values are compared.
-VOTE_KEYS_NOT_REPLAYED = {"elementai"}
+VOTE_KEYS_NOT_REPLAYED = {"elementai", "n_partition_walls"}
 _FAILURE_LINE = re.compile(r"\bfailed\b|MISSING|Traceback|\bException\b", re.IGNORECASE)
 
 
@@ -201,7 +205,7 @@ def test_no_reader_fails_quietly(run):
     codes = {w.get("code") or w.get("source") for w in result.get("warnings") or [] if isinstance(w, dict)}
     assert not codes & {"room_calc_failed", "pozicijos_build_failure", "doors_page_unread", "doors_unattributed",
                         "adjacency_unread"}
-    assert result["_meta"]["adjacency"]["status"] == "applied"
+    assert result["_meta"]["adjacency"]["status"] == "skipped"     # no Vision adjacency pass (v4 3b)
     assert result["pozicijos"]
 
 
@@ -218,7 +222,8 @@ def test_every_reader_ran_on_its_stored_answer(run):
         return [(c.get("reader"), c.get("input_tokens"), c.get("output_tokens"),
                  c.get("cache_read_tokens"), c.get("cache_write_tokens")) for c in calls]
 
-    assert billed(meta["extra_calls"]) == billed(stored["extra_calls"])
+    assert billed(meta["extra_calls"]) == billed([c for c in stored["extra_calls"]
+                                                  if c.get("reader") not in _GONE_READERS])
     assert [(r["input_tokens"], r["output_tokens"]) for r in meta["voting_models"]] == \
         [(r["input_tokens"], r["output_tokens"]) for r in stored["voting_models"]]
     # each reader's answer reached the extract
@@ -226,8 +231,6 @@ def test_every_reader_ran_on_its_stored_answer(run):
     assert result["_voting"]["low_confidence_fields"] == frozen["_voting"]["low_confidence_fields"]
     assert [r.get("_vote", {}).get(f) for r in result["patalpos"] for f in ("perimetras_m", "plotas_m2")] == \
         [r.get("_vote", {}).get(f) for r in frozen["patalpos"] for f in ("perimetras_m", "plotas_m2")]
-    assert [r.get("n_partition_walls") for r in result["patalpos"]] == [r.get("n_partition_walls") for r in frozen["patalpos"]]
-    assert [r.get("_adjacency") for r in result["patalpos"]] == [r.get("_adjacency") for r in frozen["patalpos"]]
     assert meta["zoom_attempted"] == stored["zoom_attempted"] == 9
     assert [r.get("_zoom") for r in result["patalpos"]] == [r.get("_zoom") for r in frozen["patalpos"]]
     assert (meta["doors_total_count"], meta["doors_exterior_count"]) == (stored["doors_total_count"], stored["doors_exterior_count"])
@@ -236,8 +239,7 @@ def test_every_reader_ran_on_its_stored_answer(run):
     assert meta["fixtures_status"] == "ok" and meta["fixtures_raised"] == stored["fixtures_raised"]
     assert result["_sanitary_prietaisai"] == frozen["_sanitary_prietaisai"]
     assert result["detected_symbols_summary"] == frozen["detected_symbols_summary"]
-    assert (meta["niche_locator_pages"], meta["niche_locator_count"]) == (stored["niche_locator_pages"], stored["niche_locator_count"])
-    assert meta["niche_inference_rooms"] == stored["niche_inference_rooms"]
+    assert "niche_locator_pages" not in meta and "niche_inference_rooms" not in meta
 
 
 # ── (c) ──────────────────────────────────────────────────────────────────────

@@ -33,11 +33,11 @@ def _window(n=1):
 def _rooms():
     return [
         {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-         "perimetras_m": 22.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1, "elementai": [_door(1), _window(2)]},
+         "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1, "elementai": [_door(1), _window(2)]},
         {"nr": "02", "pavadinimas": "Virtuvė", "paskirtis": "virtuve", "plotas_m2": 14.0,
-         "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1, "elementai": [_door(1), _window(1)]},
+         "perimetras_m": 15.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1, "elementai": [_door(1), _window(1)]},
         {"nr": "03", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1, "elementai": [_door(1)]},
+         "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1, "elementai": [_door(1)]},
     ]
 
 

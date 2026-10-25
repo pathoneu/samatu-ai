@@ -94,6 +94,17 @@ def client():
     return TestClient(app)
 
 
+def _as_his_entries(blob: dict) -> dict:
+    """v4 3b: a frozen extract's perimeters and heights are Pass-1's — every wall row would be blank. Tests of the
+    arithmetic take them as the person's own entries."""
+    for r in blob.get("patalpos") or []:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "user_override"
+        if r.get("lubu_aukstis_m"):
+            r["lubu_aukstis_saltinis"] = "user_override"
+    return blob
+
+
 @pytest.fixture(scope="module")
 def project():
     """The saved extraction, re-run through the extraction pipeline's own
@@ -109,7 +120,7 @@ def project():
         _recompute_per_room_via_python, _build_pozicijos_from_rooms,
         _emit_v8_compat_fields,
     )
-    blob = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    blob = _as_his_entries(json.loads(FIXTURE.read_text(encoding="utf-8")))
     _recompute_per_room_via_python(blob, blob.get("_overrides") or {})
     blob = _build_pozicijos_from_rooms(blob)
     blob["darbu_sarasas"] = _emit_v8_compat_fields(
@@ -306,7 +317,7 @@ def test_opening_counts_survive_a_ceiling_edit(client):
     """
     room = {
         "nr": "1", "pavadinimas": "Miegamasis", "paskirtis": "gyvenamoji",
-        "plotas_m2": 23.97, "perimetras_m": 20.0, "lubu_aukstis_m": 2.8,
+        "plotas_m2": 23.97, "perimetras_m": 20.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
         "elementai": [
             {"tipas": "duris", "kiekis": 2, "plotis_mm": 900, "aukstis_mm": 2100},
             {"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500},
@@ -341,7 +352,7 @@ def test_ceiling_edit_does_not_invent_openings(client):
     derived at all, so the calculator's own missing-key default applied."""
     room = {
         "nr": "1", "pavadinimas": "Skalbykla", "paskirtis": "gyvenamoji",
-        "plotas_m2": 6.84, "perimetras_m": 10.5, "lubu_aukstis_m": 2.8,
+        "plotas_m2": 6.84, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
         "elementai": [],
     }
     res = client.post("/api/recompute-quantities", json={

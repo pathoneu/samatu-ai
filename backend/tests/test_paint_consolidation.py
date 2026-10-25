@@ -26,8 +26,8 @@ def _parsed(rooms, overrides=None):
 
 
 def _room(**kw):
-    r = {"paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-         "lubu_aukstis_m": 2.7, "elementai": []}
+    r = {"paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+         "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
     # The per-room material fields the extraction pipeline computes on top of
@@ -98,8 +98,8 @@ def test_paint_split_when_flag_off():
 def test_high_room_gets_iki_and_virs_3m_lines():
     # one normal room (≤3m) + one high room (>3m) → split into the two
     # contractor lines (items 16/17). Combined area preserved.
-    rooms = [_room(plotas_m2=20.0, perimetras_m=18.0, lubu_aukstis_m=2.7),
-             _room(plotas_m2=30.0, perimetras_m=22.0, lubu_aukstis_m=3.4)]
+    rooms = [_room(plotas_m2=20.0, perimetras_m=18.0, perimetras_saltinis="plano_matmenys", lubu_aukstis_m=2.7, lubu_aukstis_saltinis="plano_uzrasas"),
+             _room(plotas_m2=30.0, perimetras_m=22.0, perimetras_saltinis="plano_matmenys", lubu_aukstis_m=3.4, lubu_aukstis_saltinis="plano_uzrasas")]
     out = _build_pozicijos_from_rooms(_parsed(rooms))
     for surf in ("Sienų glaistymas/dažymas", "Lubų glaistymas/dažymas"):
         gd = [p["aprasymas"] for p in out["pozicijos"]
@@ -121,8 +121,11 @@ def test_led_niche_consolidated_default_on():
     # m rate for both phases). Same length; the structural GKP framing line stays.
     os.environ.pop("ENABLE_CONSOLIDATE_PAINT_LINES", None)  # defensive: default ON
     r = _room()
-    r["nisu_metrai"] = 42.3
-    out = _build_pozicijos_from_rooms(_parsed([r]))
+    r["elementai"] = [{"tipas": "nisa_LED", "ilgis_m": 42.3}]
+    parsed = _parsed([r])
+    # v4 3b: the length is the legend's, the room's niche only says there are niches
+    parsed["_autoriaus_kiekiai"] = [{"page": 3, "label": "LED juosta", "value": 42.3, "unit": "m", "family": "led"}]
+    out = _build_pozicijos_from_rooms(parsed)
     labels = [p["aprasymas"] for p in out["pozicijos"]]
     assert "LED nišų glaistymas/dažymas" in labels, labels
     assert "LED nišų glaistymas" not in labels, labels

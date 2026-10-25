@@ -97,10 +97,10 @@ def client(monkeypatch):
 
 
 ROOMS = [
-    {"nr": "01", "pavadinimas": "Kambarys", "paskirtis": "gyvenamoji", "plotas_m2": 14.0, "perimetras_m": 15.2,
-     "lubu_aukstis_m": 2.7, "durys": 1, "langai": 1},
-    {"nr": "02", "pavadinimas": "Koridorius", "paskirtis": "koridorius", "plotas_m2": 6.0, "perimetras_m": 10.4,
-     "lubu_aukstis_m": 2.7, "durys": 2, "langai": 0},
+    {"nr": "01", "pavadinimas": "Kambarys", "paskirtis": "gyvenamoji", "plotas_m2": 14.0, "perimetras_m": 15.2, "perimetras_saltinis": "plano_matmenys",
+     "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "durys": 1, "langai": 1},
+    {"nr": "02", "pavadinimas": "Koridorius", "paskirtis": "koridorius", "plotas_m2": 6.0, "perimetras_m": 10.4, "perimetras_saltinis": "plano_matmenys",
+     "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "durys": 2, "langai": 0},
 ]
 
 

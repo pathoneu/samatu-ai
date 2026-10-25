@@ -95,8 +95,8 @@ def _call_free(c, name):
     raise AssertionError(name)
 
 
-_FREE = ("recompute-interior", "detect-type", "click-to-fill",
-         "detect-room-polygons", "cv-match-template", "cv-magic-wand")
+_FREE = ("recompute-interior", "detect-type",
+         "cv-match-template")   # click-to-fill, detect-room-polygons, magic-wand deleted (v4 3b)
 
 
 @pytest.mark.parametrize("name", _FREE)
@@ -147,8 +147,8 @@ def test_unmounted_stub_routes_are_not_billable():
     (a placeholder square, an empty list). If they are mounted again as they
     are, they must not charge; wiring a real Vision call there means switching
     them back to require_billable_user."""
-    from api import lasso_rerun, vision_fill
-    for router in (vision_fill.router, lasso_rerun.router):
+    from api import lasso_rerun   # vision_fill deleted in v4 3b
+    for router in (lasso_rerun.router,):
         for route in router.routes:
             calls = [d.call for d in route.dependant.dependencies]
             assert auth.require_billable_user not in calls, route.path

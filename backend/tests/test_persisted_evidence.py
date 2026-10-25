@@ -25,49 +25,11 @@ sys.path.insert(0, str(ROOT))
 from extractor.height_markers import (  # noqa: E402
     _marker_points, assign_markers_to_rooms,
 )
-from extractor.vision.adjacency_extractor import (  # noqa: E402
-    Adjacency, AdjacencyPayload, RoomAdjacency, apply_adjacency_to_rooms,
-)
 from extractor.apdailos_reader import merge_apdailos_into_rooms  # noqa: E402
 from extractor.vision_call import (  # noqa: E402
     _apply_schedule_match, _recompute_per_room_via_python,
     _stamp_eksplikacija_evidence,
 )
-
-
-# ── adjacency ───────────────────────────────────────────────────────────────
-
-def test_the_adjacency_payload_survives_the_call_site():
-    rooms = [{"nr": "101", "pavadinimas": "Svetainė", "elementai": []}]
-    payload = AdjacencyPayload(rooms=[RoomAdjacency(
-        room_name="Svetainė", room_nr="101",
-        adjacent_rooms=[
-            Adjacency(to_room="Virtuvė", to_room_nr="102", shared_wall_count=1,
-                      wall_types=["pertvara"]),
-            Adjacency(to_room="Koridorius", to_room_nr="103", shared_wall_count=2,
-                      wall_types=["pertvara", "laikanti"]),
-        ],
-        exterior_wall_count=2, confidence="high",
-        evidence="Svetainė ribojasi su virtuve ir koridoriumi")])
-
-    apply_adjacency_to_rooms(rooms, payload)
-    adj = rooms[0]["_adjacency"]
-    # The scalar everything downstream already used stays exactly as it was…
-    assert rooms[0]["n_partition_walls"] == 3
-    # …and now it can say why.
-    assert [n["room_nr"] for n in adj["neighbours"]] == ["102", "103"]
-    assert [n["shared_walls"] for n in adj["neighbours"]] == [1, 2]
-    assert adj["wall_types"] == ["laikanti", "pertvara"]
-    assert adj["exterior_walls"] == 2
-    assert adj["confidence"] == "high"
-    assert "virtuve" in adj["evidence"].lower()
-
-
-def test_an_unmatched_room_gets_no_adjacency_at_all():
-    """A room the pass could not match must not carry someone else's walls."""
-    rooms = [{"nr": "999", "pavadinimas": "Nežinoma", "elementai": []}]
-    apply_adjacency_to_rooms(rooms, AdjacencyPayload(rooms=[]))
-    assert "_adjacency" not in rooms[0]
 
 
 # ── height markers ──────────────────────────────────────────────────────────

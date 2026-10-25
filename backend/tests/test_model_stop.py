@@ -309,72 +309,26 @@ def test_page_classifier_refusal_raises_model_stopped(monkeypatch):
     assert ei.value._meta == {"model": "claude-test", "input_tokens": 5497, "output_tokens": 0}
 
 
-def test_legend_refusal_raises_model_stopped(monkeypatch):
-    from extractor import legend_injection as li
-    monkeypatch.setattr(li, "model_for", lambda role: "claude-test")
-    with pytest.raises(ModelStopped) as ei:
-        li.extract_legend("AAAA", client=_CreateClient(_cut_off()))
-    assert ei.value.error == "cut_off"
-    assert ei.value._meta["input_tokens"] == 900
-
-
-def test_legend_success_shape_unchanged(monkeypatch):
-    from extractor import legend_injection as li
-    monkeypatch.setattr(li, "model_for", lambda role: "claude-test")
-    out = li.extract_legend("AAAA", client=_CreateClient(_ok('{"symbols": []}')))
-    assert out == {"symbols": [], "_meta": {"model": "claude-test", "input_tokens": 1200,
-                                            "output_tokens": 300}}
-
-
-def test_verify_pass_refusal_raises_model_stopped(monkeypatch):
-    from extractor import verify_pass as vp
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-used")
-    client = _CreateClient(_refusal())
-    monkeypatch.setattr(vp.anthropic, "Anthropic", lambda **kw: client)
-    monkeypatch.setattr(vp, "model_for", lambda role: "claude-test")
-    with pytest.raises(ModelStopped) as ei:
-        vp._call_opus("prompt")
-    assert ei.value.error == "refused:reasoning_extraction"
-    assert ei.value._meta["input_tokens"] == 5497
-    assert client.calls == 1
-
-
 # ── extractor/vision/*: raise ModelStopped, never cache a refused answer ─────
 
 def _vision_readers():
-    from extractor.vision import (adjacency_extractor, bbox_locator, built_in_detector,
-                                  dimension_extractor, elevation_extractor, height_extractor,
-                                  niche_locator, room_graph_extractor, schedule_extractor,
-                                  symbol_detector)
+    # v4 3b (2026-10-25): the room-geometry readers are deleted; the two Phase 3c reduces to text remain
+    from extractor.vision import height_extractor, schedule_extractor
     return [
-        ("adjacency_extractor", adjacency_extractor.extract_adjacency,
-         adjacency_extractor.parse_adjacency_payload, {}),
-        ("bbox_locator", bbox_locator.extract_room_bboxes, bbox_locator.parse_bbox_payload, {}),
-        ("built_in_detector", built_in_detector.detect_built_ins,
-         built_in_detector.parse_built_in_payload, {}),
-        ("dimension_extractor", dimension_extractor.extract_dimensions,
-         dimension_extractor.parse_dimension_payload, {}),
-        ("elevation_extractor", elevation_extractor.extract_elevation_zones,
-         elevation_extractor.parse_elevation_payload, {}),
         ("height_extractor", height_extractor.extract_ceiling_height,
          height_extractor.parse_height_payload, {}),
-        ("niche_locator", niche_locator.extract_niches, niche_locator.parse_niche_payload, {}),
-        ("room_graph_extractor", room_graph_extractor.extract_room_graph,
-         room_graph_extractor.parse_room_graph_payload, {"dimensions_payload": {"dimensions": []}}),
         ("schedule_extractor", schedule_extractor.extract_schedule,
          schedule_extractor.parse_schedule_payload, {}),
-        ("symbol_detector", symbol_detector.detect_symbols,
-         symbol_detector.parse_symbol_payload, {}),
     ]
 
 
 _VISION_IDS = [r[0] for r in _vision_readers()]
 # Readers that ask a cut-off answer once more with a larger cap (2026-10-07):
 # both answers are billed, so the stop carries both answers' usage.
-_RETRY_A_CUT_OFF = {"adjacency_extractor"}
+_RETRY_A_CUT_OFF: set[str] = set()
 
 
-@pytest.mark.parametrize("idx", range(10), ids=_VISION_IDS)
+@pytest.mark.parametrize("idx", range(len(_VISION_IDS)), ids=_VISION_IDS)
 @pytest.mark.parametrize("resp_kind", ["refusal", "cut_off"])
 def test_vision_reader_stop_raises_and_caches_nothing(tmp_path, capsys, idx, resp_kind):
     from extractor.vision._cache import VisionCache
@@ -406,7 +360,7 @@ def _empty_payload(name):
             "room_graph_extractor": {"walls": [], "openings": []}}.get(name, {})
 
 
-@pytest.mark.parametrize("idx", range(10), ids=_VISION_IDS)
+@pytest.mark.parametrize("idx", range(len(_VISION_IDS)), ids=_VISION_IDS)
 def test_vision_reader_success_unchanged(tmp_path, idx):
     from extractor.vision._cache import VisionCache
     name, fn, parse, extra = _vision_readers()[idx]
@@ -454,18 +408,6 @@ def test_voted_all_cut_off_bills_every_round(_door_type_env):
     assert out["status"] == "error" and out["_error"] == "cut_off"
     from extractor.vision_call import _reader_call_metas
     assert [r["input_tokens"] for r in _reader_call_metas(out)] == [900, 900, 900]
-
-
-def test_a_stopped_niche_call_is_still_metered():
-    from extractor.vision_call import _meter_niche_call
-    parsed: dict = {}
-    _meter_niche_call(parsed, ModelStopped("refused:reasoning_extraction",
-                                           {"cache": "miss", "model": "claude-test",
-                                            "input_tokens": 5497, "output_tokens": 0}))
-    (entry,) = parsed["_meta"]["extra_calls"]
-    assert entry["input_tokens"] == 5497 and entry["reader"] == "niche"
-    _meter_niche_call(parsed, RuntimeError("no usage on an ordinary failure"))
-    assert len(parsed["_meta"]["extra_calls"]) == 1
 
 
 # ── material_specs (streamed, with its own two-attempt loop) ─────────────────

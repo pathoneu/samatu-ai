@@ -67,18 +67,18 @@ def gkp_project() -> dict:
         "archetipas": "standart",
         "patalpos": [
             {"nr": "101", "pavadinimas": "Tambūras", "paskirtis": "tamburas",
-             "plotas_m2": 11.0, "perimetras_m": 13.5, "lubu_aukstis_m": 2.8,
+             "plotas_m2": 11.0, "perimetras_m": 13.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp", "confidence": "high",
              "elementai": [
                  {"tipas": "duris", "kiekis": 3, "plotis_mm": 900, "aukstis_mm": 2100}]},
             {"nr": "102", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.8,
+             "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp", "confidence": "high",
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2100},
                  {"tipas": "langas", "kiekis": 2, "plotis_mm": 1200, "aukstis_mm": 1500}]},
             {"nr": "103", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp", "plyteles_sienos_aukstis_m": 2.2,
              "confidence": "high",
              "elementai": [
@@ -96,7 +96,12 @@ def _objektas_a() -> dict:
 
 
 def _checklist(poz: list[dict]) -> list[dict]:
-    return [p for p in poz if p.get("saltinis") == "checklist"]
+    # the rows that are blank by construction; a row v4 3b blanked keeps its priced label (_kilme „blank")
+    return [p for p in poz if p.get("saltinis") == "checklist" and not p.get("_tuscia_priezastis")]
+
+
+def _blanked(poz: list[dict]) -> list[dict]:
+    return [p for p in poz if p.get("_kilme") == "blank" and p.get("_tuscia_priezastis")]
 
 
 def _labels(poz: list[dict]) -> list[str]:
@@ -124,6 +129,11 @@ def test_every_checklist_row_is_null_red_and_lithuanian(gkp_project):
         assert p.get("_assumption"), f"{label}: no hint where to look"
         assert "Kur ieškoti" in p["_assumption"] or "planas" in p["_assumption"]
         assert not any(ch in label for ch in "?<>"), label
+    # a row v4 3b blanked: no quantity, red, and its sentence says what to do
+    for p in _blanked(poz):
+        assert p["kiekis"] is None and p.get("confidence") == "raudona", p["aprasymas"]
+        assert any(w in p["_tuscia_priezastis"] for w in ("įrašykite", "Įrašykite", "nustatykite", "pasirinkite",
+                                                          "atsakykite", "nubrėžkite")), p["aprasymas"]
 
 
 def test_checklist_row_carries_no_price_or_sum(gkp_project):
@@ -202,8 +212,9 @@ def test_plyteliu_grindjuostes_matches_the_contractor_on_objektas_a():
     line = rows[0]
     assert line["skyrius"] == "Plytelių klijavimas"
     assert line["vnt"] == "m"
-    # Contractor nr 35 = 22.72 m (his notes: tambūras 10.32 + katilinė 11.80).
-    assert abs(line["kiekis"] - 22.72) / 22.72 < 0.10, line["kiekis"]
+    # Contractor nr 35 = 22.72 m (his notes: tambūras 10.32 + katilinė 11.80). v4 3b: the frozen extract's
+    # perimeters are Pass-1's — the row is blank until the walls come from the drawing.
+    assert line["kiekis"] is None and "perimetras neperskaitytas" in line["_tuscia_priezastis"]
 
 
 def test_plyteliu_grindjuostes_skip_wet_rooms(gkp_project):

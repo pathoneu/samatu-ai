@@ -829,47 +829,5 @@ def test_detect_scale_hint_does_not_echo_pdf_library_internals(monkeypatch):
     assert "mastel" in body["error"].lower()
 
 
-def test_click_to_fill_render_failure_does_not_echo_internals(
-        tmp_path, monkeypatch):
-    db.upsert_project("p-ctf", {"name": "CTF"}, user_id=auth._DEV_USER_ID)
-    monkeypatch.setattr(main, "_billable_user",
-                        lambda request: {"id": "u1", "is_admin": True})
-    monkeypatch.setattr(main, "_check_rate_limit", lambda ip, ep: None)
-
-    import page_raster_cache as _cache
-
-    def _boom(*a, **kw):
-        raise RuntimeError("poppler crashed at /var/lib/secret")
-    monkeypatch.setattr(_cache, "render_grayscale_from_bytes", _boom)
-
-    r = client.post("/api/click-to-fill", data={
-        "project_id": "p-ctf", "page_nr": 1,
-        "click_x_pct": 0.5, "click_y_pct": 0.5,
-    }, files={"pdf_file": ("x.pdf", b"%PDF-1.4 fake", "application/pdf")})
-    assert r.status_code == 500
-    detail = r.json()["detail"]
-    assert "poppler" not in detail and "/var/lib/secret" not in detail
-    assert "PDF" in detail
 
 
-def test_detect_room_polygons_render_failure_does_not_echo_internals(
-        tmp_path, monkeypatch):
-    """Sibling of the click-to-fill site — same `page render failed: {e}` echo."""
-    db.upsert_project("p-drp", {"name": "DRP"}, user_id=auth._DEV_USER_ID)
-    monkeypatch.setattr(main, "_billable_user",
-                        lambda request: {"id": "u1", "is_admin": True})
-    monkeypatch.setattr(main, "_check_rate_limit", lambda ip, ep: None)
-
-    import page_raster_cache as _cache
-
-    def _boom(*a, **kw):
-        raise RuntimeError("poppler crashed at /var/lib/secret")
-    monkeypatch.setattr(_cache, "render_grayscale_from_bytes", _boom)
-
-    r = client.post("/api/projects/p-drp/detect-room-polygons", data={
-        "page_nr": 1, "rooms_json": '[{"nr": "01", "plotas_m2": 6.4}]',
-    }, files={"pdf_file": ("x.pdf", b"%PDF-1.4 fake", "application/pdf")})
-    assert r.status_code == 500, r.text[:200]
-    detail = r.json()["detail"]
-    assert "poppler" not in detail and "/var/lib/secret" not in detail
-    assert "PDF" in detail

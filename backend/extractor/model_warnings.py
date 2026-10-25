@@ -138,11 +138,28 @@ def _digits(text: str) -> list[str]:
     return [t.replace(",", ".") for t in re.findall(r"\d+(?:[.,]\d+)*", text)]
 
 
+_LED_CTX = re.compile(r"led|niš|nis[uų]", re.IGNORECASE)
+_ROOM_LIST = re.compile(r"kambari(?:uose|ai|ų)\s*((?:\d+[.\d]*\s*,\s*)+\d+[.\d]*)", re.IGNORECASE)
+
+
+def enumerated_led_rooms(warnings) -> set[str] | None:
+    """The room numbers the first warning that mentions LED niches AND lists rooms names — None when none
+    does. (Moved here from niche_inference, deleted in v4 3b: the rewrite guard below must keep such a list
+    unchanged.)"""
+    for w in warnings or []:
+        text = w.get("message") if isinstance(w, dict) else str(w)
+        if not text or not _LED_CTX.search(text):
+            continue
+        m = _ROOM_LIST.search(text)
+        if m:
+            return {x.strip() for x in m.group(1).split(",")}
+    return None
+
+
 def _same_for_the_readers(before: str, after: str, rooms: list[dict]) -> bool:
     """Do the steps that read these texts by machine read the same thing?"""
     if _digits(before) != _digits(after):
         return False
-    from .niche_inference import enumerated_led_rooms
     if enumerated_led_rooms([before]) != enumerated_led_rooms([after]):
         return False
     if rooms:

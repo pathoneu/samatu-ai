@@ -333,22 +333,6 @@ def test_perimeter_floor_skips_eksplikacija_rooms():
     assert out["walls_gross_m2"] == pytest.approx(16.0 * 2.8, abs=0.01)
 
 
-def test_perimeter_floor_lifts_synthetic_square_room():
-    """A synthetic square perimeter (no eksplikacija) is floored toward an
-    elongated rectangle for the WALL path; measured perimetras_m is untouched."""
-    room = {
-        "paskirtis": "gyvenamoji",
-        "plotas_m2": 16.0,
-        "perimetras_m": 16.0,          # 4·√16 — square synthesis
-        "plotas_saltinis": "wall_dim_calc",
-        "lubu_aukstis_m": 2.8,
-    }
-    out = calc_room_quantities(room)
-    expected = 4.69 * 4.0              # 4.69·√16 = 18.76
-    assert out["_perimetras_floor_applied"] is True
-    assert out["_walls_perimetras_m"] == pytest.approx(expected, abs=0.01)
-    assert out["walls_gross_m2"] == pytest.approx(expected * 2.8, abs=0.01)
-    assert out["perimetras_m"] == pytest.approx(16.0, abs=0.01)  # measured stays
 
 
 def test_perimeter_floor_keeps_already_elongated_perimeter():
@@ -365,33 +349,8 @@ def test_perimeter_floor_keeps_already_elongated_perimeter():
     assert out["walls_gross_m2"] == pytest.approx(22.0 * 2.8, abs=0.01)
 
 
-def test_perimeter_floor_does_not_touch_silikonavimas():
-    """SCOPING: the floor is wall-path only. Wet-room corner sealant stays on the
-    MEASURED perimeter so the calibrated ×2.3 multiplier is preserved."""
-    room = {
-        "paskirtis": "vonia",
-        "plotas_m2": 4.0,
-        "perimetras_m": 8.0,           # synthetic square
-        "plotas_saltinis": "wall_dim_calc",
-        "lubu_aukstis_m": 2.8,
-    }
-    out = calc_room_quantities(room)
-    assert out["_perimetras_floor_applied"] is True
-    assert out["silikonavimas_m"] == pytest.approx(8.0 * 2.3, abs=0.01)  # measured perim
 
 
-def test_an_impossible_read_perimeter_is_floored_at_the_square_for_the_walls():
-    """objektas_g room 03 (2026-09-10): a 3,52 m² WC read as 7,08 m around —
-    below the 4·√3,52 = 7,50 m any room of that area must have. The wall path
-    takes the least possible length; the read figure itself is kept."""
-    room = {"paskirtis": "vonia", "plotas_m2": 3.52, "perimetras_m": 7.08,
-            "plotas_saltinis": "plano_uzrasas", "lubu_aukstis_m": 2.82}
-    out = calc_room_quantities(room)
-    assert out["_perimetras_floor_applied"] is True
-    assert out["_perimetras_floor_reason"] == "geometrinis_minimumas"
-    assert out["_walls_perimetras_m"] == pytest.approx(7.50, abs=0.01)
-    assert out["perimetras_m"] == pytest.approx(7.08, abs=0.01)
-    assert out["walls_gross_m2"] == pytest.approx(7.50 * 2.82, abs=0.02)
 
 
 def test_a_possible_read_perimeter_and_a_stated_one_are_not_floored():

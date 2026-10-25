@@ -309,6 +309,17 @@ TILE_MERGED_LABEL = "Sienų ir grindų plytelių klijavimas"
 
 def _merge_rows(members: list[dict], label: str, ledger) -> dict:
     first = members[0]
+    blank = next((m for m in members if m.get("kiekis") is None), None)
+    if blank is not None:
+        # v4 phase3b: a member without a legal quantity (row_provenance blanked it) leaves the merged row blank
+        # too, with that member's sentence — a sum of the rest would read as the whole
+        out = {k: v for k, v in blank.items() if k not in ("contributions", "excluded", "roll_up", "position_id")}
+        out["aprasymas"] = label
+        out["kiekis"] = None
+        out["_sujungtos_eilutes"] = [m.get("aprasymas") for m in members]
+        for k in ("medziagos_kiekis", "medziagos_aprasymas", "medziagos_vnt", "_medziagos"):
+            out.pop(k, None)
+        return out
     total = round(sum(float(m.get("kiekis") or 0) for m in members), 2)
     out = {k: v for k, v in first.items() if k not in ("contributions", "excluded", "roll_up", "medziagos_kiekis",
                                                        "medziagos_aprasymas", "medziagos_vnt", "position_id")}

@@ -37,7 +37,6 @@ import { getPdfUrl, getPdfBlob, savePdf, uploadPdfToBackend } from '@/lib/pdfSto
 import { laneScalesOf } from '@/lib/durableScale';
 import { getProject, updateProject, flushProjectSaves } from '@/lib/projectStore';
 import { buildPageMetaDict, firstPlanPage, missingInteriorTypes } from '@/lib/pageTypes';
-import { detectRoomPolygons } from '@/lib/detectRoomPolygonsApi';
 import { fetchOutlineAt, fetchOutlineMerge, fetchOutlineSet, restoreOutline } from '@/lib/roomOutlineApi';
 import { isNewest, newerSaves, restorePatch, ticketFor, undoneRooms, undoneSentence, UNDO_SUPERSEDED } from '@/lib/outlineUndo';
 import { roomsWithOutline } from '@/lib/roomOutline';
@@ -267,89 +266,8 @@ export default function InteriorWorkspace({
     };
   }, [project.id]);
 
-  // Accurate room polygons: once the PDF is available, replace the coarse bbox
-  // polygons with wall-following flood-fill ones (label-seeded + area-prior).
-  // Runs ONCE per project (skips if rooms already carry a detected source).
-  const [detecting, setDetecting] = useState(false);
-  const detectRanRef = useRef(false);
-  useEffect(() => {
-    // 2026-06-17 (founder): auto flood-fill polygons disabled — the viewer showed
-    // a clean room-number marker (centred on the existing room rect), not an
-    // auto-traced boundary.
-    // 2026-07-02: re-enabled after the multi-seed accuracy lift (label seed +
-    // bbox-centroid) + seed-inside-polygon guard + ground-truth benchmark gate
-    // (Phase A: Objektas A auto >= 8, wrong_room_fills = 0 on every project). The
-    // detector now traces walls where confident and emits a label-anchored
-    // marker_pct where it can't — never a fabricated coarse rectangle.
-    const AUTO_DETECT_POLYGONS = true;
-    if (!AUTO_DETECT_POLYGONS) return;
-    if (!pdfBlob || detectRanRef.current) return;
-    const rooms = project.v8_rooms || project.patalpos || [];
-    if (rooms.length === 0) return;
-    // Skip if EITHER array already carries a detected source (don't re-run and
-    // overwrite a user's manual correction).
-    const alreadyDetected = [...(project.patalpos || []), ...(project.v8_rooms || [])]
-      .some((r) => DETECTED_SOURCES.includes(r.polygon_source));
-    if (alreadyDetected) {
-      detectRanRef.current = true;
-      return;
-    }
-    detectRanRef.current = true;
-    setDetecting(true);
-    (async () => {
-      try {
-        const byPage = {};
-        rooms.forEach((r) => {
-          const p = r.puslapio_nr ?? r.page_nr;
-          if (p) (byPage[p] = byPage[p] || []).push(r);
-        });
-        const merged = {};
-        for (const [pageNr, pageRooms] of Object.entries(byPage)) {
-          const { results } = await detectRoomPolygons({
-            projectId: project.id, pageNr: Number(pageNr), rooms: pageRooms, pdfBlob,
-          });
-          Object.assign(merged, results);
-        }
-        const patchByNr = {};
-        for (const [nr, res] of Object.entries(merged)) {
-          patchByNr[nr] = res.polygon_pct
-            ? {
-              polygon_pct: res.polygon_pct,
-              polygon_pdf: res.polygon_pdf,
-              page_width_pdf: res.page_width_pdf,
-              page_height_pdf: res.page_height_pdf,
-              polygon_source: res.polygon_source,
-              polygon_confidence: res.confidence,
-              area_err: res.area_err,
-              marker_pct: res.marker_pct ?? null,
-              marker_source: res.marker_source ?? null,
-            }
-            // No polygon → CLEAR stale geometry fields too (contract audit
-            // 2026-07-12: 6 rooms across 3 projects carried manual_needed
-            // plus a leftover fabricated rect that any new reader would
-            // mistake for real geometry).
-            : {
-              polygon_source: res.polygon_source,
-              polygon_pct: null,
-              polygon_pdf: null,
-              polygon_confidence: null,
-              area_err: null,
-              marker_pct: res.marker_pct ?? null,
-              marker_source: res.marker_source ?? null,
-            };
-        }
-        // Re-read the CURRENT stored project — detection takes seconds and the
-        // user keeps working while it runs.
-        const fresh = getProject(project.id) || project;
-        const updated = updateProject(project.id, roomPatchFields(fresh, patchByNr));
-        if (updated) onProjectChange?.(updated);
-      } catch (e) {
-        console.warn('[detect-room-polygons] failed:', e?.message);
-      } finally {
-        setDetecting(false);
-      }
-    })();
-  }, [pdfBlob, project.id]);   
+  // (The automatic pixel flood-fill of every room — POST …/detect-room-polygons — is gone, v4 3b 2026-10-25:
+  // a room outline comes from the drawing's vector walls, the one-click „Parodyti patalpą“ or his polygon.)
 
   // Review-queue pencil → focus the room, jump to its plan page AND arm
   // click-to-fill in the viewer (fillRequest is consumed by TakeoffViewer;
@@ -359,7 +277,7 @@ export default function InteriorWorkspace({
     if (!room?.nr) return;
     if (room.puslapio_nr) setLocalFocusedPage(room.puslapio_nr);
     setLocalFocusedRoom(room);
-    setFillRequest({ nr: room.nr, t: Date.now() });
+    // (it used to arm the click flood fill — gone, v4 3b; the room tool draws the outline)
   };
 
   // Manual fix: persist a click-to-fill polygon as the focused room's accurate
@@ -1083,12 +1001,6 @@ export default function InteriorWorkspace({
         {detectRun.run && !strip && (
           <div className="pointer-events-none absolute inset-x-0 bottom-14 z-30 flex justify-center px-4">
             <DetectRunProgress run={detectRun.run} view={detectRun.view} groups={project?._meta?.geometrija?.grupes} onDismiss={detectRun.dismiss} onRetry={detectRun.retry} />
-          </div>
-        )}
-        {detecting && !strip && (
-          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 text-xs text-blue-300">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            {t('project.interiorWorkspace.detecting')}
           </div>
         )}
         {/* Patikra's drawing controls („Į patalpą", „Visas lapas", what to click, the wall legend) — right

@@ -39,13 +39,13 @@ def _rooms():
     # n_windows on a room are never read in production.
     return [
         {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-         "perimetras_m": 22.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1,
          "elementai": [_door(1), _window(2)]},
         {"nr": "02", "pavadinimas": "Miegamasis", "paskirtis": "miegamasis", "plotas_m2": 14.0,
-         "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 15.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1,
          "elementai": [_door(1), _window(1)]},
         {"nr": "03", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "puslapio_nr": 1,
          "hidroizoliacija_m2": 9.5, "elementai": [_door(1)]},
     ]
 
@@ -408,7 +408,7 @@ def test_walls_without_openings_also_on_the_wall_finish_branch():
     too, or a project with finish sheets would ignore „be angų"."""
     from extractor.universal_rules import ROOM_TYPE_RULES, calc_room_quantities
     room = {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-            "perimetras_m": 22.0, "lubu_aukstis_m": 2.7, "n_doors": 2, "n_windows": 1,
+            "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 2, "n_windows": 1,
             "sienu_apdailos_breakdown": {"dazai_share": 1.0}}
     with_deduction = calc_room_quantities(dict(room))
     rules = {k: dict(v) for k, v in ROOM_TYPE_RULES.items()}
@@ -475,8 +475,11 @@ def test_tiles_off_in_the_bathroom_drops_its_tile_rows_and_piece_counts():
 def test_rotband_is_a_stated_assumption_until_he_chooses():
     base = _recompute()
     row = _row(base, "Sienų lyginimas Knauf Rotband")
-    assert row is not None and "Prielaida" in str(row.get("_assumption") or "")
-    assert float(row["kiekis"]) == pytest.approx(0.30 * _qty(base, "Sienų glaistymas/dažymas"), abs=0.05)
+    # v4 3b: until he chooses, the share is not on the drawing — blank, and the sentence says where to choose
+    assert row is not None and row["kiekis"] is None and "Ką skaičiuoti" in row["_assumption"]
+    chosen = _recompute({"rotband": "dalis", "rotband_dalis": 30})
+    assert _qty(chosen, "Sienų lyginimas Knauf Rotband") == pytest.approx(
+        0.30 * _qty(chosen, "Sienų glaistymas/dažymas"), abs=0.05)
     none = _recompute({"rotband": "nera"})
     assert _row(none, "Sienų lyginimas Knauf Rotband") is None
     all_walls = _recompute({"rotband": "visos"})

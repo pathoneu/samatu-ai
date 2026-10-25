@@ -20,18 +20,21 @@ from extractor.universal_rules import calc_room_quantities
 
 
 def _room(**kw):
-    r = {"paskirtis": "san", "plotas_m2": 6.0, "perimetras_m": 10.0,
-         "lubu_aukstis_m": 2.7, "elementai": []}
+    r = {"paskirtis": "san", "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys",
+         "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
     return r
 
 
 def _build(symbols=None, overrides=None, rooms=None, **extra):
+    # v4 3b: the counts are the plumbing reader's (a room-type or a glyph count would be a blank row) — one
+    # toilet and one shower per san room unless the test says otherwise
     parsed = {"patalpos": rooms if rooms is not None else [_room(nr="107"),
                                                            _room(nr="111")],
               "santrauka": {},
-              "detected_symbols_summary": symbols or {}}
+              "_meta": {"fixtures_status": "ok"},
+              "detected_symbols_summary": {"klozetai": 2, "dusai": 2, **(symbols or {})}}
     if overrides is not None:
         parsed["_overrides"] = overrides
     parsed.update(extra)
@@ -74,8 +77,8 @@ def test_concealed_project_emits_pairs_singles_and_matching_counts():
     assert _qty(out, "klozeto montavimas") == [2]
     assert _qty(out, "wc rėmo montavimas") == [2]
     assert _qty(out, "praustuvės montavimas") == [3]      # the basin, not its mixer
-    assert _qty(out, "gyvatuko montavimas") == [2]
-    assert _qty(out, "skalbimo mašinos montavimas") == [1]
+    assert _qty(out, "gyvatuko montavimas") == [None]     # a room-type count — blank with a reason (v4 3b)
+    assert _qty(out, "skalbimo mašinos montavimas") == [None]   # room type → blank (v4 3b)
     assert _qty(out, "linijinio latako") == [2]
 
 
@@ -296,7 +299,7 @@ def test_a_read_plautuve_count_is_not_labelled_a_room_type_default():
     # …and the room-type fallback still says so.
     only_room = _build(symbols={"praustuves": 2}, rooms=[_room(nr="107"), _kitchen()])
     plaut2 = [p for p in _san(only_room) if "plautuvės montavimas" in p["aprasymas"].lower()]
-    assert [p["saltinis"] for p in plaut2] == ["paskirtis_default"]
+    assert [(p["kiekis"], p["_kilme"]) for p in plaut2] == [(None, "blank")]   # room type → blank (v4 3b)
 
 
 def test_extract_without_the_plautuves_key_behaves_exactly_as_before():
@@ -308,8 +311,8 @@ def test_extract_without_the_plautuves_key_behaves_exactly_as_before():
     assert _qty(no_kitchen, "plautuvės montavimas") == []
     with_kitchen = _build(symbols={"praustuves": 3},
                           rooms=[_room(nr="107"), _kitchen()])
-    assert _qty(with_kitchen, "plautuvės montavimas") == [1]
-    assert _qty(with_kitchen, "virtuvės maišytuvo montavimas") == [1]
+    assert _qty(with_kitchen, "plautuvės montavimas") == [None]           # room type → blank (v4 3b)
+    assert _qty(with_kitchen, "virtuvės maišytuvo montavimas") == [None]
 
 
 @pytest.mark.parametrize("n_plautuves", [1, 2, 5])
@@ -336,7 +339,7 @@ def test_moving_a_sink_between_buckets_does_not_change_the_hole_count():
 
 
 def test_dry_project_emits_no_sanitary_lines_at_all():
-    out = _build(rooms=[_room(nr="1", paskirtis="miegamoji")])
+    out = _build(symbols={"klozetai": 0, "dusai": 0}, rooms=[_room(nr="1", paskirtis="miegamoji")])
     assert _san(out) == []
     assert out["_sanitary_assumptions"] == []
 
@@ -405,4 +408,4 @@ def test_pair_halves_can_never_drift(n_praustuves):
     out = _build(symbols={"praustuves": n_praustuves})
     p = _qty(out, "praustuvės maišytuvo potinkinės")
     v = _qty(out, "praustuvės maišytuvo virštinkinės")
-    assert p == v == [max(n_praustuves, 2)]
+    assert p == v == [n_praustuves]          # the plumbing reader's count stands (v4 3b)

@@ -80,7 +80,7 @@ def test_material_row_reasons_are_clean():
     out = _build_pozicijos_from_rooms({
         "patalpos": [
             {"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
              "glaistas_kg": 120.0, "dazai_l": 12.0, "gruntas_l": 8.0,
              "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
              "dazymo_plotas_m2": 65.0, "kampu_metrai": 30.0,
@@ -105,7 +105,7 @@ def test_contribution_ledger_strings_are_clean():
     out = _build_pozicijos_from_rooms({
         "patalpos": [
             {"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
              "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
              "dazymo_plotas_m2": 65.0, "kampu_metrai": 30.0,
              "kampai_inner_m": 10.8, "kampai_opening_reveals_m": 1.2,
@@ -113,7 +113,7 @@ def test_contribution_ledger_strings_are_clean():
              "grindjuosciu_m": 16.0, "_grindjuosciu_baze_m": 14.55,
              "elementai": []},
             {"nr": "102", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 2.7,
+             "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
              "walls_paintable_m2": 0.0, "ceiling_paintable_m2": 6.0,
              "plyteles_grindys_m2": 6.0, "kampu_metrai": 0.0,
              "grindjuosciu_m": 0.0, "elementai": []},
@@ -360,34 +360,34 @@ def _rule_rooms():
         # too small for its purpose, low ceiling, perimeter too short; walls
         # and ceiling left out by the purpose standard
         {"nr": "T1", "pavadinimas": "Tambūras", "paskirtis": "tamburas",
-         "plotas_m2": 0.9, "perimetras_m": 2.0, "lubu_aukstis_m": 2.0},
+         "plotas_m2": 0.9, "perimetras_m": 2.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.0, "lubu_aukstis_saltinis": "plano_uzrasas"},
         # too big, ceiling out of range and above 3 m, perimeter too long
         {"nr": "G2", "pavadinimas": "Garažas", "paskirtis": "garazas",
-         "plotas_m2": 80.0, "perimetras_m": 100.0, "lubu_aukstis_m": 4.8},
+         "plotas_m2": 80.0, "perimetras_m": 100.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 4.8, "lubu_aukstis_saltinis": "plano_uzrasas"},
         # below the STR minimum for a bedroom
         {"nr": "M3", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
-         "plotas_m2": 12.0, "perimetras_m": 14.0, "lubu_aukstis_m": 2.4},
+         "plotas_m2": 12.0, "perimetras_m": 14.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.4, "lubu_aukstis_saltinis": "plano_uzrasas"},
         # the kitchen splashback along an assumed counter
         {"nr": "K4", "pavadinimas": "Virtuvė/valgomasis", "paskirtis": "virtuve",
-         "plotas_m2": 12.0, "perimetras_m": 14.0, "lubu_aukstis_m": 2.7},
+         "plotas_m2": 12.0, "perimetras_m": 14.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas"},
         # a wet room on the purpose default band, above 3 m
         {"nr": "V5", "pavadinimas": "Vonia", "paskirtis": "vonia",
-         "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 3.4},
+         "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 3.4, "lubu_aukstis_saltinis": "plano_uzrasas"},
         # the pipeline's bathroom default (no wall elevation pages)
         {"nr": "S6", "pavadinimas": "San. mazgas", "paskirtis": "san",
-         "plotas_m2": 4.0, "perimetras_m": 8.0, "lubu_aukstis_m": 2.7,
+         "plotas_m2": 4.0, "perimetras_m": 8.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "_bathroom_paint_above_tile_m": 2.0},
         # the elevation measured the walls and found no tile
         {"nr": "L7", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla",
-         "plotas_m2": 5.0, "perimetras_m": 9.0, "lubu_aukstis_m": 2.7,
+         "plotas_m2": 5.0, "perimetras_m": 9.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "_tile_elevation_evidence": {"walls_measured": 2, "tile_zones_seen": 0}},
         # the finish table paints a garage the standard leaves raw
         {"nr": "G8", "pavadinimas": "Garažas", "paskirtis": "garazas",
-         "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8,
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
          "sienu_apdailos_breakdown": {"dazymas_share": 1.0}},
         # a sauna: wood-lined ceiling, left out
         {"nr": "P9", "pavadinimas": "Pirtis", "paskirtis": "pirtis",
-         "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 2.4},
+         "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.4, "lubu_aukstis_saltinis": "plano_uzrasas"},
     ]
     rooms = []
     for spec in specs:
@@ -395,7 +395,7 @@ def _rule_rooms():
         rooms.append({**r, **calc_room_quantities(r)})
     # a wet room with no tile evidence at all (his rules: no band)
     wet = {"nr": "V10", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 5.0,
-           "perimetras_m": 9.0, "lubu_aukstis_m": 2.7, "elementai": []}
+           "perimetras_m": 9.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     rules = {"vonia": {**ROOM_TYPE_RULES["vonia"], "tile_walls_to_m": 0}}
     rooms.append({**wet, **calc_room_quantities(wet, rules=rules)})
     rooms[0]["_height_source"] = "positioned_marker"
@@ -415,7 +415,7 @@ def test_rule_engine_rows_read_plain():
     rows += _warning_texts(warnings, "lt_rules")
     # the project-level branches each need their own project
     dup = [{"nr": f"D{i}", "pavadinimas": "Koridorius", "paskirtis": "koridorius",
-            "plotas_m2": 6.0, "perimetras_m": 10.0} for i in (1, 2)]
+            "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys"} for i in (1, 2)]
     for tag, parsed in (
         ("few rooms + duplicate", {"patalpos": dup}),
         ("many rooms", {"patalpos": [{"nr": f"N{i}", "pavadinimas": f"Kambarys {i}",
@@ -462,10 +462,11 @@ def test_extraction_rows_read_plain():
     for k, (msg, hint) in vc._CONSISTENCY_LT.items():
         rows += [(f"consistency.{k}", msg), (f"consistency.{k}.hint", hint)]
 
-    w = vc.perimeter_warning({"room_nr": "T1", "room_name": "Svetainė", "perim_m": 7.08,
-                              "area_m2": 3.52, "lower_bound_m": 7.5, "upper_bound_m": 18.76})
-    assert w["patalpa_nr"] == "T1" and "T1" not in w["message"]
-    rows += _warning_texts([w], "perimeter")
+    # (the perimeter-bound warning went with Pass-1's perimeters — v4 3b; the blank rows' sentences are here)
+    from extractor import row_provenance as rp
+    rows += [(f"row_provenance.{k}", getattr(rp, k)) for k in
+             ("LED_NO_LEGEND_LT", "DUCTS_LT", "DUCTS_INSULATION_LT", "DUCTS_FIXING_LT", "RUBBISH_LT")]
+    rows += [("row_provenance.protection", rp.protection_lt(120.5))]
 
     for partial in (False, True):
         parsed: dict = {}
@@ -477,7 +478,7 @@ def test_extraction_rows_read_plain():
     rows += _warning_texts(vc._validate_room_bboxes(boxed)["warnings"], "bbox")
 
     failing = {"patalpos": [{"nr": "K4", "pavadinimas": "Virtuvė", "paskirtis": "virtuve",
-                             "plotas_m2": 26.0, "perimetras_m": 20.8, "lubu_aukstis_m": 2.8,
+                             "plotas_m2": 26.0, "perimetras_m": 20.8, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
                              "lubu_tipas": ["gkp", "tempiamos"], "elementai": []}]}
     calc = [x for x in vc._recompute_per_room_via_python(failing, None).get("warnings") or []
             if isinstance(x, dict) and x.get("code") == "room_calc_failed"]
@@ -501,14 +502,14 @@ def test_cross_check_rows_read_plain():
 
     parsed = {
         "patalpos": [
-            room("101", "Svetainė", "gyvenamoji", plotas_m2=40.0, perimetras_m=60.0,
-                 lubu_aukstis_m=2.1, ceiling_paintable_m2=30.0, lubu_tipas="gkp",
+            room("101", "Svetainė", "gyvenamoji", plotas_m2=40.0, perimetras_m=60.0, perimetras_saltinis="plano_matmenys",
+                 lubu_aukstis_m=2.1, lubu_aukstis_saltinis="plano_uzrasas", ceiling_paintable_m2=30.0, lubu_tipas="gkp",
                  dazymo_plotas_m2=400.0, dazai_l=200.0, grindjuosciu_m=80.0, puslapio_nr=3,
                  aukstas=2, elementai=[{"tipas": "duris", "kiekis": 2}, {"tipas": "langas", "kiekis": 3}]),
-            room("201", "Vonia", "vonia", plotas_m2=6.0, perimetras_m=7.0, lubu_aukstis_m=5.0, aukstas=2),
-            room("202", "WC", "wc", plotas_m2=2.0, perimetras_m=6.0, lubu_aukstis_m=2.7, aukstas=2),
-            room("301", "Sandėliukas", "sandeliukas", plotas_m2=5.0, perimetras_m=9.0,
-                 lubu_aukstis_m=2.7, aukstas=3),
+            room("201", "Vonia", "vonia", plotas_m2=6.0, perimetras_m=7.0, perimetras_saltinis="plano_matmenys", lubu_aukstis_m=5.0, lubu_aukstis_saltinis="plano_uzrasas", aukstas=2),
+            room("202", "WC", "wc", plotas_m2=2.0, perimetras_m=6.0, perimetras_saltinis="plano_matmenys", lubu_aukstis_m=2.7, lubu_aukstis_saltinis="plano_uzrasas", aukstas=2),
+            room("301", "Sandėliukas", "sandeliukas", plotas_m2=5.0, perimetras_m=9.0, perimetras_saltinis="plano_matmenys",
+                 lubu_aukstis_m=2.7, lubu_aukstis_saltinis="plano_uzrasas", aukstas=3),
         ],
         "schedule_tables": {"durys": [{"kiekis": 5}], "langai": [{"kiekis": 7}]},
         "_eksplikacija": {"patalpos": [{"nr": "101", "plotas_m2": 60.0, "aukstas": 2},
@@ -533,11 +534,11 @@ def test_quantity_logic_rows_read_plain(monkeypatch):
     from extractor.scale_validator import validate_scale
 
     rooms = [
-        {"nr": "1", "pavadinimas": "Svetainė", "plotas_m2": 20.0, "perimetras_m": 9.0,
+        {"nr": "1", "pavadinimas": "Svetainė", "plotas_m2": 20.0, "perimetras_m": 9.0, "perimetras_saltinis": "plano_matmenys",
          "walls_paintable_m2": 120.0, "ceiling_paintable_m2": 12.0, "grindjuosciu_m": 40.0,
          "dazai_l": 1.0, "gkp_lubu_standart_m2": 30.0,
          "elementai": [{"type": "langas", "reveal_length_m": 0}, {"tipas": "duris"}]},
-        {"nr": "2", "pavadinimas": "Kambarys", "plotas_m2": 15.0, "perimetras_m": 16.0,
+        {"nr": "2", "pavadinimas": "Kambarys", "plotas_m2": 15.0, "perimetras_m": 16.0, "perimetras_saltinis": "plano_matmenys",
          "walls_paintable_m2": 40.0, "ceiling_paintable_m2": 15.0,
          "elementai": [{"type": "langas", "reveal_length_m": 12.0}]},
     ]
@@ -617,7 +618,7 @@ _ROW_BUILDERS = (
     "extractor/cross_page_validator.py", "extractor/sanity_checks.py",
     "extractor/scale_validator.py", "extractor/plan_area_annotations.py",
     "extractor/room_facts.py", "extractor/project_questions.py", "extractor/sanity_mirror.py",
-    "extractor/niche_inference.py",
+    "extractor/row_provenance.py",
     "api/recompute_quantities.py", "api/revalidate.py", "main.py",
 )
 _OLD_FRAGMENTS = re.compile(r"\(nr=|Prielaidų skydel|Prielaidose|[Pp]rielaidų skyri|"
@@ -713,29 +714,3 @@ def test_every_model_written_warning_in_the_corpus_has_his_numbers():
     assert clean >= 4, "no sentence went from flagged to plain — the net and the rewrite disagree"
 
 
-def test_the_led_estimate_rows_read_plain():
-    from extractor.niche_inference import LED_ESTIMATE_CHOICE_KEY, LED_ESTIMATE_ROOM_SENTENCE
-    from extractor.vision_call import _build_pozicijos_from_rooms, _recompute_per_room_via_python
-
-    def project():
-        return {"patalpos": [
-            {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-             "perimetras_m": 22.0, "lubu_aukstis_m": 2.7,
-             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 8.0, "_source": "niche_locator"}]},
-            {"nr": "02", "pavadinimas": "Koridorius", "paskirtis": "koridorius", "plotas_m2": 8.0,
-             "perimetras_m": 12.0, "lubu_aukstis_m": 2.7,
-             "elementai": [{"tipas": "nisa_LED", "kiekis": 1, "ilgis_m": 6.6,
-                            "_source": "statistical_inference"}]}], "santrauka": {}}
-
-    rows = []
-    for overrides in ({}, {LED_ESTIMATE_CHOICE_KEY: True}):
-        built = _build_pozicijos_from_rooms(_recompute_per_room_via_python(project(), overrides))
-        for r in built["pozicijos"]:
-            if "niš" not in str(r.get("aprasymas") or "").lower():
-                continue
-            rows += [(f"{r['aprasymas']}.{k}", r[k]) for k in ("_confidence_reason", "_assumption")
-                     if isinstance(r.get(k), str) and r[k]]
-    rows.append(("LED_ESTIMATE_ROOM_SENTENCE", LED_ESTIMATE_ROOM_SENTENCE))
-    assert any("suveskite ilgį" in where for where, _ in rows)
-    assert any("Nišų formavimas" in where for where, _ in rows)
-    _assert_plain(rows, allow=("01", "02", "Svetainė", "Koridorius"))

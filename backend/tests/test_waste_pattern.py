@@ -43,12 +43,12 @@ def test_factors_come_from_universal_rules():
 
 def _rooms():
     base = [
-        {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "svetaine", "plotas_m2": 30.0, "perimetras_m": 22.0,
-         "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 2,
+        {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "svetaine", "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys",
+         "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 2,
          "grindu_danga": "laminatas", "grindu_danga_saltinis": "grindu_planas",
          "_grindu_danga": {"danga": "laminatas", "tekstas": "Grindys – ąžuolo parketas, eglutės raštas"}},
-        {"nr": "2", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
-         "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0},
+        {"nr": "2", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys",
+         "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0},
     ]
     out = []
     for r in base:

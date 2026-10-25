@@ -18,7 +18,6 @@ import pytest
 from extractor.confidence import (
     KAMPAI_REASON, ROOM_DEFAULT_REASON, apply_confidence,
 )
-from extractor.niche_inference import LED_ESTIMATE_CHOICE_KEY
 from extractor.universal_rules import calc_room_quantities
 from extractor.vision_call import (
     SHOWER_ASSUMED_SENTENCE, SHOWER_KEY, _build_pozicijos_from_rooms,
@@ -31,7 +30,7 @@ from extractor.vision_call import (
 
 def _room(nr, name, paskirtis, plotas=6.0, perim=10.0, **kw):
     r = {"nr": nr, "pavadinimas": name, "paskirtis": paskirtis,
-         "plotas_m2": plotas, "perimetras_m": perim, "lubu_aukstis_m": 2.7,
+         "plotas_m2": plotas, "perimetras_m": perim, "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "lubu_tipas": "pakabinamos", "elementai": [
              {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}]}
     r.update(kw)
@@ -185,17 +184,14 @@ _SHOWER_ROWS = ("Nuolydžio formavimas dušo zonoje", "Linijinio latako montavim
                 "Potinkinio dušo maišytuvo virštinkinės dalies montavimas")
 
 
-def test_without_a_plumbing_reading_showers_are_a_disclosed_assumption():
+def test_without_a_plumbing_reading_shower_rows_are_blank_and_say_what_to_count():
+    """v4 3b (2026-10-25): a shower count by room type is a default — the rows stay, blank, with the count the
+    room types would give in the sentence."""
     rows = _build(_three_bathrooms())
     for prefix in _SHOWER_ROWS:
         row = _row(rows, prefix)
-        assert row["kiekis"] == 3, prefix               # quantities unchanged
-        assert row["saltinis"] == "paskirtis_default", prefix
-        assert row["confidence"] != "zalia", prefix
-        assert "Patikrinkite, ar patalpose 03, 06 ir 07 yra dušas" in row["_confidence_reason"]
-    # the room's own sheet says it per room
-    nuolydis = _row(rows, "Nuolydžio formavimas dušo zonoje")
-    assert {c["included_because"] for c in nuolydis["contributions"]} == {SHOWER_ASSUMED_SENTENCE}
+        assert row["kiekis"] is None and row["_kilme"] == "blank", prefix
+        assert "santechnikos plane neperskaityta" in row["_tuscia_priezastis"] and "3 vnt" in row["_tuscia_priezastis"]
 
 
 def test_with_a_plumbing_reading_showers_are_its_count():
@@ -207,9 +203,8 @@ def test_with_a_plumbing_reading_showers_are_its_count():
     nuolydis = _row(rows, "Nuolydžio formavimas dušo zonoje")
     assert sorted(c["room_nr"] for c in nuolydis["contributions"]) == ["06", "07"]
     shelves = _row(rows, "Lentynėlių iš plytelių įrengimas dušo kabinoje")
-    assert shelves["kiekis"] == 4 and shelves["saltinis"] == "project_assumption"
-    # the per-shower number is still an assumption: never green
-    assert shelves["confidence"] != "zalia"
+    # the number per shower is not on the drawing: blank until he sets it (v4 3b)
+    assert shelves["kiekis"] is None and shelves["_kilme"] == "blank"
 
 
 def test_no_shower_anywhere_the_plan_answers_means_no_shower_rows():
@@ -247,15 +242,13 @@ def test_toilet_rows_follow_the_plumbing_reading():
     assert wc["roll_up"][-1]["op"] == "anchor" and wc["roll_up"][-1]["value"] == 2
 
 
-def test_toilet_rows_without_a_reading_are_never_green():
+def test_toilet_rows_without_a_reading_are_blank():
     rows = _build(_three_bathrooms())
     for prefix in ("WC rėmo montavimas", "Klozeto montavimas", "Gyvatuko montavimas",
                    "Pertvaros sutvirtinimas WC mechanizmams"):
         row = _row(rows, prefix)
-        assert row["kiekis"] == 3, prefix
-        assert row["saltinis"] == "paskirtis_default", prefix
-        assert row["confidence"] == "geltona", prefix
-        assert row["_confidence_reason"] == ROOM_DEFAULT_REASON, prefix
+        assert row["kiekis"] is None and row["_kilme"] == "blank", prefix
+        assert "pagal patalpų paskirtį būtų" in row["_tuscia_priezastis"], prefix
 
 
 def test_toilet_count_helper_ignores_frames():
@@ -335,36 +328,33 @@ def _led_project(read_m: float | None) -> dict:
 
 
 _LED_ROWS = ("Nišų formavimas GKP konstrukcijoje", "LED nišų glaistymas")
-# Since 2026-10-06 an estimate is billed only once he accepts it in Nustatymai
-# (niche_inference.LED_ESTIMATE_OPT_IN, tests/test_led_estimate_choice_2026_10_06.py);
-# the disclosure below is what the rows say after he did.
-_ACCEPTED = {LED_ESTIMATE_CHOICE_KEY: True}
+# v4 3b (2026-10-25): the room-type estimate is gone and a Pass-1 niche length is a signal only — the rows take
+# the length the drawing's legend states, else they stay blank with a reason.
 
 
-def test_led_rows_with_an_estimate_are_never_green_and_name_the_rooms():
-    rows = _build(_led_project(read_m=8.0), _ACCEPTED)
+def test_led_rows_without_a_legend_are_blank_and_never_count_an_estimate():
+    rows = _build(_led_project(read_m=8.0))
     for prefix in _LED_ROWS:
         row = _row(rows, prefix)
-        assert row["kiekis"] == pytest.approx(14.6), prefix     # quantity unchanged
-        assert row["confidence"] == "geltona", prefix
-        assert "02 (6,60 m)" in row["_confidence_reason"], prefix
-        assert "ne išmatuota" in row["_confidence_reason"], prefix
-    framing = _row(rows, "Nišų formavimas GKP konstrukcijoje")
-    why = {c["room_nr"]: c["included_because"] for c in framing["contributions"]}
-    assert "neišmatuotas" in why["02"] and why["01"] == "LED nišos lubose"
+        assert row["kiekis"] is None, prefix
+        assert row["_kilme"] == "blank" and "legendoje" in row["_tuscia_priezastis"], prefix
 
 
-def test_led_rows_all_estimated_are_red():
-    rows = _build(_led_project(read_m=None), _ACCEPTED)
-    assert _row(rows, "Nišų formavimas GKP konstrukcijoje")["confidence"] == "raudona"
-
-
-def test_led_rows_all_read_stay_as_before():
+def test_led_rows_from_the_legend():
     p = _led_project(read_m=8.0)
-    p["patalpos"][1]["elementai"] = []
-    row = _row(_build(p), "Nišų formavimas GKP konstrukcijoje")
-    assert row["kiekis"] == 8.0 and row["confidence"] == "zalia"
-    assert not row.get("_confidence_reason")
+    p["_autoriaus_kiekiai"] = [{"page": 7, "label": "LED juosta šviesos šaltinis", "value": 24.0,
+                                "unit": "m", "family": "led"},
+                               {"page": 7, "label": "Priglaistoma LED juosta", "value": 2.4,
+                                "unit": "m", "family": "led"}]
+    for prefix in _LED_ROWS:
+        row = _row(_build(p), prefix)
+        assert row["kiekis"] == 24.0 and row["_kilme"] == "drawing", prefix
+        assert "24,00 m" in row["_assumption"] and "2,40 m" in row["_assumption"], prefix
+
+
+def test_only_estimated_niches_raise_no_led_rows():
+    p = _led_project(read_m=None)
+    assert not [r for r in _build(p) if (r.get("aprasymas") or "").startswith(_LED_ROWS)]
 
 
 # ── kampai: the words say what the engine adds up ───────────────────────────
@@ -374,8 +364,8 @@ def test_kampai_reason_names_the_terms_the_engine_adds():
     for term in ("perimetro", "vidinių kampų", "angų kraštų", "pertvarų sandūrų", "standartinio dydžio"):
         assert term in KAMPAI_REASON, term
     # …and the engine adds exactly those terms (calc-engine-5: text only, math untouched)
-    room = {"nr": "1", "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-            "lubu_aukstis_m": 2.7, "n_doors": 2, "n_windows": 1, "n_partition_walls": 1}
+    room = {"nr": "1", "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+            "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 2, "n_windows": 1, "n_partition_walls": 1}
     q = calc_room_quantities(room)
     expected = 18.0 + 4 * 2.7 + 2 * (0.9 + 2 * 2.05) + 1 * (1.2 + 2 * 1.5) + 1 * 2.7
     assert q["kampu_metrai"] == pytest.approx(expected, abs=0.01)

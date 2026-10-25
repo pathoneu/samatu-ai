@@ -34,7 +34,7 @@ ROOM_110_LIKE = {
     # Objektas A room 110 shape: 2.8 m nominal room with a 3.4 m coffer zone and
     # above-3m soffit/feature walls.
     "nr": "110", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
-    "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8,
+    "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
     "lubu_tipas": "gkp",
     "extra_walls_virs_3m_m2": 47.44,
     "high_ceiling_area_m2": 12.28,
@@ -56,7 +56,7 @@ def test_partial_high_room_adds_to_nominal_high_rooms():
     """Mixed project: nominal-high room's full paint + partial room's >3m slice."""
     high_room = {
         "nr": "1", "pavadinimas": "Salė", "paskirtis": "gyvenamoji",
-        "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 4.0,
+        "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 4.0, "lubu_aukstis_saltinis": "plano_uzrasas",
         "lubu_tipas": "gkp", "elementai": [], "confidence": "high",
     }
     out = _run({"patalpos": [high_room, copy.deepcopy(ROOM_110_LIKE)]})
@@ -80,7 +80,7 @@ def test_low_room_without_high_surfaces_stays_scaffold_free():
     """No nominal-high rooms, no explicit above-3m surfaces → no pastoliai."""
     low = {
         "nr": "1", "pavadinimas": "X", "paskirtis": "gyvenamoji",
-        "plotas_m2": 20, "perimetras_m": 18, "lubu_aukstis_m": 2.65,
+        "plotas_m2": 20, "perimetras_m": 18, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
         "elementai": [], "confidence": "high",
     }
     out = _run({"patalpos": [low]})
@@ -90,13 +90,13 @@ def test_low_room_without_high_surfaces_stays_scaffold_free():
 # ── _room_virs_3m_paint unit contract ────────────────────────────────────────
 
 def test_helper_nominal_high_room_returns_full_paint():
-    r = {"lubu_aukstis_m": 3.2, "walls_paintable_m2": 40.0,
+    r = {"lubu_aukstis_m": 3.2, "lubu_aukstis_saltinis": "plano_uzrasas", "walls_paintable_m2": 40.0,
          "ceiling_paintable_m2": 15.0}
     assert _room_virs_3m_paint(r) == 55.0
 
 
 def test_helper_partial_room_returns_explicit_high_slices():
-    r = {"lubu_aukstis_m": 2.8, "walls_paintable_m2": 90.0,
+    r = {"lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas", "walls_paintable_m2": 90.0,
          "ceiling_paintable_m2": 20.0,
          "extra_walls_virs_3m_m2": 47.44, "high_ceiling_area_m2": 12.28}
     assert _room_virs_3m_paint(r) == 47.44 + 12.28
@@ -104,7 +104,7 @@ def test_helper_partial_room_returns_explicit_high_slices():
 
 def test_helper_caps_high_ceiling_slice_at_ceiling_paint():
     """high_ceiling_area_m2 is a zone override; never exceed actual ceiling paint."""
-    r = {"lubu_aukstis_m": 2.8, "walls_paintable_m2": 50.0,
+    r = {"lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas", "walls_paintable_m2": 50.0,
          "ceiling_paintable_m2": 8.0, "high_ceiling_area_m2": 12.28}
     assert _room_virs_3m_paint(r) == 8.0
 
@@ -112,11 +112,11 @@ def test_helper_caps_high_ceiling_slice_at_ceiling_paint():
 def test_helper_vision_direct_high_room_falls_back_to_dazymo_plotas():
     """Vision-direct rooms (no recompute pass) only carry dazymo_plotas_m2 —
     a nominal-high one must still contribute, as it did before this fix."""
-    r = {"lubu_aukstis_m": 4.0, "dazymo_plotas_m2": 120.0}
+    r = {"lubu_aukstis_m": 4.0, "lubu_aukstis_saltinis": "plano_uzrasas", "dazymo_plotas_m2": 120.0}
     assert _room_virs_3m_paint(r) == 120.0
 
 
 def test_helper_low_room_without_high_fields_is_zero():
-    r = {"lubu_aukstis_m": 2.65, "walls_paintable_m2": 40.0,
+    r = {"lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas", "walls_paintable_m2": 40.0,
          "ceiling_paintable_m2": 15.0}
     assert _room_virs_3m_paint(r) == 0.0

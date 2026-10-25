@@ -386,8 +386,6 @@ from api.cv_tools import router as cv_tools_router
 from api.annotations import router as annotations_router
 # Room-graph endpoint — feeds the Annotator's magic-wand polygon overlay.
 from api.room_graph import router as room_graph_router
-# Symbol detection — Vision pass returning point-symbols for the Annotator.
-from api.symbols import router as symbols_router
 # Project calibration — contractor enters known totals, system stores
 # per-project adjustment factors (never modifies the global formula).
 from api.calibrate import router as calibrate_router
@@ -429,7 +427,6 @@ from api.project_questions import router as project_questions_router
 from api.reminders import router as reminders_router
 from api.table_export import router as table_export_router
 from api.intake import router as intake_router
-from api.vision_readers import router as vision_readers_router
 from api.project_versions import router as project_versions_router
 from api.pdf_revisions import router as pdf_revisions_router
 from api.account import router as account_router  # account deletion (2026-10-05)
@@ -767,7 +764,6 @@ app.include_router(revalidate_router)
 app.include_router(cv_tools_router)
 app.include_router(annotations_router)
 app.include_router(room_graph_router)
-app.include_router(symbols_router)
 app.include_router(calibrate_router)
 app.include_router(room_recalc_router)
 app.include_router(export_excel_router)
@@ -793,7 +789,6 @@ app.include_router(sheet_links_router)
 app.include_router(export_overlay_pdf_router)
 app.include_router(table_export_router)          # „Eksportuoti lentelę" (v3 W5-D D10)
 app.include_router(intake_router)                # several PDFs / pictures → one project PDF (v3 W5-D D14)
-app.include_router(vision_readers_router)        # raster legend / schedule, paid, SAMATU_VISION_LEGEND off (v3 W5-D D4/D5)
 # Patikra as a short list of questions for the whole project (2026-09-21) — read-only, saves nothing.
 app.include_router(project_questions_router)
 # What an estimator commonly forgets, as notices for Patikra and the Sąmata (v3 W5-E) — read-only.
@@ -8274,275 +8269,9 @@ def detect_scale_hint(payload: DetectScalePayload, request: Request):
     return {"found": False, "page": None, "scale_ratio": None, "scale_text": None, "confidence": "low"}
 
 
-# ── Phase C-3: click-to-fill walls (OpenCV flood-fill) ───────────────────────
-
-@app.post("/api/click-to-fill")
-async def click_to_fill_endpoint(
-    request: Request,
-    project_id: str = Form(...),
-    page_nr: int = Form(...),
-    click_x_pct: float = Form(...),
-    click_y_pct: float = Form(...),
-    sensitivity: float = Form(0.7),
-    pdf_file: UploadFile | None = File(None),
-):
-    """Phase C-3 — server-side OpenCV flood-fill from a user's click.
-
-    Accepts multipart form: project_id, page_nr, click coords, sensitivity,
-    optional pdf_file. If pdf_file is provided, it's cached server-side for
-    this project_id. Subsequent clicks for the same project can omit pdf_file
-    and reuse the cached PDF (~1h TTL). Returns polygon in PDF point space.
-    """
-    _user = _auth.require_user(request)  # OpenCV only — no spend reservation
-    _check_rate_limit(
-        _client_key(request),
-        "click-to-fill",
-    )
-    # N6 (2026-07-04 pentest, pass 2 — re-audit): this route shares the same
-    # project-keyed PDF byte cache (page_raster_cache._PDF_CACHE) as the cv_tools
-    # + detect-room-polygons routes and had auth but NO ownership check, so a
-    # logged-in tenant A could prime/POISON or read tenant B's cached PDF under
-    # B's project_id. Gate on ownership BEFORE any store_pdf / get_pdf / render.
-    # Admins bypass the filter; missing/foreign project → 404 (no existence leak).
-    _n6_filter = None if _user.get("is_admin") else _user["id"]
-    if db.get_project(project_id, user_id=_n6_filter) is None:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-
-    from extractor.cv_polygon import (
-        click_to_fill_pipeline, PolygonValidationError,
-    )
-    import page_raster_cache as _cache
-
-    pdf_bytes: bytes | None = None
-    if pdf_file is not None:
-        pdf_bytes = await pdf_file.read()
-        if pdf_bytes:
-            _cache.store_pdf(project_id, pdf_bytes)
-    if pdf_bytes is None:
-        pdf_bytes = _cache.get_pdf(project_id)
-    if pdf_bytes is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "PDF byte cache nerasta — pridėkite pdf_file laukelį pirmoje "
-                "click-to-fill užklausoje. Vėliau client'as gali kviesti be PDF."
-            ),
-        )
-    if not pdf_bytes[:4].startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="pdf_file nėra galiojantis PDF")
-
-    # to_thread (2026-07-28 audit): poppler rasterization + the OpenCV flood-fill
-    # are hundreds of ms of pure blocking CPU. This handler is `async` (it awaits
-    # the upload), so they ran ON the event loop and stalled every concurrent
-    # request — including the viewer's own PDF fetches while the user clicks.
-    try:
-        raster = await asyncio.to_thread(
-            _cache.render_grayscale_from_bytes, pdf_bytes, page_nr=page_nr)
-    except Exception:
-        log.exception("click-to-fill page render failed")
-        raise HTTPException(
-            status_code=500,
-            detail="Nepavyko atvaizduoti PDF puslapio. Bandykite dar kartą.")
-
-    try:
-        result = await asyncio.to_thread(
-            click_to_fill_pipeline,
-            raster=raster,
-            click_x_pct=click_x_pct,
-            click_y_pct=click_y_pct,
-            sensitivity=sensitivity,
-        )
-    except PolygonValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    # pdf2image with grayscale=True still returns 3-channel RGB on some PDFs
-    # (depends on Poppler version + source PDF color profile). Take h,w from
-    # the first 2 dims only.
-    h, w = raster.shape[:2]
-    px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
-    polygon_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt]
-                   for x, y in result.polygon_px]
-    page_width_pdf = float(w) * px_to_pt
-    page_height_pdf = float(h) * px_to_pt
-
-    log.info(
-        "click-to-fill: project=%s page=%d click=(%.3f,%.3f) sens=%.2f "
-        "vertices=%d confidence=%s user=%s",
-        project_id, page_nr, click_x_pct, click_y_pct, sensitivity,
-        len(polygon_pdf), result.confidence,
-        (_user or {}).get("id", "anon"),
-    )
-
-    return {
-        "polygon_pdf": polygon_pdf,
-        "page_width_pdf": page_width_pdf,
-        "page_height_pdf": page_height_pdf,
-        "confidence": result.confidence,
-        "fill_method": result.fill_method,
-    }
-
-
-@app.post("/api/projects/{project_id}/detect-room-polygons")
-async def detect_room_polygons_endpoint(
-    request: Request,
-    project_id: str,
-    page_nr: int = Form(...),
-    rooms_json: str = Form(...),
-    pdf_file: UploadFile | None = File(None),
-):
-    """Batch accurate-polygon detection for every room on a floor-plan page.
-
-    Label-seeded flood-fill + area-prior (auto_room_polygon). Returns an
-    accurate polygon for the rooms it can solve and marks the rest
-    'manual_needed' — never ships a leaked/wrong polygon. rooms_json is a JSON
-    list of {nr, plotas_m2}. PDF is taken from pdf_file (cached) or the cache.
-    """
-    _n6_user = _auth.require_user(request)  # OpenCV only — no spend reservation
-    _check_rate_limit(
-        _client_key(request),
-        "detect-room-polygons",
-    )
-    # N6 (2026-07-04 pentest, pass 2): F4 authed this route but added no
-    # ownership check, so tenant A could prime/poison the PDF byte cache under
-    # tenant B's project_id (the cache is keyed purely on project_id) and drive
-    # compute against B. Gate on ownership BEFORE any store_pdf / get_pdf /
-    # render. Admins bypass the filter; missing/foreign project → 404.
-    _n6_filter = None if _n6_user.get("is_admin") else _n6_user["id"]
-    if db.get_project(project_id, user_id=_n6_filter) is None:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
-    import json as _json
-    from extractor.cv_polygon import auto_room_polygon
-    from extractor.room_seeds import locate_room_seeds, calibrate_page_scale
-    import page_raster_cache as _cache
-    import cv2 as _cv2
-    import numpy as _np
-
-    try:
-        rooms = _json.loads(rooms_json)
-        assert isinstance(rooms, list)
-    except Exception:
-        raise HTTPException(status_code=400, detail="rooms_json must be a JSON list")
-
-    pdf_bytes: bytes | None = None
-    if pdf_file is not None:
-        pdf_bytes = await pdf_file.read()
-        if pdf_bytes:
-            _cache.store_pdf(project_id, pdf_bytes)
-    if pdf_bytes is None:
-        pdf_bytes = _cache.get_pdf(project_id)
-    if pdf_bytes is None:
-        raise HTTPException(status_code=400, detail="PDF byte cache nerasta — pridėkite pdf_file")
-
-    # to_thread — same reasoning as /api/click-to-fill above (2026-07-28 audit):
-    # this is poppler rasterization on an `async` handler's event loop, and this
-    # route runs it for a whole page of rooms at project-open time.
-    try:
-        raster = await asyncio.to_thread(
-            _cache.render_grayscale_from_bytes, pdf_bytes, page_nr=page_nr)
-    except Exception:
-        log.exception("detect-room-polygons page render failed")
-        raise HTTPException(
-            status_code=500,
-            detail="Nepavyko atvaizduoti PDF puslapio. Bandykite dar kartą.")
-    h, w = raster.shape[:2]
-    px_to_pt = 72.0 / _cache.PAGE_RENDER_DPI
-    page_w_pt, page_h_pt = float(w) * px_to_pt, float(h) * px_to_pt
-
-    from extractor.room_seeds import bbox_centroid_seed
-
-    nrs = [str(r.get("nr")) for r in rooms if r.get("nr") is not None]
-    plotas = {str(r.get("nr")): float(r.get("plotas_m2") or 0) for r in rooms}
-    bbox_by_nr = {str(r.get("nr")): r.get("bbox_pct") for r in rooms if r.get("nr") is not None}
-    label_seeds = locate_room_seeds(pdf_bytes, page_nr - 1, nrs)
-
-    # marker_pct = where to put the Tier-2 circled number when the polygon fails.
-    # ONLY the pdfplumber label seed (the actual printed room-number location) is
-    # trustworthy enough to anchor a marker. We deliberately do NOT fall back to
-    # the Vision bbox centroid: on furnished/rotated plans those bboxes are often
-    # garbage, and a marker on a garbage centroid is exactly the "marked random
-    # places" failure. A room with no label seed gets NO marker → it surfaces in
-    # the honest "N patalpų be vietos" chip instead of a misplaced circle.
-    marker_by_nr: dict[str, list[float]] = {
-        nr: [label_seeds[nr][0], label_seeds[nr][1]] for nr in nrs if nr in label_seeds
-    }
-
-    # Per-room seeds: primary = printed label (if found) else bbox centroid;
-    # extra = the other. Same seeding drives BOTH calibration passes (pass-1
-    # label-only left objektas_c/romainiai with no samples → no area prior → unsafe
-    # 'pick largest' fills; seeding pass-1 from bbox centroids too recovers scale).
-    seeds_by_nr: dict[str, tuple[tuple[float, float], list]] = {}
-    for nr in nrs:
-        label = label_seeds.get(nr)
-        bc = bbox_centroid_seed(bbox_by_nr.get(nr))
-        primary = label or bc
-        if primary is None:
-            continue
-        seeds_by_nr[nr] = (primary, [bc] if (label and bc) else [])
-
-    # Two-pass scale calibration: pass-1 = no area prior, collect (area_pct, m²).
-    samples = []
-    for nr, (primary, extra) in seeds_by_nr.items():
-        r0 = auto_room_polygon(raster, primary[0], primary[1], seeds_pct=extra)
-        if r0 is not None and plotas.get(nr):
-            ap = float(_cv2.contourArea(r0.polygon_px.reshape(-1, 1, 2).astype(_np.int32))) / (h * w)
-            samples.append((ap, plotas[nr]))
-    scale = calibrate_page_scale(samples)
-
-    results: dict[str, dict] = {}
-    n_auto = n_manual = 0
-    for nr in nrs:
-        marker = marker_by_nr.get(nr)
-        seed = seeds_by_nr.get(nr)
-        if seed is None:  # no label seed AND no bbox → cannot place at all
-            results[nr] = {"polygon_source": "manual_needed", "confidence": "manual"}
-            n_manual += 1
-            continue
-        (primary, extra) = seed
-        r = auto_room_polygon(
-            raster, primary[0], primary[1], seeds_pct=extra,
-            room_plotas_m2=plotas.get(nr) or None, page_scale_m2_per_pct=scale,
-        )
-        if r is None:
-            res = {"polygon_source": "manual_needed", "confidence": "manual"}
-            if marker:
-                # marker_source tells the viewer this anchor is a VERIFIED
-                # printed-label location (table columns filtered out), so a
-                # Tier-2 circled number may be shown even without a polygon.
-                res["marker_pct"] = marker
-                res["marker_source"] = "plan_label"
-            results[nr] = res
-            n_manual += 1
-            continue
-        poly_pct = [[float(x) / w, float(y) / h] for x, y in r.polygon_px]
-        poly_pdf = [[float(x) * px_to_pt, float(y) * px_to_pt] for x, y in r.polygon_px]
-        results[nr] = {
-            "polygon_pct": poly_pct,
-            "polygon_pdf": poly_pdf,
-            "page_width_pdf": page_w_pt,
-            "page_height_pdf": page_h_pt,
-            "polygon_source": "auto_floodfill",
-            "confidence": r.confidence,
-            "area_err": r.area_err,
-            "marker_pct": marker,
-        }
-        if marker:
-            results[nr]["marker_source"] = "plan_label"
-        n_auto += 1
-
-    # Post-pass (2026-07-12): fills are produced per-room with no cross-check,
-    # so corridor-callout labels seed IDENTICAL polygons for different rooms
-    # (Objektas A 103/108/109) and nothing catches it. Resolve duplicate clusters to
-    # a single owner and demote grossly mis-sized fills — an honest
-    # manual_needed beats a confidently wrong polygon.
-    from extractor.polygon_dedupe import resolve_duplicate_fills
-    results, n_demoted = resolve_duplicate_fills(results, plotas, scale)
-    n_auto -= n_demoted
-    n_manual += n_demoted
-
-    return {"results": results, "page_nr": page_nr,
-            "stats": {"auto": n_auto, "manual": n_manual, "total": len(nrs),
-                      "deduped": n_demoted,
-                      "page_scale_m2_per_pct": scale}}
+# (POST /api/click-to-fill and POST /api/projects/{id}/detect-room-polygons — pixel flood fill of a room —
+# are gone, v4 3b 2026-10-25: a room outline comes from the drawing's vector walls, the one-click
+# „Parodyti patalpą“ (outline-at) or his own polygon.)
 
 
 # ── /health ───────────────────────────────────────────────────────────────────

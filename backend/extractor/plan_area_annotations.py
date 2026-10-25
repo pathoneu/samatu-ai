@@ -844,8 +844,15 @@ def _figures_on_page(pn: int, W: float, H: float, chars: list[dict],
             if _HEIGHT_TAIL_RE.search(before):
                 continue                     # „h - 1,20 m": a height, not a quantity
             used_lines = [i]
+            # the last sentence before the number (a note may share the baseline: „…KITAIP. LED juosta; …")
+            _whole = _clean_label(re.sub(r"[;:]", " ", re.split(r"(?<=[.!?])\s+", before)[-1]))[:80]
             if _family_of(_trim_label(before, unit), unit):
                 label_src = _trim_label(before, unit)
+            elif _family_of(_whole, unit) == "led":
+                # „LED juosta; šviesos šaltinis - 24,00 m;" (objektas_i): the legend names the strip before the
+                # „;" and the length after it — the whole line is the label (v4 3b, 2026-10-25). Only for the
+                # LED family, so no other family's anchor moves.
+                label_src = _whole
             else:
                 above = _label_lines_above(lines, texts, i)
                 if not above:

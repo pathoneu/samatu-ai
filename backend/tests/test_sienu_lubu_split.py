@@ -43,7 +43,7 @@ HEADER = {"nr": 0, "pavadinimas": 1, "plotas": 2}
 
 def _room(nr, **kw):
     r = {"nr": nr, "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
-         "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "elementai": []}
+         "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     r.update(kw)
     r.update(calc_room_quantities(r))
     return r
@@ -254,7 +254,7 @@ def test_the_provenance_string_guides_and_never_confesses():
 def test_the_tier_split_distributes_the_anchored_base():
     """The virš-3m line is a SUBSET of the ceiling quantity — it can never
     exceed the anchored total, and the two tiers must add back up to it."""
-    rooms = [_room("101", lubu_aukstis_m=3.4), _room("102")]
+    rooms = [_room("101", lubu_aukstis_m=3.4, lubu_aukstis_saltinis="plano_uzrasas"), _room("102")]
     floor = round(sum(r["plotas_m2"] for r in rooms), 2)
     p = _parsed(rooms, _ceiling_anchor=_anchor(floor))
     poz = _build_pozicijos_from_rooms(p)["pozicijos"]

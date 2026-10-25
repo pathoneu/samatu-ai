@@ -38,13 +38,13 @@ def _window(n=1):
 def _rooms(h01=2.7):
     return [
         {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 30.0,
-         "perimetras_m": 22.0, "lubu_aukstis_m": h01, "puslapio_nr": 1,
+         "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": h01, "lubu_aukstis_saltinis": "ceiling_plan_marker", "puslapio_nr": 1,
          "elementai": [_door(1), _window(2)]},
         {"nr": "02", "pavadinimas": "Miegamasis", "paskirtis": "miegamasis", "plotas_m2": 14.0,
-         "perimetras_m": 15.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 15.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "ceiling_plan_marker", "puslapio_nr": 1,
          "elementai": [_door(1), _window(1)]},
         {"nr": "03", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0,
-         "perimetras_m": 10.0, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "ceiling_plan_marker", "puslapio_nr": 1,
          "plyteles_sienos_aukstis_m": 2.4, "elementai": [_door(1)]},
     ]
 
@@ -137,7 +137,7 @@ def test_the_bathroom_check_sheet_lists_its_tiles(client):
 def test_a_family_switched_off_in_one_room_is_named_on_its_lines(client):
     rooms = _rooms() + [
         {"nr": "04", "pavadinimas": "WC", "paskirtis": "wc", "plotas_m2": 2.5,
-         "perimetras_m": 6.4, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 6.4, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "ceiling_plan_marker", "puslapio_nr": 1,
          "plyteles_sienos_aukstis_m": 2.4, "elementai": [_door(1)]}]
     out = _recompute(client, rooms, apimtis={"patalpu_sritys_ne": {"03": ["plyteles"]}})
     row = _row(out, "Vonios sienų plytelių klijavimas")
@@ -193,7 +193,7 @@ def test_ceiling_materials_follow_the_anchored_ceiling(client):
 def test_an_excluded_room_is_named_only_on_the_lines_it_belonged_to(client):
     rooms = _rooms() + [
         {"nr": "04", "pavadinimas": "WC", "paskirtis": "wc", "plotas_m2": 2.5,
-         "perimetras_m": 6.4, "lubu_aukstis_m": 2.7, "puslapio_nr": 1,
+         "perimetras_m": 6.4, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "ceiling_plan_marker", "puslapio_nr": 1,
          "plyteles_sienos_aukstis_m": 2.4, "elementai": [_door(1)]}]
     out = _recompute(client, rooms, apimtis={"patalpos_ne": ["03"]})
     _, excluded = room_facts.room_quantities(out, "03")
@@ -215,9 +215,10 @@ def test_the_living_room_sheet_lists_its_cornice_reveals_and_gkp(client):
     out = _recompute(client, rooms, legend={"text_layer_ok": True, "karnizas": {"defined": True, "pages": [1], "samples": []}})
     q01, _ = room_facts.room_quantities(out, "01")
     labels = {q["aprasymas"] for q in q01}
+    # v4 3b: Rotband (until he chooses a share), the frameless preparation (symbols alone) and the LED niches
+    # (no legend length) are blank rows without a ledger
     for want in ("Lubų karnizo sumontavimas", "Angokraščių glaistymas-dažymas",
-                 "GKP lubų montavimas", "GKP siūlių glaistymas", "Sienų lyginimas Knauf Rotband",
-                 "Durų angų paruošimas beapvadinėms durims", "LED nišų"):
+                 "GKP lubų montavimas", "GKP siūlių glaistymas"):
         assert any(l.startswith(want) for l in labels), (want, sorted(labels))
 
 
@@ -225,10 +226,9 @@ def test_the_bathroom_sheet_lists_its_fixtures_and_tile_work(client):
     out = _recompute(client)
     q03, _ = room_facts.room_quantities(out, "03")
     labels = {q["aprasymas"] for q in q03}
-    for want in ("WC rėmo montavimas", "Klozeto montavimas", "Praustuvės montavimas",
-                 "Gyvatuko montavimas", "Linijinio latako montavimas", "Nuolydžio formavimas",
-                 "Silikonavimas tarp plytelių zonos", "Plytelių vidinių kampų silikonavimas",
-                 "Plytelių 45° pjovimas", "Pertvaros sutvirtinimas WC"):
+    # v4 3b: the fixture counts by room type are blank rows (no ledger) — the tile work stays on the sheet
+    for want in ("Silikonavimas tarp plytelių zonos", "Plytelių vidinių kampų silikonavimas",
+                 "Plytelių 45° pjovimas"):
         assert any(l.startswith(want) for l in labels), (want, sorted(labels))
 
 
@@ -242,12 +242,13 @@ def test_every_ledgered_line_is_explained_by_its_rooms_or_an_anchor(client):
         seen += 1
         assert _ledger.replay(row.get("contributions"), row.get("roll_up")) == pytest.approx(
             float(row["kiekis"]), abs=_ledger.rounding_bound(float(row["kiekis"])) + 0.011), row["aprasymas"]
-    assert seen >= 25, seen
+    assert seen >= 17, seen      # v4 3b: room-type fixture counts are blank rows now
 
 
 def test_a_symbol_count_above_the_room_count_is_stated_as_an_anchor(client):
     rooms = _rooms()
-    body = {"patalpos": rooms, "rules_override": {}, "context": {"detected_symbols_summary": {"praustuves": 3}}}
+    body = {"patalpos": rooms, "rules_override": {},
+            "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": {"fixtures_status": "ok"}}}
     r = client.post("/recompute-interior", json=body)
     assert r.status_code == 200, r.text
     out = r.json()

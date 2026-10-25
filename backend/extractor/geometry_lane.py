@@ -178,7 +178,11 @@ def _forget_open_space(room: dict) -> None:
 # `_vienetas` / `_nr_brezinyje` — before the lane runs, so each room is placed by its own badge in its own unit
 # (api/free_reread.renumber_rooms, extractor/room_identity.py); `_perkeisti_numeriai` says which key became which.
 # The lane itself reads as at 16.
-LANE_VERSION = 17
+# 18 (2026-10-25, v4 Phase 3b): the free re-read's text scan reads a legend LED length whose label stands before a
+# „;" or after a note on the same baseline („LED juosta; šviesos šaltinis - 24,00 m", objektas_i) — the LED niche
+# rows take that length now (row_provenance.led_legend_length); a stored project needs the re-read to get it.
+# The geometry lane itself reads as at 16.
+LANE_VERSION = 18
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

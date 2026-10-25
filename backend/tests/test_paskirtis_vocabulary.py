@@ -30,7 +30,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from extractor.line_items import WET_ROOM_PASKIRTIS  # noqa: E402
-from extractor.niche_inference import LED_RATIO_BY_PASKIRTIS  # noqa: E402
 from extractor.universal_rules import (  # noqa: E402
     ROOM_TYPE_RULES,
     classify_room_name,
@@ -321,19 +320,18 @@ def test_dry_labels_do_not_reach_the_extract_waterproofing_lane(label):
     assert _calc_hidroizoliacija_m2(room, 14.0) == 0.0
 
 
-@pytest.mark.parametrize("label,cls,led", [
-    ("Svetainė su spinta", "gyvenamoji", 0.40),
-    ("Koridorius su spinta", "koridorius", 0.55),
-    ("Valgomasis su spinta", "valgomasis", 0.39),
-    ("Miegamasis su spinta", "miegamoji", 0.17),
+@pytest.mark.parametrize("label,cls", [
+    ("Svetainė su spinta", "gyvenamoji"),
+    ("Koridorius su spinta", "koridorius"),
+    ("Valgomasis su spinta", "valgomasis"),
+    ("Miegamasis su spinta", "miegamoji"),
 ])
-def test_a_wardrobe_in_the_label_does_not_replace_the_room(label, cls, led):
+def test_a_wardrobe_in_the_label_does_not_replace_the_room(label, cls):
     """"spinta" is furniture. Placed above the room words it swallowed every
     "<room> su spinta" label into `drabuzine`, whose LED niche ratio is 0.00 —
     so the LED strip metres for a living room with a fitted wardrobe silently
     became zero. It must be the LAST needle consulted."""
     assert normalize_paskirtis(label) == cls
-    assert LED_RATIO_BY_PASKIRTIS.get(cls) == led
 
 
 def test_kitchen_with_a_wardrobe_keeps_its_backsplash():
@@ -377,24 +375,7 @@ def test_pool_is_not_in_the_bathroom_family():
     assert ROOM_TYPE_RULES["baseinas"]["tile_floor"] is True
 
 
-def test_every_class_the_classifier_emits_has_an_led_ratio_entry():
-    """A missing key silently means 0.0. That is often the RIGHT answer, but
-    it should be a written-down 0.0, not an accident."""
-    emitted = {cls for _, cls in VOCABULARY}
-    missing = sorted(c for c in emitted if c not in LED_RATIO_BY_PASKIRTIS)
-    assert not missing, f"no LED ratio recorded for: {missing}"
-
-
-def test_led_inference_uses_the_normaliser():
-    """A room labelled "Tambūras" must not have LED metres invented for it
-    just because the raw string missed the ratio table."""
-    from extractor.niche_inference import infer_missing_niches
-    rooms = [{"nr": "1", "paskirtis": "Tambūras", "perimetras_m": 12.0,
-              "elementai": []}]
-    assert infer_missing_niches(rooms) == 0
-    rooms = [{"nr": "1", "paskirtis": "Koridorius 1", "perimetras_m": 12.0,
-              "elementai": []}]
-    assert infer_missing_niches(rooms) == 1
+# (The LED-ratio checks went with the room-type niche estimator — v4 3b, 2026-10-25.)
 
 
 # ── 5. THE FOLDER + THE "DON'T GUESS" CONTRACT ─────────────────────────────

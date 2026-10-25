@@ -87,7 +87,7 @@ def _skalbykla(**kw):
     """Objektas A room 106: 6.84 m², 10.5 m perimeter, 2.8 m ceiling. The apdailos
     reader claims 70% tile at a 2.8 m band; the išklotinė says none."""
     r = {"nr": "106", "pavadinimas": "Skalbykla", "paskirtis": "skalbykla",
-         "plotas_m2": 6.84, "perimetras_m": 10.5, "lubu_aukstis_m": 2.8,
+         "plotas_m2": 6.84, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
          "plyteles_sienos_aukstis_m": 2.8,
          "sienu_apdailos_breakdown": {"dazymas_share": 0.3,
                                       "plyteles_share": 0.7},
@@ -263,7 +263,7 @@ def test_anchor_check_gates_only_a_readable_drawing_with_no_label():
 
 def _rooms():
     return [{"nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp", "elementai": [], "confidence": "high"}]
 
 
@@ -305,20 +305,16 @@ def test_unanchored_count_does_not_fabricate_ductwork():
             if p.get("skyrius") == "Ventiliacijos darbai"] == []
 
 
-def test_anchored_count_is_billed_as_before():
+def test_an_anchored_glyph_count_from_the_reading_is_a_question_too():
+    # v4 3b: the legend defines the glyph, but the count is Pass-1's — only the drawing's paths may bill it
     out = _build_pozicijos_from_rooms(_parsed({"difuzoriai": 6}, DEFINED))
-    montavimas = _lines(out, "Difūzorių montavimas (vėdinimo taškai)")
-    apdirbimas = _lines(out, "Difūzorių apdirbimas")
-    assert [p["kiekis"] for p in montavimas] == [6]
-    assert [p["kiekis"] for p in apdirbimas] == [6]
-    assert [p for p in out["pozicijos"]
-            if p.get("skyrius") == "Ventiliacijos darbai"], (
-        "the D125 fallback still runs for an anchored count")
+    assert [p["kiekis"] for p in _lines(out, "difūzor")] == [None]
+    assert [p["kiekis"] for p in out["pozicijos"] if p.get("skyrius") == "Ventiliacijos darbai"] == []
 
 
-def test_no_legend_scan_keeps_the_old_behaviour():
+def test_no_legend_scan_no_billed_count():
     out = _build_pozicijos_from_rooms(_parsed({"difuzoriai": 6}))
-    assert [p["kiekis"] for p in _lines(out, "Difūzorių montavimas (vėdinimo")] == [6]
+    assert [p["kiekis"] for p in _lines(out, "difūzor")] == [None]
 
 
 def test_zero_count_still_emits_the_generic_checklist_wording():

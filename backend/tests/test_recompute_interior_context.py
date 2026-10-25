@@ -37,7 +37,7 @@ def client(monkeypatch):
 
 def _room(nr: str, **kw) -> dict:
     r = {"nr": nr, "pavadinimas": f"Kambarys {nr}", "paskirtis": "gyvenamoji",
-         "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": []}
     r.update(kw)
     return r
@@ -124,24 +124,24 @@ def test_the_reader_context_reaches_the_positions_builder(client):
     drawing's own count was lost on every recompute and the room-type default
     silently won."""
     rooms = ROOMS + [_room("103", paskirtis="vonia", plotas_m2=6.0,
-                           perimetras_m=10.0)]
+                           perimetras_m=10.0, perimetras_saltinis="plano_matmenys")]
 
     def _praustuves(body):
         rows = [p for p in body["pozicijos"]
                 if p.get("aprasymas") == "Praustuvės montavimas"]
         assert len(rows) == 1, [p["aprasymas"] for p in body["pozicijos"]]
-        return float(rows[0]["kiekis"])
+        return rows[0]["kiekis"]
 
     with_ctx = client.post("/recompute-interior", json={
         "patalpos": rooms,
-        "context": {"detected_symbols_summary": {"praustuves": 3}},
+        "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": {"fixtures_status": "ok"}},
     })
     assert with_ctx.status_code == 200, with_ctx.text
     without = client.post("/recompute-interior", json={"patalpos": rooms})
     assert without.status_code == 200, without.text
 
-    assert _praustuves(with_ctx.json()) == 3.0     # the drawing's count
-    assert _praustuves(without.json()) == 1.0      # the room-type default
+    assert _praustuves(with_ctx.json()) == 3       # the plumbing reader's count
+    assert _praustuves(without.json()) is None      # a room-type count is a blank row (v4 3b)
 
 
 def test_the_explicit_fields_win_over_a_stale_copy_in_the_context(client):
