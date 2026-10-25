@@ -1,0 +1,10 @@
+{
+  "slug": "objektas_b",
+  "kas": "Ką žmogus įrašytų, kai programa klausia — tik iš teisybės failų (ne iš ai_extract.json).",
+  "lubu_aukstis_m": null,
+  "lubu_auksciai": {},
+  "saltiniai": [],
+  "_pastabos": [
+    "Truth files state no ceiling height — no answer; rows that wait for it stay blank (real gap)."
+  ]
+}

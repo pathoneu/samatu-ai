@@ -1,0 +1,15 @@
+{
+  "slug": "objektas_a",
+  "kas": "Ką žmogus įrašytų, kai programa klausia — tik iš teisybės failų (ne iš ai_extract.json).",
+  "lubu_aukstis_m": 2.8,
+  "lubu_auksciai": {},
+  "saltiniai": [
+    {
+      "m": 2.8,
+      "kur": "sąmatos eilutė nr. 1"
+    }
+  ],
+  "_pastabos": [
+    "Higher ceilings stated ([3.4] m) without rooms — recorded, not applied."
+  ]
+}
