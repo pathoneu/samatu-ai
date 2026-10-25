@@ -1237,7 +1237,8 @@ def read_height_statements(pdf_bytes: bytes, pages: Iterable[int] | None = None)
     return out
 
 
-_DEFAULT_HEIGHT_SOURCES = ("section_average", "default_fallback", "height_gate_reattributed",
+# "nera": no height read yet — text/heights.py takes every height not his off before the readers run (v4 3c-1)
+_DEFAULT_HEIGHT_SOURCES = ("section_average", "default_fallback", "height_gate_reattributed", "nera",
                            "height_gate_clamped", "")
 
 

@@ -160,14 +160,16 @@ def test_only_the_models_own_entries_are_rewritten():
 
 def test_the_extraction_runs_it_on_pass1_warnings_before_the_checks():
     """Wired where the model's warnings are taken into the result: captured
-    right after Pass 1, rewritten at Step 3.9 — after the height salvage and the
+    right after Pass 1, rewritten at Step 3.9 — after the zoom pick and the
     LED gate read them, before `apply_lt_sanity` and the list's mirror."""
     import inspect
 
     from extractor import vision_call as vc
     src = inspect.getsource(vc.extract_interior)
     capture = src.index("_model_warnings = list(parsed[\"warnings\"])")
-    assert src.index("_run_pass1_once(") < capture < src.index("salvage_heights_from_warnings")
+    # the zoom pass picks its rooms by the heights the model narrated in these texts (v4 3c-1: no height is
+    # applied from them any more) — it must still read them raw
+    assert src.index("_run_pass1_once(") < capture < src.index("_can_skip_zoom(r)")
     run = src.index("normalise_model_warnings(parsed, _model_warnings)")
     assert src.index("_recompute_per_room_via_python(parsed, rules_override)") < run
     assert run < src.index("apply_lt_sanity(parsed)") < src.index("build_lt_sanity(parsed)")

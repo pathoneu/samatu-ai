@@ -795,6 +795,9 @@ _HEIGHT_SOURCES: dict[str, tuple[str, str, str]] = {
     "section_pjuvis": ("read", "pjuvis", "Aukštis — iš pjūvio."),
     "per_room": ("read", "planas", "Aukštis užrašytas prie šios patalpos."),
     "plano_uzrasas": ("read", "planas", "Aukštis — užrašytas plane (visam aukštui)."),
+    # v4 Phase 3c-1 (text/heights.py): the room table's height column; the storey height the text writes
+    "patalpu_lentele": ("read", "eksplikacija", "Aukštis — iš patalpų lentelės aukščio stulpelio."),
+    "projekto_aukstis": ("read", "pjuvis", "Aukštis — brėžinyje užrašytas visam aukštui."),
     "user_override": ("read", "prielaida", "Šį aukštį įrašėte patys."),
     # vision_call.ZOOM_SOURCE: the program's own reading of a close-up of the plan, checked by nothing printed
     "zoom": ("assumed", "planas",
@@ -889,6 +892,13 @@ def _fact_aukstis(project: dict, room: dict,
                     min(1.0, label_rect[2] + m), min(1.0, label_rect[3] + m)]
         if uz.get("text"):
             sentence = f"Aukštis — užrašytas plane: „{uz.get('text')}\"."
+    prov = room.get("aukstis_saltinis") if isinstance(room.get("aukstis_saltinis"), dict) else {}
+    if saltinis in ("patalpu_lentele", "projekto_aukstis") and prov:
+        # the string itself, on its sheet (text/heights.py provenance)
+        p = _f(prov.get("lapas"))
+        page = int(p) if p else page
+        if prov.get("tekstas"):
+            sentence = f"{sentence[:-1]}: „{prov['tekstas']}\"" + (f" (lapas {int(p)})." if p else ".")
     if page is None:
         page = (first_page_of_type(project, "section")
                 if kind == "pjuvis"

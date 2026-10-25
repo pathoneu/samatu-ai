@@ -45,9 +45,10 @@ READ_PERIMETERS = frozenset({
     "konturo_ivertis", "atviros_erdves_ivertis",
 })
 # ── height ─────────────────────────────────────────────────────────────────
-# Read: an altitude printed inside the room, a height the plan states, his own entry. `section_average`
-# is legal only when the project height it copies was read from the drawing's text (the section marker).
-READ_HEIGHTS = frozenset({"ceiling_plan_marker", "plano_uzrasas", "user_override", "manual"})
+# Read: an altitude printed inside the room, a height the plan states, the room table's own height column
+# (text/heights.py, v4 3c-1), his own entry. `section_average` is legal only when the project height it copies
+# was read from the drawing's text (a section altitude, a storey statement — text/heights.project_height).
+READ_HEIGHTS = frozenset({"ceiling_plan_marker", "plano_uzrasas", "patalpu_lentele", "projekto_aukstis", "user_override", "manual"})
 PROJECT_HEIGHT_FROM_TEXT = "pjuvio_zymuo"                    # parsed["_lubu_aukstis_saltinis"]
 SECTION_MARKER_WARNING = "ceiling_height_from_section_marker"
 SAME_AS_OTHERS = "kaip_kitose"                                # room["lubu_aukstis_saltinis"] the fill writes
@@ -149,9 +150,13 @@ def read_heights(rooms: list[dict], parsed: dict) -> list[float]:
 def fill_heights_from_read(rooms: list[dict], parsed: dict) -> int:
     """The paid reading's height pass (2026-10-25): a room whose height was not read takes the height read in
     the other rooms („imu tokį pat kaip kitose", the existing question); with no height read anywhere the room
-    keeps no height at all — the walls wait for his answer. Returns the number of rooms changed."""
+    keeps no height at all — the walls wait for his answer. Two heights read equally often (objektas_a: two
+    rooms at 3,4 m, two at 2,8 m on the ceiling plan) give no „other rooms' height" — which one the rest share
+    the drawing does not say, so they wait for his answer too (v4 3c-1; before, the first room's value won by
+    list order). Returns the number of rooms changed."""
     vals = read_heights(rooms, parsed)
-    common = Counter(round(v, 2) for v in vals).most_common(1)[0][0] if vals else None
+    ranked = Counter(round(v, 2) for v in vals).most_common(2)
+    common = ranked[0][0] if ranked and (len(ranked) == 1 or ranked[0][1] > ranked[1][1]) else None
     n = 0
     for r in rooms:
         if not isinstance(r, dict):

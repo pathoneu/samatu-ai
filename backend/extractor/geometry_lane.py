@@ -182,7 +182,11 @@ def _forget_open_space(room: dict) -> None:
 # „;" or after a note on the same baseline („LED juosta; šviesos šaltinis - 24,00 m", objektas_i) — the LED niche
 # rows take that length now (row_provenance.led_legend_length); a stored project needs the re-read to get it.
 # The geometry lane itself reads as at 16.
-LANE_VERSION = 18
+# 19 (2026-10-25, v4 Phase 3c-1): the free re-read reads the ceiling heights from the drawing's text with the paid
+# reading's own reader (text/heights.py: the ceiling plan's altitudes, the room table's height column, a height the
+# plan writes for one room, else the storey height the text writes) — a model height a stored room still carries
+# comes off, his entries stay. The geometry lane itself reads as at 16.
+LANE_VERSION = 19
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

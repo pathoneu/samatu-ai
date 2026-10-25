@@ -335,13 +335,13 @@ def test_single_project_modes_refuse_a_blind_slug(harness, tmp_path, monkeypatch
             harness.main()
 
 
-def test_blind_once_refuses_a_non_default_pipeline(harness, monkeypatch):
-    # main() sets these module globals; monkeypatch puts them back afterwards.
-    monkeypatch.setattr(harness, "GEOMETRY_LANE", False)
-    monkeypatch.setattr(harness, "REPLAY_GEOMETRY", False, raising=False)
+def test_blind_once_takes_the_old_lane_flags_as_no_ops(harness, monkeypatch):
+    """v4 Phase 3c-1: every --recompute runs the drawing's lanes; --geometry / --replay-geometry change nothing,
+    so the one blind scoring is of the default pipeline whatever the command line says."""
     monkeypatch.setattr(sys, "argv", ["eval_harness.py", "--blind-once", "--geometry"])
-    with pytest.raises(SystemExit, match="default pipeline"):
-        harness.main()
+    called = []
+    monkeypatch.setattr(harness, "run_blind_once", lambda *a, **k: called.append(a) or 0)
+    assert harness.main() == 0 and called
 
 
 def _blind_project(root: Path, slug: str) -> None:
