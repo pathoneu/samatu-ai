@@ -129,6 +129,18 @@ test('a room with no outline at all is its printed number, and says why', () => 
   assert.ok(o.roomFocus.rect[2] - o.roomFocus.rect[0] >= 0.1);              // a readable neighbourhood, not a dot
 });
 
+test('a stored room (puslapio_nr, nothing placed on its sheet) still opens on ITS sheet, whole', () => {
+  const stored = { nr: '2-6', puslapio_nr: 4 };
+  const o = buildCheckOverlay({ room: stored, facts: [], sutapdinimas: SUT, activeFactKey: null });
+  assert.deepEqual(o.roomFocus, { page: 4, rect: [0, 0, 1, 1] });
+  // the printed number is placed on that sheet too
+  const marked = buildCheckOverlay({ room: { ...stored, marker_pct: [0.5, 0.5] }, facts: [], sutapdinimas: SUT, activeFactKey: null });
+  assert.equal(marked.roomFocus.page, 4);
+  assert.deepEqual(marked.pages[4].marker, { x: 0.5, y: 0.5, nr: '2-6' });
+  // no sheet known at all: nothing to look at
+  assert.equal(buildCheckOverlay({ room: { nr: '9' }, facts: [], sutapdinimas: SUT }).roomFocus, null);
+});
+
 test('nothing to go on gives an empty overlay, not an exception', () => {
   const o = buildCheckOverlay({ room: null, facts: null, sutapdinimas: null, activeFactKey: null });
   assert.deepEqual(o.pages, {});

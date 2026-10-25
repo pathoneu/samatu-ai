@@ -29,10 +29,10 @@ import { pageScaleIn } from './pageScales.js';
  * `scales` = the viewer's effective map (what it measures with); `project` + `durable` feed the overview;
  * `t` = i18n's translate function (lib/scaleProvenance words every text).
  */
-export function scaleChipModel({ page, scales, project = null, durable = null, pageCount = null, t }) {
+export function scaleChipModel({ page, scales, project = null, durable = null, pageCount = null, extraLane = null, t }) {
   const p = Number(page) || 1;
   const scale = pageScaleIn(scales, p);
-  const { rows, groups } = buildScaleOverview(project || {}, { pageCount, durable: durable || {} });
+  const { rows, groups } = buildScaleOverview(project || {}, { pageCount, durable: durable || {}, extraLane });
   const row = rows.find((r) => r.page === p) || null;
   const desc = row?.desc || { state: 'nenustatytas', line: 'none', label: '', phrase: { key: 'none' }, notes: [], explain: [{ key: 'none' }] };
   const state = row?.state || 'nenustatytas';

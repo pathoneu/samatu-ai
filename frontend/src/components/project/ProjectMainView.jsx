@@ -232,11 +232,13 @@ function WorkRow({
   };
 
   const beginQtyEdit = () => {
-    setDraftQty(String(item.kiekis ?? 0).replace('.', ','));
+    // a blank row starts EMPTY (a 0 would be a number he did not type)
+    setDraftQty(item.kiekis == null ? '' : String(item.kiekis).replace('.', ','));
     setEditingQty(true);
   };
 
   const commitQty = () => {
+    if (item.kiekis == null && draftQty.trim() === '') { setEditingQty(false); return; }   // nothing typed in a blank row: it stays blank
     const num = parseLtNumber(draftQty);
     if (!isValidAmount(num)) {
       toast.error(t(invalidAmountKey(num)));
@@ -303,6 +305,10 @@ function WorkRow({
   }
 
   const noPrice = !item.kaina;
+  // no number and a reason for it: v4 3b's `_tuscia_priezastis` (the same sentence is `_assumption`)
+  const blankReason = item.kiekis == null
+    ? String(item._tuscia_priezastis || (item._kilme === 'blank' ? item._assumption : '') || '').trim()
+    : '';
 
   // Sprint §FIX-8 (2026-04-29): user feedback — visi taškai vizualiai trukdo
   // ir confidence info jau matosi PERŽIŪRA queue'oje. Dots default OFF.
@@ -353,6 +359,24 @@ function WorkRow({
         )}
         {materialNote && (
           <div className="text-meta text-muted-foreground mt-0.5">{materialNote}</div>
+        )}
+        {/* A blank row (v4 3b: no legal source for the number) says WHY in plain words under itself — the
+            backend's own sentence, never a hover — and offers the one click that gets him typing. */}
+        {blankReason && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui leading-snug text-foreground" data-testid="blank-row-reason">
+            <span>{blankReason}</span>
+            {!editingQty && (
+              <button
+                type="button"
+                onClick={beginQtyEdit}
+                aria-label={t('project.mainView.blankEnterAria', { name: item.aprasymas })}
+                className="inline-flex min-h-[28px] items-center rounded-[2px] border border-border bg-card px-2.5 font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="blank-row-enter"
+              >
+                {t('project.mainView.blankEnter')}
+              </button>
+            )}
+          </div>
         )}
         {/* A row the last recompute could not reproduce is CARRIED, not deleted
             — its quantity is the old one. The flag existed since 2026-07-28 and

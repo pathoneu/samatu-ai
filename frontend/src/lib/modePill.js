@@ -125,10 +125,10 @@ export function modePillFor(state = {}) {
         : [exit],
     };
   }
-  if (tool === 'calibrate' || tool === 'scalecheck') {
+  if (tool === 'calibrate' || tool === 'scalecheck' || tool === 'scaleLine') {
     return {
       id: tool,
-      name: tool === 'calibrate' ? nameOf('calibrate') : 'Mastelio patikra',
+      name: tool === 'scalecheck' ? 'Mastelio patikra' : nameOf(tool),
       detail: calibPoint ? '1 taškas iš 2' : null,
       keys: null,
       actions: calibPoint

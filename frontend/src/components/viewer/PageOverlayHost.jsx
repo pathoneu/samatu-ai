@@ -134,6 +134,8 @@ export default function PageOverlayHost({
   onMeasureDraftAction = null,
   measureCalibA = null,
   onMeasureCalibAChange = null,
+  // The „Skaičius" line kept on this sheet until confirmed ({a, b, state}); MeasureLayer draws it.
+  scaleLineMark = null,
   // Check-sheet mode (Patikra v2): what was READ about one room, for this page
   // (lib/checkOverlay). While it is on, the all-rooms zone layer stays out —
   // one room is being checked, nothing may compete with its outline.
@@ -348,6 +350,7 @@ export default function PageOverlayHost({
             onDraftAction={onMeasureDraftAction}
             calibA={measureCalibA}
             onCalibAChange={onMeasureCalibAChange}
+            scaleLineMark={scaleLineMark}
           />
           {/* Where the selected mark is — the selection bar (v3 W1-B B6) stands right above it with
               Pervadinti · Keisti tipą · Rodyti sąraše · Ištrinti (the old one-icon ✕ lived here). */}

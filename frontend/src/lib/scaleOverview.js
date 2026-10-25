@@ -74,9 +74,11 @@ function pagesOf(project, pageCount, scales) {
  *   groups   = [{ratio, label, pages}] — two or more unconfirmed sheets sharing one lane ratio, for
  *              „Patvirtinti visus su tuo pačiu masteliu".
  */
-export function buildScaleOverview(project, { pageCount = null, durable = project?.pageScalesDurable, sampleSize = 4 } = {}) {
-  const scales = effectivePageScales(project, durable || {});
-  const lane = laneScalesOf(project);
+export function buildScaleOverview(project, { pageCount = null, durable = project?.pageScalesDurable, sampleSize = 4, extraLane = null } = {}) {
+  // `extraLane`: sheets scaled in this session by a line over a written dimension (the viewer's „Skaičius" tool) —
+  // not in the stored project yet, but they are the sheet's scale now
+  const lane = { ...laneScalesOf(project), ...(extraLane || {}) };
+  const scales = effectivePageScales(project, durable || {}, lane);
   const strings = dimensionStringsOf(project);
   const rows = pagesOf(project, pageCount, scales).map((page) => {
     const scale = pageScaleIn(scales, page);

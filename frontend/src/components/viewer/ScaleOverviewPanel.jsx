@@ -122,12 +122,12 @@ export function ScaleOverviewPanel({ rows, groups, currentPage, onJump, onConfir
 }
 
 /** The panel, connected to the viewer's scroll state (jump + highlight the visible sheet). */
-export function ScaleOverviewDock({ documentId, project, totalPages, durable, onConfirm, onFix, onCheck, onClose }) {
+export function ScaleOverviewDock({ documentId, project, totalPages, durable, extraLane = null, onConfirm, onFix, onCheck, onClose }) {
   const { state: scroll, provides: scrollApi } = useScroll(documentId);
   const currentPage = visiblePageOf(scroll);
   const { rows, groups } = useMemo(
-    () => buildScaleOverview(project, { pageCount: totalPages, durable }),
-    [project, totalPages, durable],
+    () => buildScaleOverview(project, { pageCount: totalPages, durable, extraLane }),
+    [project, totalPages, durable, extraLane],
   );
   const jump = (page) => scrollApi?.scrollToPage({ pageNumber: page, behavior: 'smooth' });
   return (

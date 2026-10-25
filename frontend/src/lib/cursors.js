@@ -31,6 +31,7 @@ const MODE_CURSORS = {
   perimeter: 'place',
   count: 'place',
   calibrate: 'place',
+  scaleLine: 'place',
   scalecheck: 'place',
   room: 'place',
   findSimilar: 'box',
