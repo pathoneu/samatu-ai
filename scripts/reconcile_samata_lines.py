@@ -291,7 +291,9 @@ CONCEPTS: list[Concept] = [
             _rx(r"Rozetės / jungiklio pajungimas")),
     Concept("led_juosta", _rx(r"led juost"), _rx(r"LED juostos pajungimas")),
     Concept("ortakiai", _rx(r"ortaki\w*\s+(įrengimas|montavimas)|rekuperac"),
-            _rx(r"Ortakių D\d+ mm montavimas")),
+            # `(D\d+ mm )?` 2026-10-25 (Phase 2b, wording): since Phase 3b the row without a read length is
+            # „Ortakių montavimas — suveskite ilgį“ (blank) — his row meets it as what it is, our blank row
+            _rx(r"Ortakių (D\d+ mm )?montavimas")),
     Concept("vent_medziagos",
             _rx(r"^(ortakis|alkūnė|mova|trišakis|pereiga|balninė|statmena|"
                 r"lankstus|apvali|perforuota|izoliacinė|aliuminio|aliuminė|"

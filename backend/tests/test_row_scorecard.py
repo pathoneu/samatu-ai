@@ -498,3 +498,11 @@ def test_the_profile_merged_paint_row_is_read_by_his_all_in_row():
     split = score_rows([_c("1", "Sienų, lubų glaistymas/dažymas (iki 3 m)", "m2", 400.0),
                         _c("2", "Sienų, lubų glaistymas/dažymas (virš 3 m)", "m2", 20.0)], ours)
     assert [r.bucket for r in split.rows] == ["within_10", "within_10"]
+
+
+def test_the_blank_duct_row_since_phase_3b_is_read_by_the_duct_family():
+    table = load_concepts()
+    key = next(c.key for c in table if c.app is not None and c.app.search("Ortakių montavimas — suveskite ilgį"))
+    assert key == "ortakiai"
+    assert next((c.key for c in table if c.app is not None
+                 and c.app.search("Ortakių izoliacija (akmens vata + AlMg folija) — suveskite ilgį")), None) != "ortakiai"
