@@ -19,13 +19,13 @@ import { scaleChipModel } from '@/lib/scaleChip';
 import { useTranslation } from '@/i18n/react';
 import { visiblePageOf } from '@/lib/visiblePage';
 
-export default function ScaleChip({ documentId, scales, project, durable, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12, openNonce = 0, pageSizeOf = null, isNotNeeded = null, onSetRatio = null, onNotNeeded = null }) {
+export default function ScaleChip({ documentId, scales, project, durable, extraLane = null, totalPages, onConfirm, onCalibrate, onCheck, onOverview, left = 12, openNonce = 0, pageSizeOf = null, isNotNeeded = null, onSetRatio = null, onNotNeeded = null }) {
   const { t } = useTranslation();
   const { state: scroll } = useScroll(documentId);
   const page = visiblePageOf(scroll);
   const chip = useMemo(
-    () => scaleChipModel({ page, scales, project, durable, pageCount: totalPages, t }),
-    [page, scales, project, durable, totalPages, t],
+    () => scaleChipModel({ page, scales, project, durable, extraLane, pageCount: totalPages, t }),
+    [page, scales, project, durable, extraLane, totalPages, t],
   );
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');

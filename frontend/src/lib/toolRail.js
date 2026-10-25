@@ -41,6 +41,7 @@ export const RAIL_GROUPS = [
       { id: 'room', name: 'Patalpa', label: 'Patalpa', sentence: 'Spustelėkite patalpos viduje — kontūras pagal brėžinio sienas.' },
       { id: 'legend', name: 'Pažymėti legendą', label: 'Legenda', sentence: 'Programa pasiūlo lapo legendą ir suskaičiuoja jos ženklus — jūs peržiūrite eilutes ir sukuriate kiekius.' },
       { id: 'findSimilar', name: 'Rasti panašius', label: 'Panašūs', sentence: 'Apveskite vieną simbolį — programa suras panašius, jūs peržiūrite ir pridedate kaip kiekį.' },
+      { id: 'scaleLine', name: 'Mastelis pagal skaičių', label: 'Skaičius', sentence: 'Nubrėžkite liniją išilgai brėžinyje užrašyto matmens (pvz. 4280) — programa perskaito skaičių ir nustato lapo mastelį.' },
       { id: 'calibrate', name: 'Mastelis', label: 'Mastelis', sentence: 'Pažymėkite atkarpą, kurios tikrą ilgį žinote, ir jį įrašykite.' },
     ],
   },

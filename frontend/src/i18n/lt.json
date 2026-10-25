@@ -1248,6 +1248,8 @@
       "add1": "Pridėti 1",
       "aiOriginal": "iš brėžinio: {{value}}",
       "enterPrice": "įveskite",
+      "blankEnter": "Įrašyti",
+      "blankEnterAria": "Įrašyti kiekį: {{name}}",
       "openSourceTitle": "Atidaryti šaltinį psl. {{page}}",
       "edit": "Redaguoti",
       "beVat": "Be PVM",
@@ -1420,7 +1422,7 @@
         "doors": "Durų matmenys atimami iš dažomo ploto ir grindjuosčių.",
         "packaging": "Sąmatoje parašoma, kiek maišų ar kibirų reikės.",
         "mixers": "Potinkiniai — dvi eilutės: korpusas sienoje ir matoma dalis.",
-        "led": "Patalpose {{rooms}} nišų ilgis neperskaitytas, įvertinimas {{total}} m."
+        "led": "LED nišų ilgis imamas iš brėžinio legendos — čia jo keisti nereikia."
       },
       "changed": "Pakeista: {{label}}.",
       "undo": "Atšaukti",
@@ -1521,14 +1523,6 @@
       "framelessTitles": {
         "true": "Visos vidaus durys — beapvadinės: eilutė „Durų angų paruošimas beapvadinėms durims“ skaičiuojama",
         "false": "Visos vidaus durys — su apvadais: ta eilutė iškrenta iš sąmatos"
-      },
-      "ledEstimate": "LED nišos be perskaityto ilgio",
-      "ledEstimateNote": "Patalpose {{rooms}} nišų ilgio brėžinyje neperskaičiau — skliaustuose įvertinimas pagal patalpos tipą, iš viso {{total}} m. Tai ne matmuo: priimkite jį tik patikrinę lubų planą. Kol nepriimtas, nišų eilutėse skaičiuojamas tik perskaitytas ilgis.",
-      "ledEstimateLeave": "Palikti tuščią",
-      "ledEstimateAccept": "Priimti įvertinimą",
-      "ledEstimateTitles": {
-        "false": "Nišų eilutėse — tik brėžinyje perskaitytas ilgis; įvertinimas lieka tuščioje eilutėje „LED nišos — suveskite ilgį“",
-        "true": "Įvertinimas pridedamas prie nišų eilučių (nišų formavimas, glaistymas, dažymas)"
       },
       "puttyLevelPlain": {
         "Q1": "Q1 — po storais tapetais",

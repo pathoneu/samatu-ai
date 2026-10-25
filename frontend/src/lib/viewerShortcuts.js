@@ -48,6 +48,7 @@ export const VIEWER_SHORTCUTS = [
   { id: 'toolFindSimilar', tool: 'findSimilar', group: 'tools', bound: 'hotkeys', label: 'Rasti panašius — apvesti vieną simbolį, programa suras panašius', combos: [{ keys: ['f', 'F'], shift: false }] },
   // „Pažymėti legendą" (Pathon v3 W2-B): the sheet's legend proposed, its rows counted and reviewed, then created
   { id: 'toolLegend', tool: 'legend', group: 'tools', bound: 'hotkeys', label: 'Pažymėti legendą — programa pasiūlo legendą, suskaičiuoja jos ženklus, jūs peržiūrite ir sukuriate kiekius', combos: [{ keys: ['g', 'G'] }] },
+  { id: 'toolScaleLine', tool: 'scaleLine', group: 'tools', bound: 'hotkeys', label: 'Mastelis pagal skaičių — nubrėžti liniją išilgai užrašyto matmens', combos: [{ keys: ['n', 'N'] }] },
   { id: 'toolCalibrate', tool: 'calibrate', group: 'tools', bound: 'hotkeys', label: 'Mastelis — nustatyti pagal atkarpą, kurios ilgį žinote', combos: [{ keys: ['k', 'K'] }] },
 
   // ── Naršymas

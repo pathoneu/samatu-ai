@@ -9,7 +9,6 @@ import { parseLtNumber } from '@/lib/parseLtNumber';
 import { buildRecomputeContext } from '@/lib/recomputeContext';
 import { rulesWithScope } from '@/lib/scope';
 import { isStretchCeiling as isStretchCeilingNr, withStretchCeiling } from '@/lib/stretchCeiling';
-import { estimatedLedRooms, ledEstimateBilled, ledEstimateText } from '@/lib/ledEstimate';
 import { createDebouncedRun, createRequestOrder } from '@/lib/debouncedRun';
 import { BAG_KEY, BAG_RANGE, BUCKET_KEY, BUCKET_RANGE, packagingSizes } from '@/lib/packaging';
 import { perRoomSplit, sectionForField, visibleRoomRows } from '@/lib/settingsSections';
@@ -525,7 +524,6 @@ export default function AssumptionsPanel({
       case 'santechnika_potinkinis': return mixersOn;
       case 'vidaus_durys_beapvadines': return framelessCurrent;
       case 'angokrasciai_apimtis': return { ...revealsCurrent };
-      case 'led_nisu_ivertinimas': return ledBilled;
       case 'sienos_storis_m': return sienos_storis_m ?? 0.10;
       case 'lubu_auksciai': return Object.fromEntries(rooms.map((r) => [String(r.nr), heightOf(r)]));
       case 'walls_paint_override': return Object.fromEntries(rooms.map((r) => [r.nr, isWallsPainted(r) ? 1 : 0]));
@@ -631,11 +629,6 @@ export default function AssumptionsPanel({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [focusField?.field, focusField?.roomNr, focusField?.nonce]);
-
-  // LED niches with no length read (2026-10-06): the rooms, their estimate, and whether the
-  // niche rows carry it right now (his answer, or — before he gave one — what the rows do)
-  const ledEstimates = estimatedLedRooms(rooms);
-  const ledBilled = ledEstimateBilled(rooms, safeAssumptions.led_nisu_ivertinimas);
 
   // ── values in words ──
   const puttyWords = (q) => String(t(`project.assumptions.puttyLevelPlain.${q}`)).replace(/^Q\d\s*—\s*/, '');
@@ -1069,25 +1062,8 @@ export default function AssumptionsPanel({
               />
             </SettingLine>
 
-            {/* LED nišos be perskaityto ilgio (2026-10-06, founder decision): an estimate is billed
-                only once he accepts it — `_overrides.led_nisu_ivertinimas`. Shown only when the
-                project HAS such an estimate. */}
-            {ledEstimates.length > 0 && (
-              <SettingLine id="led_nisu_ivertinimas" label={t('project.assumptions.ledEstimate')}
-                note={t('project.settings.notes.led', ledEstimateText(ledEstimates))} wide>
-                <Segmented
-                  label={t('project.assumptions.ledEstimate')}
-                  dataAssumption="led_nisu_ivertinimas"
-                  value={ledBilled}
-                  options={[false, true].map((v) => ({
-                    value: v,
-                    label: v ? t('project.assumptions.ledEstimateAccept') : t('project.assumptions.ledEstimateLeave'),
-                    title: t(`project.assumptions.ledEstimateTitles.${v}`),
-                  }))}
-                  onChange={(v) => setOne('led_nisu_ivertinimas', v, `${t('project.assumptions.ledEstimate')}: ${v ? t('project.assumptions.ledEstimateAccept') : t('project.assumptions.ledEstimateLeave')}`)}
-                />
-              </SettingLine>
-            )}
+            {/* LED lengths come from the drawing's legend (v4, 2026-10-25): the estimate switch is gone. */}
+            <p className="text-ui text-muted-foreground" data-testid="settings-led-note">{t('project.settings.notes.led')}</p>
           </Section>
         </div>
       )}

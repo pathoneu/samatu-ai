@@ -8,7 +8,7 @@ const ev = (key, mods = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: f
 test('the rail holds the planned cards in order', () => {
   assert.deepEqual(RAIL_GROUPS.map((g) => g.id), ['navigate', 'measure', 'read', 'layers']);
   assert.deepEqual(RAIL_TOOLS.map((t) => t.id), [
-    'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'room', 'legend', 'findSimilar', 'calibrate', 'zones', 'walls',
+    'select', 'lasso', 'pan', 'distance', 'area', 'perimeter', 'count', 'room', 'legend', 'findSimilar', 'scaleLine', 'calibrate', 'zones', 'walls',
   ]);
 });
 
@@ -30,7 +30,7 @@ test('every rail item has a key, and no two items share one', () => {
 });
 
 test('the keys the rail shows are the keys that arm it', () => {
-  const expect = { select: '1', lasso: 'L', pan: 'H', distance: '2', area: '3', perimeter: '4', count: '6', room: 'R', findSimilar: 'F', calibrate: 'K', zones: 'U', walls: 'S' };
+  const expect = { select: '1', lasso: 'L', pan: 'H', distance: '2', area: '3', perimeter: '4', count: '6', room: 'R', findSimilar: 'F', scaleLine: 'N', calibrate: 'K', zones: 'U', walls: 'S' };
   for (const [id, key] of Object.entries(expect)) {
     assert.equal(railKey(id, { mac: false }), key, id);
     assert.equal(matchViewerHotkey(ev(key.toLowerCase())), railShortcut(id).id, `${key} arms ${id}`);

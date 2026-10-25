@@ -34,6 +34,8 @@ import { autoPageScalesFromRooms, confirmLaneScales } from '@/lib/durableScale';
 import { mergePageScales } from '@/lib/pageScales';
 import { dimensionStringsOf } from '@/lib/scaleOverview';
 import { scaleCheckReadout } from '@/lib/scaleCheck';
+import { scaleLineBody, scaleLineOutcome } from '@/lib/scaleLine';
+import { postScaleLine } from '@/lib/scaleLineApi';
 import { visiblePageOf } from '@/lib/visiblePage';
 import { scaleStatusText, scaleStatusTitle } from '@/lib/scaleLabel';
 import { blankReasonOf } from '@/lib/scaleProvenance';
@@ -422,6 +424,7 @@ function ViewerHotkeys({ documentId, onCopyMarks = null, onPasteMarks = null, on
       toolSelect: () => tool('select'),
       toolPan: () => tool('pan'),
       toolCalibrate: () => tool('calibrate'),
+      toolScaleLine: () => tool('scaleLine'),
       toolFindSimilar: () => (!onToggleSymbolSearch ? false : fillArmed ? refused() : (onToggleSymbolSearch(), true)),
       // G — „Pažymėti legendą" (Pathon v3 W2-B): the legend proposed, counted, reviewed, then created
       toolLegend: () => (!onToggleLegend ? false : fillArmed ? refused() : (onToggleLegend(), true)),
@@ -561,7 +564,10 @@ function FocusZoomer({ documentId, focus, pages }) {
   useEffect(() => {
     if (!focus || !focus.page) return undefined;
     let cancelled = false;
-    let tries = 0;
+    // Waits for the document: a deep link `?kambarys=` asks for the room's place while a big PDF is still loading
+    // (the sheet list and the layout arrive seconds later), and a window of 60 frames (~1 s) gave up — the viewer
+    // stayed on sheet 1. Time-boxed instead: the place is shown as soon as its sheet is laid out, up to 45 s.
+    const startedAt = performance.now();
     let raf = 0;
     const pageIndex = Number(focus.page) - 1;
     const run = () => {
@@ -572,7 +578,7 @@ function FocusZoomer({ documentId, focus, pages }) {
       const rot = normalizeRotation(pagesRef.current?.[pageIndex]?.rotation ?? 0);
       const laidOut = sApi?.getLayout?.()?.virtualItems?.some((it) => it.pageLayouts?.some((p) => p.pageIndex === pageIndex));
       if (!sApi || !zApi || !size || !laidOut) {
-        if (tries++ < 60) raf = requestAnimationFrame(run);
+        if (performance.now() - startedAt < 45_000) raf = requestAnimationFrame(run);
         return;
       }
       const Wd = rot === 90 || rot === 270 ? size.height : size.width;
@@ -953,9 +959,13 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   // derived meters-per-point — measurements read real meters with no manual
   // step. A user calibration (measureScales) always wins the merge.
   const autoScales = useMemo(() => autoPageScalesFromRooms(rooms), [rooms]);
+  // Sheets he scaled with the „Skaičius" line (a line over a written dimension): shown as the drawing's own read,
+  // worded „jūsų nubrėžta linija ant „4280“"; the server keeps the line, the next read of the drawing starts from it.
+  const [lineScales, setLineScales] = useState({});
+  const allLaneScales = useMemo(() => ({ ...(laneScales || {}), ...lineScales }), [laneScales, lineScales]);
   const effectiveScales = useMemo(
-    () => mergePageScales(autoScales, laneScales || {}, measureScales),
-    [autoScales, laneScales, measureScales]);
+    () => mergePageScales(autoScales, allLaneScales, measureScales),
+    [autoScales, allLaneScales, measureScales]);
   // „Masteliai" (Togal-v2 W6): every sheet's scale, confirm a guessed one, check it against a known length.
   const [scalesOpen, setScalesOpen] = useState(false);
   // The last „Patikrinti mastelį" readout: {page, readout} | null. Nothing is saved.
@@ -964,6 +974,75 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
   const [scaleChipOpen, setScaleChipOpen] = useState(0);
   // W5-B B8: a typed or picked 1:N becomes his scale for the sheet; „nereikia" marks a schedule or specification.
   // Both are one undoable change (the toast's „Atšaukti" puts the sheet's previous entry back).
+  // „Skaičius" (Mastelis pagal skaičių): the line he dragged over a written dimension. The line stays on the sheet
+  // (solid once a string was read under it, dashed when nothing was) until he says „Tinka" or „Atšaukti"; one notice
+  // at a time (toast id), a retry on a miss. The server stores the line when it reads a string.
+  const [scaleLineMark, setScaleLineMark] = useState(null);
+  const scaleLineRun = useRef(0);
+  const SCALE_LINE_NOTICE = 'scale-line';
+  const runScaleLine = async ({ pageNr, a, b, pageSize, rotation }) => {
+    const run = ++scaleLineRun.current;
+    const retry = () => { toast.dismiss(SCALE_LINE_NOTICE); setScaleLineMark(null); setMeasureTool('scaleLine'); };
+    const miss = (reason) => {
+      setScaleLineMark({ page: pageNr, a, b, state: 'blank' });
+      toast.error(reason, { id: SCALE_LINE_NOTICE, duration: 30_000, action: { label: 'Bandyti dar kartą', onClick: retry } });
+    };
+    const body = scaleLineBody({ page: pageNr, a, b, pageSize, rotation });
+    if (!projectId || !body) {
+      miss(projectId ? 'Lapo dydis dar nežinomas — palaukite akimirką ir nubrėžkite liniją iš naujo.'
+        : 'Mastelis pagal skaičių veikia projekto brėžinyje, kai jis atidarytas iš projekto.');
+      return;
+    }
+    setScaleLineMark({ page: pageNr, a, b, state: 'reading' });
+    toast.loading('Skaitomas skaičius po linija…', { id: SCALE_LINE_NOTICE });
+    let out;
+    try {
+      out = scaleLineOutcome(await postScaleLine(projectId, body));
+    } catch (err) {
+      out = { ok: false, reason: err?.userMessage || 'Nepavyko susisiekti su serveriu — bandykite dar kartą.' };
+    }
+    if (run !== scaleLineRun.current) return;
+    if (!out.ok) { miss(out.reason); return; }
+    const beforeLine = lineScales[pageNr] ?? null;
+    const beforeOwn = measureScales[pageNr] ?? measureScales[String(pageNr)] ?? null;
+    setLineScales((prev) => ({ ...prev, [pageNr]: out.pageScale }));
+    // his earlier calibration of this sheet would hide the new line: the newest word on the sheet is the line
+    if (beforeOwn) {
+      setMeasureScales((prev) => {
+        const next = { ...prev };
+        delete next[pageNr];
+        delete next[String(pageNr)];
+        return next;
+      });
+    }
+    setScaleLineMark({ page: pageNr, a, b, state: 'ok' });
+    // one line, one sheet: the pointer goes back to the drawing (a miss keeps the tool armed for the retry)
+    setMeasureTool(null);
+    setSelectedMeasureId(null);
+    let settled = false;
+    const settle = () => { if (settled) return; settled = true; if (run === scaleLineRun.current) setScaleLineMark(null); };
+    toast.success(`Lapo ${pageNr} mastelis ${out.pageScale.label}`, {
+      id: SCALE_LINE_NOTICE,
+      description: `Jūsų nubrėžta linija ant „${out.text}“. Linija lieka brėžinyje, kol patvirtinsite.`,
+      duration: 20_000,
+      action: { label: 'Tinka', onClick: settle },
+      cancel: {
+        label: 'Atšaukti',
+        onClick: () => {
+          settled = true;
+          setScaleLineMark(null);
+          setLineScales((prev) => {
+            const next = { ...prev };
+            if (beforeLine) next[pageNr] = beforeLine; else delete next[pageNr];
+            return next;
+          });
+          if (beforeOwn) setMeasureScales((prev) => ({ ...prev, [pageNr]: beforeOwn }));
+        },
+      },
+      onAutoClose: settle,
+      onDismiss: settle,
+    });
+  };
   const putSheetScale = (page, entry, message) => {
     const before = measureScales[page] ?? measureScales[String(page)] ?? null;
     const set = (value) => setMeasureScales((prev) => {
@@ -980,7 +1059,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     on ? `Lapui ${page} mastelio nereikia — programa jo nebeklaus` : `Lapui ${page} mastelis vėl reikalingas`);
   const sheetNotNeeded = (page) => isNotNeeded(measureScales[page] ?? measureScales[String(page)]);
   const confirmScales = (pages) => {
-    setMeasureScales((prev) => confirmLaneScales(prev, pages, laneScales || {}));
+    setMeasureScales((prev) => confirmLaneScales(prev, pages, allLaneScales));
     toast.success(pages.length > 1 ? `Patvirtinta ${pages.length} lapų mastelis` : `Patvirtintas ${pages[0]} lapo mastelis`, {
       description: 'Mastelis dabar jūsų. Jei perskaičius brėžinį iš naujo matmenys rodys kitą, „Masteliai" tai parodys.',
     });
@@ -2032,7 +2111,12 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                       selectedMeasureIds={selectedMeasureIds}
                       selectionMenuOnMiss={measureTool === 'lasso' && selectedMeasureIds.length > 1}
                       onMeasureCommit={commitMeasurement}
-                      onMeasureCalibrate={(pageNr, a, b) => (measureTool === 'scalecheck' ? setScaleCheck({
+                      scaleLineMark={scaleLineMark && scaleLineMark.page === layout.pageNumber ? scaleLineMark : null}
+                      onMeasureCalibrate={(pageNr, a, b) => (measureTool === 'scaleLine' ? runScaleLine({
+                        pageNr, a, b,
+                        pageSize: documentState?.document?.pages?.[layout.pageIndex]?.size,
+                        rotation: documentState?.document?.pages?.[layout.pageIndex]?.rotation ?? 0,
+                      }) : measureTool === 'scalecheck' ? setScaleCheck({
                         page: pageNr,
                         readout: scaleCheckReadout({
                           a, b,
@@ -2087,6 +2171,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                     available={{
                       room: onRoomTool ? undefined : 'Patalpos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.',
                       legend: projectId ? undefined : 'Legendos įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.',
+                      scaleLine: projectId ? undefined : 'Šis įrankis veikia projekto brėžinyje, kai jis atidarytas iš projekto.',
                     }}
                     layers={{ zones: zoneFillsVisible, walls: wallsLayerVisible }}
                     onToggleLayer={(id) => (id === 'zones' ? setZoneFillsVisible((v) => !v) : setWallsLayerVisible(!wallsLayerVisible))}
@@ -2197,6 +2282,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                 scales={effectiveScales}
                 project={project}
                 durable={measureScales}
+                extraLane={lineScales}
                 totalPages={totalPages}
                 left={panelLeft}
                 onConfirm={confirmScales}
@@ -2226,6 +2312,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
                     project={project}
                     totalPages={totalPages}
                     durable={measureScales}
+                    extraLane={lineScales}
                     onConfirm={confirmScales}
                     onFix={() => { setScaleCheck(null); if (measureTool !== 'calibrate') armMeasureTool('calibrate'); }}
                     onCheck={() => { setScaleCheck(null); if (measureTool !== 'scalecheck') armMeasureTool('scalecheck'); }}

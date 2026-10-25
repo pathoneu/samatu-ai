@@ -13,7 +13,7 @@
  * false) is drawn disabled with the reason in its tooltip — never silently missing.
  */
 import {
-  MousePointer2, Lasso, Hand, Ruler, Pentagon, Spline, Hash, SquareDashedMousePointer, ScanSearch, Scaling, ListTree,
+  MousePointer2, Lasso, Hand, Ruler, Pentagon, Spline, Hash, SquareDashedMousePointer, ScanSearch, Scaling, Baseline, ListTree,
   Layers, BrickWall, MoreHorizontal,
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -35,6 +35,7 @@ const ICONS = {
   findSimilar: ScanSearch,
   legend: ListTree,
   calibrate: Scaling,
+  scaleLine: Baseline,
   zones: Layers,
   walls: BrickWall,
 };

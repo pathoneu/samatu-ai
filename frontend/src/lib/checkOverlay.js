@@ -127,7 +127,9 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   };
 
   const perim = list.find((f) => f?.key === 'perimetras') || null;
-  const outlinePage = num(perim?.outline?.page) ?? num(room.page);
+  // the sheet the room table puts it on: a stored room carries `puslapio_nr` (`page` is the check's own spelling)
+  const roomPage = num(room.page) ?? num(room.puslapio_nr);
+  const outlinePage = num(perim?.outline?.page) ?? roomPage;
   const outline = validPolygon(perim?.outline?.polygon_pct) ? perim.outline.polygon_pct : null;
   const space = perim?.outline?.open_space;
   const shared = validPolygon(space?.polygon_pct) ? space.polygon_pct : null;
@@ -198,7 +200,7 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   // the room's printed number: the only mark a room without its own outline has
   const marker = Array.isArray(room.marker_pct) && num(room.marker_pct[0]) != null && num(room.marker_pct[1]) != null
     ? { x: Number(room.marker_pct[0]), y: Number(room.marker_pct[1]), nr: String(room.nr ?? '') } : null;
-  if (marker && !outline && num(room.page) != null) pageOf(room.page).marker = marker;
+  if (marker && !outline && roomPage != null) pageOf(roomPage).marker = marker;
 
   // where each fact was read — only a place the fact really has (not the room's own box)
   const roomBox = outline ? boxOf(outline) : null;
@@ -224,8 +226,11 @@ export function buildCheckOverlay({ room, facts, sutapdinimas = null, activeFact
   const focusShape = outline || shared || proposalShape
     || (marker ? [[marker.x - MARKER_NEIGHBOURHOOD, marker.y - MARKER_NEIGHBOURHOOD], [marker.x + MARKER_NEIGHBOURHOOD, marker.y + MARKER_NEIGHBOURHOOD]] : null)
     || (Array.isArray(room.region_pct) ? room.region_pct : null);
-  const focusPage = outline ? outlinePage : (shared ? (num(space.page) ?? outlinePage) : (proposalShape ? num(proposal.page) : num(room.page)));
+  const focusPage = outline ? outlinePage : (shared ? (num(space.page) ?? outlinePage) : (proposalShape ? num(proposal.page) : roomPage));
   if (focusShape && focusPage != null) out.roomFocus = { page: Number(focusPage), rect: focusRectFor(focusShape) };
+  // nothing of the room is placed on the sheet (no outline, no printed number, no region): „Į patalpą" still opens
+  // ITS sheet, whole — a deep link `?kambarys=` never leaves the viewer on sheet 1
+  else if (focusPage != null) out.roomFocus = { page: Number(focusPage), rect: [0, 0, 1, 1] };
 
   // The active fact was read on ANOTHER sheet and has no box of its own there (a floor covering „pagal grindų
   // planą, 7 psl."): look where the ROOM lies on that sheet — sheets of one plan lie over each other — and at
