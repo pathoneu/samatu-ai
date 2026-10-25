@@ -26,6 +26,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 @pytest.fixture()
@@ -134,13 +135,13 @@ def test_the_reader_context_reaches_the_positions_builder(client):
 
     with_ctx = client.post("/recompute-interior", json={
         "patalpos": rooms,
-        "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": {"fixtures_status": "ok"}},
+        "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": legend_meta({"praustuves": 3})},
     })
     assert with_ctx.status_code == 200, with_ctx.text
     without = client.post("/recompute-interior", json={"patalpos": rooms})
     assert without.status_code == 200, without.text
 
-    assert _praustuves(with_ctx.json()) == 3       # the plumbing reader's count
+    assert _praustuves(with_ctx.json()) == 3       # the legend's count (v4 3c-2)
     assert _praustuves(without.json()) is None      # a room-type count is a blank row (v4 3b)
 
 

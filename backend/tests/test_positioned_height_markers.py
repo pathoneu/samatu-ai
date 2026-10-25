@@ -302,29 +302,6 @@ def test_user_override_beats_a_positioned_marker_height():
     assert abs(room["walls_gross_m2"] - 13.5 * 2.6) < 0.05
 
 
-def test_duplicate_room_names_do_not_collapse_marker_heights():
-    """`_apply_per_room_heights` keys by NAME, and Objektas A alone has two rooms
-    called "Berniuko kambarys". A marker belongs to a room NUMBER — the
-    pipeline must re-assert it per nr after the name-keyed merge, or one
-    room silently inherits the other's ceiling."""
-    from extractor.vision_call import _apply_per_room_heights
-
-    rooms = [
-        {"nr": "108", "pavadinimas": "Berniuko kambarys",
-         "_height_source": "positioned_marker", "_height_marker_m": 2.8},
-        {"nr": "109", "pavadinimas": "Berniuko kambarys",
-         "_height_source": "positioned_marker", "_height_marker_m": 3.4},
-    ]
-    # The name map can only hold ONE value for a duplicated name.
-    merged = _apply_per_room_heights(rooms, {"Berniuko kambarys": 3.4}, 2.82,
-                                     name_key="pavadinimas")
-    # …which is exactly the collapse the re-assert undoes.
-    for room in merged:
-        if room.get("_height_source") == "positioned_marker":
-            room["lubu_aukstis_m"] = float(room["_height_marker_m"])
-    assert [r["lubu_aukstis_m"] for r in merged] == [2.8, 3.4]
-
-
 def test_split_level_conflict_keeps_the_taller_reading_and_discloses():
     """A marker labels ONE ceiling plane. In objektas_b's double-height
     svetainė (~5.7 m) the plan prints the LOW plane inside the same outline;

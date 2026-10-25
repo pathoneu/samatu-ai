@@ -58,6 +58,8 @@ Roles:
   symbols          — extractor/vision/symbol_detector + interior_v9.
   extraction       — main.py KŽ text-extraction Claude fallback.
   chat             — main.py project chat endpoint.
+  text_schema      — backend/text/schema_llm.py: extracted TEXT → schema JSON, every value substring-guarded (v4
+                     3c-2, the only model call a text-first reader may make; it never sees an image).
 """
 from __future__ import annotations
 
@@ -76,12 +78,13 @@ ROLES: dict[str, str] = {
     "symbols": DEFAULT_MODEL,
     "extraction": DEFAULT_MODEL,
     "chat": DEFAULT_MODEL,
+    "text_schema": DEFAULT_MODEL,
 }
 
 # Roles historically steered by the legacy VISION_MODEL env — everything
 # that reads drawings. "extraction" keeps EXTRACTION_MODEL; "chat" has no
 # legacy env.
-_VISION_ROLES = frozenset(ROLES) - {"extraction", "chat"}
+_VISION_ROLES = frozenset(ROLES) - {"extraction", "chat", "text_schema"}
 
 
 def model_for(role: str) -> str:

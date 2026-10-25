@@ -8,6 +8,7 @@ drawing exactly as a fresh reading does. The free re-read of a stored project ca
 (`geometry_lane.apply_geometry`) and the same height reader (`text.heights.apply_text_heights`); the 2.44 text
 lanes below need the reading's fresh room list, which a stored project no longer has.
 
+  2.44k  every sheet's kind from its title text (text/page_kind.py, v4 3c-2) — what the lanes pick sheets by;
   2.44   one text-layer scan → the designer's own figures and the walls / floors anchors billed from them; only
          when no room table merged, the area-label lane and its ceiling anchor;
   2.44b  rectangle pairs from the dimension strings (plan_dimensions);
@@ -17,7 +18,8 @@ lanes below need the reading's fresh room list, which a stored project no longer
          reading model's;
   2.44d  the geometry lane (vector outlines, scale with provenance, perimeters added from the strings, openings
          as drawn, floor coverings);
-  2.44h  the heights again, now with the lane's outlines (an altitude is placed by the outline that holds it).
+  2.44h  the heights again, now with the lane's outlines (an altitude is placed by the outline that holds it);
+  2.44l  the legend counts (extractor/legend_counts.py, v4 3c-2) — proposals for the per-piece rows.
 
 No model call anywhere here. What it cost is written to `_meta.braizinio_skaitymas` (seconds per step, the model
 calls — always 0 — and € 0).
@@ -48,6 +50,16 @@ def run_drawing_lanes(parsed: dict, pdf_bytes: bytes, *, emit: Callable[[dict], 
     seconds: dict[str, float] = {}
     t_all = time.time()
     meta = parsed.setdefault("_meta", {})
+    # Step 2.44k (v4 3c-2): every sheet's kind from its own title text (text/page_kind.py) — the lanes below pick
+    # their sheets by it; Pass-1's kind from the image stays beside it as evidence only (`tipas_modelio`).
+    try:
+        from text.page_kind import apply_text_page_kinds
+        t = time.time()
+        n_kinds = apply_text_page_kinds(parsed, pdf_bytes)
+        seconds["lapu_rusys"] = round(time.time() - t, 2)
+        _emit({"event": "page_kinds_from_text", "classified": n_kinds})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] page kinds from text failed: {exc}")
     scan: dict | None = None
     # Step 2.44: plan-area annotations lane (2026-09-06, item 3 of the €0 generalisation work). Only when NO room
     # table merged: the designer's own room areas written on the lubų/grindų planas („37.86 m²" standing alone in
@@ -176,6 +188,23 @@ def run_drawing_lanes(parsed: dict, pdf_bytes: bytes, *, emit: Callable[[dict], 
     heights = apply_text_heights(parsed, pdf_bytes, statements=stamps, emit=emit)
     seconds["aukstis"] = round(time.time() - t, 2)
 
+    # Step 2.44l (v4 3c-2): what the legends count — lights, sockets, switches, fixtures — counted on the drawing
+    # from each legend row's own glyph (extractor/legend_counts.py: the paths, else the glyph's shape on the
+    # rendered sheet). PROPOSALS for the rows, which ask him to confirm them with the count tool; replaces the
+    # plumbing reader's model count. A drawing without a legend proposes nothing.
+    legend: dict = {}
+    try:
+        from .legend_counts import SIULYMAI_KEY, auto_legend_counts
+        t = time.time()
+        legend = auto_legend_counts(pdf_bytes)
+        meta[SIULYMAI_KEY] = legend
+        seconds["legendos"] = round(time.time() - t, 2)
+        _emit({"event": "legend_counts", "status": legend.get("status"),
+               "seimos": {k: v.get("kiekis") for k, v in (legend.get("seimos") or {}).items()},
+               "seconds": legend.get("sekundes")})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[extractor] legend counts failed: {exc}")
+
     total = round(time.time() - t_all, 2)
     meta["braizinio_skaitymas"] = {"sekundes": seconds, "viso_s": total, "modelio_kvietimai": 0, "kaina_eur": 0.0}
-    return {"scan": scan, "geometry": geometry, "heights": heights, "seconds": total}
+    return {"scan": scan, "geometry": geometry, "heights": heights, "legend": legend, "seconds": total}

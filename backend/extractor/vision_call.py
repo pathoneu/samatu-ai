@@ -190,33 +190,6 @@ def _reader_call_metas(result: dict | None) -> list[dict]:
     return [m] if m else []
 
 
-def _note_doors_unread(parsed: dict, doors_result: dict) -> None:
-    """Record the plan sheets the doors reader left unread, and why.
-
-    ``_meta.doors_page_errors`` and the warning's internal ``_page_errors``
-    map each unread sheet to its reader ``_error`` ("refused:<category>",
-    "cut_off", "no JSON in response" …) so the next failure can be diagnosed
-    from the stored project (2026-09-30: objektas_g page 2 was refused and
-    only its number was recorded). The Lithuanian message is unchanged."""
-    unread = [p for p in (doors_result.get("pages_unread") or []) if p]
-    if not unread:
-        return
-    errors = {str(r.get("page")): str(r.get("_error") or "")
-              for r in (doors_result.get("page_results") or [])
-              if r.get("status") != "ok" and r.get("page") in unread}
-    meta = parsed.setdefault("_meta", {})
-    meta["doors_pages_unread"] = unread
-    meta["doors_page_errors"] = errors
-    parsed.setdefault("warnings", []).append({
-        "level": "WARN", "code": "doors_page_unread", "severity": "med",
-        "message": ((f"Brėžinio {unread[0]} puslapio" if len(unread) == 1 else
-                     f"Brėžinio {', '.join(str(p) for p in unread)} puslapių")
-                    + " durys nebuvo perskaičiuotos — tose patalpose paliktas pirmo "
-                    "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
-        "_page_errors": errors,
-    })
-
-
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
 # instruction text + JSON envelope. Above this the native-PDF experiment
 # falls back to the image path for that extraction (recorded in _meta).
@@ -1345,6 +1318,33 @@ def _record_apdailos_meta(parsed: dict, result: dict, n_updated: int) -> None:
         meta["apdailos_error_class"] = rmeta["error_class"]
 
 
+def apply_apdailos(parsed: dict, pdf_bytes: bytes | None, client=None) -> dict:
+    """Step 2.85 (and the eval tail), v4 3c-2: the wall finishes the finish sheets' TEXT writes
+    (apdailos_reader.read_apdailos_finishes — text layer / OCR, schema_llm only on text with a client). A finish
+    breakdown a room carries from a reading of the sheet IMAGE (no `_apdailos_saltinis`) comes off first — it was a
+    model's estimate of coloured lines; his own choices (`walls_paint_override`, his kinds) are not touched. Returns
+    the reader's answer (status / pages / rooms); records `_meta.apdailos_*`; warns when nothing was read."""
+    from .apdailos_reader import TEXT_SOURCE, merge_apdailos_into_rooms, read_apdailos_finishes
+    rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict)]
+    taken = 0
+    for r in rooms:
+        if r.get("sienu_apdailos_breakdown") and r.get("_apdailos_saltinis") != TEXT_SOURCE:
+            r["_apdailos_modelio"] = r.pop("sienu_apdailos_breakdown")
+            r.pop("_apdailos_confidence", None)
+            taken += 1
+    if pdf_bytes is None:
+        res = {"status": "skipped", "page": None, "pages": [], "patalpos": [], "_error": "no drawing",
+               "_meta": {"saltinis": TEXT_SOURCE}}
+    else:
+        res = read_apdailos_finishes(pdf_bytes, rooms, pages_meta=parsed.get("puslapiai") or [], client=client)
+    n = merge_apdailos_into_rooms(rooms, res) if res.get("status") in ("ok", "partial") else 0
+    _record_apdailos_meta(parsed, res, n)
+    parsed["_meta"]["apdailos_modelio_nuimta"] = taken
+    if n == 0 and res.get("status") != "skipped":
+        _warn_apdailos_degraded(parsed, res.get("_error"))
+    return res
+
+
 def _warn_apdailos_degraded(parsed: dict, reason: str | None,
                             partial: bool = False) -> None:
     """Persist a user-visible WARN when the apdailos (išklotinių) reader did
@@ -1523,32 +1523,30 @@ def _count0(v) -> int:
 
 
 def plumbing_reading(parsed: dict) -> dict[str, int] | None:
-    """The fixture counts of the santechnikos plan when the plumbing reader read
-    one; None when no plumbing reading exists (no plumbing sheet, the reader
-    failed, an extract older than the reader) or it counted nothing at all.
+    """The fixture counts of the plumbing plan, from its LEGEND (v4 3c-2): his confirmed counts
+    (`_legendos_kiekiai`) or the reading's legend proposals (`_meta.legendos_siulymai`, extractor/legend_counts.py);
+    None when the drawing's legends count no fixture — then every santechnika row is blank with the room-type
+    count in its sentence. The plumbing reader's model count (`_meta.fixtures_status` / the model's
+    `detected_symbols_summary`, Phase 3b `model-3c`) is no source any more, also on a stored project.
 
-    Read from `_meta` + `detected_symbols_summary` only — both ride the
-    recompute context (frontend lib/recomputeContext.js), so the extraction,
-    the Prielaidos recompute and the room-sheet recompute all take the counts
-    from the same place. The counts are the RECONCILED ones (the reader raises
-    the main pass's glance, never lowers it), and a count he corrects on the
-    general page lands there too.
-    """
-    meta = parsed.get("_meta") if isinstance(parsed.get("_meta"), dict) else {}
-    status = meta.get("fixtures_status")
-    if status is None and isinstance(meta.get("fixtures_raised"), list):
-        status = "ok"   # extracts before 2026-10-03: `fixtures_raised` is written only on an ok read
-    if status != "ok":
-        return None
-    # a reader that ran and listed nothing is no reading — judged on its OWN
-    # counts where they were kept (2026-10-03 on), else on the reconciled ones
-    own = meta.get("fixtures_counts")
-    if isinstance(own, dict) and not any(_count0(v) for v in own.values()):
-        return None
-    summary = parsed.get("detected_symbols_summary")
-    summary = summary if isinstance(summary, dict) else {}
-    counts = {k: _count0(summary.get(k)) for k in _PLUMBING_READ_KEYS}
+    Keys: praustuves, plautuves, klozetai, vonios (= vonios_kubilai: a legend row names a bathtub, never a tray),
+    vonios_kubilai, dusai, wc_remai, bide — 0 where the legend counts none."""
+    from .legend_counts import counts_for_rows
+    c = counts_for_rows(parsed)
+    counts = {k: int(c[k]["n"]) if k in c else 0 for k in _PLUMBING_READ_KEYS if k != "vonios"}
+    tubs = int(c["vonios_kubilai"]["n"]) if "vonios_kubilai" in c else 0
+    counts["vonios"] = tubs
+    counts["vonios_kubilai"] = tubs
     return counts if any(counts.values()) else None
+
+
+def plumbing_sentence(parsed: dict) -> str | None:
+    """One sentence naming where the plumbing counts come from (the legend rows, proposed or his), or None."""
+    from .legend_counts import counts_for_rows
+    c = counts_for_rows(parsed)
+    parts = [c[k]["sakinys"] for k in ("klozetai", "wc_remai", "praustuves", "plautuves", "dusai", "vonios_kubilai",
+                                       "bide") if k in c]
+    return " ".join(parts) if parts else None
 
 
 _VIETA_SPLIT = _re.compile(r"\s[–—-]\s")
@@ -1607,7 +1605,12 @@ def mark_shower_rooms(parsed: dict) -> int:
     the recompute paths read the flags off the stored rooms. Returns how many
     rooms the list decided."""
     listed = parsed.get("_sanitary_prietaisai")
+    # v4 3c-2: the list was the plumbing reader's (a model reading the plan image) — no source any more; a list
+    # written by a reader of the drawing itself carries `saltinis: "brezinys"` on every fixture
     if not isinstance(listed, list) or not listed or plumbing_reading(parsed) is None:
+        return 0
+    listed = [f for f in listed if isinstance(f, dict) and f.get("saltinis") == "brezinys"]
+    if not listed:
         return 0
     rooms = [r for r in (parsed.get("patalpos") or []) if isinstance(r, dict)]
     seen: dict[str, set[str]] = {}
@@ -1960,80 +1963,19 @@ def build_gkp_pozicijos(rooms: list[dict]) -> list[dict]:
     return pozicijos
 
 
-# Vision's own labels for a room height it says it READ (prompt.py schema) — its `default_fallback` is not one
-_VISION_READ_HEIGHTS = ("section_pjuvis", "ceiling_plan_annotation")
-
-
-def _model_height_resolved(room: dict, parsed: dict) -> bool:
-    """Did the reading MODEL resolve this room's height itself (its own voted height with a read label, or its
-    per-room name / number map)? What the old Step 2.45 called `per_room` — used since v4 Phase 3c-1 only to pick
-    the rooms the zoom pass re-reads, never as a height (text/heights.py keeps the model's figure aside)."""
-    from extractor.feature_flags import get_flags
-    if not get_flags()["per_room_ceiling"]:
+def zoom_wanted(room: dict) -> bool:
+    """v4 3c-2: Step 2.5 (the zoom) re-reads only a room whose AREA the drawing's text and geometry left unread —
+    no room-table row or area label (READ_SOURCES), no outline the lane traced. Its height is never a reason any
+    more (heights are read from the text; the model's are off every room), and a room the drawing already measures
+    needs no model to look at it again. THE LAST PLACE A MODEL READS PIXELS IN THE READING, with Pass-1 itself:
+    kept because a raster sheet (no text layer, no vectors — objektas_i's cover, a scanned set; the raster outline
+    track is parked by the founder) has no other source for a room's area yet. Every number it writes stays
+    model-class: a perimeter `zoom` blanks the rows behind it, its height and niche metres are evidence only."""
+    if (room.get("plotas_saltinis") or "") in READ_SOURCES["plotas_saltinis"]:
         return False
-    src = str(room.get("_lubu_aukstis_modelio_saltinis") or "").strip().lower()
-    if src in _VISION_READ_HEIGHTS and room.get("_lubu_aukstis_modelio") is not None:
-        return True
-    by_name = parsed.get("_lubu_auksciai_modelio") or {}
-    by_nr = parsed.get("_lubu_auksciai_by_nr_modelio") or {}
-    if not by_name and not by_nr:
-        # the old step mined the model's warning texts for heights when it gave no map (objektas_h: „Vonios
-        # kambarys 1/2" — exactly the two rooms production did not zoom)
-        from extractor.height_markers import salvage_heights_from_warnings
-        by_name = salvage_heights_from_warnings(parsed.get("warnings") or [], parsed.get("patalpos") or []) or {}
-    nr = str(room.get("nr") or "").strip()
-    return bool((room.get("pavadinimas") and room.get("pavadinimas") in by_name) or (nr and nr in by_nr))
-
-
-def _apply_per_room_heights(rooms: list[dict], per_room: dict[str, float],
-                            section_average: float,
-                            name_key: str = "name") -> list[dict]:
-    """Sprint 0 Fix 4: use Vision's per-room ceiling heights when available
-    and the flag is enabled; otherwise apply section average to all rooms.
-
-    One room's height, strongest source first (2026-09-29): his own entry →
-    the altitude printed inside the room (height_markers) → the height the plan
-    states (plan_area_annotations, `plano_uzrasas`) → the room's own height the
-    rounds voted, when Vision says it read it → the name/number map from the
-    sections (`per_room`) → the section average. A weaker source never replaces
-    a stronger one; the label names the winner. The per-room steps are Vision's
-    and stay behind the flag. When the rounds disagreed, their heights are kept
-    as `_lubu_aukstis_sklaida` for the check sheet.
-
-    Returns a NEW list of room dicts (not in-place mutation).
-
-    name_key: which dict key holds the room name. Defaults to "name" for
-    test compatibility; production uses "pavadinimas" (LT convention).
-    """
-    from extractor.feature_flags import get_flags
-    flag_on = get_flags()["per_room_ceiling"]
-    out = []
-    for r in rooms:
-        room = {**r}
-        room_name = r.get(name_key)
-        src = str(r.get("lubu_aukstis_saltinis") or "").strip().lower()
-        has_own = r.get("lubu_aukstis_m") is not None
-        votes = [float(v) for v in (((r.get("_vote") or {}).get("lubu_aukstis_m") or {}).get("values") or [])
-                 if v is not None]
-        if len(set(votes)) > 1:
-            room["_lubu_aukstis_sklaida"] = {"values": votes, "min_m": min(votes), "max_m": max(votes)}
-        if src in ("user_override", "manual") and has_own:
-            pass                                              # his own entry
-        elif r.get("_height_source") == "positioned_marker" and r.get("_height_marker_m") is not None:
-            room["lubu_aukstis_m"] = float(r["_height_marker_m"])
-            room["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
-        elif src in ("ceiling_plan_marker", "plano_uzrasas") and has_own:
-            pass                                              # printed in the room / stated on the plan
-        elif flag_on and src in _VISION_READ_HEIGHTS and has_own:
-            pass                                              # the room's own voted height, its label says from where
-        elif flag_on and room_name and room_name in per_room:
-            room["lubu_aukstis_m"] = per_room[room_name]
-            room["lubu_aukstis_saltinis"] = "per_room"
-        else:
-            room["lubu_aukstis_m"] = section_average
-            room["lubu_aukstis_saltinis"] = "section_average"
-        out.append(room)
-    return out
+    if str(room.get("polygon_source") or "") == "vektoriniai_konturai" or room.get("_konturas"):
+        return False
+    return True
 
 
 def _apply_polygon_prepass(vision_result: dict) -> dict:
@@ -3418,6 +3360,43 @@ def _record_san_assumptions(parsed: dict, notes: list[str]) -> None:
         summ["low"] = summ["info"]
 
 
+# ── v4 3c-2: door types from the drawing's text ─────────────────────────────────
+DOOR_TYPES_FROM_TEXT = "tekstas"     # parsed["_door_types"]["saltinis"] of a reading of the text layer
+
+
+def apply_door_types(parsed: dict, pdf_bytes: bytes) -> dict:
+    """Step 2.865 (and the eval tail): the frameless / sliding doors the drawing's TEXT names
+    (door_type_reader.read_door_types — text layer, no model) → `parsed["_door_types"]`, marked
+    `saltinis: "tekstas"`. The plan's own door symbols are not a second count any more (they came from the
+    reading model's look at the image): the reconcile gets 0 for them, so the text's count stands alone and a
+    governing note („visos vidaus durys — beapvadinės") is applied as before. Returns the reader's answer."""
+    from .door_type_reader import read_door_types, reconcile_frameless
+    rooms_now = parsed.get("patalpos") or []
+    dt = read_door_types(pdf_bytes, rooms_now, page_classifications=parsed.get("puslapiai") or [])
+    if dt.get("status") != "ok":
+        if (parsed.get("_door_types") or {}).get("saltinis") != DOOR_TYPES_FROM_TEXT:
+            parsed.pop("_door_types", None)     # an older reading of the sheet image is no source
+        return dt
+    _NONINT = {"garazas", "tamburas", "tambūras"}
+    n_interior = sum(int(el.get("kiekis") or 1) for r in rooms_now
+                     for el in (r.get("elementai") or [])
+                     if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
+                     and _pask(r) not in _NONINT)
+    rec = reconcile_frameless(
+        plan_frameless=0, reader_frameless=dt.get("beapvadines_count", 0),
+        bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,
+        archetipas=parsed.get("archetipas") or (parsed.get("santrauka") or {}).get("archetipas"))
+    parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
+                             "plan_tagged": 0, "pages": dt.get("pages"),
+                             "reader_standartines": dt.get("standartines_count"),
+                             "reader_stumdomos": dt.get("stumdomos_count"),
+                             "bendras_tipas": dt.get("bendras_tipas"),
+                             "doors": [d for d in (dt.get("doors") or []) if isinstance(d, dict)][:40],
+                             "saltinis": DOOR_TYPES_FROM_TEXT}
+    parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
+    return dt
+
+
 # ── v4 3b: row provenance (2026-10-25) ────────────────────────────────────────
 # Which per-room field puts a room behind a row that carries no ledger of its own (the ledger's
 # contributions name the rooms otherwise).
@@ -3493,14 +3472,16 @@ def _gate_frameless(pozicijos: list[dict], parsed: dict) -> None:
         if src in _FRAMELESS_READ:
             _rp.tag(p, _rp.DRAWING)
             continue
+        _dtt = parsed.get("_door_types") or {}
         try:
-            text_read = int(((parsed.get("_door_types") or {}).get("reader_beapvadines")) or 0) > 0
+            text_read = (_dtt.get("saltinis") == DOOR_TYPES_FROM_TEXT
+                         and int(_dtt.get("reader_beapvadines") or 0) > 0)
         except (TypeError, ValueError):
             text_read = False
         if text_read:
-            # the door-type reader found frameless doors written in the drawing's text (tags, annotations) —
-            # a reader of text from the sheet image, which Phase 3c moves onto the text layer
-            _rp.tag(p, _rp.MODEL_3C)
+            # v4 3c-2: frameless doors written in the drawing's text layer (door_type_reader, no model); an older
+            # reading of the sheet IMAGE (no `saltinis`) is no source
+            _rp.tag(p, _rp.DRAWING)
             continue
         said = str(prep.get("sakinys") or "").strip()
         _rp.blank(p, ((said + " ") if said else "")
@@ -3517,8 +3498,8 @@ _COUNT_FROM_GLYPHS_LT = ("Kiekis — iš plano ženklų, kurių brėžinio tekst
 
 def _gate_defaults(pozicijos: list[dict], parsed: dict) -> None:
     """The fact-defaults (a share, a count by room type, a count per shower) and Pass-1's glyph counts
-    become blank rows that say what to write (v4 3b). His own choices and the plumbing reader's counts
-    (a 3c reader) stay."""
+    become blank rows that say what to write (v4 3b). His own choices and the legend's plumbing counts (v4 3c-2)
+    stay."""
     overrides = parsed.get("_overrides") if isinstance(parsed.get("_overrides"), dict) else {}
     plumbing = plumbing_reading(parsed) is not None
     for p in pozicijos:
@@ -3561,7 +3542,12 @@ def _gate_defaults(pozicijos: list[dict], parsed: dict) -> None:
             continue
         if sal == "simboliai_brezinyje":
             if plumbing and sk in _PLUMBING_SECTIONS:
-                _rp.tag(p, _rp.MODEL_3C)          # the plumbing reader's count — Phase 3c reduces it to text
+                # v4 3c-2: the plumbing counts are the drawing's legend rows (plumbing_reading) — his confirmed
+                # count or the reading's proposal, which the sentence asks him to confirm
+                _rp.tag(p, _rp.DRAWING)
+                said = plumbing_sentence(parsed)
+                if said and not p.get("_assumption"):
+                    p["_assumption"] = said
             else:
                 _rp.blank(p, _COUNT_FROM_GLYPHS_LT)
 
@@ -4550,7 +4536,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # Skylių gręžimas — symbol-driven (klozetas×4 + praustuvė×6 + vonia×8
         # + WC rėmas×3) per wet room. Symbols come from detected_symbols_summary
         # or fall back to opening-count heuristic when symbols not detected.
-        sym = (parsed.get("detected_symbols_summary") or {})
+        sym = plumbing_reading(parsed) or {}     # v4 3c-2: the legend's counts, never the model's glance
         n_kloz = int(sym.get("klozetai") or 0)
         n_praust = int(sym.get("praustuves") or 0)
         # Kitchen/laundry sinks left `praustuves` for their own key on
@@ -4898,10 +4884,8 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     if _basins_read > 0:
         n_praustuves, _basin_src = _basins_read, "simboliai_brezinyje"
     else:
-        _basins_sym = _count0((parsed.get("detected_symbols_summary") or {}).get("praustuves"))
-        n_praustuves = max(n_wet_with_klozetas, _basins_sym)
-        _basin_src = ("simboliai_brezinyje" if _basins_sym > n_wet_with_klozetas
-                      else "paskirtis_default")
+        # v4 3c-2: the model's glance at the basins is no source — the wet rooms, as a disclosed assumption
+        n_praustuves, _basin_src = n_wet_with_klozetas, "paskirtis_default"
     # Plautuvės (virtuvės/skalbyklos kriauklės) — a SEPARATE contractor line
     # from the praustuvė (objektas_d nr 32 "Plautuvės montavimas" alongside nr 33
     # "Praustuvės montavimas"), so it needs a count of its own.
@@ -4915,8 +4899,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Room type stays the FLOOR (a virtuvė has a sink whether or not a plumbing
     # sheet exists); read evidence may only raise it, never lower — same policy
     # as reconcile_fixture_counts. Absent key ⇒ pre-change behaviour exactly.
-    n_plautuves = max(n_virtuve,
-                      int((parsed.get("detected_symbols_summary") or {}).get("plautuves") or 0))
+    n_plautuves = max(n_virtuve, _count0((_plumb or {}).get("plautuves")))
     # Bathtub mixer is a SEPARATE fixture from the shower mixer (contractor
     # objektas_a 38/39 + objektas_b 83/84 bill "vonios maišytuvas" alongside "dušo
     # maišytuvas").
@@ -4930,10 +4913,13 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # wet fixture is there and not which, so emit the checklist TODO and let
     # the user answer. 2 of 6 registry PDFs have no plumbing sheet at all, so
     # "reader never ran" is a normal state, not an error.
-    _sym = parsed.get("detected_symbols_summary") or {}
-    _tubs_read = _sym.get("vonios_kubilai")
+    _sym = _plumb or {}                      # v4 3c-2: the legend's counts only
+    # a bathtub the legend counts; a legend that names none proves nothing (legends list some fixtures only)
+    _tubs_read = _sym.get("vonios_kubilai") if _plumb and _sym.get("vonios_kubilai") else None
     n_vonios_sym = int(_tubs_read or 0) if _tubs_read is not None else 0
-    vonia_unknown = _tubs_read is None and int(_sym.get("vonios") or 0) > 0
+    # the reading's glance at a tub-or-tray symbol is no count — only the reason to ask (the row stays blank)
+    _tub_glance = int((parsed.get("detected_symbols_summary") or {}).get("vonios") or 0)
+    vonia_unknown = _tubs_read is None and _tub_glance > 0
     # Bidė dušiukai — counted by the sanitary reader since 2026-07-29 (the
     # `bide` fixture key); the count lands in detected_symbols_summary via
     # reconcile_fixture_counts. Contractor truth: 3 vnt on objektas_a AND on
@@ -4999,7 +4985,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # count, floor drains from a legend count (extractor/fixture_rows_flag.py)
         from .fixture_rows_flag import fixture_rows as _fixture_rows
         pozicijos.extend(_fixture_rows(parsed, tubs_read=(n_vonios_sym if _tubs_read is not None else None),
-                                       tub_or_tray_glance=int(_sym.get("vonios") or 0), skyrius=SK_SAN))
+                                       tub_or_tray_glance=_tub_glance, skyrius=SK_SAN))
         # Virtuvė / skalbykla — plautuvė + jos maišytuvas. Both consume
         # `n_plautuves`, so the sink and its mixer can never drift apart, and
         # neither is billed a second time inside the praustuvė lines above.
@@ -5075,39 +5061,52 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     symbols = (parsed.get("v9_meta", {}) or {}).get("symbols_detected") \
               or parsed.get("detected_symbols_summary") \
               or {}
-    rozetes_n = int(symbols.get("rozetes") or 0)
-    jungikliai_n = int(symbols.get("jungikliai") or 0)
-    sviestuvai_n = int(symbols.get("sviestuvai") or 0)
-    pakabinami_n = int(symbols.get("pakabinami_sviestuvai") or 0)
+    # v4 3c-2: the electrical counts come from the drawing's legend rows (extractor/legend_counts.py: his confirmed
+    # count, else the reading's proposal). The model's glance at the glyphs (`symbols`) only says the plan shows
+    # such things at all — then the row stays, blank, saying what to count.
+    from .legend_counts import counts_for_rows as _counts_for_rows, no_count_reason as _no_count_reason
+    _lc = _counts_for_rows(parsed)
+    _glance = {k: float(symbols.get(k) or 0) > 0 for k in ("rozetes", "jungikliai", "sviestuvai", "pakabinami_sviestuvai")}
+    from text.page_kind import kinds_from_meta as _kinds_from_meta
+    _el_sheet = "electrical" in set(_kinds_from_meta(parsed).values())   # the text's sheet kinds, kept in `_meta`
+
+    def _n(*fams: str) -> int:
+        return sum(int(_lc[f]["n"]) for f in fams if f in _lc)
+
+    def _said(*fams: str) -> str:
+        return " ".join(_lc[f]["sakinys"] for f in fams if f in _lc)
+
+    rozetes_n = _n("rozetes")
+    jungikliai_n = _n("jungikliai")
+    sviestuvai_n = _n("sviestuvai")
+    pakabinami_n = _n("sviestuvai_pakabinami")
     led_juostu_m = float(symbols.get("led_juostos") or 0)
     difuzoriai_n = int(symbols.get("difuzoriai") or 0)
 
-    # Šitos pozicijos pridedam VISADA (kaip rangovo „checklist") — kiekiai 0/null
-    # kai nėra duomenų; vartotojas gali įvesti rankiniu būdu.
+    def _counted(label: str, n: int, fams: tuple[str, ...]) -> dict:
+        return _rp.tag({"skyrius": SK_EL, "aprasymas": label, "vnt": "vnt", "kiekis": n,
+                        "saltinis": "legendos_skaicius", "confidence": "medium", "_assumption": _said(*fams)},
+                       _rp.DRAWING)
+
+    def _uncounted(label: str, what_lt: str) -> dict:
+        return _rp.blank({"skyrius": SK_EL, "aprasymas": label, "vnt": "vnt", "kiekis": None,
+                          "saltinis": "checklist", "confidence": "low"}, _no_count_reason(parsed, what_lt))
+
     el_lines: list[dict] = []
     if rozetes_n + jungikliai_n > 0:
-        el_lines.append({
-            "skyrius": SK_EL, "aprasymas": "Rozetės / jungiklio pajungimas",
-            "vnt": "vnt", "kiekis": rozetes_n + jungikliai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
-        })
+        el_lines.append(_counted("Rozetės / jungiklio pajungimas", rozetes_n + jungikliai_n, ("rozetes", "jungikliai")))
+    elif _glance["rozetes"] or _glance["jungikliai"] or _el_sheet:
+        el_lines.append(_uncounted("Rozetės / jungiklio pajungimas", "rozečių ir jungiklių"))
     if sviestuvai_n > 0:
-        el_lines.append({
-            "skyrius": SK_EL, "aprasymas": "Lubinių priglaistomų šviestuvų montavimas",
-            "vnt": "vnt", "kiekis": sviestuvai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
-        })
-        el_lines.append({
-            "skyrius": SK_EL, "aprasymas": "Skylių šviestuvams gręžimas",
-            "vnt": "vnt", "kiekis": sviestuvai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
-        })
+        el_lines.append(_counted("Lubinių priglaistomų šviestuvų montavimas", sviestuvai_n, ("sviestuvai",)))
+        el_lines.append(_counted("Skylių šviestuvams gręžimas", sviestuvai_n, ("sviestuvai",)))
+    elif _glance["sviestuvai"] or _el_sheet:
+        el_lines.append(_uncounted("Lubinių priglaistomų šviestuvų montavimas", "lubinių šviestuvų"))
+        el_lines.append(_uncounted("Skylių šviestuvams gręžimas", "lubinių šviestuvų"))
     if pakabinami_n > 0:
-        el_lines.append({
-            "skyrius": SK_EL, "aprasymas": "Pakabinamų šviestuvų montavimas",
-            "vnt": "vnt", "kiekis": pakabinami_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
-        })
+        el_lines.append(_counted("Pakabinamų šviestuvų montavimas", pakabinami_n, ("sviestuvai_pakabinami",)))
+    elif _glance["pakabinami_sviestuvai"] or _el_sheet:
+        el_lines.append(_uncounted("Pakabinamų šviestuvų montavimas", "pakabinamų šviestuvų"))
     if _led:
         # v4 3b: the LED strip length the legend states (the same reading the LED niche rows take)
         el_lines.append(_rp.tag({
@@ -5200,19 +5199,22 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
                 "apdirbimą (priglaistymą)."
             ),
         })
-    # Termoreguliatoriai: no reader tracks them at all (truth: 8 vnt on the
-    # reference project) — always a checklist TODO until a reader exists.
-    el_lines.append({
-        "skyrius": SK_EL,
-        "aprasymas": "Termoreguliatorių pajungimas — suveskite kiekį",
-        "vnt": "vnt", "kiekis": None,
-        "saltinis": "checklist", "confidence": "low",
-        "_assumption": (
-            "Kiekio skaitytuvo nėra. Kur ieškoti: šildymo / grindinio šildymo "
-            "planas — termostatų vietos patalpose (dažnai 1 vnt kiekvienai "
-            "patalpai su grindiniu šildymu)."
-        ),
-    })
+    # Termoreguliatoriai — v4 3c-2: the legend row naming the thermostat („Termostato vieta", „Termostatas"),
+    # counted on the plan (a proposal he confirms); otherwise the checklist row, as before.
+    if _n("termostatai") > 0:
+        el_lines.append(_counted("Termoreguliatorių pajungimas", _n("termostatai"), ("termostatai",)))
+    else:
+        el_lines.append({
+            "skyrius": SK_EL,
+            "aprasymas": "Termoreguliatorių pajungimas — suveskite kiekį",
+            "vnt": "vnt", "kiekis": None,
+            "saltinis": "checklist", "confidence": "low",
+            "_assumption": (
+                "Kiekio skaitytuvo nėra. Kur ieškoti: šildymo / grindinio šildymo "
+                "planas — termostatų vietos patalpose (dažnai 1 vnt kiekvienai "
+                "patalpai su grindiniu šildymu)."
+            ),
+        })
 
     SK_VENT = "Ventiliacijos darbai"
     # Ducts (2026-10-25, v4 3b): no drawing in the corpus or in his uploads draws a duct run with a length —
@@ -5235,11 +5237,9 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # Same pair pattern for šviestuvai — rangovas lists montavimas separately
         # from apdirbimas (gipsiniai). We already emit montavimas + skylės
         # above; add apdirbimas as third line.
-        el_lines.append({
-            "skyrius": SK_EL, "aprasymas": "Šviestuvų apdirbimas (gipsiniai priglaistomi)",
-            "vnt": "vnt", "kiekis": sviestuvai_n,
-            "saltinis": "simboliai_brezinyje", "confidence": "medium",
-        })
+        el_lines.append(_counted("Šviestuvų apdirbimas (gipsiniai priglaistomi)", sviestuvai_n, ("sviestuvai",)))
+    elif _glance["sviestuvai"] or _el_sheet:
+        el_lines.append(_uncounted("Šviestuvų apdirbimas (gipsiniai priglaistomi)", "lubinių šviestuvų"))
     pozicijos.extend(el_lines)
 
     # ════════════════════════════════════════════════════════════════════════
@@ -5315,7 +5315,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # + apdirbimas) mirrors how the contractor bills every priglaistomas
     # element. Gated on a ceiling-lighting read so it never appears on a
     # project whose lighting plan we never saw.
-    if sviestuvai_n > 0 or pakabinami_n > 0 or led_juostu_m > 0:
+    if sviestuvai_n > 0 or pakabinami_n > 0 or led_juostu_m > 0 or _glance["sviestuvai"]:
         pozicijos.extend([
             _checklist(SK_EL,
                        "Magnetinės TRACK apšvietimo sistemos montavimas — suveskite ilgį",
@@ -6704,8 +6704,9 @@ def extract_interior(
     zoom_count_skipped = 0
     t_zoom_start = time.time()
 
-    # Sprint E2: SMART ZOOM SKIP — when room has eksplikacija-anchored plotas
-    # AND a name-matched eksplikacija row, plotas is byte-exact (pdfplumber).
+    # Sprint E2 → v4 3c-2: SMART ZOOM SKIP — a room the drawing already measures (text area or traced outline) is
+    # never zoomed (see _can_skip_zoom). History: when a room had eksplikacija-anchored plotas
+    # AND a name-matched eksplikacija row, plotas was byte-exact (pdfplumber).
     # Zoom adds value primarily for opening dimensions and edge cases. We can
     # safely skip zoom when:
     #   1. plotas_saltinis == "eksplikacija" (deterministic primitive)
@@ -6713,27 +6714,7 @@ def extract_interior(
     # This typically saves 50-75% of zoom calls on CAD-export projects with
     # clean eksplikacija — without losing accuracy on the primary primitive.
     def _can_skip_zoom(r: dict) -> bool:
-        if (r.get("plotas_saltinis") or "") != "eksplikacija":
-            return False
-        if r.get("eksplikacija_row_idx") is None:
-            return False
-        # Confidence guard: only skip if Vision considered this room "high"
-        if (r.get("confidence") or "") == "low":
-            return False
-        # Ceiling height is NOT an eksplikacija primitive — the table carries only
-        # plotas/perimetras. If this room's height wasn't individually resolved
-        # (saltinis != "per_room"), the zoom pass is the ONLY recovery path; don't
-        # skip it, else the room keeps the section-average height and the
-        # iki/virš-3m paint split + pastoliai collapse. (Fix: 2026-06-09, the
-        # zoom-once regression where 10/11 objektas_a rooms got a uniform 2.82 m.)
-        # (2026-09-29: the room's own voted height keeps Vision's label — resolved the same way.)
-        # v4 Phase 3c-1: the zoom no longer sets a height (text/heights.py reads them from the text) and the model's
-        # height is taken off the room before this step; which rooms are zoomed is still decided by the model's
-        # own reading, exactly as before, so the reading asks the model no more and no fewer crops.
-        # (Follow-up for the manager: with heights off the zoom, this condition could go — fewer paid crops.)
-        if not _model_height_resolved(r, parsed):
-            return False
-        return True
+        return not zoom_wanted(r)
 
     _zoomable = [r for r in rooms
                  if r.get("bbox_pct") and r.get("puslapio_nr")
@@ -6827,244 +6808,42 @@ def extract_interior(
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
           f"{zoom_count_applied} applied, {zoom_elapsed}s")
 
-    # Step 2.85: APDAILOS READER (2026-05-27).
-    # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
-    # page) and override the heuristic walls_paint per-room. This replaces
-    # hardcoded defaults like `tamburas: walls_paint=0` with what the project
-    # actually specifies — per the user directive "imam B iškart" (read from
-    # project, forget paskirtis-based heuristics). Objektas A fixture simulation
-    # showed walls accuracy: -11,6% → -4,3% after this step.
+    # Step 2.85: WALL FINISHES FROM THE FINISH SHEETS' TEXT (v4 3c-2 — apply_apdailos: text layer / OCR, a model
+    # only on the extracted text through text/schema_llm.py; no sheet image is sent).
     try:
-        from .apdailos_reader import read_apdailos_finishes, merge_apdailos_into_rooms
         _emit({"event": "apdailos_started"})
-        apdailos_result = read_apdailos_finishes(
-            pdf_bytes, parsed.get("patalpos") or [],
-            pages_meta=parsed.get("puslapiai") or [])
-        _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # roll tokens into cost
-        status = apdailos_result.get("status")
-        if status in ("ok", "partial"):
-            n_updated = merge_apdailos_into_rooms(parsed.get("patalpos") or [], apdailos_result)
-            _record_apdailos_meta(parsed, apdailos_result, n_updated)
-            _emit({
-                "event": "apdailos_completed",
-                "page": apdailos_result.get("page"),
-                "rooms_updated": n_updated,
-                "status": status,
-            })
-            if n_updated == 0:
-                _warn_apdailos_degraded(parsed, "apdailos lape neatpažinta nė viena patalpa")
-            elif status == "partial":
-                # Some rooms arrived, some did not — say so rather than letting
-                # the un-updated rooms look read.
-                _warn_apdailos_degraded(
-                    parsed,
-                    f"atsakymas nutrūko – nuskaityta tik {n_updated} "
-                    f"iš {len(parsed.get('patalpos') or [])} patalpų "
-                    f"({apdailos_result.get('_error')})",
-                    partial=True)
-        else:
-            _record_apdailos_meta(parsed, apdailos_result, 0)
-            _emit({
-                "event": "apdailos_skipped",
-                "reason": apdailos_result.get("_error"),
-            })
-            _warn_apdailos_degraded(parsed, apdailos_result.get("_error"))
-    except ImportError as exc:
-        # A missing reader module is a REGRESSION, not a benign runtime miss —
-        # it silently drops per-room wall-finish recovery (walls_paint collapses
-        # to the legacy paskirtis heuristic). Make it LOUD. (2026-06-09: both
-        # reader modules were lost from git and failed silently for weeks.)
-        print(f"[extractor] ⚠️ APDAILOS READER MODULE MISSING — paint recovery DISABLED: {exc}")
-        _emit({"event": "apdailos_error", "message": f"module_missing: {exc}", "severity": "regression"})
-        _record_apdailos_meta(parsed, {"status": "module_missing", "_error": str(exc),
-                                       "_meta": {"error_class": type(exc).__name__}}, 0)
-        _warn_apdailos_degraded(parsed, f"modulis nerastas: {exc}")
-    except Exception as exc:
+        apdailos_result = apply_apdailos(parsed, pdf_bytes, client=client)
+        _append_extra_call(parsed, apdailos_result.get("_meta"), reader="apdailos")  # a schema_llm text call, if any
+        _emit({"event": "apdailos_completed" if apdailos_result.get("status") == "ok" else "apdailos_skipped",
+               "page": apdailos_result.get("page"), "status": apdailos_result.get("status"),
+               "rooms_updated": (parsed.get("_meta") or {}).get("apdailos_rooms_updated"),
+               "reason": apdailos_result.get("_error")})
+    except Exception as exc:  # noqa: BLE001
         print(f"[extractor] apdailos read failed (non-fatal): {exc}")
         _emit({"event": "apdailos_error", "message": str(exc)})
-        _record_apdailos_meta(parsed, {"status": "exception", "_error": str(exc),
-                                       "_meta": {"error_class": type(exc).__name__}}, 0)
-        _warn_apdailos_degraded(parsed, str(exc))
 
-    # Step 2.86: DOORS READER (2026-05-27).
-    # Focused Vision pass on floor_plan to count ALL doors including exterior
-    # (front, garage, terrace) and corridor doors that pass-1 systematically
-    # misses. Objektas A fixture: pass-1 found 9 doors, truth = 14. With doors_reader
-    # paint area gap closes from -1.2% to ±0.5% (to the dot).
-    try:
-        from .doors_reader import read_doors_from_plan_pages, merge_doors_by_page
-        _emit({"event": "doors_started"})
-        # One read per plan sheet that holds rooms; each sheet's doors replace
-        # only the doors of the rooms on that sheet (audit 2026-09-30,
-        # vision-pipeline-6 — a two-storey project lost the other storey's doors).
-        doors_result = read_doors_from_plan_pages(
-            pdf_bytes,
-            parsed.get("patalpos") or [],
-            page_classifications=parsed.get("puslapiai") or [],
-        )
-        for _dm in _reader_call_metas(doors_result):  # one billed call per sheet
-            _append_extra_call(parsed, _dm, reader="doors")
-        _note_doors_unread(parsed, doors_result)
-        if doors_result.get("status") == "ok":
-            n_updated = merge_doors_by_page(parsed.get("patalpos") or [], doors_result)
-            parsed.setdefault("_meta", {})["doors_page"] = doors_result.get("page")
-            parsed["_meta"]["doors_pages"] = doors_result.get("pages_read")
-            parsed["_meta"]["doors_total_count"] = doors_result.get("total_count")
-            parsed["_meta"]["doors_interior_count"] = doors_result.get("interior_count")
-            parsed["_meta"]["doors_exterior_count"] = doors_result.get("exterior_count")
-            parsed["_meta"]["doors_rooms_updated"] = n_updated
-            parsed["_meta"]["doors_elapsed_s"] = doors_result.get("_elapsed_s")
-            _n_unplaced = int(doors_result.get("_unattributed") or 0)
-            parsed["_meta"]["doors_unattributed"] = _n_unplaced
-            if _n_unplaced:
-                parsed.setdefault("warnings", []).append({
-                    "level": "WARN", "code": "doors_unattributed", "severity": "med",
-                    "message": (f"{_n_unplaced} durų iš plano nepavyko priskirti patalpoms"
-                                + (" — palikti pirmo skaitymo durų skaičiai" if doors_result.get("_kept_pass1_doors") else "")
-                                + ". Patikrinkite durų skaičių patalpose."),
-                })
-            _emit({
-                "event": "doors_completed",
-                "page": doors_result.get("page"),
-                "pages": doors_result.get("pages_read"),
-                "total": doors_result.get("total_count"),
-                "interior": doors_result.get("interior_count"),
-                "exterior": doors_result.get("exterior_count"),
-            })
-        else:
-            _emit({
-                "event": "doors_skipped",
-                "reason": doors_result.get("_error"),
-            })
-    except ImportError as exc:
-        print(f"[extractor] ⚠️ DOORS READER MODULE MISSING — door recount DISABLED: {exc}")
-        _emit({"event": "doors_error", "message": f"module_missing: {exc}", "severity": "regression"})
-    except Exception as exc:
-        print(f"[extractor] doors read failed (non-fatal): {exc}")
-        _emit({"event": "doors_error", "message": str(exc)})
+    # Step 2.86 (the doors reader — a model counting doors off the plan image and replacing each room's doors with
+    # its count) is gone (v4 3c-2, 2026-10-25). The doors come from the drawing: the geometry lane's openings as drawn
+    # (Step 2.44d — swing arcs and gaps in the walls, per outlined room) and the door schedule's text (Step 2.43).
 
-    # Step 2.865: DOOR-TYPE READER (2026-06-14, council 5/5 + research).
-    # Frameless ("beapvadinės") door TYPE is structurally NOT in the door glyph —
-    # it's in the drawing TEXT (tags LD-1, annotations "skirta beapvadinėms
-    # durims"). The glyph pass under-tags frameless doors (Objektas A 2 of ~8 →
-    # "Durų angų paruošimas" 10.2 m vs contractor 39.2 m). Read the text, reconcile
-    # against the tagged count, RAISE + flag — never silently overwrite.
+    # Step 2.865: DOOR TYPES FROM THE DRAWING'S TEXT (v4 3c-2: the text layer, no model — apply_door_types).
     try:
-        from .door_type_reader import (
-            read_door_types, read_door_types_voted, reconcile_frameless)
         _emit({"event": "door_types_started"})
-        rooms_now = parsed.get("patalpos") or []
-        # Opus 4.8 has no temperature knob — this single-pass recall-critical
-        # reader is the #1 variance source. Vote it (median/mode) when voting is on.
-        dt = (read_door_types_voted(pdf_bytes, rooms_now,
-                                    page_classifications=parsed.get("puslapiai") or [])
-              if _voting_on else
-              read_door_types(pdf_bytes, rooms_now,
-                              page_classifications=parsed.get("puslapiai") or []))
-        # Roll door-type reader tokens into cost. Voted: one extra_call per round
-        # (_round_metas); single-pass: the one _meta. Each round may run a
-        # different model (mixed voting) → priced per-model downstream.
-        for _rm in _reader_call_metas(dt):
-            _append_extra_call(parsed, _rm, reader="door_type")
+        dt = apply_door_types(parsed, pdf_bytes)
         if dt.get("status") == "ok":
-            n_tagged = sum(int(el.get("kiekis") or 1) for r in rooms_now
-                           for el in (r.get("elementai") or [])
-                           if (el.get("tipas") or "").lower() == "pasleptos_duris")
-            _NONINT = {"garazas", "tamburas", "tambūras"}
-            n_interior = sum(int(el.get("kiekis") or 1) for r in rooms_now
-                             for el in (r.get("elementai") or [])
-                             if (el.get("tipas") or "").lower() in ("duris", "pasleptos_duris")
-                             and _pask(r) not in _NONINT)
-            rec = reconcile_frameless(
-                plan_frameless=n_tagged, reader_frameless=dt.get("beapvadines_count", 0),
-                bendras_tipas=dt.get("bendras_tipas"), n_interior_doors=n_interior,
-                archetipas=parsed.get("archetipas") or (parsed.get("santrauka") or {}).get("archetipas"))
-            # If the voted reads disagreed (spread>0), surface it as geltona —
-            # the honest output is "reads varied, verify", not a silent pick.
-            _vote = dt.get("_vote") or {}
-            if _vote.get("spread", 0) > 0:
-                if rec.get("confidence") == "zalia":
-                    rec["confidence"] = "geltona"
-                rec["reason"] = (rec.get("reason") or "") + \
-                    f" (skaitymai svyravo tarp paleidimų: {_vote.get('beapvadines_values')})"
-            parsed["_door_types"] = {**rec, "reader_beapvadines": dt.get("beapvadines_count"),
-                                     "plan_tagged": n_tagged, "pages": dt.get("pages"),
-                                     # 2026-09-23: what the reader said about the OTHER doors is kept too —
-                                     # „how many doors with casings" was unanswerable from a count of one kind
-                                     "reader_standartines": dt.get("standartines_count"),
-                                     "reader_stumdomos": dt.get("stumdomos_count"),
-                                     "bendras_tipas": dt.get("bendras_tipas"),
-                                     "doors": [d for d in (dt.get("doors") or []) if isinstance(d, dict)][:40],
-                                     "_vote": _vote}
-            parsed.setdefault("_meta", {})["door_types_elapsed_s"] = dt.get("_elapsed_s")
-            _emit({"event": "door_types_completed", "frameless": rec.get("count"),
-                   "confidence": rec.get("confidence"), "reader": dt.get("beapvadines_count"),
-                   "tagged": n_tagged})
+            _dtt = parsed.get("_door_types") or {}
+            _emit({"event": "door_types_completed", "frameless": _dtt.get("count"),
+                   "confidence": _dtt.get("confidence"), "reader": dt.get("beapvadines_count"), "tagged": 0})
         else:
             _emit({"event": "door_types_skipped", "reason": dt.get("_error")})
     except Exception as exc:  # noqa: BLE001
         print(f"[extractor] door-type read failed (non-fatal): {exc}")
         _emit({"event": "door_types_error", "message": str(exc)})
 
-    # Step 2.866: SANITARY FIXTURE READER (2026-06-14, research #3 point-list).
-    # The full-sheet pass under-counts dense sanitary symbols (Objektas A praustuvės
-    # 3, truth 5). A focused point-list-then-count read raises recall (3→4 live);
-    # reconcile RAISES detected_symbols_summary to the higher count (the skylių
-    # formula consumes it), never silently lowers. Modest, honest — fixtures have
-    # no clean schedule to read (research-confirmed).
-    try:
-        from .sanitary_fixture_reader import (
-            read_fixtures, read_fixtures_voted, reconcile_fixture_counts)
-        _emit({"event": "fixtures_started"})
-        # `puslapiai` (the main pass's page classification) steers the page
-        # picker onto the sheet labelled `plumbing` instead of the first page
-        # that happens to say "maišytuvas" — see _find_sanitary_pages.
-        _pages_meta = parsed.get("puslapiai") or []
-        fx = (read_fixtures_voted(pdf_bytes, parsed.get("patalpos") or [],
-                                  pages_meta=_pages_meta)
-              if _voting_on else
-              read_fixtures(pdf_bytes, parsed.get("patalpos") or [],
-                            pages_meta=_pages_meta))
-        # Roll fixture-reader tokens into cost (voted: per-round; single: one).
-        for _rm in _reader_call_metas(fx):
-            _append_extra_call(parsed, _rm, reader="fixtures")
-        # Whether a plumbing reading EXISTS decides where every santechnika
-        # count comes from (`plumbing_reading`, 2026-10-03) — kept in `_meta`
-        # because `_meta` rides the recompute context and the rows must not
-        # change source when he touches a Prielaidos slider.
-        parsed.setdefault("_meta", {})["fixtures_status"] = fx.get("status") or "error"
-        if fx.get("status") == "ok":
-            parsed["_meta"]["fixtures_counts"] = dict(fx.get("counts") or {})
-            rec = reconcile_fixture_counts(parsed.get("detected_symbols_summary") or {},
-                                           fx.get("counts") or {})
-            parsed["detected_symbols_summary"] = rec["merged"]
-            # KEEP the enumeration, not only the counts it collapses into
-            # (2026-09-02). The reader is asked to point-list every fixture
-            # BECAUSE counting from a glance under-reads dense symbols — and
-            # then the list, `{tipas, vieta}` per fixture, was dropped at this
-            # call site. Every santechnika row is billed off these integers, so
-            # the list is the only evidence a contractor could check them
-            # against. Small (tens of short dicts) and already paid for.
-            if fx.get("prietaisai"):
-                parsed["_sanitary_prietaisai"] = fx["prietaisai"]
-            # Which rooms the plumbing plan shows a shower in (2026-10-03) —
-            # attached to the ROOMS here, at read time, like the doors reader:
-            # the shower zone is a calculator input (Step 2.9 below), and the
-            # recompute paths get the rooms, not the fixture list.
-            try:
-                mark_shower_rooms(parsed)
-            except Exception as _exc:  # noqa: BLE001
-                print(f"[extractor] shower attribution failed (non-fatal): {_exc}")
-            parsed.setdefault("_meta", {})["fixtures_raised"] = rec["raised"]
-            parsed["_meta"]["fixtures_elapsed_s"] = fx.get("_elapsed_s")
-            _emit({"event": "fixtures_completed", "raised": rec["raised"],
-                   "counts": fx.get("counts")})
-        else:
-            _emit({"event": "fixtures_skipped", "reason": fx.get("_error")})
-    except Exception as exc:  # noqa: BLE001
-        print(f"[extractor] fixture read failed (non-fatal): {exc}")
-        parsed.setdefault("_meta", {})["fixtures_status"] = "error"
-        _emit({"event": "fixtures_error", "message": str(exc)})
+    # Step 2.866 (the plumbing reader — a model counting fixtures off the plan image, Phase 3b `model-3c`) is gone
+    # (v4 3c-2, 2026-10-25): the fixtures are counted from the plumbing plan's legend rows in the drawing's lanes
+    # (Step 2.44l, extractor/legend_counts.py) and `plumbing_reading` takes them from there; a plan without a
+    # fixture legend leaves the santechnika rows blank with the room-type count in their sentence.
 
     # Steps 2.87 / 2.88 (the Vision niche locator and the room-type niche estimate) are gone (v4 3b,
     # 2026-10-25): the LED niche rows take the length the drawing's legend states, else stay blank.
@@ -7136,7 +6915,7 @@ def extract_interior(
             ]
             if we_pages:
                 _emit({"event": "wall_elevation_started", "pages": len(we_pages)})
-                we_result = extract_wall_elevations(pdf_bytes, client, we_pages)
+                we_result = extract_wall_elevations(pdf_bytes, client, we_pages, parsed.get("patalpos") or [])
                 parsed["_wall_elevations"] = we_result.get("wall_elevations", [])
                 parsed.setdefault("_meta", {})["wall_elevation_meta"] = we_result.get("_meta", {})
                 _emit({

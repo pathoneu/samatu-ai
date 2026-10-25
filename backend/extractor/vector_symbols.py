@@ -111,6 +111,12 @@ def _glyphs(page) -> list[dict]:
             x1 = max(p["x1"] for p in g)
             y0 = min(p["top"] for p in g)
             y1 = max(p["bottom"] for p in g)
+            run = _side_by_side(g) if len(g) > 1 else None
+            if run is not None:
+                for sg in run:
+                    out.append(_make_glyph(key[0], key[1], min(p["x0"] for p in sg), max(p["x1"] for p in sg),
+                                           min(p["top"] for p in sg), max(p["bottom"] for p in sg), len(sg)))
+                continue
             if _fits(x1 - x0, y1 - y0):
                 out.append(_make_glyph(key[0], key[1], x0, x1, y0, y1, len(g)))
                 continue
@@ -119,6 +125,49 @@ def _glyphs(page) -> list[dict]:
                 if _fits(p["x1"] - p["x0"], p["bottom"] - p["top"]):
                     out.append(_make_glyph(key[0], key[1], p["x0"], p["x1"], p["top"], p["bottom"], 1))
     return _merge_coincident(out)
+
+
+_ROW_RATIO_TOL = 0.15          # a run of k touching copies is k × as long as it is wide, within this share of k
+_CELL_MAX_ASPECT = 1.25        # … and every copy in it is round or square
+
+
+def _side_by_side(g: list[dict]) -> list[list[dict]] | None:
+    """A touching cluster that is a run of k copies of one round or square symbol drawn side by side (v4 3c-2:
+    objektas_b's ceiling lights stand in touching pairs and threes — „○○", „○○○" — the pair counted as one odd
+    glyph that matched nothing and the three fell apart into the strips of their hatch: 10 of the plan's
+    ~50 lights found) → the k copies. The cluster's box must be k times as long as it is wide (k ≥ 2, within
+    _ROW_RATIO_TOL · k); it is cut into k equal cells along its length and every primitive goes to the cell its
+    centre stands in; every cell must hold something and be round or square itself. None when the cluster is
+    not such a run — a slot's double line (its cells come out empty), a ring with petals, a hatch."""
+    x0 = min(p["x0"] for p in g)
+    x1 = max(p["x1"] for p in g)
+    y0 = min(p["top"] for p in g)
+    y1 = max(p["bottom"] for p in g)
+    w, h = x1 - x0, y1 - y0
+    long, short = max(w, h), min(w, h)
+    if short < _MIN_GLYPH_PT or short > _COMPACT_MAX_PT or short <= 0:
+        return None
+    if short <= _THIN_SHORT_MAX_PT and long >= max(6.0, 3 * short):
+        return None                                            # a thin mark is a slot or a line, never a run of rings
+    ratio = long / short
+    k = round(ratio)
+    if k < 2 or abs(ratio - k) > _ROW_RATIO_TOL * k:
+        return None
+    along_x = w >= h
+    start = x0 if along_x else y0
+    step = long / k
+    cells: list[list[dict]] = [[] for _ in range(k)]
+    for p in g:
+        c = ((p["x0"] + p["x1"]) / 2) if along_x else ((p["top"] + p["bottom"]) / 2)
+        cells[min(k - 1, max(0, int((c - start) / step)))].append(p)
+    for cell in cells:
+        if not cell:
+            return None
+        cw = max(p["x1"] for p in cell) - min(p["x0"] for p in cell)
+        ch = max(p["bottom"] for p in cell) - min(p["top"] for p in cell)
+        if min(cw, ch) <= 0 or max(cw, ch) / min(cw, ch) > _CELL_MAX_ASPECT:
+            return None
+    return cells
 
 
 def _clusters(ps: list[dict]) -> list[list[dict]]:

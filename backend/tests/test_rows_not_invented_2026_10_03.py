@@ -24,6 +24,7 @@ from extractor.vision_call import (
     _calc_hidroizoliacija_m2, _recompute_per_room_via_python, _rooms_named_in,
     mark_shower_rooms, plumbing_reading, shower_count, toilet_count,
 )
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -53,17 +54,17 @@ def _three_bathrooms() -> dict:
 
 def _with_plumbing(parsed: dict) -> dict:
     p = copy.deepcopy(parsed)
-    p["_meta"] = {"fixtures_status": "ok"}
     p["detected_symbols_summary"] = {"klozetai": 2, "praustuves": 2, "dusai": 2,
                                      "wc_remai": 3, "vonios": 1, "vonios_kubilai": 1}
+    p["_meta"] = legend_meta(p["detected_symbols_summary"])
     p["_sanitary_prietaisai"] = [
-        {"tipas": "praustuve", "vieta": "03 Miegamojo san. mazgas – praustuvas, h=1.070"},
-        {"tipas": "klozetas", "vieta": "03 Miegamojo san. mazgas – pakabinamas klozetas"},
-        {"tipas": "dusas", "vieta": "07 Vonios kambarys (viršutinis) – dušo maišytuvas"},
-        {"tipas": "dusas", "vieta": "05/06 zona – dušo maišytuvas, plyšinis latakas"},
-        {"tipas": "klozetas", "vieta": "06 Vonios kambarys – pakabinamas klozetas"},
-        {"tipas": "praustuve", "vieta": "06 Vonios kambarys – praustuvas"},
-        {"tipas": "kita", "vieta": "Terasa/išorė – trapas"},
+        {"tipas": "praustuve", "vieta": "03 Miegamojo san. mazgas – praustuvas, h=1.070", "saltinis": "brezinys"},
+        {"tipas": "klozetas", "vieta": "03 Miegamojo san. mazgas – pakabinamas klozetas", "saltinis": "brezinys"},
+        {"tipas": "dusas", "vieta": "07 Vonios kambarys (viršutinis) – dušo maišytuvas", "saltinis": "brezinys"},
+        {"tipas": "dusas", "vieta": "05/06 zona – dušo maišytuvas, plyšinis latakas", "saltinis": "brezinys"},
+        {"tipas": "klozetas", "vieta": "06 Vonios kambarys – pakabinamas klozetas", "saltinis": "brezinys"},
+        {"tipas": "praustuve", "vieta": "06 Vonios kambarys – praustuvas", "saltinis": "brezinys"},
+        {"tipas": "kita", "vieta": "Terasa/išorė – trapas", "saltinis": "brezinys"},
     ]
     return p
 
@@ -97,24 +98,6 @@ def test_no_plumbing_reading_without_an_ok_reader():
                              "detected_symbols_summary": {"klozetai": 2}}) is None
     # the main pass's glance alone is not a plumbing reading
     assert plumbing_reading({"detected_symbols_summary": {"klozetai": 2, "dusai": 2}}) is None
-
-
-def test_plumbing_reading_from_status_and_from_an_older_extract():
-    ok = plumbing_reading({"_meta": {"fixtures_status": "ok"},
-                           "detected_symbols_summary": {"klozetai": 2, "dusai": "1"}})
-    assert ok["klozetai"] == 2 and ok["dusai"] == 1
-    # before the status was kept: `fixtures_raised` is written only on an ok read
-    legacy = plumbing_reading({"_meta": {"fixtures_raised": []},
-                               "detected_symbols_summary": {"praustuves": 3}})
-    assert legacy["praustuves"] == 3
-    # an ok read that counted nothing usable is no reading
-    assert plumbing_reading({"_meta": {"fixtures_status": "ok"},
-                             "detected_symbols_summary": {"rozetes": 40}}) is None
-    # …also when the main pass's glance filled the summary: the reader's own
-    # (kept) counts decide whether it read anything
-    assert plumbing_reading({"_meta": {"fixtures_status": "ok",
-                                       "fixtures_counts": {"klozetai": 0, "dusai": 0}},
-                             "detected_symbols_summary": {"klozetai": 2, "dusai": 2}}) is None
 
 
 # ── which room a fixture stands in ──────────────────────────────────────────
@@ -210,10 +193,11 @@ def test_with_a_plumbing_reading_showers_are_its_count():
 def test_no_shower_anywhere_the_plan_answers_means_no_shower_rows():
     p = _with_plumbing(_three_bathrooms())
     p["detected_symbols_summary"]["dusai"] = 0
+    p["_meta"] = legend_meta(p["detected_symbols_summary"])
     p["_sanitary_prietaisai"] = [
-        {"tipas": "klozetas", "vieta": "03 Miegamojo san. mazgas – klozetas"},
-        {"tipas": "praustuve", "vieta": "06 Vonios kambarys – praustuvas"},
-        {"tipas": "vonia", "vieta": "07 Vonios kambarys – vonia"},
+        {"tipas": "klozetas", "vieta": "03 Miegamojo san. mazgas – klozetas", "saltinis": "brezinys"},
+        {"tipas": "praustuve", "vieta": "06 Vonios kambarys – praustuvas", "saltinis": "brezinys"},
+        {"tipas": "vonia", "vieta": "07 Vonios kambarys – vonia", "saltinis": "brezinys"},
     ]
     rows = _build(p)
     assert not any((r.get("aprasymas") or "").startswith(_SHOWER_ROWS) for r in rows)

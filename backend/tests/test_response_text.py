@@ -111,10 +111,10 @@ def test_interior_readers_all_use_the_safe_path():
     reintroduce `content[0].text`. This is the check that keeps the bug from
     spreading back by copy-paste."""
     import inspect
-    from extractor import (apdailos_reader, door_type_reader, doors_reader,
-                           sanitary_fixture_reader)
-    for mod in (apdailos_reader, doors_reader, door_type_reader,
-                sanitary_fixture_reader):
+    # v4 3c-2: the interior readers read the text layer now; the model calls left are Pass-1 / zoom (vision_call)
+    # and text/schema_llm.py
+    from text import schema_llm
+    for mod in (schema_llm,):
         src = inspect.getsource(mod)
         assert "content[0].text" not in src, (
             f"{mod.__name__} reads content[0].text — it will crash on any "

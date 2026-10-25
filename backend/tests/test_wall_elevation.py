@@ -38,16 +38,6 @@ def test_schema_zones_have_mm_dimensions():
     assert tile_zone_props["from_floor_mm"]["type"] == "integer"
 
 
-def test_system_prompt_emphasizes_lithuanian_and_mm():
-    """System prompt must ground in LT terminology + mm units."""
-    assert "sienų išklotinę" in SYSTEM_TEXT
-    assert "MILIMETRAIS" in SYSTEM_TEXT
-    assert "plytelių" in SYSTEM_TEXT.lower() or "plyteles" in SYSTEM_TEXT.lower()
-    assert "tile_zones" in SYSTEM_TEXT
-    assert "paint_zones" in SYSTEM_TEXT
-    assert "niches" in SYSTEM_TEXT
-
-
 def test_repair_json_strips_fences_and_trailing_commas():
     assert json.loads(_repair_json('```json\n{"a": 1,}\n```')) == {"a": 1}
     assert json.loads(_repair_json('{"a": 1, "b": 2,}')) == {"a": 1, "b": 2}

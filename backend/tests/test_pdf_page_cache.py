@@ -205,9 +205,7 @@ def test_page_filter_signals_shape_is_backward_compatible():
 def test_sub_reader_locators_share_one_parse(monkeypatch):
     """The four page locators must hit the cache, not re-open the document."""
     from extractor.apdailos_reader import _find_apdailos_pages
-    from extractor.doors_reader import _find_floor_plan_page
     from extractor.door_type_reader import _find_door_pages
-    from extractor.sanitary_fixture_reader import _find_sanitary_pages
 
     pdf = _make_pdf([["Titulinis"],
                      ["PIRMO AUKŠTO PLANAS", "D-01 beapvade"],
@@ -226,7 +224,5 @@ def test_sub_reader_locators_share_one_parse(monkeypatch):
     monkeypatch.setattr(pdf_page_cache, "_parse", counting_parse)
 
     assert _find_apdailos_pages(pdf) == [3]
-    assert _find_floor_plan_page(pdf) == 2
     assert _find_door_pages(pdf) == [2]
-    assert _find_sanitary_pages(pdf, [], limit=2) == [4]
     assert calls["n"] == 0, "locators must reuse the warmed parse"

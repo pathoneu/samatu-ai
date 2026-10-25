@@ -1,8 +1,8 @@
 """Bathtub and floor-drain rows (Pathon v3 W5-E, E5; CLAUDE.md §1.14) — behind flag ``SAMATU_BATH_DRAIN_ROWS``
 (default off: nothing changes with it off).
 
-  · „Vonios montavimas" — from the sanitary reader's tub-only count (``detected_symbols_summary.vonios_kubilai``,
-    the count the bathtub-mixer row already rides on). A tub-or-tray symbol with no tub reading becomes the
+  · „Vonios montavimas" — from the legend's bathtub count (v4 3c-2: ``vision_call.plumbing_reading`` →
+    ``vonios_kubilai``, the count the bathtub-mixer row already rides on). A tub-or-tray symbol with no tub reading becomes the
     blank row with a question, never a guessed 1.
   · „Trapų montavimas" — from a LEGEND count only (W2-A counts a legend row; the count → row path (W5-D) stores
     it as ``parsed["_legendos_kiekiai"]`` (see CONTRACT below) = {kind: {"kiekis": n, "tekstas": legend row text}}). No count, no row:
@@ -60,7 +60,7 @@ def fixture_rows(parsed: dict, *, tubs_read: int | None, tub_or_tray_glance: int
     if tubs_read and tubs_read > 0:
         out.append({"skyrius": skyrius, "aprasymas": BATHTUB_ROW, "vnt": "vnt", "kiekis": int(tubs_read),
                     "saltinis": "simboliai_brezinyje",
-                    "_kilme": "model-3c",   # v4 phase3b: the sanitary reader's tub-only count (Phase 3c → text)
+                    "_kilme": "drawing",    # v4 3c-2: a legend row naming a bathtub, counted on the plan
                     "_confidence_reason": f"Vonios suskaičiuotos santechnikos plane: {int(tubs_read)} vnt."})
     elif tubs_read is None and tub_or_tray_glance > 0:
         out.append({"skyrius": skyrius, "aprasymas": f"{BATHTUB_ROW} — suveskite kiekį", "vnt": "vnt",

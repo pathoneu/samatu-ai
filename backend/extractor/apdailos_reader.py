@@ -1,136 +1,56 @@
-"""Read IŠKLOTINIŲ IR APDAILŲ PLANAS (wall finish plan) page from a project PDF.
+"""Read the wall finishes the IŠKLOTINĖS / APDAILOS sheets write — TEXT-FIRST (v4 Phase 3c-2, 2026-10-25).
 
-LT interjero projektuose paskutiniai puslapiai paprastai turi:
-- `GRINDŲ PLANAS` (floor finishes)
-- `IŠKLOTINIŲ IR APDAILŲ PLANAS` (wall finishes — colored lines + markers)
+LT interjero projektuose paskutiniai puslapiai paprastai turi `GRINDŲ PLANAS`, `IŠKLOTINIŲ IR APDAILŲ PLANAS` and
+the per-room `… IŠKLOTINĖS`. Until v4 3c-2 a model looked at those sheet images and ESTIMATED each room's finish
+shares from coloured lines (and, by its own prompt, guessed from the room type when it could not see them). That is
+gone. Now the sheets' TEXT is read (text layer; local OCR behind `SAMATU_OCR` for a sheet without one):
 
-Šis modulis randa tokį puslapį, paleidžia fokusuotą Vision call'ą ant jo
-vieno, ir grąžina per-room finish breakdown. Naudojama `extract_interior`
-flow'e po pass-1, kad pakeistume hardcoded `walls_paint` heuristics
-(`tamburas: 0`, `garazas: 0`, ir t.t.) realiu projekto specifikuotu apdailos
-plotu.
+  · a sheet whose title or text names exactly ONE room of the project (its number or its unique name) is that
+    room's sheet; the finish words on it („dažoma", „plytelės", „tapetai", „dekoratyvinis tinkas", „mikrocementas",
+    „plokštė", „veidrodis") are the room's finish KINDS, each with the words that named it;
+  · a room whose sheets name ONE finish kind gets that kind as its whole wall finish (share 1,0 — the sheet names
+    nothing else); a room whose sheets name several gets the kinds listed and NO shares — how much of the wall each
+    covers is a measure of the drawing, not of its text, and is left to him (the rows keep their room-type rule);
+  · with a client, the finish sheets' TEXT may be structured by text/schema_llm.py (which room, which kind, every
+    value substring-guarded); the model never sees a sheet.
 
-2026-05-27 — pirma versija (Objektas A fixture testas: -11,6% → -4,3% walls accuracy).
-
-RECONSTRUCTED 2026-06-09: the original .py was never committed and was lost;
-this is rebuilt from the surviving cpython-314.pyc (verbatim SYSTEM_PROMPT,
-schema, signatures, constants) + the universal_rules consumer contract
-(sienu_apdailos_breakdown drives the apdailos paint branch at lines 707-745).
+Returns the same shape as before ({status, page, pages, patalpos, _error, _elapsed_s, _meta}); `patalpos[]` rows carry
+`sienu_apdaila` only when a single kind decides it, plus `apdailos_rusys` and `pastabos` (the words, the sheet).
 """
 from __future__ import annotations
 
-import base64
-import io
-import json
 import re
 import time
+import unicodedata
 from typing import Optional
 
-import anthropic
-import pdfplumber
-from pdf2image import convert_from_bytes
+TEXT_SOURCE = "tekstas"       # room["_apdailos_saltinis"] / _meta["saltinis"] of a reading of the text layer
+MAX_ATTEMPTS = 3              # kept for callers that read it (the text reading makes no call)
 
-from models_config import model_for  # role: "apdailos" — resolved at call time
-from .response_text import response_text
+# finish kind → the words that name it on a finish sheet (folded: upper case, no diacritics)
+FINISH_WORDS: tuple[tuple[str, re.Pattern], ...] = (
+    ("molio_tinkas", re.compile(r"\bMOLIO TINK|\bDEKORATYVIN\w* TINK|\bKALKIN\w* TINK|\bVENECIJIEC")),
+    ("kita_danga", re.compile(r"\bMIKROCEMENT|\bBETONO EFEKT")),
+    ("tapetai", re.compile(r"\bTAPET")),
+    ("plyteles", re.compile(r"\bPLYTEL|\bMOZAIK")),
+    ("plokste", re.compile(r"\bPLOKST\w*(?! LUB)|\bPANEL")),
+    ("veidrodis", re.compile(r"\bVEIDROD")),
+    ("dazymas", re.compile(r"\bDAZ(OMA|YMAS|YTI|OMOS|OMAS|AI)\b|\bDAZOM")),
+)
 
-# 2026-07-29 — THE INTERMITTENT-FAILURE FIX. 4096 was too snug for THIS reader
-# and it was truncating the answer mid-JSON on most runs:
-#   measured on objektas_a (11 rooms, 12 išklotinių pages)
-#     - full answer  ≈ 6 344 chars ≈ 2 400 output tokens
-#     - the ONE success (10:38) reported output_tokens = 2 776 → thinking was
-#       only ~370 tokens that run; it fit under 4 096 by ~1 300 tokens
-#     - the two 12:0x failures died at char 3 664 and char 4 789 of the SAME
-#       answer with `Expecting ',' delimiter` — i.e. the body stopped mid-object
-#       at 58% and 79% of the way through. Thinking had eaten ~2 300-2 700 of
-#       the cap. Opus 5 has thinking ON BY DEFAULT and it counts against
-#       max_tokens, so a 4 096 cap on a ~2 400-token answer is a coin flip.
-# Caps are FREE (billing is by actuals — see a709250), so buy real headroom:
-# ~14k for thinking on top of the largest answer we have ever produced.
-#
-# CEILING — do not raise past 21_333 without switching to streaming. This is a
-# NON-STREAMING call, and the SDK refuses non-streaming requests it predicts
-# will exceed 10 minutes (_base_client._calculate_nonstreaming_timeout:
-# 3600 * max_tokens / 128_000 > 600). At 21_334 it raises ValueError BEFORE any
-# HTTP call — which this reader would classify as a non-retryable error and
-# degrade on, i.e. the exact silent failure being fixed here, from a new cause.
-# Raising the cap does NOT buy longer thinking either: on Opus 5 thinking depth
-# is set by `output_config.effort` (default high), not by max_tokens — the cap
-# only decides whether the answer fits alongside it.
-MAX_TOKENS = 16384
-MAX_TOKENS_NONSTREAMING_CEILING = 21_333
 
-# CLAUDE.md: "every external API call: retry logic, max 3 retries". Bounded on
-# purpose (a709250 capped retry multiplication) — only transport-class failures
-# are retried. A `refusal` or a `max_tokens` stop_reason is NOT retried: the
-# payload is unchanged, so a retry is a coin flip, not a fix (the fix for
-# max_tokens is the cap above; the fix for a refusal is a human).
-MAX_ATTEMPTS = 3
-RETRY_SLEEP_S = 1.0  # × attempt number; monkeypatched to 0 in tests
-
-SYSTEM_PROMPT = """Tu esi LT interjero brėžinio analizės agentas. Tau duotas vienas puslapis — IŠKLOTINIŲ IR APDAILŲ PLANAS (wall finishes plan).
-
-Šis puslapis rodo, KAIP apdailinta KIEKVIENA siena KIEKVIENAME kambaryje. Skirtingos sienos apdailos pažymėtos:
-- skirtingomis spalvomis (linijomis ant brėžinio)
-- markers (a1-a9, b1-b3, c1-c4, ir t.t.) iš legendos
-
-Tavo darbas: kiekvienam pateiktam kambariui nustatyti, KOKIA YRA DOMINUOJANTI sienų apdaila ir kokia DALIS sienų yra padengta kuriuo finišu.
-
-Apdailos tipai (skaityk iš puslapio legendos — pavadinimai ir spalvos gali skirtis):
-- "dazymas" — sienos dažomos
-- "plyteles" — plytelės (skirtingi tipai grupuojami čia: porcelain, didžiaformatės, ir t.t.)
-- "tapetai" — tapetai (vaikiški ar dekoratyviniai)
-- "plokste" — siena dengiama plokšte (medienos panelis, akmuo, t.t.)
-- "veidrodis" — veidrodinė siena
-- "molio_tinkas" — molio / kalkinis dekoratyvinis tinkas, sienų dekoravimas tinku (NE dažymas!)
-- "kita_danga" — mikrocementas, betono efektas, kita ištisinė danga (NE dažymas, NE plytelės)
-
-SVARBU: skaityk iš APDAILOS PLANO / IŠKLOTINIŲ puslapio, NE iš vizualizacijų
-(renderių). Jei matai tik vizualizaciją — pažymėk pastabose "low confidence".
-
-Grąžink TIK JSON, jokios prozos. Ne markdown fences."""
-
-_USER_SCHEMA = """
-
-Output schema (JSON):
-{
-  "patalpos": [
-    {
-      "nr": "101",
-      "pavadinimas": "...",
-      "sienu_apdaila": {
-        "dazymas_share": 0.0..1.0,
-        "plyteles_share": 0.0..1.0,
-        "tapetai_share": 0.0..1.0,
-        "plokste_share": 0.0..1.0,
-        "veidrodis_share": 0.0..1.0,
-        "molio_tinkas_share": 0.0..1.0,
-        "kita_danga_share": 0.0..1.0
-      },
-      "plyteliu_aukstis_m": null | number,
-      "pastabos": "trumpai ką matei brėžinyje"
-    }
-  ]
-}
-
-TAISYKLĖS:
-- Sumos shares per kambarį turi būti ≈ 1.0.
-- Jei matai SOLID spalvotą liniją tik dalies sienos ilgyje, įvertink share procentaliai.
-- Jei plytelės eina tik iki tam tikro aukščio (pvz. iki 1,5m kabinete prie darbo stalo) — pažymėk `plyteliu_aukstis_m`.
-- Jei plytelės eina IKI LUBŲ (typical vonia / san) — palik `plyteliu_aukstis_m: null`.
-- Veidrodis paprastai mažas plotas (0.05-0.15 share).
-- Jei kambariui apdaila nematyti — pažymėk pastabose "low confidence" ir spėk pagal paskirtį (vonia/san = 0.85+ plytelės; garazas/tambūras = 0.8+ dažymas; miegamasis/kabinetas/gyvenamoji = 0.8+ dažymas)."""
+def _fold(text) -> str:
+    s = unicodedata.normalize("NFD", str(text or "").upper())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.split())
 
 
 def build_user_text(rooms: list[dict]) -> str:
-    """Room list + output schema. The model maps each listed room to a finish
-    breakdown keyed by its nr."""
+    """The room list as the schema reader gets it (nr, name, area) — text only."""
     lines = ["Kambariai (priskirk apdailą kiekvienam pagal nr):"]
     for r in rooms:
-        nr = r.get("nr") or "?"
-        nm = r.get("pavadinimas") or ""
-        plotas = r.get("plotas_m2")
-        lines.append(f"  {nr} {nm}  ({plotas} m²)")
-    return "\n".join(lines) + _USER_SCHEMA
+        lines.append(f"  {r.get('nr') or '?'} {r.get('pavadinimas') or ''}  ({r.get('plotas_m2')} m²)")
+    return "\n".join(lines)
 
 
 def _find_apdailos_page(pdf_bytes: bytes) -> Optional[int]:
@@ -203,96 +123,56 @@ def _find_apdailos_pages(pdf_bytes: bytes, pages_meta=None) -> list[int]:
     if not candidates:
         fallback = _classified_pages(pages_meta, ("wall_elevation", "finish_schedule"))
         if fallback:
-            print(f"[apdailos_reader] no text-layer hits — using Pass-1 classified "
+            print(f"[apdailos_reader] no title hits — using the sheet kinds "
                   f"pages {fallback[:MAX_APDAILOS_PAGES]}")
         return fallback[:MAX_APDAILOS_PAGES]
     return [pg for _prio, pg in candidates[:MAX_APDAILOS_PAGES]]
 
 
-def _render_page_b64(pdf_bytes: bytes, page_nr_1based: int, dpi: int = 200) -> Optional[str]:
+def _sheet_text(pdf_bytes: bytes, page: int) -> str:
     try:
-        imgs = convert_from_bytes(pdf_bytes, dpi=dpi,
-                                  first_page=page_nr_1based, last_page=page_nr_1based)
-        if not imgs:
-            return None
-        buf = io.BytesIO()
-        imgs[0].save(buf, format="PNG")
-        return base64.standard_b64encode(buf.getvalue()).decode("ascii")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[apdailos_reader] render page failed: {exc}")
-        return None
-
-
-def _is_retryable(exc: Exception) -> bool:
-    """True for transport-class failures that a second identical call can fix.
-
-    Deliberately narrow: connection/timeout/rate-limit/5xx. A 400 (bad request),
-    401/403 (auth) or 404 is deterministic — retrying it only burns time.
-    """
-    for name in ("APIConnectionError", "APITimeoutError", "RateLimitError",
-                 "InternalServerError", "APIStatusError"):
-        cls = getattr(anthropic, name, None)
-        if cls is not None and isinstance(exc, cls):
-            if name == "APIStatusError":  # only 429/5xx of the generic status class
-                status = getattr(exc, "status_code", None)
-                return status is not None and (status == 429 or status >= 500)
-            return True
-    return False
-
-
-def _salvage_patalpos(raw: str) -> list[dict]:
-    """Recover every COMPLETE room object from a truncated ``patalpos`` array.
-
-    A body cut off by ``max_tokens`` is unparseable as a whole, but the rooms
-    that DID arrive are intact JSON objects. Losing 11/11 rooms because the
-    11th was half-written is the failure this reader kept shipping; recovering
-    8/11 and disclosing the gap is strictly better (CLAUDE.md §"Honest
-    disclosure beats clever fixes").
-    """
-    i = raw.find('"patalpos"')
-    if i < 0:
-        return []
-    start = raw.find("[", i)
-    if start < 0:
-        return []
-    dec = json.JSONDecoder()
-    out: list[dict] = []
-    pos = start + 1
-    n = len(raw)
-    while pos < n:
-        while pos < n and raw[pos] in " \t\r\n,":
-            pos += 1
-        if pos >= n or raw[pos] != "{":
-            break
+        from .pdf_page_cache import page_texts
+        texts = page_texts(pdf_bytes)
+        t = texts[page - 1] if 1 <= page <= len(texts) else ""
+    except Exception:  # noqa: BLE001
+        t = ""
+    if len((t or "").strip()) < 8:
         try:
-            obj, pos = dec.raw_decode(raw, pos)
-        except ValueError:
-            break  # first incomplete object — everything after it is truncated
-        if isinstance(obj, dict):
-            out.append(obj)
+            from text.ocr import ocr_enabled, ocr_page
+            if ocr_enabled():
+                _w, _h, words = ocr_page(pdf_bytes, page)
+                t = " ".join(w.text for w in words)
+        except Exception:  # noqa: BLE001
+            pass
+    return t or ""
+
+
+def _rooms_named(text_f: str, rooms: list[dict]) -> list[str]:
+    """Room numbers a sheet's folded text names: its number as a word, or a name no other room shares."""
+    names: dict[str, list[str]] = {}
+    for r in rooms:
+        nm = _fold(r.get("pavadinimas"))
+        nr = str(r.get("nr") or "").strip()
+        if len(nm) >= 4 and nr:
+            names.setdefault(nm, []).append(nr)
+    hit: set[str] = set()
+    for r in rooms:
+        nr = str(r.get("nr") or "").strip()
+        if len(nr) >= 2 and re.search(r"(?<![\w-])(?<!\d[.,])" + re.escape(_fold(nr)) + r"(?![\w-]|[.,]\d)", text_f):
+            hit.add(nr)
+    for nm, nrs in names.items():
+        if len(nrs) == 1 and re.search(r"(?<!\w)" + re.escape(nm) + r"(?!\w)", text_f):
+            hit.add(nrs[0])
+    return sorted(hit)
+
+
+def _kinds_in(text_f: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for kind, rx in FINISH_WORDS:
+        m = rx.search(text_f)
+        if m:
+            out[kind] = m.group(0)
     return out
-
-
-def _parse_patalpos(raw: str) -> tuple[Optional[list[dict]], Optional[str]]:
-    """(patalpos, note). ``None`` patalpos = hard failure, ``[]`` = the model
-    genuinely returned no rooms, ``note`` set = salvaged from a broken body."""
-    m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if m:
-        try:
-            parsed = json.loads(m.group(0))
-        except json.JSONDecodeError as je:
-            salvaged = _salvage_patalpos(raw)
-            if salvaged:
-                return salvaged, f"JSON parse error ({je}) — salvaged {len(salvaged)} patalpas"
-            return None, f"JSON parse error: {je}"
-        pat = parsed.get("patalpos") if isinstance(parsed, dict) else None
-        if isinstance(pat, list):
-            return [p for p in pat if isinstance(p, dict)], None
-        return None, "response JSON has no 'patalpos' list"
-    salvaged = _salvage_patalpos(raw)
-    if salvaged:
-        return salvaged, f"no complete JSON object — salvaged {len(salvaged)} patalpas"
-    return None, "no JSON in response"
 
 
 def read_apdailos_finishes(
@@ -302,145 +182,79 @@ def read_apdailos_finishes(
     client=None,
     pages_meta: Optional[list] = None,
 ) -> dict:
-    """Read wall finish breakdown per room from the IŠKLOTINIŲ IR APDAILŲ
-    PLANAS page.
+    """The finish kinds each room's own sheet writes (see the module docstring). Never raises.
 
-    Returns {status, page, pages, patalpos, _error, _elapsed_s, _meta} where
-    ``status`` is one of:
-      ok       — the whole answer parsed
-      partial  — the body was cut short (or otherwise unparseable as a whole)
-                 and only the rooms that fully arrived were salvaged; the
-                 caller MUST still disclose (rooms without a breakdown fall
-                 back to paskirtis defaults)
-      error    — nothing usable; ``_error`` names the cause
-      skipped  — no išklotinių/apdailų page in this PDF
-
-    ``_meta`` is populated on EVERY path: model, pages, max_tokens, per-attempt
-    log, stop_reason, token usage and (on failure) the exception class. A run
-    artifact must never again leave a post-mortem guessing why this reader
-    produced nothing.
-    """
+    status: ok (some room read) · skipped (no finish sheet, or no sheet names one room) · error (no text)."""
     t0 = time.time()
-    # Positional-compatible: callers (and the reliability tests) may stub the
-    # locator with a one-argument fake; only pass pages_meta when we have it.
     pages = ([apdailos_page] if apdailos_page
              else _find_apdailos_pages(pdf_bytes, pages_meta) if pages_meta
              else _find_apdailos_pages(pdf_bytes))
+    meta = {"model": None, "input_tokens": 0, "output_tokens": 0, "saltinis": TEXT_SOURCE, "pages": list(pages or [])}
     if not pages:
         return {"status": "skipped", "page": None, "pages": [], "patalpos": [],
-                "_error": "no apdailos page found", "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": {"pages": [], "page_source": "explicit" if apdailos_page else "scan"}}
-    content: list[dict] = []
-    rendered: list[int] = []
+                "_error": "no apdailos page found", "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
+    per_room: dict[str, dict] = {}
+    read_pages: list[int] = []
+    texts: list[tuple[int, str]] = []
     for pg in pages:
-        b64 = _render_page_b64(pdf_bytes, pg, dpi=150 if len(pages) > 3 else 200)
-        if b64:
-            content.append({"type": "text", "text": f"[Apdailos/išklotinių lapas, PDF psl. {pg}]"})
-            content.append({"type": "image", "source": {"type": "base64",
-                                                        "media_type": "image/png", "data": b64}})
-            rendered.append(pg)
-    page = rendered[0] if rendered else None
-    if not rendered:
+        t = _sheet_text(pdf_bytes, pg)
+        if not t.strip():
+            continue
+        read_pages.append(pg)
+        texts.append((pg, t))
+        f = _fold(t)
+        named = _rooms_named(f, rooms)
+        if len(named) != 1:
+            continue
+        kinds = _kinds_in(f)
+        if not kinds:
+            continue
+        rec = per_room.setdefault(named[0], {"kinds": {}, "pages": []})
+        for k, w in kinds.items():
+            rec["kinds"].setdefault(k, (w, pg))
+        rec["pages"].append(pg)
+    if not read_pages:
         return {"status": "error", "page": pages[0], "pages": [], "patalpos": [],
-                "_error": "page render failed", "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": {"pages": [], "candidate_pages": pages}}
-    user_text = build_user_text(rooms)
-    if len(rendered) > 1:
-        user_text += ("\n\nPASTABA: pateikti VISI projekto apdailos/išklotinių lapai "
-                      "(po 1-2 patalpas lape). Surask kiekvienos patalpos lapą ir "
-                      "skaityk apdailą iš jo žymėjimų/legendos.")
-    content.append({"type": "text", "text": user_text})
+                "_error": "the finish sheets carry no readable text", "_elapsed_s": round(time.time() - t0, 2),
+                "_meta": meta}
+    if not per_room and client is not None:
+        per_room = _schema_rooms(texts, rooms, client, meta)
+    out_rooms: list[dict] = []
+    for nr, rec in per_room.items():
+        kinds = rec["kinds"]
+        words = "; ".join(f"„{w}“ ({pg} lapas)" for w, pg in kinds.values())
+        row = {"nr": nr, "apdailos_rusys": sorted(kinds), "pastabos": f"Iš lapo teksto: {words}",
+               "pages": sorted(set(rec["pages"]))}
+        if len(kinds) == 1:
+            row["sienu_apdaila"] = {f"{next(iter(kinds))}_share": 1.0}
+        out_rooms.append(row)
+    status = "ok" if out_rooms else "skipped"
+    return {"status": status, "page": read_pages[0], "pages": read_pages, "patalpos": out_rooms,
+            "_error": None if out_rooms else "no finish sheet names exactly one room",
+            "_elapsed_s": round(time.time() - t0, 2), "_meta": meta}
 
-    model = model_for("apdailos")  # call-time resolution (MODEL_OVERRIDE etc.)
-    client = client or anthropic.Anthropic(max_retries=1)
-    # Every attempt is recorded — a post-mortem must be able to see WHY this
-    # reader produced nothing without re-running a €2.5 extraction.
-    attempts: list[dict] = []
-    resp = None
-    last_exc: Optional[Exception] = None
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        try:
-            resp = client.messages.create(
-                model=model, max_tokens=MAX_TOKENS,
-                system=[{"type": "text", "text": SYSTEM_PROMPT,
-                         "cache_control": {"type": "ephemeral"}}],
-                messages=[{"role": "user", "content": content}],
-            )
-        except Exception as exc:  # noqa: BLE001
-            last_exc = exc
-            retryable = _is_retryable(exc)
-            attempts.append({"attempt": attempt, "outcome": "exception",
-                             "error_class": type(exc).__name__,
-                             "error": str(exc)[:200], "retryable": retryable})
-            print(f"[apdailos_reader] attempt {attempt}/{MAX_ATTEMPTS} failed "
-                  f"({type(exc).__name__}): {exc}")
-            if retryable and attempt < MAX_ATTEMPTS:
-                time.sleep(RETRY_SLEEP_S * attempt)
-                continue
-            break
-        attempts.append({"attempt": attempt, "outcome": "response",
-                         "stop_reason": getattr(resp, "stop_reason", None)})
-        break
 
-    def _meta(**extra) -> dict:
-        usage = getattr(resp, "usage", None)
-        m = {"model": model, "pages": rendered, "max_tokens": MAX_TOKENS,
-             "attempts": attempts, "attempt_count": len(attempts),
-             "stop_reason": getattr(resp, "stop_reason", None),
-             # Tokens on EVERY path, not just success: a truncated call is a
-             # billed call, and an unmetered euro is a dishonest euro (a709250).
-             "input_tokens": getattr(usage, "input_tokens", None),
-             "output_tokens": getattr(usage, "output_tokens", None),
-             "cache_read_tokens": getattr(usage, "cache_read_input_tokens", None),
-             "cache_write_tokens": getattr(usage, "cache_creation_input_tokens", None)}
-        m.update(extra)
-        return m
-
-    if resp is None:
-        return {"status": "error", "page": page, "pages": rendered, "patalpos": [],
-                "_error": f"Vision call failed after {len(attempts)} attempt(s): {last_exc}",
-                "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": _meta(error_class=type(last_exc).__name__ if last_exc else None)}
-
-    stop_reason = getattr(resp, "stop_reason", None)
-    if stop_reason == "refusal":
-        # HTTP 200 with an empty body — a safety classifier stopped it. Never
-        # retried (identical payload); disclosed instead.
-        return {"status": "error", "page": page, "pages": rendered, "patalpos": [],
-                "_error": "safety refusal (stop_reason=refusal)",
-                "_elapsed_s": round(time.time() - t0, 2), "_meta": _meta()}
-
-    # Text blocks only — block 0 is a ThinkingBlock on thinking-enabled
-    # models, and reading .text off it killed this reader mid-run.
-    raw = response_text(resp)
-    patalpos, note = _parse_patalpos(raw)
-    truncated = stop_reason == "max_tokens"
-    if patalpos is None:
-        reason = note or "no JSON in response"
-        if truncated:
-            reason = (f"atsakymas nutrūko ties max_tokens={MAX_TOKENS} "
-                      f"(nepavyko išgelbėti nė vienos patalpos): {reason}")
-        return {"status": "error", "page": page, "pages": rendered, "patalpos": [],
-                "_error": reason, "_raw_excerpt": raw[:500],
-                "_elapsed_s": round(time.time() - t0, 2),
-                "_meta": _meta(truncated=truncated, raw_chars=len(raw))}
-
-    # A truncated-but-salvaged read is NOT "ok" — the rooms that never arrived
-    # must keep falling back visibly (the caller warns on "partial").
-    partial = bool(truncated or note)
-    if truncated and not note:
-        # Parsed cleanly but the body still hit the cap — the rooms after the
-        # cut never arrived. Name it rather than reporting a reasonless partial.
-        note = f"atsakymas nutrūko ties max_tokens={MAX_TOKENS}"
-    return {
-        "status": "partial" if partial else "ok",
-        "page": page, "pages": rendered,
-        "patalpos": patalpos,
-        "_error": note if partial else None,
-        "_elapsed_s": round(time.time() - t0, 2),
-        "_meta": _meta(truncated=truncated, raw_chars=len(raw),
-                       salvaged=bool(note), rooms_returned=len(patalpos)),
-    }
+def _schema_rooms(texts: list[tuple[int, str]], rooms: list[dict], client, meta: dict) -> dict[str, dict]:
+    """With a client: the finish sheets' TEXT → which room has which finish kind (text/schema_llm.py, guarded)."""
+    from text.schema_llm import structure
+    kinds = [k for k, _ in FINISH_WORDS]
+    text = "\n\n".join(f"[lapas {pg}]\n{t}" for pg, t in texts)
+    res = structure(text, fields={"nr": "text", "rusis": kinds, "zodziai": "text"}, key="nr", client=client,
+                    instruction=(build_user_text(rooms) + "\nIš apdailos / išklotinių lapų teksto nurodyk, kurios "
+                                 "patalpos sienų apdaila kokia (rusis), ir nukopijuok žodžius, kurie ją įvardija "
+                                 "(zodziai). Jokių dalių ar procentų."))
+    meta["input_tokens"] = int((res.get("_meta") or {}).get("input_tokens") or 0)
+    meta["output_tokens"] = int((res.get("_meta") or {}).get("output_tokens") or 0)
+    meta["model"] = (res.get("_meta") or {}).get("model")
+    meta["schema_llm"] = {"status": res.get("status"), "atmesta": len(res.get("refused") or [])}
+    known = {str(r.get("nr") or "").strip() for r in rooms}
+    out: dict[str, dict] = {}
+    for it in res.get("items") or []:
+        nr = str(it.get("nr") or "").strip()
+        if nr not in known or not it.get("rusis"):
+            continue
+        out.setdefault(nr, {"kinds": {}, "pages": []})["kinds"].setdefault(it["rusis"], (it.get("zodziai") or it["rusis"], 0))
+    return out
 
 
 def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
@@ -485,6 +299,10 @@ def merge_apdailos_into_rooms(rooms: list[dict], apdailos_result: dict) -> int:
         breakdown = p.get("sienu_apdaila")
         if breakdown:
             room["sienu_apdailos_breakdown"] = breakdown
+            room["_apdailos_saltinis"] = TEXT_SOURCE if (apdailos_result.get("_meta") or {}).get("saltinis") \
+                == TEXT_SOURCE else room.get("_apdailos_saltinis")
+        if p.get("apdailos_rusys"):
+            room["_apdailos_rusys"] = list(p["apdailos_rusys"])
         if room.get("plyteliu_aukstis_m") is None and p.get("plyteliu_aukstis_m") is not None:
             room["plyteliu_aukstis_m"] = p.get("plyteliu_aukstis_m")
         if p.get("pastabos"):

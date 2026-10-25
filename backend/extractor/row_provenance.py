@@ -10,8 +10,9 @@ Every row the builder emits gets a class in `_kilme`:
                 openings, floor coverings), the vector symbol counter — or the person's own entry;
     derived   — a formula over drawing facts with a named convention (waste, material norms, one lump per
                 project, a scope choice he can change);
-    model-3c  — a reader of a table or a text image (apdailos, doors, sanitary fixtures, wall elevations)
-                that Phase 3c reduces to the text layer; left as it is in 3b;
+    model-3c  — a reader of a table or a text image that Phase 3c reduces to the text layer. Since v4 3c-2
+                (2026-10-25) nothing emits it: the plumbing counts are the legend's (extractor/legend_counts.py),
+                the door types and wall finishes are read from the text layer — the class stays for old blobs;
     blank     — no legal source: kiekis None, the row stays in the sąmata with „—" and a reason sentence
                 that says what to check (`_assumption`, and the same sentence in `_tuscia_priezastis`).
 

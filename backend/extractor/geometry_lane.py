@@ -186,7 +186,11 @@ def _forget_open_space(room: dict) -> None:
 # reading's own reader (text/heights.py: the ceiling plan's altitudes, the room table's height column, a height the
 # plan writes for one room, else the storey height the text writes) — a model height a stored room still carries
 # comes off, his entries stay. The geometry lane itself reads as at 16.
-LANE_VERSION = 19
+# 20 (2026-10-25, v4 Phase 3c-2): the free re-read counts what the legends define (lights, sockets, switches,
+# thermostats, fixtures — extractor/legend_counts.py, proposals he confirms) and takes every sheet's kind from its
+# title text (text/page_kind.py), both under `_meta`; the plumbing rows no longer take the plumbing reader's model
+# count, so a stored project needs the re-read to get the legend's. The geometry lane itself reads as at 16.
+LANE_VERSION = 20
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")

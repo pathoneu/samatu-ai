@@ -18,8 +18,10 @@ machine: the real client class and every socket refuse while the stub is in.
     failed, no build-failure row. Two steps report „skipped", as on the stored
     run: the positioned-marker lane (the drawing prints no altitudes) and the
     apdailos reader (it has no finish sheet).
-(b) Every reader ran on its stub — 3 Pass-1 rounds, 9 zoom,
-    1 doors, 3 door-type, 3 fixtures (no adjacency or niche call since v4 3b); none unexpected, none
+(b) Every reader ran on its stub — 3 Pass-1 rounds and nothing else since v4 3c-2 (2026-10-25): the zoom asks
+    only for rooms the drawing does not measure (objektas_h: none — every room is in the table and outlined), the
+    doors and plumbing readers are gone, the door types and finishes are read from the text layer, the fixtures
+    from the legends (no adjacency or niche call since v4 3b); none unexpected, none
     left over — its answer reached the extract, and the billed calls the run
     records (`_meta.extra_calls`, `voting_models`) are the stored run's, call
     for call.
@@ -70,14 +72,30 @@ SLUG = "objektas_h"
 DEFAULT_PDF = REPO_ROOT / "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.pdf"
 
 # v4 3b (2026-10-25): the adjacency pass and the niche locator are gone — they are not asked any more
-EXPECTED_CALLS = {"pass1": 3, "zoom": 9, "doors": 1, "door_type": 3, "fixtures": 3}
-_GONE_READERS = ("adjacency", "niche")
+# v4 3c-2 (2026-10-25): the zoom picks only rooms the drawing does not measure (none on objektas_h), the doors and
+# fixture readers are deleted, door types / finishes / fixture counts are read from the drawing's text and legends
+EXPECTED_CALLS = {"pass1": 3}
+_GONE_READERS = ("adjacency", "niche", "zoom", "doors", "door_type", "fixtures")
 EXPECTED_SKIPPED = {"positioned_marker_lane_skipped", "apdailos_skipped"}
 # The metrics plain --recompute got wrong on objektas_h while it did not run the drawing lanes.
 # Since v4 Phase 3c-1 (2026-10-25) every --recompute runs them through the function production
 # calls (extractor/drawing_lanes.py), so the set is empty — a metric appearing here again means
 # the eval and the paid reading have parted ways.
 LANES_MOVE: set[str] = set()
+# v4 3c-2 (2026-10-25): production no longer runs the doors reader (a model counting doors off the plan image and
+# writing each door with its `_exterior` flag). The frozen extract still carries that reader's door list, so the eval
+# replay of it differs from production exactly where those doors count: the reveals of exterior doors, the walls'
+# door deductions and corners, the frameless frames. On a fresh reading the two agree (the eval tail runs on
+# production's own output unchanged — test_the_eval_reproduces_production_on_its_own_output).
+DOORS_READER_GONE = {"angokrasciu_m", "kampu_metrai_m", "dazymo_walls_plus_ceilings_combined_m2",
+                     "pasleptu_duru_staktos_m"}
+DOORS_ROOM_KEYS = {"elementai", "angokrasciu_gkp_m", "door_area_m2", "doors_deducted_m2", "pasleptu_duru_staktu_m",
+                   "_n_windows", "calculation_trace", "dazai_l", "dazymo_plotas_m2", "glaistas_kg", "gruntas_l",
+                   "kampai_m", "kampai_opening_reveals_m", "kampu_metrai", "walls_paintable_m2", "window_area_m2",
+                   "windows_deducted_m2"}
+DOORS_ROWS = {"Angokraščių glaistymas-dažymas", "Angokraščių apdirbimas GKP (struktūra)",
+              "Glaistas luboms (pradinis + baigiamasis)", "Gruntas luboms", "Dažai luboms (2 sluoksniai)",
+              "GKP juostelės + savisriegiai"}
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
 # nothing, and not a step the eval runs.
 # v4 3b: the Vision adjacency pass is gone — the frozen extract still carries what it wrote, the eval leaves it
@@ -222,7 +240,7 @@ def test_every_reader_ran_on_its_stored_answer(run):
         return [(c.get("reader"), c.get("input_tokens"), c.get("output_tokens"),
                  c.get("cache_read_tokens"), c.get("cache_write_tokens")) for c in calls]
 
-    assert billed(meta["extra_calls"]) == billed([c for c in stored["extra_calls"]
+    assert billed(meta.get("extra_calls") or []) == billed([c for c in stored["extra_calls"]
                                                   if c.get("reader") not in _GONE_READERS])
     assert [(r["input_tokens"], r["output_tokens"]) for r in meta["voting_models"]] == \
         [(r["input_tokens"], r["output_tokens"]) for r in stored["voting_models"]]
@@ -231,14 +249,12 @@ def test_every_reader_ran_on_its_stored_answer(run):
     assert result["_voting"]["low_confidence_fields"] == frozen["_voting"]["low_confidence_fields"]
     assert [r.get("_vote", {}).get(f) for r in result["patalpos"] for f in ("perimetras_m", "plotas_m2")] == \
         [r.get("_vote", {}).get(f) for r in frozen["patalpos"] for f in ("perimetras_m", "plotas_m2")]
-    assert meta["zoom_attempted"] == stored["zoom_attempted"] == 9
-    assert [r.get("_zoom") for r in result["patalpos"]] == [r.get("_zoom") for r in frozen["patalpos"]]
-    assert (meta["doors_total_count"], meta["doors_exterior_count"]) == (stored["doors_total_count"], stored["doors_exterior_count"])
-    assert result["_door_types"]["count"] == frozen["_door_types"]["count"]
-    assert result["_door_types"]["_vote"] == frozen["_door_types"]["_vote"]
-    assert meta["fixtures_status"] == "ok" and meta["fixtures_raised"] == stored["fixtures_raised"]
-    assert result["_sanitary_prietaisai"] == frozen["_sanitary_prietaisai"]
-    assert result["detected_symbols_summary"] == frozen["detected_symbols_summary"]
+    assert stored["zoom_attempted"] == 9 and meta["zoom_attempted"] == 0       # v4 3c-2: the drawing measures every room
+    assert "doors_total_count" not in meta and "fixtures_status" not in meta
+    assert result["_door_types"]["saltinis"] == "tekstas" and result["_door_types"]["reader_beapvadines"] == 0
+    fams = {k: v["kiekis"] for k, v in meta["legendos_siulymai"]["seimos"].items()}
+    assert fams["jungikliai"] == 27 and fams["difuzoriai"] == 9      # the legends, counted on the plans
+    assert meta["lapu_rusys_is_teksto"]["klasifikuota"] == 8
     assert "niche_locator_pages" not in meta and "niche_inference_rooms" not in meta
 
 
@@ -247,62 +263,20 @@ def test_totals_equal_the_eval_replay(run):
     prod, frozen = run["result"], run["frozen"]
     assert not [r["nr"] for r in frozen["patalpos"] if "_dusas" in r], "the frozen extract predates the attribution"
     replayed = _eval_tail(run, frozen, replay=True)
-    assert _metrics(run, replayed) == _metrics(run, prod)
-    assert replayed["santrauka"] == prod["santrauka"]
-    assert _rows(replayed) == _rows(prod)
-    assert _room_diffs(replayed, prod) == {}
-    # the shower attribution is the eval's step too: room 07 (the plumbing plan lists
-    # a bathtub there, no shower) loses the shower zone, as in production
-    by_nr = {r["nr"]: r for r in replayed["patalpos"]}
-    assert (by_nr["04"]["_dusas"], by_nr["07"]["_dusas"], by_nr["08"]["_dusas"]) == (False, False, True)
-
-
-def test_without_the_shower_attribution_no_row_changes_under_the_two_row_default(run, monkeypatch):
-    """Founder decision 2026-10-24: the waterproofing default is two rows
-    („Grindų hidroizoliacija" m² = net floor area, „Hidroizoliacinė juosta
-    kampams" m = perimeter), neither of which reads the shower zone. So the eval
-    tail without `mark_shower_rooms` differs from production only in the
-    `_dusas` flags and room 07's `hidroizoliacija_m2` detail — every sąmata row,
-    „Hidroizoliacinė medžiaga" included, is identical. (Before the step ran in
-    the eval, 2026-10-05, the one-row form made that material row differ; see the
-    one-row test below.)"""
-    from extractor import vision_call as vc
-
-    prod = run["result"]
-    monkeypatch.setattr(vc, "mark_shower_rooms", lambda parsed: 0)
-    unmarked = _eval_tail(run, run["frozen"], replay=True)
-    assert _metrics(run, unmarked) == _metrics(run, prod)
-    assert _room_diffs(unmarked, prod) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
-    assert _rows(unmarked) == _rows(prod)
-    eval_07 = next(r for r in unmarked["patalpos"] if r["nr"] == "07")
-    assert next(r for r in prod["patalpos"] if r["nr"] == "07")["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
-
-
-def test_without_the_shower_attribution_the_one_row_form_scored_the_type_default(run, monkeypatch):
-    """What closed the gap (2026-10-05), under the one-row form
-    (`hidro_rows = "one"`, no longer the default since the founder decision of
-    2026-10-24): before the eval's tail ran `mark_shower_rooms`, every wet room
-    kept its type's shower zone — room 07's waterproofing larger and
-    „Hidroizoliacinė medžiaga" differing from production's. The only
-    difference was that one step."""
-    from extractor import vision_call as vc
-
-    one_row = {**copy.deepcopy(run["frozen"]), "_overrides": {"profilis": {"hidro_rows": "one"}}}
-    marked = _eval_tail(run, one_row, replay=True)
-    monkeypatch.setattr(vc, "mark_shower_rooms", lambda parsed: 0)
-    unmarked = _eval_tail(run, one_row, replay=True)
-    assert _room_diffs(unmarked, marked) == {"04": ["_dusas"], "07": ["_dusas", "hidroizoliacija_m2"], "08": ["_dusas"]}
-    changed = [r for r in _rows(unmarked) if r not in _rows(marked)]
-    assert changed and changed == [r for r in _rows(unmarked) if r[1] == "Hidroizoliacinė medžiaga (2 sluoksniai)"]
-    eval_07 = next(r for r in unmarked["patalpos"] if r["nr"] == "07")
-    assert next(r for r in marked["patalpos"] if r["nr"] == "07")["hidroizoliacija_m2"] < eval_07["hidroizoliacija_m2"]
+    mp, mr = _metrics(run, prod), _metrics(run, replayed)
+    assert {k for k in mp if mp[k] != mr[k]} == DOORS_READER_GONE
+    diffs = _room_diffs(replayed, prod)
+    assert diffs and all(set(v) <= DOORS_ROOM_KEYS and "elementai" in v for v in diffs.values()), diffs
+    assert {r[1] for r in _rows(replayed) if r not in _rows(prod)} == DOORS_ROWS
+    # v4 3c-2: the plumbing reader's list (a model reading the plan image) settles no shower any more
+    assert not [r["nr"] for r in replayed["patalpos"] if "_dusas" in r]
 
 
 def test_plain_recompute_misses_exactly_the_drawing_lanes(run):
     prod = run["result"]
     plain = _metrics(run, _eval_tail(run, run["frozen"], replay=False))
     ours = _metrics(run, prod)
-    assert {k for k in ours if plain[k] != ours[k]} == LANES_MOVE
+    assert {k for k in ours if plain[k] != ours[k]} == LANES_MOVE | DOORS_READER_GONE
 
 
 def test_the_eval_reproduces_production_on_its_own_output(run):

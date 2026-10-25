@@ -23,7 +23,10 @@ def _rows(monkeypatch, flag, **extra):
     return _build_pozicijos_from_rooms(_parsed(**extra))["pozicijos"]
 
 
-TUBS = {"detected_symbols_summary": {"vonios_kubilai": 2, "vonios": 2}}
+# v4 3c-2: the tub-only count is the legend's (the plumbing reader is gone)
+TUBS = {"detected_symbols_summary": {"vonios": 2},
+        "_meta": {"legendos_siulymai": {"status": "ok", "lapai_su_legenda": [4],
+                                        "seimos": {"vonios_kubilai": {"kiekis": 2, "tekstas": "Vonia", "lapai": [4]}}}}}
 DRAINS = {fr.LEGEND_COUNTS_KEY: {"trapai": {"kiekis": 3, "tekstas": "Trapas"}}}
 
 
@@ -47,9 +50,10 @@ def test_tub_or_tray_without_a_reading_is_a_question(monkeypatch):
     assert row["kiekis"] is None and row["aprasymas"].endswith("suveskite kiekį")
 
 
-def test_no_tub_read_no_row(monkeypatch):
+def test_no_tub_read_no_billed_row(monkeypatch):
+    # v4 3c-2: no legend count of a bathtub → never a number, only the question
     poz = _rows(monkeypatch, "1", detected_symbols_summary={"vonios_kubilai": 0, "vonios": 1})
-    assert not any(p["aprasymas"].startswith(fr.BATHTUB_ROW) for p in poz)
+    assert all(p["kiekis"] is None for p in poz if p["aprasymas"].startswith(fr.BATHTUB_ROW))
 
 
 def test_drains_only_from_a_legend_count(monkeypatch):

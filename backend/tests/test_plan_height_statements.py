@@ -170,29 +170,3 @@ def test_the_text_and_its_char_map_match_line_text():
 OBJEKTAS_A_PDF = REPO_ROOT / "docs/superpowers/fixtures/2026-05-26-objektas-a/project.pdf"
 
 
-@pytest.mark.integration
-def test_objektas_a_air_conditioner_heights_reach_no_room(monkeypatch):
-    """The simulation the audit asked for: every room's height label a default,
-    as a fresh paid run can leave it at Step 2.44. Before 2026-10-05 the four
-    „h=2600 mm" set all 11 rooms to 2,6 m and Step 2.45 kept it over the name
-    map; now no room takes them and the name map decides (room 102: 3,4 m)."""
-    if not OBJEKTAS_A_PDF.is_file():
-        pytest.skip("objektas_a: the drawing is not on this machine")
-    from extractor.vision_call import _apply_per_room_heights
-
-    monkeypatch.setenv("ENABLE_PER_ROOM_CEILING", "1")
-    frozen = json.loads((REPO_ROOT / "ground_truth/objektas_a/ai_extract.json").read_text(encoding="utf-8"))
-    rooms = copy.deepcopy(frozen["patalpos"])
-    for r in rooms:
-        r["lubu_aukstis_saltinis"] = "default_fallback"
-    scan = pa.scan_text_layer(OBJEKTAS_A_PDF.read_bytes(),
-                              pages=pa.text_pages_from_classification(frozen.get("puslapiai") or []) or None)
-    hs = scan["heights"]
-    assert [(h["page"], h["value_m"], h["context"]) for h in hs] == [(4, 2.6, "Kondicionierius")] * 4
-    res = apply_height_statements(rooms, hs)
-    assert (res["status"], res["rooms"], res["elements"]) == ("not_tied", [], 4)
-    assert not [r["nr"] for r in rooms if r["lubu_aukstis_saltinis"] == "plano_uzrasas"]
-    out = _apply_per_room_heights(rooms, frozen["lubu_auksciai"], 2.8, name_key="pavadinimas")
-    got = {r["nr"]: r["lubu_aukstis_m"] for r in out}
-    assert len(got) == 11 and 2.6 not in got.values()
-    assert (got["102"], got["105"]) == (3.4, 3.0)

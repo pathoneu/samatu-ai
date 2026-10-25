@@ -11,6 +11,7 @@ brittle magic numbers, so they survive future extract changes.
 """
 from extractor.vision_call import _build_pozicijos_from_rooms
 from extractor.universal_rules import calc_room_quantities
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 def _parsed(rooms):
@@ -48,7 +49,7 @@ def test_basin_count_uses_praustuves_symbol():
              _room([], paskirtis="san", plotas_m2=4.0)]
     parsed = _parsed(rooms)
     parsed["detected_symbols_summary"] = {"praustuves": 3}
-    parsed["_meta"] = {"fixtures_status": "ok"}      # the plumbing reader's count (v4 3b)
+    parsed["_meta"] = legend_meta({"praustuves": 3})      # the legend's count (v4 3c-2)
     out = _build_pozicijos_from_rooms(parsed)
     # Label-agnostic on purpose: the 2026-07-29 potinkinė/virštinkinė split
     # renamed this line into a pair, but RC1's claim is about the COUNT SOURCE

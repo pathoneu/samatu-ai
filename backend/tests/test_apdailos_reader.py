@@ -6,7 +6,7 @@ falls to the legacy paskirtis path that hardcodes walls_paint=0 for tamburas/
 garazas and full-tile-clips wet rooms to 0. merge_apdailos_into_rooms must set
 the breakdown so the apdailos branch (universal_rules.py:707-745) restores paint.
 """
-from extractor.apdailos_reader import merge_apdailos_into_rooms, build_user_text
+from extractor.apdailos_reader import merge_apdailos_into_rooms
 from extractor.universal_rules import calc_room_quantities
 
 
@@ -50,13 +50,6 @@ def test_merge_skipped_status_is_noop():
     assert "sienu_apdailos_breakdown" not in rooms[0]
 
 
-def test_build_user_text_lists_rooms_and_schema():
-    txt = build_user_text([{"nr": "101", "pavadinimas": "Tambūras", "plotas_m2": 5.0}])
-    assert "Tambūras" in txt
-    assert "sienu_apdaila" in txt          # schema present
-    assert "dazymas_share" in txt
-
-
 def test_find_apdailos_page_skips_vizualizacija(monkeypatch):
     # Objektas B regression: the reader classified finishes from RENDERS.
     import extractor.apdailos_reader as ar
@@ -74,7 +67,8 @@ def test_find_apdailos_page_skips_vizualizacija(monkeypatch):
              _Page("INTERJERO VIZUALIZACIJA. APDAILŲ PLANAS fragmentas"),  # render — skip
              _Page("GRINDŲ APDAILOS PLANAS"),                              # ok, prio 1
              _Page("SIENŲ IŠKLOTINIŲ IR APDAILŲ PLANAS")]                  # best, prio 0
-    monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    import extractor.pdf_page_cache as _ppc
+    monkeypatch.setattr(_ppc, "page_texts", lambda *_a, **_k: [pg.extract_text() for pg in pages])
     assert ar._find_apdailos_page(b"x") == 4
 
 
@@ -94,5 +88,6 @@ def test_find_apdailos_pages_returns_all_iskotines(monkeypatch):
     pages = [_Page("TITULINIS"), _Page("VIZUALIZACIJA IŠKLOTINĖ"),
              _Page("SIENŲ IŠKLOTINĖS L1"), _Page("SIENŲ IŠKLOTINĖS L2"),
              _Page("GRINDŲ APDAILOS PLANAS")]
-    monkeypatch.setattr(ar.pdfplumber, "open", lambda *_a, **_k: _Pdf(pages))
+    import extractor.pdf_page_cache as _ppc
+    monkeypatch.setattr(_ppc, "page_texts", lambda *_a, **_k: [pg.extract_text() for pg in pages])
     assert ar._find_apdailos_pages(b"x") == [3, 4, 5]  # išklotinės first, render skipped

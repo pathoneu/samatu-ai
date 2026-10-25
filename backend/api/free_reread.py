@@ -288,6 +288,17 @@ def read_drawing(project: dict, pdf_bytes: bytes, *, on_stage=None) -> dict:
         fill_heights_from_read(parsed.get("patalpos") or [], parsed)
     except Exception as exc:  # noqa: BLE001 — heights are never the reason a re-read fails
         log.warning("free-reread text heights failed for %s: %r", project.get("id"), exc)
+    # v4 3c-2: what the legends count (lights, sockets, switches, fixtures — proposals the rows show and ask him to
+    # confirm) and every sheet's kind from its title text, both under `_meta` like the paid reading's
+    try:
+        from extractor.legend_counts import SIULYMAI_KEY, auto_legend_counts
+        from text.page_kind import META_KEY as _KINDS_KEY, page_kinds
+        parsed.setdefault("_meta", {})[SIULYMAI_KEY] = auto_legend_counts(pdf_bytes)
+        _kinds = page_kinds(pdf_bytes)
+        parsed["_meta"][_KINDS_KEY] = {"klasifikuota": sum(1 for k in _kinds if k["saltinis"]), "lapu": len(_kinds),
+                                       "rusys": {str(k["nr"]): k["tipas"] for k in _kinds}}
+    except Exception as exc:  # noqa: BLE001 — counts are never the reason a re-read fails
+        log.warning("free-reread legend counts failed for %s: %r", project.get("id"), exc)
     # the wall and partition types the legends name (Pathon v3 W5-D, D9) — evidence beside the walls fact
     from extractor.wall_types import read_wall_types
     walls = read_wall_types(pdf_bytes)
