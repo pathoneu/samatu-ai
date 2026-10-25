@@ -179,9 +179,23 @@ _LEDGER = ("contributions", "excluded", "roll_up", "contributions_sum_to_total")
 _MATERIAL = ("medziagos_aprasymas", "medziagos_kiekis", "medziagos_vnt", "_medziagos")
 
 
-def blank(row: dict, reason: str) -> dict:
-    """The row stays, its quantity goes: kiekis None, „—" on screen, the reason says what to check. Its
-    materials and its ledger go with the number (a bag of putty for an unknown wall area is unknown too)."""
+def blank(row: dict, reason: str, why_by_room: dict[str, str] | None = None) -> dict:
+    """The row stays, its quantity goes: kiekis None, „—" on screen, the reason says what to check.
+
+    Its ledger stays as evidence without a number: no contribution (a room's share of an unknown total is not
+    shown), every room that was behind the row listed under `excluded` with why (`why_by_room[nr]`, else the
+    row's reason), an empty `roll_up`. Its materials stay as names with no quantity (`medziagos_kiekis` None,
+    `_medziagos[].kiekis` None) — the Medžiagos rows keep their place, their id and his price."""
+    rooms = [c for c in (row.get("contributions") or []) if isinstance(c, dict)]
+    excluded = [dict(e) for e in (row.get("excluded") or []) if isinstance(e, dict)]
+    seen = {str(e.get("room_nr") or "") for e in excluded}
+    for c in rooms:
+        nr = str(c.get("room_nr") or "")
+        if nr in seen:
+            continue
+        seen.add(nr)
+        excluded.append({"room_nr": nr, "room_name": c.get("room_name") or "",
+                         "excluded_because": (why_by_room or {}).get(nr) or reason})
     row["kiekis"] = None
     row["saltinis"] = BLANK_SALTINIS
     row["confidence"] = "low"
@@ -189,8 +203,16 @@ def blank(row: dict, reason: str) -> dict:
     row[REASON_KEY] = reason
     row["_assumption"] = reason
     row.pop("_confidence_reason", None)
-    for k in _LEDGER + _MATERIAL:
-        row.pop(k, None)
+    row["contributions"] = []
+    row["excluded"] = excluded
+    row["roll_up"] = []
+    row["contributions_sum_to_total"] = False
+    if row.get("medziagos_aprasymas"):
+        row["medziagos_kiekis"] = None
+    else:
+        row.pop("medziagos_kiekis", None)
+    if isinstance(row.get("_medziagos"), list):
+        row["_medziagos"] = [{**m, "kiekis": None} for m in row["_medziagos"] if isinstance(m, dict)]
     return row
 
 
@@ -241,15 +263,22 @@ def gate_room_inputs(pozicijos: list[dict], rooms: list[dict], parsed: dict,
     read_h = read_heights(rooms, parsed)
     n = 0
     for p in pozicijos:
-        if not isinstance(p, dict) or p.get(KILME_KEY) in (DRAWING, BLANK):
+        if not isinstance(p, dict) or p.get(KILME_KEY) == BLANK:
             continue
+        label = str(p.get("aprasymas") or "")
+        tier = "(iki 3" in label or "(virš 3" in label
+        if p.get(KILME_KEY) == DRAWING and not tier:
+            continue                         # the drawing's own total, no height split in it
         kiekis = p.get("kiekis")
         if not isinstance(kiekis, (int, float)) or isinstance(kiekis, bool):
             continue
-        deps = _deps(str(p.get("aprasymas") or ""))
+        deps = _deps(label)
         if deps is None:
             continue
         need_p, need_h = deps
+        if p.get(KILME_KEY) == DRAWING:
+            # a drawing total split into height tiers: the total is read, the split rests on the heights
+            need_p, need_h = False, True
         nrs = rooms_for(p) if rooms_for else [str(c.get("room_nr") or "") for c in (p.get("contributions") or [])]
         bad_p, bad_h, good = [], [], []
         for nr in nrs:
@@ -278,7 +307,14 @@ def gate_room_inputs(pozicijos: list[dict], rooms: list[dict], parsed: dict,
                 parts.append(f"patalpose {_rooms_list(bad_h)} aukštis neperskaitytas — įrašykite lubų aukštį")
         reason = "; ".join(parts)
         reason = reason[0].upper() + reason[1:] + ". Kol to nėra, kiekio neskaičiuoju."
-        blank(p, reason)
+        why: dict[str, str] = {}
+        for nr in good:
+            why[nr] = "Šios patalpos įvestys iš brėžinio, bet eilutė laukia kitų patalpų"
+        for nr in bad_h:
+            why[nr] = "Aukštis neperskaitytas — įrašykite lubų aukštį"
+        for nr in bad_p:
+            why[nr] = "Perimetras neperskaitytas — nubrėžkite kontūrą arba įveskite sienų ilgį"
+        blank(p, reason, why)
         n += 1
     return n
 
@@ -298,7 +334,7 @@ def blank_followers(pozicijos: list[dict], skip_prefixes: tuple[str, ...] = ()) 
             continue
         parent = str(p.get("susijes_darbas") or "").strip()
         if parent and parent in gone and isinstance(p.get("kiekis"), (int, float)):
-            blank(p, f"Kiekis seka eilutę „{parent}“ — kol ji tuščia, šios eilutės kiekio nėra.")
+            blank(p, f"Kiekis seka eilutę „{parent}“ — kol ji tuščia, šios eilutės kiekio nėra; įrašykite jį pagal tą eilutę.")
             n += 1
     return n
 

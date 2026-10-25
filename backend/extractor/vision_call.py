@@ -2754,9 +2754,6 @@ def _extract_medziagos_section(parsed: dict) -> None:
             kept.append(p)                # already extracted (defensive)
             continue
         parent = (p.get("aprasymas") or "").strip()
-        if p.get(_IS_MATERIAL_LINE) and p.get("kiekis") is None:
-            # v4 3b: goods bought for a blank work row are unknown with it — not a shopping-list line
-            continue
         if p.get(_IS_MATERIAL_LINE):
             # This row is the goods. Drop any self-copy it still carries and
             # move it whole — never emit a second row for the same purchase.
@@ -2786,7 +2783,9 @@ def _extract_medziagos_section(parsed: dict) -> None:
         ap = p.pop("medziagos_aprasymas", None)
         kiekis = _medziagos_kiekis(p.pop("medziagos_kiekis", None))
         vnt = p.pop("medziagos_vnt", None)
-        if ap and str(ap).strip() and kiekis is not None:
+        # v4 3b: a blank work row's goods stay in the list, blank too — their place, id and price survive
+        parent_blank = p.get(_rp.KILME_KEY) == _rp.BLANK
+        if ap and str(ap).strip() and (kiekis is not None or parent_blank):
             found.append((str(ap).strip(), kiekis, str(vnt or "vnt")))
         # 2. the list the paint consolidation attaches to its combined lines
         for m in (p.pop("_medziagos", None) or []):
@@ -2794,9 +2793,18 @@ def _extract_medziagos_section(parsed: dict) -> None:
                 continue
             m_ap = str(m.get("aprasymas") or "").strip()
             m_kiekis = _medziagos_kiekis(m.get("kiekis"))
-            if m_ap and m_kiekis is not None:
+            if m_ap and (m_kiekis is not None or parent_blank):
                 found.append((m_ap, m_kiekis, str(m.get("vnt") or "vnt")))
         for m_ap, m_kiekis, m_vnt in found:
+            if m_kiekis is None:
+                _why = f"Kiekis seka eilutę „{parent}“ — kol ji tuščia, šios medžiagos kiekio nėra; įrašykite jį pagal tą eilutę."
+                _mb = _rp.blank({"skyrius": SK_MEDZIAGOS, "aprasymas": m_ap, "vnt": m_vnt,
+                                 "susijes_darbas": parent, "_medziaga": True}, _why)
+                # this pass runs after apply_confidence: the tier and the reason are set here, as its parent's
+                _mb["confidence"] = p.get("confidence") or "raudona"
+                _mb["_confidence_reason"] = _why
+                materials.append(_mb)
+                continue
             materials.append({
                 "skyrius": SK_MEDZIAGOS,
                 "aprasymas": m_ap,
@@ -2886,7 +2894,7 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         return
 
     from .universal_rules import is_high_ceiling as _is_high
-    _read_h = _rp.read_heights(rooms, parsed)
+
 
     def _room_virs_3m_paint(r: dict) -> tuple[float, float]:
         """(walls, ceiling) m² of a room's paint that belongs above 3 m.
@@ -2905,10 +2913,8 @@ def _consolidate_paint_pozicijos(parsed: dict) -> None:
         large soffit borrow the ceiling's headroom."""
         w = float(r.get("walls_paintable_m2") or 0)
         c = _ceiling_paint_m2(r, stretch_nrs)
-        if _rp.height_class(r, parsed, _read_h) not in (_rp.DRAWING, _rp.DERIVED):
-            # v4 3b: a height the drawing did not give puts nothing above 3 m — the ceiling's m² stay whole on
-            # one line, and the walls (which rest on the height) are blank anyway
-            return 0.0, 0.0
+        # v4 3b: the tiers follow the stored heights, so the labels (and the prices on them) stay; a tier that
+        # rests on a height the drawing did not give is blanked by the provenance gate (HEIGHT_TIERS)
         if _is_high(r.get("lubu_aukstis_m")):
             return w, c
         xw = min(float(r.get("extra_walls_virs_3m_m2") or 0), w)

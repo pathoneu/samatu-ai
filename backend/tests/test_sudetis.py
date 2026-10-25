@@ -44,7 +44,8 @@ def _explained(project: dict) -> dict[str, dict]:
 
 
 def _check_every_material_row_is_explained_exactly(project: dict, name: str) -> int:
-    mats = [r for r in project["darbu_sarasas"] if r.get("skyrius") == "Medžiagos" and r.get("id")]
+    mats = [r for r in project["darbu_sarasas"] if r.get("skyrius") == "Medžiagos" and r.get("id")
+            and r.get("kiekis") is not None]          # v4 3b: a blank work row's goods are blank too
     explained = _explained(project)
     with_norm = 0
     for m in mats:

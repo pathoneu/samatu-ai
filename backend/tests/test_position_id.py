@@ -37,11 +37,24 @@ SNAPSHOT = (Path(__file__).resolve().parents[1]
             / "data" / "demo-objektas-a-snapshot-20260714.json")
 
 
+def _drawn(blob: dict) -> dict:
+    """v4 3b: the snapshot predates the geometry lane — its perimeters and heights are the reading model's, so every
+    row resting on them would be blank. These tests are about rows, prices and the ledger, not about where a wall
+    length comes from: the rooms' walls are taken as the lane writes summed strings, the heights as altitudes printed
+    in the rooms."""
+    for r in blob.get("patalpos") or []:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "matmenu_eilutes"
+        if r.get("lubu_aukstis_m"):
+            r["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
+    return blob
+
+
 @pytest.fixture(scope="module")
 def blob() -> dict:
     if not SNAPSHOT.exists():  # backend/data/ is gitignored: absent in a fresh checkout (CI)
         pytest.skip(f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)")
-    return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    return _drawn(json.loads(SNAPSHOT.read_text(encoding="utf-8")))
 
 
 def _build(blob: dict) -> list[dict]:
@@ -238,7 +251,8 @@ def test_priced_round_trip_keeps_every_price_with_ids_on(blob):
     # …and nothing was double-counted onto a second row: a detour through 3,1 m
     # must cost exactly what going straight to 2,8 m costs.
     assert _money(down["darbu_sarasas"]) == _money(straight["darbu_sarasas"])
-    assert _money(down["darbu_sarasas"]) > money0 * 0.9, "the leg lost work"
+    # (v4 3b: the old „> 0,9 × the snapshot's money" compared against the reading model's quantities; the rows
+    # whose number had no legal source are „—" now, their prices kept — asserted above, row by row.)
     # No row can be reached by two ids, and none by two labels.
     ids = [r.get("id") for r in down["darbu_sarasas"] if r.get("id")]
     assert len(set(ids)) == len(ids)
