@@ -255,3 +255,18 @@ test('the designer figures and anchors (sent only with the server flag on) land,
   const kept = mergeFreeReread({ ...base(), _autoriaus_kiekiai: figures }, result(), 'T').project;
   assert.deepEqual(kept._autoriaus_kiekiai, figures, 'never overwritten by their absence');
 });
+
+test('the legend count proposals and the sheet kinds read from the text land with the re-read and are kept when absent', () => {
+  const legendos_siulymai = { versija: 1, eilutes: [{ lapas: 3, kiekis: 13, pavadinimas: 'Priglaistomas šviestuvas' }] };
+  const lapu_rusys_is_teksto = { 1: 'planas', 3: 'apšvietimo planas' };
+  const fresh = { ...result(), _meta: { ...result()._meta, legendos_siulymai, lapu_rusys_is_teksto } };
+  const { project } = mergeFreeReread(base(), fresh, 'T');
+  assert.deepEqual(project._meta.legendos_siulymai, legendos_siulymai);
+  assert.deepEqual(project._meta.lapu_rusys_is_teksto, lapu_rusys_is_teksto);
+  assert.equal(project._meta.model, 'x', 'the rest of the stored meta stays');
+  // a read without them keeps the stored ones — never overwritten by their absence
+  const stored = { ...base(), _meta: { ...base()._meta, legendos_siulymai, lapu_rusys_is_teksto } };
+  const kept = mergeFreeReread(stored, result(), 'T').project;
+  assert.deepEqual(kept._meta.legendos_siulymai, legendos_siulymai);
+  assert.deepEqual(kept._meta.lapu_rusys_is_teksto, lapu_rusys_is_teksto);
+});
