@@ -65,7 +65,7 @@ export default function NoticeFold({ children, className = '' }) {
   const ctx = useMemo(() => {
     if (!lead) return null;
     const rest = foldLabel(ids, lead);
-    return { lead, open, title: rest.title, names: rest.names, openFold: () => setOpen(true) };
+    return { lead, open, title: rest.title, names: rest.names, count: rest.count, openFold: () => setOpen(true) };
   }, [lead, ids, open]);
 
   // the „Pranešimai (N)" line: always when folded without a lead; with a lead only once opened (to fold again)
@@ -101,17 +101,21 @@ export default function NoticeFold({ children, className = '' }) {
 export function NoticeFoldMore({ notice, className = '' }) {
   const ctx = useNoticeFold();
   if (!ctx || ctx.lead !== notice || ctx.open) return null;
+  // A short „+N" that sits at the end of the offer's second line and never wraps (a third line made the offer
+  // 86 px in the 340 px panel, limit 66). The full words live in the accessible name and the title; the names of
+  // the folded notices show as soon as it is opened.
+  const label = ctx.names ? `${ctx.title}: ${ctx.names}` : ctx.title;
   return (
     <button
       type="button"
       onClick={ctx.openFold}
       aria-expanded={false}
+      aria-label={label}
+      title={label}
       data-testid="notice-fold-more"
-      className={`inline-flex min-h-[24px] flex-wrap items-center gap-x-1 rounded px-1 text-left text-ui text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
+      className={`-my-1 ml-auto inline-flex min-h-[24px] shrink-0 items-center whitespace-nowrap rounded px-1 text-ui font-medium text-foreground underline underline-offset-2 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
     >
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="font-medium underline underline-offset-2">{ctx.title}</span>
-      {ctx.names && <span className="text-muted-foreground">{ctx.names}</span>}
+      +{ctx.count}
     </button>
   );
 }

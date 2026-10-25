@@ -247,3 +247,15 @@ test('a room to check answers its door count on the card: set, marked as checked
   const t = (key, p) => `${key}|${p.rooms}|${p.count}`;
   assert.equal(answerSummary({ kind: 'angos' }, a, t), 'project.questions.answeredCounts|03, 05|0');
 });
+
+test('skipping never applies the proposal: the words say the rows stay blank (plan rule R7)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const lt = JSON.parse(readFileSync(new URL('../i18n/lt.json', import.meta.url), 'utf8')).project.questions;
+  assert.equal(lt.skipNote, 'Praleidus eilutės lieka tuščios — grįžti galite bet kada.');
+  assert.doesNotMatch(lt.skipNote + lt.doneSkipped, /su savo siūlymu/);
+  assert.match(lt.doneSkipped, /eilutės lieka tuščios/);
+  // the skip handler only marks the question skipped locally — it posts nothing
+  const page = readFileSync(new URL('../pages/PatikraQuestions.jsx', import.meta.url), 'utf8');
+  const skip = page.slice(page.indexOf('const skip = useCallback'), page.indexOf('}, [current, skipped, questions, pilot]);'));
+  assert.doesNotMatch(skip, /fetch|post|apply|land|run\(/i);
+});
