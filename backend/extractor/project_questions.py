@@ -103,7 +103,8 @@ def _ask_aukstis(rows: list[tuple[dict, dict]], everyone: list[tuple[dict, dict]
         why = (f"Aukštį radau užrašytą tik {_in_rooms(len(same))} {where}: {lt_num(proposed)} m. "
                f"{others} imu tiek pat. Pagal jūsų skaičių perskaičiuosiu sienų plotus.")
     else:
-        why = f"Lubų aukščio brėžinyje neradau — skaičiuoju su {lt_num(proposed)} m. Pagal jūsų skaičių perskaičiuosiu sienų plotus."
+        why = (f"Lubų aukščio brėžinyje neradau. Kol neįrašysite, sienų kiekių neskaičiuoju — jų eilutės lieka tuščios. "
+               f"Įprastas aukštis {lt_num(proposed)} m — įrašykite tikrą.")
     return _q("aukstis", "number_all", "Kokio aukščio lubos?", why, items, unit="m", proposed=proposed)
 
 

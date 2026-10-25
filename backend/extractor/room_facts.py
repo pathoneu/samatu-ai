@@ -820,6 +820,9 @@ _HEIGHT_SOURCES: dict[str, tuple[str, str, str]] = {
 # The questions an assumed fact opens with — the default is offered, not
 # asserted. A read fact never gets one.
 _ASK_HEIGHT = "Koks šios patalpos lubų aukštis?"
+# Since Phase 3b the wall rows stay blank until a height is entered — the sentence must not say we compute with the default.
+_NO_HEIGHT_YET = ("Lubų aukščio brėžinyje neradau. Kol neįrašysite, šios patalpos sienų kiekių neskaičiuoju. "
+                  "Įprastas aukštis {} m — įrašykite tikrą.")
 _ASK_FLOOR = "Kokia čia grindų danga?"
 
 
@@ -913,8 +916,10 @@ def _fact_aukstis(project: dict, room: dict,
                      "Lubų aukščio brėžinyje neradau — įrašykite jį patys." + _asked_elsewhere(same),
                      editable, same_question=same)
     if not sentence:
-        sentence = (f"Lubų aukščio brėžinyje neradau — skaičiuoju su "
-                    f"{lt_num(value)} m. Įrašykite tikrą.")
+        sentence = _NO_HEIGHT_YET.format(lt_num(value))
+    elif saltinis in ("height_gate_reattributed", "height_gate_clamped"):
+        # our own gate moved the number — not a reading, so the walls wait like for any default
+        sentence = _NO_HEIGHT_YET.format(lt_num(value))
     if status == "assumed":
         # A default is a QUESTION on the sheet, not a statement (council
         # verdict 4, 2026-09-13): the row opens with the field showing, the

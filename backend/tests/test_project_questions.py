@@ -65,7 +65,9 @@ def test_the_height_is_asked_once_for_every_room_that_assumes_it():
 def test_a_height_nobody_wrote_anywhere_says_what_it_is_computed_with():
     out = build_questions({"patalpos": [_quiet("01", lubu_aukstis_saltinis="default_fallback", lubu_aukstis_m=2.7)]})
     q = _q(out, "aukstis")
-    assert "neradau" in q["why"] and "2,70 m" in q["why"]
+    assert q["why"] == ("Lubų aukščio brėžinyje neradau. Kol neįrašysite, sienų kiekių neskaičiuoju — jų eilutės lieka "
+                        "tuščios. Įprastas aukštis 2,70 m — įrašykite tikrą.")
+    assert q["proposed"] == 2.7
 
 
 def test_perimeters_the_plan_does_not_state_come_as_one_list_with_the_numbers_in_use():
@@ -411,3 +413,12 @@ def test_door_and_window_counts_are_answered_on_the_card_and_the_answered_room_a
     rooms[0]["_angos_patikrinta_at"] = "2026-10-19T10:00:00Z"
     assert not [x for x in build_questions({"patalpos": rooms, "_duru_ziniarastis": _SCHEDULE})["questions"]
                 if x["kind"] == "angos"]
+
+
+def test_per_room_default_height_sentence_says_the_walls_wait():
+    from extractor.room_facts import _fact_aukstis
+    want = ("Lubų aukščio brėžinyje neradau. Kol neįrašysite, šios patalpos sienų kiekių neskaičiuoju. "
+            "Įprastas aukštis 2,70 m — įrašykite tikrą.")
+    for src in ("default_fallback", "height_gate_clamped", "height_gate_reattributed"):
+        f = _fact_aukstis({"patalpos": []}, {"nr": "01", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": src}, None)
+        assert want in f["sentence"], (src, f["sentence"])
