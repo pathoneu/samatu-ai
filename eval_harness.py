@@ -1826,6 +1826,8 @@ def run_totals_only_multi(registry_path: Path, *, detailed: bool = False,
     _print_collapsed_footnote(per_project_summary)
     _print_rows_block(rows_scored, rows_excluded, recomputed=recompute,
                       formerly_blind=frozenset(formerly_blind_slugs))
+    if recompute:
+        print_answers_block(his_missing=his_missing_by_reason(rows_scored))
     print(f"  Saved → {out_json}")
 
     if collect is not None:  # --gate / --accept-baseline read the same numbers
@@ -1846,6 +1848,161 @@ def _infer_slug_from_run_name(name: str) -> str | None:
 
 
 GEOMETRY_LANE = False        # set by --geometry
+
+
+# ── The person's answers (v4, 2026-10-25) ──────────────────────────────────────
+# After Phase 3b no sąmata row carries a model or default number: where the drawing's
+# text writes no ceiling height the wall rows are blank and the app asks the person one
+# question („Kokio aukščio lubos?"). The eval used to count that blank as wrong. With
+# `ground_truth/<slug>/answers.json` the harness supplies what a person would type —
+# through the app's OWN path (`api.recompute_quantities._apply_assumption_edits`, the
+# Prielaidos per-room height edit; the answer lands in `_overrides.lubu_auksciai`
+# exactly as /api/recompute-quantities stores it) — before the rows are built. What
+# stays blank afterwards is a real gap, printed as its own section. Shape and rules:
+# ground_truth/_schema_v2.md § answers.json. NEVER filled from ai_extract.json.
+ANSWERS = True               # --no-answers reproduces the pre-re-base instrument
+ANSWER_REPORT: dict[str, dict] = {}      # slug → {supplied, blank rows}
+
+
+def load_answers(slug: str | None) -> dict | None:
+    """`ground_truth/<slug>/answers.json`, or None (no file = the project is scored as before)."""
+    if not slug:
+        return None
+    path = GROUND_TRUTH_ROOT / slug / "answers.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else None
+
+
+def _answer_height(v: Any) -> float | None:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if 1.5 <= x <= 8.0 else None      # the Prielaidos panel's own range
+
+
+def apply_person_answers(parsed: dict, slug: str | None) -> dict | None:
+    """Apply the project's answers.json to `parsed` the way the app applies a person's
+    ceiling-height answer: per room, only where the room's height was not read from the
+    drawing (the rows' own test, `row_provenance.height_class`), through
+    `_apply_assumption_edits` (room height + source `user_override`) and into
+    `_overrides.lubu_auksciai`. Returns {supplied, rooms, kinds} or None when there is no file."""
+    ans = load_answers(slug)
+    if ans is None:
+        return None
+    from extractor import row_provenance as rp
+    rooms = parsed.get("patalpos") or []
+    per_room = {str(k).strip(): _answer_height(v) for k, v in (ans.get("lubu_auksciai") or {}).items()}
+    project_h = _answer_height(ans.get("lubu_aukstis_m"))
+    heights: dict[str, float] = {}
+    for r in rooms:
+        if not isinstance(r, dict):
+            continue
+        nr = rp._nr(r)
+        if not nr:
+            continue
+        if per_room.get(nr):
+            heights[nr] = per_room[nr]
+        elif project_h and rp.height_class(r, parsed, None) != rp.DRAWING:
+            heights[nr] = project_h
+    report = {"supplied": len(heights), "rooms": sorted(heights), "kinds": {}}
+    if not heights:
+        return report
+    from api.recompute_quantities import _apply_assumption_edits
+    degradations: list = []
+    parsed["patalpos"] = _apply_assumption_edits(list(rooms), {"lubu_auksciai": dict(heights)}, degradations)
+    overrides = dict(parsed.get("_overrides") or {})
+    overrides["lubu_auksciai"] = {**(overrides.get("lubu_auksciai") or {}), **heights}
+    parsed["_overrides"] = overrides
+    report["kinds"]["lubu_aukstis"] = len(heights)
+    if degradations:
+        report["degradations"] = degradations
+    return report
+
+
+# Why a row stayed blank, grouped by the cause the sentence names (first match wins).
+_GAP_CAUSES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("no written ceiling height", ("lubų aukščio brėžinyje neradau", "aukštis neperskaitytas")),
+    ("no drawn perimeter", ("perimetras neperskaitytas",)),
+    ("no ceiling-plan altitude", ("altitudės nėra",)),
+    ("frame type of the doors", ("beapvadin",)),
+    ("LED length not in a legend", ("led nišų ilgio",)),
+    ("ventilation not drawn", ("ortakių", "ortakiams", "difuzori")),
+    ("plumbing / electrical count not read", ("santechnikos plane", "plano ženklų", "ženklai", "potinkinė dalis montuojama")),
+    ("share / count the drawing does not state", ("rotband", "didžiaformačių", "slenksč", "lentynėlių")),
+    ("site item the drawing does not state", ("statybinių atliekų", "apsauginėmis")),
+    ("work described in text / elevations, no reader", ("kiekis neaptiktas automatiškai", "kiekio skaitytuvo nėra")),
+)
+
+
+def gap_cause(reason: str | None) -> str:
+    low = (reason or "").lower()
+    for name, needles in _GAP_CAUSES:
+        if any(n in low for n in needles):
+            return name
+    return "other"
+
+
+def _record_gaps(slug: str | None, parsed: dict, answers_report: dict | None) -> None:
+    """Remember, per project, how many answers were supplied and which rows are STILL blank."""
+    if not slug:
+        return
+    blank = []
+    for p in parsed.get("pozicijos") or parsed.get("darbu_sarasas") or []:
+        if isinstance(p, dict) and p.get("_kilme") == "blank":
+            reason = p.get("_tuscia_priezastis") or p.get("_assumption") or ""
+            blank.append({"label": str(p.get("aprasymas") or p.get("pavadinimas") or ""),
+                          "cause": gap_cause(reason), "reason": reason})
+    ANSWER_REPORT[slug] = {"supplied": (answers_report or {}).get("supplied", 0),
+                           "answers_file": answers_report is not None,
+                           "blank": blank}
+
+
+def his_missing_by_reason(scored: list[tuple[str, Any]]) -> dict[str, dict[str, int]]:
+    """For each scored project: his `missing` rows grouped by the scorecard's reason class."""
+    out: dict[str, dict[str, int]] = {}
+    for slug, sc in scored:
+        counts: dict[str, int] = {}
+        for r in sc.rows:
+            if r.bucket != "missing":
+                continue
+            reason = r.reason or ""
+            if reason.startswith("app row has no quantity"):
+                key = "our row blank"
+            elif reason.startswith("no app row matched"):
+                key = "no row of ours"
+            elif reason.startswith("admitted gap"):
+                key = "admitted gap"
+            elif reason.startswith("granularity"):
+                key = "granularity"
+            else:
+                key = "other"
+            counts[key] = counts.get(key, 0) + 1
+        out[slug] = counts
+    return out
+
+
+def print_answers_block(*, his_missing: dict[str, dict[str, int]] | None = None) -> None:
+    """Per project: answers supplied, rows still blank (the real gaps) by cause."""
+    if not ANSWER_REPORT:
+        return
+    print("\n  Asmens atsakymai ir tikri trūkumai"
+          + ("" if ANSWERS else "  (--no-answers: nothing supplied)"))
+    print(f"  {'Project':<14} {'answers':>8} {'blank rows':>11}  causes")
+    print("  " + "─" * 80)
+    for slug in sorted(ANSWER_REPORT):
+        rep = ANSWER_REPORT[slug]
+        causes: dict[str, int] = {}
+        for b in rep["blank"]:
+            causes[b["cause"]] = causes.get(b["cause"], 0) + 1
+        txt = "; ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1])) or "—"
+        print(f"  {slug:<14} {rep['supplied']:>8} {len(rep['blank']):>11}  {txt}")
+        if his_missing and slug in his_missing:
+            m = his_missing[slug]
+            print(f"  {'':<14} {'':>8} {'':>11}  his rows `missing`: "
+                  + "; ".join(f"{k} {v}" for k, v in sorted(m.items(), key=lambda kv: -kv[1])))
 
 
 # ── --replay-geometry (audit round 13) ─────────────────────────────────────────
@@ -2315,9 +2472,17 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
     except Exception as exc:
         print(f"  ⚠ shower attribution failed during rescore: {exc}")
 
+    # The person's answers (v4 re-base, 2026-10-25): what a person would type when the app asks —
+    # applied through the Prielaidos height path, after every height producer and before the
+    # per-room recompute, so the rows are built from them exactly as after a real answer.
+    answers_report = apply_person_answers(parsed, slug) if (ANSWERS and slug) else None
+    if answers_report is not None and answers_report.get("supplied"):
+        print(f"  ⤴ asmens atsakymai: {answers_report['supplied']} lubų aukščiai "
+              f"({', '.join(answers_report['rooms'][:12])}{'…' if len(answers_report['rooms']) > 12 else ''})")
     parsed = vc._recompute_per_room_via_python(parsed, _harness_rules_override(parsed))
     parsed = vc._recompute_santrauka(parsed)
     parsed = vc._build_pozicijos_from_rooms(parsed)
+    _record_gaps(slug, parsed, answers_report)
     return parsed
 
 
@@ -2500,6 +2665,8 @@ def run_rows_scorecard(registry_path: Path, *, recompute: bool = False,
     _print_blindness_banner(blind_slugs)
     _print_rows_block(scored, extra, recomputed=recompute,
                       formerly_blind=frozenset(formerly_blind))
+    if recompute:
+        print_answers_block(his_missing=his_missing_by_reason(scored))
 
     # The coverage gap: his families no concept covers. This list — not a
     # better reader — is the input for the family-template work.
@@ -3377,6 +3544,8 @@ def main() -> int:
                          "froze into the extract. Prints per project what changed. A "
                          "project without its PDF is scored without it. Not the default; "
                          "never accepted as the baseline.")
+    ap.add_argument("--no-answers", action="store_true",
+                    help="do not apply ground_truth/<slug>/answers.json (the person's answers: the\n                         ceiling height a person would type when the app asks) — reproduces the\n                         instrument as it was before the 2026-10-25 re-base")
     ap.add_argument("--estimate-exterior", action="store_true",
                     help="apply the principled exterior-opening heuristic to "
                          "gt_dimensions in memory before invoking the calculator "
@@ -3435,6 +3604,8 @@ def main() -> int:
     gate_mode = _gate_mode(args)
     global GEOMETRY_LANE
     GEOMETRY_LANE = bool(args.geometry)
+    global ANSWERS
+    ANSWERS = not args.no_answers
     global REPLAY_GEOMETRY
     REPLAY_GEOMETRY = bool(args.replay_geometry)
     if REPLAY_GEOMETRY:
