@@ -146,7 +146,11 @@ test('a blank sąmata row says why under itself and „Įrašyti" opens its quan
   test.skip(!(await hasObjektasI()), 'objektas_i (A) is not in this database');
   await openOther(page, '?step=samata');
   const reasons = page.getByTestId('blank-row-reason');
-  await expect(reasons.first()).toBeVisible({ timeout: 60_000 });
+  // Phase 3b: blank rows (and their reasons) exist only on a project read by the current lane; a stored project
+  // is offered the free re-read first (LANE_VERSION 20) — one click, no Vision — and the rows appear after it
+  const offer = page.getByTestId('free-reread-banner').getByRole('button', { name: 'Perskaityti', exact: true });
+  if (await offer.isVisible({ timeout: 15_000 }).catch(() => false)) await offer.click();
+  await expect(reasons.first()).toBeVisible({ timeout: 120_000 });
   const n = await reasons.count();
   expect(n, 'the blank rows of the re-read').toBeGreaterThan(20);
   // the materials that follow a blank work row carry the backend's sentence about that row

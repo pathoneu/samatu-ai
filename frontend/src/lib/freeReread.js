@@ -70,6 +70,10 @@ export function mergeReadMeta(storedMeta, readMeta) {
   // where the room numbers come from (v4 Phase 3a, api/free_reread.renumber_rooms) — kept, so the drawing's table
   // is not opened again on the next re-read
   if (isObj(readMeta.kambariu_tapatybe)) out.kambariu_tapatybe = readMeta.kambariu_tapatybe;
+  // v4 Phase 3c-2: the legend count proposals and the sheet kinds read from the text — records of the whole
+  // drawing, taken whole, so a stored project keeps the counts the server just computed
+  if (isObj(readMeta.legendos_siulymai)) out.legendos_siulymai = readMeta.legendos_siulymai;
+  if (isObj(readMeta.lapu_rusys_is_teksto)) out.lapu_rusys_is_teksto = readMeta.lapu_rusys_is_teksto;
   const zonos = mergeZones(base.zonos, readMeta.zonos);
   if (zonos !== undefined) out.zonos = zonos;
   return out;

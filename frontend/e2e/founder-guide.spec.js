@@ -230,9 +230,16 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
   // read (writes nothing)
   const chipNotice = page.getByTestId('reread-diff-banner');
   await expect(chipNotice).toContainText('Kas pasikeitė');
-  await expect(chipNotice).toContainText('skaičiai nepasikeitė');
+  // Phase 3b/3c (blank rows by rule, legend counts): no room moved, but the quote's rows are read again and 63 of
+  // them changed (a count now comes from the legend, a row the drawing cannot answer is blank) — the chip says so
+  await expect(chipNotice).toContainText('63 eilutės');
   await page.getByTestId('reread-diff-toggle').click();
-  await expect(chipNotice).toContainText('Skaičiai nepasikeitė — visos patalpos perskaitytos taip pat.');
+  await expect(chipNotice).toContainText('Sąmatos eilutės (63)');
+  // blank by rule: the drawing does not answer these rows (Phase 3b), so the re-read blanks them instead of keeping the model's guess
+  await expect(chipNotice).toContainText('Sienų lyginimas Knauf Rotband 92,50 → — m²');
+  await expect(chipNotice).toContainText('Skylių gręžimas plytelėse (vamzdžiams, kaiščiams) 48,00 → — vnt');
+  // a number that moved on the current head (Phase 3b/3c re-read)
+  await expect(chipNotice).toContainText('Sienų glaistymas/dažymas 308,32 → 344,28 m²');
   await expect(chipNotice).toContainText(startedAt.toLocaleDateString('lt-LT', { timeZone: 'Europe/Vilnius' }));
   await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => (await api(`/api/projects/${PROJECT}/versions`)).versions[0].id, { timeout: 30_000 })
@@ -372,8 +379,13 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   // say what they said before the merge (no false „Lubų plotas 0,80× grindų ploto", no „…sienų plotas 1,72×").
   await expect(page.getByRole('button', { name: /^Patalpos 11 143,27 m²$/ })).toBeVisible();
   const floorRatios = (p) => (p.lt_sanity?.warnings || []).map((w) => w.message || '').filter((m) => /grindų ploto$/.test(m));
-  await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 }).toEqual(floorRatios(project));
-  note(`after merge: „Patalpos 11 143,27 m²" · checks as before the merge: ${floorRatios(project).join(' · ') || '—'}`);
+  // The stored start state predates the current wall-area engine (Phase 3b/3c): it carries 2,15×, and a save
+  // recomputes the check on today's engine — 2,40× — so the pair is pinned, not "same as before". What must not
+  // appear is the merge's false 0,80× / 1,72× (asserted by the exact list).
+  expect(floorRatios(project)).toEqual(['Dažomas sienų plotas 2,15× grindų ploto']);
+  await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 })
+    .toEqual(['Dažomas sienų plotas 2,40× grindų ploto']);
+  note(`after merge: „Patalpos 11 143,27 m²" · wall-area check 2,15× → 2,40×`);
   // W1-F F2: 04 keeps the floor covering the floor plan gives it (it went to „—" and Patikra asked again)
   expect(roomsByNr(await getProject())['04']).toMatchObject({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' });
   const { questions } = await api(`/api/projects/${PROJECT}/questions`);
