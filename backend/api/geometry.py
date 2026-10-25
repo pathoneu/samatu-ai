@@ -137,3 +137,24 @@ def api_scale(request: Request, project_id: str, page: int = Query(ge=1)):
     ctx = ScaleContext(pdf_bytes, dims=_all_strings(pdf_bytes), user_scales=_db.get_page_scales(project_id))
     sc = scale_for_page(ctx, page)
     return {"status": "ok" if sc.found else "blank", "page": page, "scale": sc.to_dict()}
+
+
+@router.delete("/{project_id}/geometry/scale")
+def api_scale_withdraw(request: Request, project_id: str, page: int = Query(ge=1)):
+    """„Atšaukti" on the „Skaičius" tool: his scale line for the page stops being in force (a tombstone row in the
+    append-only `page_scales`, db.withdraw_page_scale); answers the scale now in force with its provenance."""
+    _project_for(request, project_id)
+    from main import _check_rate_limit, _client_key
+    _check_rate_limit(_client_key(request), "geometry_scale")
+    import auth as _auth
+    import db as _db
+    from geometry.scale import ScaleContext, scale_for_page
+
+    pdf_bytes = _pdf_of(project_id)
+    _page_size(pdf_bytes, page)
+    had = page in _db.get_page_scales(project_id)
+    if had:
+        _db.withdraw_page_scale(project_id, page, user_id=_auth.require_user(request).get("id"))
+    ctx = ScaleContext(pdf_bytes, dims=_all_strings(pdf_bytes), user_scales=_db.get_page_scales(project_id))
+    sc = scale_for_page(ctx, page)
+    return {"status": "ok" if sc.found else "blank", "page": page, "atsaukta": had, "scale": sc.to_dict()}

@@ -91,13 +91,3 @@ def test_the_rebuilt_pass1_rounds_vote_back_to_the_stored_rooms(frozen):
     assert all(set(w) <= {"level", "message", "patalpa_nr"} for w in rounds[0]["warnings"])
 
 
-def test_the_rebuilt_door_list_places_exactly_the_stored_doors(frozen):
-    from extractor.doors_reader import merge_doors_into_rooms
-
-    rooms = [{**r, "elementai": [e for e in r["elementai"] if e.get("tipas") not in ("duris", "pasleptos_duris")]}
-             for r in copy.deepcopy(frozen["patalpos"])]
-    answer = gr._doors_answer(frozen)
-    assert (answer["total_count"], answer["exterior_count"]) == (frozen["_meta"]["doors_total_count"],
-                                                                  frozen["_meta"]["doors_exterior_count"])
-    merge_doors_into_rooms(rooms, {"status": "ok", **answer})
-    assert [r["elementai"] for r in rooms] == [r["elementai"] for r in frozen["patalpos"]]

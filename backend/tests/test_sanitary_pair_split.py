@@ -17,6 +17,7 @@ from extractor.vision_call import (
     _SAN_ASSUMPTION_FIELD,
 )
 from extractor.universal_rules import calc_room_quantities
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 def _room(**kw):
@@ -33,7 +34,7 @@ def _build(symbols=None, overrides=None, rooms=None, **extra):
     parsed = {"patalpos": rooms if rooms is not None else [_room(nr="107"),
                                                            _room(nr="111")],
               "santrauka": {},
-              "_meta": {"fixtures_status": "ok"},
+              "_meta": legend_meta({"klozetai": 2, "dusai": 2, **(symbols or {})}),
               "detected_symbols_summary": {"klozetai": 2, "dusai": 2, **(symbols or {})}}
     if overrides is not None:
         parsed["_overrides"] = overrides
@@ -97,10 +98,11 @@ def test_bathtub_mixer_pair_follows_the_readers_tub_only_count():
 def test_shower_tray_read_as_a_tub_does_not_bill_a_bathtub_mixer():
     """objektas_d: the contractor bills only "Dušo maišytuvo sistemos montavimas
     (ne potinkinės)" — no bathtub anywhere — yet the conflated symbol reads 1.
-    Reader says 0 tubs → the bathtub line must not appear at all."""
+    v4 3c-2: the counts are the legend's, and a legend that names no bathtub proves none — the bathtub line is
+    never BILLED on the tub-or-tray glance; it stays a blank question."""
     out = _build(symbols={"praustuves": 1, "vonios": 1, "vonios_kubilai": 0,
                           "dusai": 1})
-    assert _qty(out, "vonios maišytuvo") == []
+    assert all(q is None for q in _qty(out, "vonios maišytuvo"))
 
 
 def test_conflated_tub_symbol_without_reader_evidence_is_a_todo_not_a_guess():

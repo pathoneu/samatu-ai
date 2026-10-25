@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 import main
 from extractor import room_facts
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 @pytest.fixture
@@ -248,7 +249,7 @@ def test_every_ledgered_line_is_explained_by_its_rooms_or_an_anchor(client):
 def test_a_symbol_count_above_the_room_count_is_stated_as_an_anchor(client):
     rooms = _rooms()
     body = {"patalpos": rooms, "rules_override": {},
-            "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": {"fixtures_status": "ok"}}}
+            "context": {"detected_symbols_summary": {"praustuves": 3}, "_meta": legend_meta({"praustuves": 3})}}
     r = client.post("/recompute-interior", json=body)
     assert r.status_code == 200, r.text
     out = r.json()

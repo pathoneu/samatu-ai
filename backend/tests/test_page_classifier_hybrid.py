@@ -1,4 +1,8 @@
-"""Tests for hybrid `classify_page` wiring (Phase 1 T3).
+"""Tests for `classify_page` (Phase 1 T3; text-only since v4 Phase 3c-2, 2026-10-25).
+
+v4 3c-2: no image goes to a model. The sheet kind comes from its title text (text/page_kind.py); a model may only
+pick a kind from the page's TEXT (stub here, its cited words guarded); the dalis comes from the title block.
+The history of this file tested the old image classifier:
 
 Verifies that `classify_page`:
   - Stays Haiku-only when no PDF path is given (backward compat).
@@ -72,98 +76,47 @@ def _fake_haiku_client(payload: dict) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# Backward compat: image-only callers
+# v4 3c-2: the text decides; an image is never sent
 # ---------------------------------------------------------------------------
 
-def test_image_only_caller_skips_pdf_path():
-    """No pdf_path → Haiku-only, just like before T3."""
-    client = _fake_haiku_client({
-        "page_type": "floor_plan",
-        "confidence": 0.94,
-        "dalis": "SA",
-        "roof_type_hint": None,
-    })
-    result = classify_page("fakeb64image", client=client)
-    assert result.page_type is PageType.FLOOR_PLAN
-    assert result.dalis is Dalis.SA          # Haiku's value preserved as-is
-    assert result.roof_type_hint is None
-    client.messages.create.assert_called_once()
+class _NoCall:
+    class messages:  # noqa: N801
+        @staticmethod
+        def create(**kw):
+            raise AssertionError("no model call expected")
 
 
-# ---------------------------------------------------------------------------
-# Hybrid path: text-first dalis wins
-# ---------------------------------------------------------------------------
-
-def test_antspaudas_text_overrides_haiku_dalis(tmp_path):
-    """Text-extracted dalis must override Haiku's vision answer (deterministic > probabilistic)."""
-    pdf = _make_pdf(tmp_path / "p.pdf", "PROJ-TDP-SA.AR")
-    client = _fake_haiku_client({
-        "page_type": "section",
-        "confidence": 0.91,
-        "dalis": "BD",  # Haiku is wrong
-        "roof_type_hint": "dvislaitis",
-    })
-    result = classify_page("fakeb64image", client=client, pdf_path=pdf, page_num=1)
-    assert result.dalis is Dalis.SA   # text wins
-    assert result.page_type is PageType.SECTION
-    assert result.roof_type_hint is RoofTypeHint.DVISLAITIS
+def test_an_image_alone_classifies_nothing_and_calls_nothing():
+    result = classify_page("fakeb64image", client=_NoCall())
+    assert result.page_type is PageType.UNKNOWN and result.confidence == 0.0
 
 
-def test_antspaudas_text_supplies_dalis_when_haiku_returns_none(tmp_path):
-    pdf = _make_pdf(tmp_path / "p.pdf", "PROJ-TDP-VVN.AR")
-    client = _fake_haiku_client({
-        "page_type": "plumbing",
-        "confidence": 0.97,
-        "dalis": None,
-        "roof_type_hint": None,
-    })
-    result = classify_page("fakeb64image", client=client, pdf_path=pdf, page_num=1)
-    assert result.dalis is Dalis.VVN
+def test_the_title_text_decides_the_kind_and_the_dalis_without_a_model(tmp_path):
+    pdf = _make_pdf(tmp_path / "p.pdf", "SANTECHNIKOS PLANAS PROJ-TDP-VVN.AR")
+    result = classify_page("fakeb64image", client=_NoCall(), pdf_path=pdf, page_num=1)
     assert result.page_type is PageType.PLUMBING
+    assert result.dalis is Dalis.VVN
 
 
-# ---------------------------------------------------------------------------
-# Fallback: raster pages (no text) → Haiku's dalis is kept
-# ---------------------------------------------------------------------------
-
-def test_raster_page_falls_back_to_haiku_dalis(tmp_path):
-    """Empty lower-right → text returns None → Haiku's dalis is kept."""
-    pdf = _make_pdf(tmp_path / "raster.pdf", None)   # no text drawn
-    client = _fake_haiku_client({
-        "page_type": "floor_plan",
-        "confidence": 0.86,
-        "dalis": "SA",          # Haiku is the only source available
-        "roof_type_hint": None,
-    })
-    result = classify_page("fakeb64image", client=client, pdf_path=pdf, page_num=1)
-    assert result.dalis is Dalis.SA
-
-
-def test_raster_page_with_no_haiku_dalis_yields_none(tmp_path):
-    """Both signals null → final dalis is None (caller can decide what to do)."""
+def test_a_page_without_text_stays_unknown_without_a_client(tmp_path):
     pdf = _make_pdf(tmp_path / "raster.pdf", None)
-    client = _fake_haiku_client({
-        "page_type": "unknown",
-        "confidence": 0.4,
-        "dalis": None,
-        "roof_type_hint": None,
-    })
-    result = classify_page("fakeb64image", client=client, pdf_path=pdf, page_num=1)
-    assert result.dalis is None
+    result = classify_page("fakeb64image", pdf_path=pdf, page_num=1)
+    assert result.page_type is PageType.UNKNOWN and result.dalis is None
 
 
-# ---------------------------------------------------------------------------
-# Partial pdf parameters
-# ---------------------------------------------------------------------------
+def test_the_model_picks_from_the_text_only_and_its_words_must_stand_in_it(tmp_path):
+    pdf = _make_pdf(tmp_path / "p.pdf", "Pjūvio vaizdas 1-1 PROJ-TDP-SA.AR")
+    sent = []
 
-def test_pdf_path_without_page_num_skips_text_extraction(tmp_path):
-    """Both pdf_path AND page_num are required to enable text-first."""
-    pdf = _make_pdf(tmp_path / "p.pdf", "PROJ-TDP-SK.AR")
-    client = _fake_haiku_client({
-        "page_type": "floor_plan",
-        "confidence": 0.92,
-        "dalis": "SA",
-        "roof_type_hint": None,
-    })
-    result = classify_page("fakeb64image", client=client, pdf_path=pdf)
-    assert result.dalis is Dalis.SA  # Haiku's value, text path not taken
+    class _Client:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**kw):
+                sent.append(kw)
+                text = json.dumps({"items": [{"page_type": {"value": "section", "source_text": "Pjūvio vaizdas"},
+                                              "zodziai": {"value": "Pjūvio vaizdas", "source_text": "Pjūvio vaizdas"}}]})
+                return MagicMock(content=[MagicMock(type="text", text=text)], stop_reason="end_turn", stop_details=None)
+
+    result = classify_page("fakeb64image", client=_Client(), pdf_path=pdf, page_num=1)
+    assert result.page_type is PageType.SECTION and result.dalis is Dalis.SA
+    assert all(b["type"] == "text" for kw in sent for m in kw["messages"] for b in m["content"])

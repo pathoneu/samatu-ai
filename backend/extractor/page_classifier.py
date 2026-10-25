@@ -1,4 +1,12 @@
-"""Haiku 4.5 page classifier (canonical plan Week 3 Task 3.3).
+"""Page classifier — the sheet kind from the sheet's TEXT (v4 Phase 3c-2; originally the Haiku 4.5 page classifier,
+canonical plan Week 3 Task 3.3).
+
+v4 3c-2 (2026-10-25): no model looks at a page image any more. `classify_page` reads the sheet's title-block text
+and layout (text/page_kind.py) when it is given the PDF and the page; when the text decides nothing and a client is
+given, a model may pick the kind from the sheet's TEXT only (`_call_haiku`, the old name kept), and its answer is kept
+only when the title words it cites stand in that text. A rendered image passed in is ignored.
+
+The history below describes the old image classifier.
 
 Replaces the legacy 4700-token mega-prompt that ran the same instructions
 across every page type (floor plan, ceiling, išklotinė, electrical, etc.).
@@ -13,14 +21,11 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-import json
 import re
 
-import anthropic
 import pdfplumber
 
 from models_config import model_for
-from .response_text import ModelStopped, read_answer, usage_meta
 
 # Model tiers — historically Haiku/Sonnet/Opus picked at call site; on
 # 2026-06-17 all tiers were promoted to Opus 4.8, and since W1.1
@@ -298,55 +303,44 @@ def parse_classification(payload: dict) -> PageClassification:
     )
 
 
+_KIND_TO_PAGETYPE = {"floor_plan": PageType.FLOOR_PLAN, "ceiling_plan": PageType.CEILING_PLAN,
+                     "wall_elevation": PageType.WALL_ELEVATION, "section": PageType.SECTION,
+                     "electrical": PageType.ELECTRICAL, "plumbing": PageType.PLUMBING,
+                     "eksplikacija": PageType.EKSPLIKACIJA, "stogo_planas": PageType.STOGO_PLANAS,
+                     "legend": PageType.LEGEND}
+
+
 def _call_haiku(
-    image_b64: str,
-    client: anthropic.Anthropic | None = None,
+    page_text: str,
+    client=None,
     model: str | None = None,
     page: int | None = None,
 ) -> PageClassification:
-    """Single-page classification via a Claude vision model.
+    """The model picks the kind from the sheet's TEXT (never an image): text/schema_llm.py with the kinds as the
+    only allowed values and the title words it cites as `source_text` (substring-guarded). No client, or nothing
+    kept → UNKNOWN at confidence 0. Name kept for the old callers."""
+    if client is None or not str(page_text or "").strip():
+        return PageClassification(page_type=PageType.UNKNOWN, confidence=0.0)
+    from text.schema_llm import structure
+    kinds = [pt.value for pt in PageType]
+    res = structure(str(page_text), fields={"page_type": kinds, "zodziai": "text"}, key="page_type", client=client,
+                    instruction=("Kokios rūšies tai brėžinio lapas? Pasirink page_type ir nukopijuok lapo pavadinimo "
+                                 "žodžius (zodziai), iš kurių tai matyti. Vienas elementas."), max_items=1)
+    items = res.get("items") or []
+    if not items:
+        return PageClassification(page_type=PageType.UNKNOWN, confidence=0.0)
+    return PageClassification(page_type=PageType(items[0]["page_type"]), confidence=0.85)
 
-    Function name kept for backward compatibility — `model` may be Haiku,
-    Sonnet, or Opus. None (default) resolves model_for("page_classifier")
-    at call time. Production callers pass their own client; tests inject
-    a fake.
-    """
-    client = client or anthropic.Anthropic(max_retries=1)
-    model = model or model_for("page_classifier")
-    resp = client.messages.create(
-        model=model,
-        max_tokens=4096,  # raised at Opus 5 cutover: thinking-on-by-default counts against the cap — 200 truncated instantly (caps are free; billing is by actuals)
-        system=[{
-            "type": "text",
-            "text": _CLASSIFIER_SYSTEM,
-            "cache_control": {"type": "ephemeral", "ttl": "1h"},
-        }],
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Classify this page:"},
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": image_b64,
-                    },
-                },
-            ],
-        }],
-        output_config={
-            "format": {
-                "type": "json_schema",
-                "schema": _SCHEMA,
-            },
-        },
-    )
-    raw, stopped = read_answer(resp, reader="page_classifier", page=page)
-    if stopped:  # refused / cut off: named, usage kept (2026-09-30)
-        raise ModelStopped(stopped, usage_meta(resp, model))
-    payload = json.loads(raw)
-    return parse_classification(payload)
+
+def classify_page_text(pdf_bytes: bytes, page_num: int) -> PageClassification:
+    """The sheet kind its own text gives (text/page_kind.py), confidence 0,95 from a title, 0,7 from the layout."""
+    from text.page_kind import page_kinds
+    kinds = page_kinds(pdf_bytes)
+    k = kinds[page_num - 1] if 1 <= page_num <= len(kinds) else None
+    if not k or not k.get("saltinis"):
+        return PageClassification(page_type=PageType.UNKNOWN, confidence=0.0)
+    pt = _KIND_TO_PAGETYPE.get(k["tipas"], PageType.UNKNOWN)
+    return PageClassification(page_type=pt, confidence=0.7 if k["saltinis"] == "isdestymas" else 0.95)
 
 
 def _extract_antspaudas_text(pdf_path: str | Path, page_num: int) -> str | None:
@@ -394,45 +388,39 @@ def _extract_antspaudas_text(pdf_path: str | Path, page_num: int) -> str | None:
 
 
 def classify_page(
-    image_b64: str,
-    client: anthropic.Anthropic | None = None,
+    image_b64: str | None = None,
+    client=None,
     *,
     pdf_path: str | Path | None = None,
     page_num: int | None = None,
     model: str | None = None,
 ) -> PageClassification:
-    """Public entry: classify one rendered page (hybrid text-first + vision).
+    """Public entry: classify one page from its TEXT (v4 3c-2). `image_b64` is accepted for the old callers and
+    ignored — no image goes to a model.
 
-    Pure-image callers (legacy) get vision-only behaviour. When BOTH
-    `pdf_path` and `page_num` are supplied, `_extract_antspaudas_text`
-    runs first; if it finds a dalis code, that value OVERRIDES the
-    vision model's answer for `dalis` (text is deterministic, vision is
-    probabilistic). Page type and roof-type hint always come from the
-    vision model.
-
-    `model` selects Haiku/Sonnet/Opus — empirical bake-off result drives
-    the choice in production.
-
-    Raster-flattened pages whose antspaudas can't be read by pdfplumber
-    silently fall through to the vision model's value — this is the
-    fallback the plan calls out for studios that flatten their PDFs.
-
-    Errors propagate — we'd rather surface a failed classification than
-    silently route to the wrong downstream prompt.
-    """
-    result = _call_haiku(image_b64, client=client, model=model, page=page_num)
-    if pdf_path is not None and page_num is not None:
+    With `pdf_path` and `page_num`: the title-block text and layout decide (classify_page_text); when they do not
+    and a client is given, the model picks a kind from the page's TEXT (`_call_haiku`, guarded). The dalis code is
+    read from the title block as before (`_extract_antspaudas_text`). Without a PDF: UNKNOWN."""
+    if pdf_path is None or page_num is None:
+        return PageClassification(page_type=PageType.UNKNOWN, confidence=0.0)
+    if page_num < 1:
+        raise ValueError(f"page_num is 1-indexed; got {page_num}")
+    pdf_bytes = Path(pdf_path).read_bytes()
+    result = classify_page_text(pdf_bytes, page_num)
+    if result.page_type == PageType.UNKNOWN and client is not None:
         try:
-            text_dalis = _extract_antspaudas_text(pdf_path, page_num)
-        except (ValueError, IndexError):
-            # Bad page_num — caller error, surface it.
-            raise
-        except Exception:
-            # pdfplumber/pdfminer crashes on CID-encoded fonts on raster-only
-            # pages. That's exactly the case where vision fallback was meant
-            # to kick in, so swallow the crash silently. The vision answer
-            # already lives in `result`.
-            text_dalis = None
-        if text_dalis is not None:
-            result = replace(result, dalis=Dalis(text_dalis))
+            from extractor.pdf_page_cache import page_texts
+            texts = page_texts(pdf_bytes)
+            result = _call_haiku(texts[page_num - 1] if page_num <= len(texts) else "", client=client, model=model,
+                                 page=page_num)
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        text_dalis = _extract_antspaudas_text(pdf_path, page_num)
+    except (ValueError, IndexError):
+        raise
+    except Exception:  # noqa: BLE001 — a CID font crash is no dalis
+        text_dalis = None
+    if text_dalis is not None:
+        result = replace(result, dalis=Dalis(text_dalis))
     return result

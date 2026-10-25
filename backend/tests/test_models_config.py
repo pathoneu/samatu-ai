@@ -93,7 +93,7 @@ def test_resolved_models_returns_live_full_map(monkeypatch):
 def test_role_set_matches_plan():
     assert set(ROLES) == {
         "vision_pass1", "vision_pass2", "doors", "apdailos", "sanitary",
-        "legend", "page_classifier", "symbols", "extraction", "chat",
+        "legend", "page_classifier", "symbols", "extraction", "chat", "text_schema",
     }
 
 

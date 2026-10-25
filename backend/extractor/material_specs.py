@@ -1,249 +1,121 @@
-"""extractor.material_specs — on-demand designer material spec extraction
-for a single room. Triggered by user click in RoomCard, not auto.
+"""extractor.material_specs — the designer's material specs for ONE room, read from the sheets' TEXT (v4 Phase 3c-2).
 
-Pages targeted:
-- "VIRTUVĖS SPALVOS", "VAIKŲ VONIOS SPALVOS", etc. (per-room paint+tile spec)
-- "VIRTUVĖS SIENŲ IŠKLOTINĖS", room wall elevations (tile spec inline)
+On-demand (a click in the room card), never part of the reading. Pages targeted: „VIRTUVĖS SPALVOS", „VAIKŲ VONIOS
+SPALVOS", the room's „… IŠKLOTINĖS" — paint codes, tile formats, floorboards.
 
-We use Vision because text layout is mixed with paint sample images and
-tile photos — pdfplumber alone can't disambiguate which spec belongs to
-which page section. ONE focused Vision call per room (~$0.20).
+Until v4 3c-2 one model call per room LOOKED at those sheets (~€0,20) and wrote the specs out. Now the sheets' text
+layer is read (local OCR behind `SAMATU_OCR` for a sheet without one):
 
-Returns structured: {paint, sienos_plyteles, grindys_plyteles, grindys_medines}
-each with brand/model/dims/color/notes/raw_text.
+  · deterministic first — a tile format „60x120" / „600×1200 mm", a paint code „HC-98" / „NCS S 0502-Y" / „RAL 9016",
+    the line each stands on kept as `raw_text`;
+  · with a client, the same TEXT may be structured by text/schema_llm.py into the schema below — every value must
+    stand in the text as written, else it is refused (plan R3). The model never sees a sheet.
 
-Cached at project level — second click for same room is free.
+Returns {paint, sienos_plyteles, grindys_plyteles, grindys_medines, _meta}; a field the text does not give is None.
+Cached at project level by the caller. Never raises.
 """
 from __future__ import annotations
 
-import json
 import re
 import time
-from typing import Any
-
-import anthropic
-
-from models_config import model_for  # call-time model resolution
-from .vision_call import pdf_to_b64_images
-from .response_text import read_answer, usage_meta
 
 __all__ = ["extract_room_material_specs"]
 
-
-SYSTEM_TEXT = """Tu esi LT interjero projektų medžiagų spec'ų skaitytojas.
-
-Iš pateiktų puslapių susijusių su konkrečia patalpa, ištrauk medžiagų
-specifikacijas (dažai, plytelės, grindys). Grąžink TIK strukturuotą JSON.
-
-GRIEŽTOS TAISYKLĖS:
-- TIK kas matoma puslapiuose. Niekada neinferink.
-- Jei lauko reikšmės nematote, palik `null`.
-- Lietuviški simboliai (ąčęėįšųūž) PRIVALO būti tikslūs.
-- Plytelių dydžiai mm (jei brėžinyje cm, konvertuok).
-- Brand'ai (Benjamin Moore, Materia Pesca, Limo Cedit, Esta Parket) — palik kaip yra.
-
-Output schema (TypeScript):
-```typescript
-type RoomSpecs = {
-  paint?: {
-    brand: string;       // "Benjamin Moore"
-    code: string | null; // "HC-98"
-    name: string | null; // "Providence Olive"
-    where: "sienos" | "lubos" | "sienos_lubos" | null;
-    raw_text: string;    // exact label as on page
-  } | null;
-  sienos_plyteles?: {
-    brand: string | null;       // "Materia Pesca"
-    model: string | null;       // "Trama Rett"
-    size_mm: string | null;     // "60x120"
-    storis_mm: number | null;   // 9
-    spalva: string | null;      // "07" or color name
-    klijavimo_kampas: string | null;  // "45°" or "tiesiai"
-    tarpas_mm: number | null;   // 0.5
-    raw_text: string;
-  } | null;
-  grindys_plyteles?: {  // same shape
-    brand: string | null;
-    model: string | null;
-    size_mm: string | null;
-    storis_mm: number | null;
-    spalva: string | null;
-    raw_text: string;
-  } | null;
-  grindys_medines?: {
-    brand: string | null;     // "Esta Parket"
-    model: string | null;     // "1 Strip Oak BC Kose Grey"
-    finish: string | null;    // "Pores Extra Matt Lac 5% 2B Brushed"
-    supplier: string | null;  // "Vielaris" / "Woodlife"
-    raw_text: string;
-  } | null;
-};
-```
-"""
+_TILE = re.compile(r"(?<!\d)(\d{2,4})\s*[x×X]\s*(\d{2,4})(?:\s*[x×X]\s*(\d{1,2}))?\s*(mm|cm)?", re.IGNORECASE)
+_PAINT = re.compile(r"\b(?:NCS\s*S?\s*\d{4}-[A-Z]\d{0,2}[A-Z]?|RAL\s*\d{4}|[A-Z]{1,3}-\d{2,4}|SW\s*\d{4})\b")
+_WOOD = re.compile(r"\b(parket|grindlent|lentos|ąžuol|azuol|oak)\w*", re.IGNORECASE)
+_FLOOR = re.compile(r"\bgrind", re.IGNORECASE)
+_WALL = re.compile(r"\bsien", re.IGNORECASE)
 
 
-def _repair_json(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text
-        if text.endswith("```"):
-            text = text[:-3]
-    text = re.sub(r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:", r'\1"\2":', text)
-    text = re.sub(r",(\s*[}\]])", r"\1", text)
-    return text
+def _empty(meta: dict) -> dict:
+    return {"paint": None, "sienos_plyteles": None, "grindys_plyteles": None, "grindys_medines": None, "_meta": meta}
 
 
-def extract_room_material_specs(
-    pdf_bytes: bytes,
-    pages_to_inspect: list[int],
-    room_pavadinimas: str,
-    client: anthropic.Anthropic | None = None,
-) -> dict:
-    """Extract material specs from designer's spec pages for ONE room.
-
-    Args:
-        pdf_bytes: full PDF
-        pages_to_inspect: 1-indexed page numbers (typically 1-3 pages —
-            the room's wall elevation page + per-room spalvos page)
-        room_pavadinimas: room name (used in user prompt for context)
-        client: Anthropic client (created if None)
-
-    Returns: RoomSpecs dict per schema, plus _meta with elapsed/tokens.
-    """
-    if not pages_to_inspect:
-        return {"paint": None, "sienos_plyteles": None,
-                "grindys_plyteles": None, "grindys_medines": None,
-                "_meta": {"elapsed_s": 0, "pages_inspected": []}}
-
-    if client is None:
-        client = anthropic.Anthropic(max_retries=1)
-
-    t0 = time.time()
-    # Render only requested pages at high DPI (300) for clean OCR of small spec text
+def _page_lines(pdf_bytes: bytes, page: int) -> list[str]:
     try:
-        from pdf2image import convert_from_bytes
-        from PIL import Image
-        import io
-        import base64
-
-        # Render only selected pages
-        all_imgs = []
-        for p in sorted(set(pages_to_inspect)):
-            try:
-                imgs = convert_from_bytes(
-                    pdf_bytes, dpi=200, fmt="jpeg",
-                    first_page=p, last_page=p,
-                )
-                if imgs:
-                    img = imgs[0]
-                    # Cap size like main pipeline
-                    w, h = img.size
-                    scale = min(1.0, 2000 / max(w, h))
-                    if scale < 1.0:
-                        img = img.resize((int(w * scale), int(h * scale)))
-                    buf = io.BytesIO()
-                    img.save(buf, format="JPEG", quality=85)
-                    all_imgs.append({
-                        "page_index": p,
-                        "image_b64": base64.b64encode(buf.getvalue()).decode("ascii"),
-                    })
-            except Exception:
-                continue
-    except Exception as exc:
-        return {"_error": f"render_failed: {exc}",
-                "paint": None, "sienos_plyteles": None,
-                "grindys_plyteles": None, "grindys_medines": None,
-                "_meta": {"elapsed_s": round(time.time() - t0, 2)}}
-
-    if not all_imgs:
-        return {"paint": None, "sienos_plyteles": None,
-                "grindys_plyteles": None, "grindys_medines": None,
-                "_meta": {"elapsed_s": round(time.time() - t0, 2),
-                          "_error": "no_pages_rendered"}}
-
-    # Build user content: instruction + page images
-    user_content: list[dict] = [{
-        "type": "text",
-        "text": (
-            f"Patalpa, kuriai ieškome medžiagų: **{room_pavadinimas}**\n\n"
-            f"Pateikti puslapiai: {[p['page_index'] for p in all_imgs]}\n\n"
-            f"Iš šių puslapių ištrauk medžiagų spec'us TIK šiai patalpai. "
-            f"Jei puslapis apima kitą patalpą — ignoruok. Jei spec'as universalus "
-            f"(visiems gyvenamiems kambariams) — pateik. Grąžink JSON pagal schemą."
-        ),
-    }]
-    for p in all_imgs:
-        user_content.append({
-            "type": "text",
-            "text": f"Page {p['page_index']}:",
-        })
-        user_content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/jpeg",
-                "data": p["image_b64"],
-            },
-        })
-
-    system = [{"type": "text", "text": SYSTEM_TEXT,
-               "cache_control": {"type": "ephemeral"}}]
-
-    # Call with retry
-    parsed_specs: dict | None = None
-    last_err: Exception | None = None
-    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
-    # F6 residual (2026-07-28): the SDK retry multiplies with this loop
-    # (max_retries=1 × 2 attempts = up to 4 HTTP calls). `with_options` is
-    # `copy` in anthropic 0.95.0 — preserves timeout/headers/pool, drops only
-    # the SDK-level retry so THIS loop is the single retry policy.
-    _call_client = (client.with_options(max_retries=0)
-                    if hasattr(client, "with_options") else client)
-    for attempt in range(2):
+        from extractor.pdf_page_cache import page_texts
+        texts = page_texts(pdf_bytes)
+        t = texts[page - 1] if 1 <= page <= len(texts) else ""
+    except Exception:  # noqa: BLE001
+        t = ""
+    if len((t or "").strip()) < 8:
         try:
-            with _call_client.messages.stream(
-                model=model,
-                max_tokens=4096,  # raised at Opus 5 cutover: thinking counts against the cap
-                system=system,
-                messages=[{"role": "user", "content": user_content}],
-                output_config={"effort": "medium"},
-            ) as stream:
-                resp = stream.get_final_message()
-            _, stopped = read_answer(resp, reader="material_specs",
-                                     page=[p["page_index"] for p in all_imgs])
-            if stopped:  # refused / cut off: named, billed tokens kept, not retried (2026-09-30)
-                return {"_error": stopped,
-                        "paint": None, "sienos_plyteles": None,
-                        "grindys_plyteles": None, "grindys_medines": None,
-                        "_meta": {"elapsed_s": round(time.time() - t0, 2),
-                                  **usage_meta(resp, model)}}
-            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
-            try:
-                parsed_specs = json.loads(text)
-            except json.JSONDecodeError:
-                parsed_specs = json.loads(_repair_json(text))
-            usage = resp.usage
-            input_tok = getattr(usage, "input_tokens", 0)
-            output_tok = getattr(usage, "output_tokens", 0)
-            break
-        except Exception as exc:
-            last_err = exc
-            if attempt == 1:
-                return {"_error": str(exc),
-                        "paint": None, "sienos_plyteles": None,
-                        "grindys_plyteles": None, "grindys_medines": None,
-                        "_meta": {"elapsed_s": round(time.time() - t0, 2)}}
-            time.sleep(1.0)
+            from text.ocr import ocr_enabled, ocr_page
+            if ocr_enabled():
+                _w, _h, words = ocr_page(pdf_bytes, page)
+                t = " ".join(w.text for w in words)
+        except Exception:  # noqa: BLE001
+            pass
+    return [ln.strip() for ln in (t or "").splitlines() if ln.strip()]
 
-    out = parsed_specs or {}
-    out.setdefault("paint", None)
-    out.setdefault("sienos_plyteles", None)
-    out.setdefault("grindys_plyteles", None)
-    out.setdefault("grindys_medines", None)
-    out["_meta"] = {
-        "elapsed_s": round(time.time() - t0, 2),
-        "pages_inspected": [p["page_index"] for p in all_imgs],
-        "input_tokens": input_tok if "input_tok" in dir() else 0,
-        "output_tokens": output_tok if "output_tok" in dir() else 0,
-    }
+
+def _tile(line: str) -> dict | None:
+    m = _TILE.search(line)
+    if not m:
+        return None
+    a, b = int(m.group(1)), int(m.group(2))
+    if (m.group(4) or "").lower() == "cm":
+        a, b = a * 10, b * 10
+    if not (50 <= min(a, b) and max(a, b) <= 3200):
+        return None
+    return {"brand": None, "model": None, "size_mm": f"{a}x{b}",
+            "storis_mm": float(m.group(3)) if m.group(3) else None, "spalva": None, "raw_text": line[:200]}
+
+
+def extract_room_material_specs(pdf_bytes: bytes, pages_to_inspect: list[int], room_pavadinimas: str,
+                                client=None) -> dict:
+    """The specs for one room from its sheets' text. `client` is used only for text/schema_llm.py."""
+    t0 = time.time()
+    pages = sorted({int(p) for p in (pages_to_inspect or []) if int(p) >= 1})
+    if not pages:
+        return _empty({"elapsed_s": 0, "pages_inspected": []})
+    lines: list[str] = []
+    for p in pages:
+        lines += _page_lines(pdf_bytes, p)
+    meta = {"elapsed_s": 0.0, "pages_inspected": pages, "saltinis": "tekstas", "input_tokens": 0, "output_tokens": 0}
+    out = _empty(meta)
+    if not lines:
+        meta["_error"] = "no_text"
+        meta["elapsed_s"] = round(time.time() - t0, 2)
+        return out
+    for ln in lines:
+        tile = _tile(ln)
+        if tile and "plytel" in ln.lower():
+            key = "grindys_plyteles" if _FLOOR.search(ln) and not _WALL.search(ln) else "sienos_plyteles"
+            if out[key] is None:
+                out[key] = tile
+        if out["paint"] is None and ("daž" in ln.lower() or "daz" in ln.lower() or _PAINT.search(ln)):
+            m = _PAINT.search(ln)
+            if m:
+                out["paint"] = {"brand": None, "code": m.group(0), "name": None, "where": None, "raw_text": ln[:200]}
+        if out["grindys_medines"] is None and _WOOD.search(ln) and _FLOOR.search(ln + " grind"):
+            out["grindys_medines"] = {"brand": None, "model": None, "finish": None, "supplier": None,
+                                      "raw_text": ln[:200]}
+    if client is not None:
+        _schema_fill(out, "\n".join(lines), room_pavadinimas, client, meta)
+    meta["elapsed_s"] = round(time.time() - t0, 2)
     return out
+
+
+def _schema_fill(out: dict, text: str, room: str, client, meta: dict) -> None:
+    """Brand / model / colour names the regexes cannot tell apart, from the TEXT (schema_llm, substring-guarded)."""
+    from text.schema_llm import structure
+    fields = {"kas": ["paint", "sienos_plyteles", "grindys_plyteles", "grindys_medines"], "brand": "text",
+              "model": "text", "code": "text", "spalva": "text", "size_mm": "text", "raw_text": "text"}
+    res = structure(text, fields=fields, key="kas", client=client,
+                    instruction=(f"Patalpa: {room}. Iš teksto ištrauk šios patalpos medžiagų specifikacijas: "
+                                 "dažai (paint), sienų plytelės, grindų plytelės, medinės grindys. Kiekvienai — "
+                                 "gamintojas (brand), modelis, kodas, spalva, dydis mm ir visa eilutė (raw_text)."))
+    meta["input_tokens"] = int((res.get("_meta") or {}).get("input_tokens") or 0)
+    meta["output_tokens"] = int((res.get("_meta") or {}).get("output_tokens") or 0)
+    meta["schema_llm"] = {"status": res.get("status"), "atmesta": len(res.get("refused") or [])}
+    for it in res.get("items") or []:
+        key = it.get("kas")
+        if key not in out:
+            continue
+        rec = dict(out[key] or {})
+        for f in ("brand", "model", "code", "spalva", "size_mm", "raw_text"):
+            if it.get(f) and not rec.get(f):
+                rec[f] = it[f]
+        out[key] = rec

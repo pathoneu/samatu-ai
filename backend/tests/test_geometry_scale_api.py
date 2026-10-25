@@ -107,6 +107,31 @@ def test_a_line_over_a_dimension_string_sets_the_sheets_scale(tmp_path, monkeypa
     assert g["status"] == "ok" and g["scale"]["source"] == "user_line"
 
 
+def test_withdrawing_a_line_leaves_a_tombstone_and_answers_the_scale_now_in_force(tmp_path, monkeypatch):
+    # v4 3c-2: „Atšaukti" on the „Skaičius" tool — DELETE …/geometry/scale?page= appends a tombstone row (the table
+    # stays append-only, the line stays as history) and the sheet falls back to the drawing's own scale
+    _isolate(tmp_path, monkeypatch)
+    _store()
+    d = _a_string()
+    client = TestClient(app)
+    assert client.post("/api/projects/p1/geometry/scale-line", json=_line_over(d, d["value_m"] / (50 * PT_M))).status_code == 200
+    assert 1 in db.get_page_scales("p1")
+    r = client.delete("/api/projects/p1/geometry/scale", params={"page": 1})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["atsaukta"] is True and out["page"] == 1
+    assert out["scale"]["source"] != "user_line"
+    assert 1 not in db.get_page_scales("p1")
+    with db._conn() as c:
+        rows = c.execute("SELECT source, m_per_pt FROM page_scales WHERE project_id='p1' ORDER BY id").fetchall()
+    assert [r["source"] for r in rows] == ["user_line", db.SCALE_TOMBSTONE_SOURCE]
+    # a second withdrawal changes nothing; a new line is in force again
+    assert client.delete("/api/projects/p1/geometry/scale", params={"page": 1}).json()["atsaukta"] is False
+    assert client.post("/api/projects/p1/geometry/scale-line", json=_line_over(d, d["value_m"] / (50 * PT_M))).status_code == 200
+    assert db.get_page_scales("p1")[1]["source"] == "user_line"
+    assert client.delete("/api/projects/nope/geometry/scale", params={"page": 1}).status_code == 404
+
+
 def test_the_scale_of_a_sheet_says_where_it_came_from(tmp_path, monkeypatch):
     _isolate(tmp_path, monkeypatch)
     _store()

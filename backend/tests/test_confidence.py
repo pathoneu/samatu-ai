@@ -27,7 +27,7 @@ def _find(out, needle):
 
 def test_calibrated_class_is_geltona():
     # v4 3b: a frame type read in the drawing's text (the door-type reader) keeps the row; symbols alone do not
-    out = _parsed([_room()], _door_types={"count": 1, "reader_beapvadines": 1})
+    out = _parsed([_room()], _door_types={"count": 1, "reader_beapvadines": 1, "saltinis": "tekstas"})
     durys = _find(out, "beapvadinėms durims")
     assert durys["confidence"] == "geltona"
     # 2026-08-31: reasons guide, never confess — the old string quoted

@@ -1,4 +1,12 @@
-"""extractor.eksplikacija_reader — focused pre-pass Vision call for LT schedule tables.
+"""extractor.eksplikacija_reader — pre-pass reader of the LT schedule tables, TEXT-FIRST (v4 Phase 3c-2).
+
+v4 3c-2 (2026-10-25): no model looks at a page any more. The tables are read from the text layer
+(`pdfplumber_eksplikacija`, deterministic); when that finds none, the TEXT of the sheets that carry a table heading
+(text layer, or local OCR behind `SAMATU_OCR` for a sheet without one) may be structured by a language model through
+`text/schema_llm.py` — every value must stand in that text as written, else it is refused (plan R3). No text, no
+table: the reading goes on without one and says so.
+
+The rest of this docstring is the module's history.
 
 Why a pre-pass?
     Main Vision extractor reads room areas via dimension-chain inference, which
@@ -19,158 +27,14 @@ import re as _re
 import time
 from typing import Any
 
-import anthropic
-
-from models_config import model_for  # call-time model resolution
-from .vision_call import pdf_to_b64_images
 
 __all__ = ["read_eksplikacija"]
 
 
-# =============================================================================
-# PROMPT — Lithuanian, table-only, no inference
-# =============================================================================
-SYSTEM_TEXT = """Tu esi LT statybinių brėžinių lentelių parser'is. Tavo VIENINTELĖ užduotis — iš pateiktų PDF puslapių rasti ir tiksliai nuskaityti šias lenteles:
-
-1) EKSPLIKACIJA (patalpų sąrašas, dažniausiai stulpeliai: Nr., Pavadinimas, Plotas m², kartais Perimetras m, Lubų aukštis m).
-2) DURŲ SPECIFIKACIJA (durų sąrašas: žymėjimas D1/D2/..., plotis mm, aukštis mm, tipas, kiekis).
-3) LANGŲ SPECIFIKACIJA (langų sąrašas: žymėjimas L1/L2/..., plotis mm, aukštis mm, tipas, kiekis).
-
-GRIEŽTOS TAISYKLĖS:
-- Grąžink TIK strukturuotą JSON pagal nurodytą schemą. Jokio markdown, jokių paaiškinimų, jokių ```json``` blokų.
-- NIEKADA NEINFERINK reikšmių. Jei lentelės nėra arba langelio reikšmė neaiški — palik tuščią masyvą arba lauką null.
-- Lietuviški simboliai (ąčęėįšųūžĄČĘĖĮŠŲŪŽ) PRIVALO būti išsaugoti tiksliai.
-- Patalpų numeriai gali būti formato "M01", "1.01", "101", "K-01" — palik EXACT kaip lentelėje.
-- Plotas matuojamas m² (kvadratiniais metrais), perimetras m (metrais).
-
-**KRITIŠKAI SVARBU — DECIMAL TIKSLUMAS (du-žingsnių procesas):**
-
-Kiekvienai skaitinei reikšmei (plotas, perimetras, lubų aukštis, plotis_mm, aukštis_mm) PRIVALAI:
-
-ŽINGSNIS 1: Pridėk `_raw_text` lauką su EXACT tuo, ką matai langelyje, simbolis-į-simbolį.
-   - Pavyzdys: jei langelyje matosi `63,45`, tu rašai `_raw_text: "63,45"`.
-   - Pavyzdys: jei langelyje yra `12.30 m²`, tu rašai `_raw_text: "12.30 m²"`.
-   - Tai užtikrina, kad nieko neapvalinai mintyse — kopijuoji raides.
-
-ŽINGSNIS 2: TIK po ŽINGSNIO 1, parse'ink į numeric lauką:
-   - Pakeisk lietuvišką kablelį `,` į tašką `.`
-   - Atmesk vienetus (`m`, `m²`, `mm`, `vnt.`)
-   - **Išsaugok VISUS decimal'us** — `63,45` → `63.45` (NE `63.4`).
-   - **NIEKADA neapvalink** „kad būtų tvarkingiau". Sistema priima ir `63.45`, ir `63.4500001`.
-
-GRIEŽTAS DRAUDIMAS:
-- Negalvok „šitą galima suapvalinti iki 1 decimal place". JOKIO apvalinimo.
-- Klaidos čia kainuoja tikslumą: 63.45 vs 63.4 = 0.05 m² delta × 15 patalpų = 0.75 m² = realūs pinigai.
-- Jei abejoji ar gerai matai — žiūrėk vaizdą didesnėje rezoliucijoje (tu turi access).
-- Jei langelis tikrai blur'is ir nematyti paskutinio decimal — palik `null` su pastaba `"_raw_text": "63,4? (paskutinis skaičius neaiškus)"`.
-
-- Durų/langų matmenys MILIMETRAIS (mm). Jei lentelėje nurodyta cm/m — konvertuok į mm tiksliai (be apvalinimo).
-- Kiekis (vnt.) — sveikas skaičius. Jei nenurodyta, naudok 1.
-- Kiekvienam patalpos įrašui pridėk `row_idx` (0-based eilės numeris lentelėje) ir `page` (1-based PDF puslapis, kuriame lentelė rasta).
-- Kiekvienai schedule pozicijai pridėk `page` (1-based PDF puslapis).
-- `eksplikacija_source_page` — vienintelis puslapis, kuriame yra eksplikacija (pirmas, jei jų keli). Jei nerasta — null.
-- Jei tos pačios lentelės kopija pasikartoja keliuose puslapiuose, naudok pirmąjį radimą.
-"""
+MAX_TABLE_PAGES = 4
+_HEADING = _re.compile(r"EKSPLIKACIJ|PATALP\w* (S\u0104RA\u0160AS|SARASAS)|DUR\u0172 SPECIFIKACIJ|LANG\u0172 SPECIFIKACIJ|DURU SPECIFIKACIJ|LANGU SPECIFIKACIJ", _re.IGNORECASE)
 
 
-# =============================================================================
-# JSON SCHEMA — locked output shape
-# =============================================================================
-OUTPUT_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["eksplikacija_source_page", "patalpos", "schedule_tables"],
-    "properties": {
-        "eksplikacija_source_page": {"type": ["integer", "null"]},
-        "patalpos": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["nr", "pavadinimas", "plotas_m2", "plotas_m2_raw",
-                             "row_idx", "page"],
-                "properties": {
-                    "nr": {"type": "string"},
-                    "pavadinimas": {"type": "string"},
-                    "plotas_m2": {"type": ["number", "null"]},
-                    # PRIVALOMA — modelis turi cituoti raw cell tekstą prieš
-                    # parse'iną į skaičių. Kitaip jis tendentingai apvalina.
-                    "plotas_m2_raw": {"type": ["string", "null"], "description": "Literal cell text from table (e.g. '63,45 m²'). REQUIRED — forces non-rounding by making model copy chars before parsing."},
-                    "perimetras_m": {"type": ["number", "null"]},
-                    "perimetras_m_raw": {"type": ["string", "null"]},
-                    "lubu_aukstis_m": {"type": ["number", "null"]},
-                    "lubu_aukstis_m_raw": {"type": ["string", "null"]},
-                    "row_idx": {"type": "integer"},
-                    "page": {"type": "integer"},
-                },
-            },
-        },
-        "schedule_tables": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["durys", "langai"],
-            "properties": {
-                "durys": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["id", "page"],
-                        "properties": {
-                            "id": {"type": "string"},
-                            "plotis_mm": {"type": ["integer", "null"]},
-                            "aukstis_mm": {"type": ["integer", "null"]},
-                            "tipas": {"type": ["string", "null"]},
-                            "kiekis": {"type": ["integer", "null"]},
-                            "page": {"type": "integer"},
-                        },
-                    },
-                },
-                "langai": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["id", "page"],
-                        "properties": {
-                            "id": {"type": "string"},
-                            "plotis_mm": {"type": ["integer", "null"]},
-                            "aukstis_mm": {"type": ["integer", "null"]},
-                            "tipas": {"type": ["string", "null"]},
-                            "kiekis": {"type": ["integer", "null"]},
-                            "page": {"type": "integer"},
-                        },
-                    },
-                },
-            },
-        },
-    },
-}
-
-
-# Compact instruction block; full schema sent inline so the model has the
-# exact structure to emit. Kept short — Vision tokens are expensive.
-USER_INSTRUCTION = (
-    "Iš šių PDF puslapių išgauk eksplikaciją ir durų/langų specifikacijas. "
-    "Grąžink TIK JSON pagal šią schemą (ATKREIPK DĖMESĮ — tikslūs lauko vardai):\n\n"
-    + json.dumps(OUTPUT_SCHEMA, ensure_ascii=False, indent=2)
-    + "\n\n"
-    + "**KRITIŠKAI SVARBU — DECIMAL TIKSLUMAS PER `_raw` LAUKUS:**\n"
-    + "Kiekvienai patalpai PRIVALAI grąžinti `plotas_m2_raw` lauką su EXACT "
-    + "celės tekstu prieš parse'iną. Jei celėj rašo `63,45 m²`, tu rašai:\n"
-    + "  `\"plotas_m2_raw\": \"63,45 m²\"`\n"
-    + "  `\"plotas_m2\": 63.45`\n"
-    + "TADA tu negalėsi suapvalinti — pirma kopijuoji simbolius, paskui "
-    + "konvertuoji. Tai apsaugo nuo `63,45 → 63.4` truncation'o.\n"
-    + "Jei nematote celės — `plotas_m2_raw: null`, `plotas_m2: null`.\n\n"
-    + "Jei lentelė nerasta — atitinkamas masyvas tuščias, "
-    + "eksplikacija_source_page = null."
-)
-
-
-# =============================================================================
-# Helpers
-# =============================================================================
 def _empty_payload() -> dict:
     """Canonical empty result shape (no tables found)."""
     return {
@@ -266,45 +130,73 @@ def _normalize_payload(parsed: dict) -> dict:
     return out
 
 
-def _build_user_content(pages: list[dict]) -> list[dict]:
-    """Assemble Anthropic Vision user content: instruction + page images."""
-    content: list[dict] = [{"type": "text", "text": USER_INSTRUCTION}]
-    for p in pages:
-        content.append({
-            "type": "text",
-            "text": f"Puslapis {p['page_index']}:",
-        })
-        content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/jpeg",
-                "data": p["image_b64"],
-            },
-        })
-    # T5c (2026-07-28 telemetry audit): breakpoint on the image prefix, mirroring
-    # prompt.build_user_content. The system prompt already had one, but the heavy
-    # part — the page images — did not, so a retry (JSON-decode failure, or a
-    # transient 5xx) re-sent byte-identical images at FULL price. With the
-    # breakpoint a retry reads them at ~0.1x instead.
-    # Tradeoff, stated honestly: a cache write costs 1.25x, so the no-retry case
-    # pays +25% on the image tokens. Break-even is a ~38% retry rate on this
-    # reader; revert this hunk if the new cache_write telemetry shows retries are
-    # rarer than that. Zero accuracy impact either way.
-    if content and content[-1].get("type") == "image":
-        content[-1]["cache_control"] = {"type": "ephemeral"}
-    return content
+def _table_texts(pdf_bytes: bytes) -> list[tuple[int, str]]:
+    """(page, text) of the sheets whose text carries a room-table or door / window schedule heading — the text
+    layer, else local OCR behind SAMATU_OCR. At most MAX_TABLE_PAGES sheets."""
+    out: list[tuple[int, str]] = []
+    try:
+        from .pdf_page_cache import page_texts
+        texts = page_texts(pdf_bytes)
+    except Exception:  # noqa: BLE001
+        return out
+    for i, t in enumerate(texts):
+        t = t or ""
+        if len(t.strip()) < 8:
+            try:
+                from text.ocr import ocr_enabled, ocr_page
+                if ocr_enabled():
+                    _w, _h, words = ocr_page(pdf_bytes, i + 1)
+                    t = " ".join(w.text for w in words)
+            except Exception:  # noqa: BLE001
+                t = ""
+        if _HEADING.search(t):
+            out.append((i + 1, t))
+        if len(out) >= MAX_TABLE_PAGES:
+            break
+    return out
 
 
-# =============================================================================
-# Public API
-# =============================================================================
-def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
+_ROOM_FIELDS = {"nr": "text", "pavadinimas": "text", "plotas_m2": "number", "perimetras_m": "number",
+                "lubu_aukstis_m": "number"}
+_OPENING_FIELDS = {"id": "text", "plotis_mm": "number", "aukstis_mm": "number", "tipas": "text", "kiekis": "integer"}
+
+
+def _schema_fallback(pdf_bytes: bytes, client) -> dict | None:
+    """The tables structured from the sheets' TEXT by text/schema_llm.py (substring-guarded), or None."""
+    pages = _table_texts(pdf_bytes)
+    if not pages or client is None:
+        return None
+    from text.schema_llm import structure
+    text = "\n\n".join(f"[lapas {p}]\n{t}" for p, t in pages)
+    rooms = structure(text, fields=_ROOM_FIELDS, key="nr", client=client,
+                      instruction="Iš teksto ištrauk PATALPŲ EKSPLIKACIJOS eilutes: patalpos numeris, pavadinimas, "
+                                  "plotas m², perimetras m ir lubų aukštis m, jei jie parašyti.")
+    doors = structure(text, fields=_OPENING_FIELDS, key="id", client=client,
+                      instruction="Iš teksto ištrauk DURŲ SPECIFIKACIJOS eilutes: žymėjimas (D1…), plotis mm, "
+                                  "aukštis mm, tipas, kiekis.")
+    wins = structure(text, fields=_OPENING_FIELDS, key="id", client=client,
+                     instruction="Iš teksto ištrauk LANGŲ SPECIFIKACIJOS eilutes: žymėjimas (L1…), plotis mm, "
+                                 "aukštis mm, tipas, kiekis.")
+    strip = lambda items: [{k: v for k, v in it.items()} for it in items]  # noqa: E731 — keep _saltinis
+    result = {
+        "eksplikacija_source_page": pages[0][0] if rooms.get("items") else None,
+        "patalpos": strip(rooms.get("items") or []),
+        "schedule_tables": {"durys": strip(doors.get("items") or []), "langai": strip(wins.get("items") or [])},
+        "_meta": {"saltinis": "tekstas+schema_llm", "pages": [p for p, _ in pages],
+                  "atmesta": len(rooms.get("refused") or []) + len(doors.get("refused") or []) + len(wins.get("refused") or []),
+                  "model": rooms.get("_meta", {}).get("model"),
+                  "input_tokens": sum(int((r.get("_meta") or {}).get("input_tokens") or 0) for r in (rooms, doors, wins)),
+                  "output_tokens": sum(int((r.get("_meta") or {}).get("output_tokens") or 0) for r in (rooms, doors, wins))},
+    }
+    return result
+
+
+def read_eksplikacija(pdf_bytes: bytes, client=None) -> dict:
     """Pre-pass extraction of eksplikacija + schedule tables from a LT PDF.
 
     Args:
         pdf_bytes: full PDF
-        client: anthropic.Anthropic() instance (passed in to share with main extract)
+        client: the reading's model client, used only by text/schema_llm.py on the sheets' TEXT (None: no call)
 
     Returns: dict shaped per docstring at module top. Never raises.
         On hard failure includes `_error` key and empty payload arrays.
@@ -369,142 +261,25 @@ def read_eksplikacija(pdf_bytes: bytes, client: anthropic.Anthropic) -> dict:
                   f"ambiguous_rows_skipped={_m.get('ambiguous_rows', 0)}, "
                   f"discarded={_m.get('tables_discarded') or []})")
     except Exception as exc:
-        # Soft failure — continue to Vision path
+        # Soft failure — continue to the text schema path
         print(f"[eksplikacija_reader] pdfplumber pre-pass error (non-fatal): {exc}")
 
-    # Step 1: PDF → base64 images at HIGH DPI (300 vs main's 200).
-    # Eksplikacijos lentelės skaitmenys yra mažas tekstas — 200 DPI verčia
-    # modelį spėti paskutinius decimal'us. 300 DPI padaro „63,45" pixel-perfect
-    # readable. ~25% daugiau tokens, bet decimal precision yra kritinė.
+    # Step 1 (v4 3c-2): no image is ever sent. The sheets' TEXT (text layer / OCR) → schema_llm, guarded.
     try:
-        pages = pdf_to_b64_images(pdf_bytes, dpi=300)
-    except Exception as exc:
-        return {
-            **_empty_payload(),
-            "_error": f"pdf_to_images_failed: {exc}",
-            "_meta": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_read_tokens": 0,
-                "elapsed_s": round(time.time() - t0, 2),
-            },
-        }
-
-    if not pages:
-        return {
-            **_empty_payload(),
-            "_error": "PDF has no renderable pages",
-            "_meta": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_read_tokens": 0,
-                "elapsed_s": round(time.time() - t0, 2),
-            },
-        }
-
-    # System prompt with cache_control for cost optimization across runs.
-    system = [
-        {"type": "text", "text": SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
-    ]
-    user_content = _build_user_content(pages)
-
-    # Step 2: Vision call with retry (max 3 attempts, exponential backoff).
-    last_err: Exception | None = None
-    parsed: dict | None = None
-    final_usage = None
-    final_attempt = 0
-
-    model = model_for("vision_pass1")  # resolved per-run (MODEL_OVERRIDE etc.)
-    # F6 residual (2026-07-28): this module owns its OWN retry loop, and the
-    # shared client is built with max_retries=1 — the two MULTIPLY, so 3
-    # attempts became up to 6 HTTP calls (and 6 × the latency before we give
-    # up). The loop below is the retry policy; the SDK's must be off inside it.
-    # `with_options` is an alias of `copy` in anthropic 0.95.0: it preserves
-    # api_key, base_url, timeout, default_headers/query and REUSES the same
-    # httpx client (connection pool) — only max_retries changes.
-    _call_client = (client.with_options(max_retries=0)
-                    if hasattr(client, "with_options") else client)
-    for attempt in range(3):
-        final_attempt = attempt + 1
-        try:
-            with _call_client.messages.stream(
-                model=model,
-                max_tokens=8192,  # tables are small vs full extract; 8k is ample
-                system=system,
-                messages=[{"role": "user", "content": user_content}],
-                # "medium" effort: tables are simpler than dimension chains
-                output_config={"effort": "medium"},
-            ) as stream:
-                resp = stream.get_final_message()
-
-            # T5b (2026-07-28 telemetry audit): `refusal` and `max_tokens` are
-            # DETERMINISTIC given an unchanged payload — the retry re-sent
-            # byte-identical input and re-paid for it three times to get the
-            # same answer. Fail immediately, matching _run_pass1_once in
-            # vision_call.py, which returns on both stop reasons. The
-            # network/5xx retries in the except block below are untouched —
-            # those are genuinely transient.
-            if resp.stop_reason in ("refusal", "max_tokens"):
-                last_err = Exception(
-                    f"stop_reason={resp.stop_reason} (deterministic — not retried)")
-                break
-
-            text = "".join(
-                b.text for b in resp.content if getattr(b, "type", None) == "text"
-            ).strip()
-
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError:
-                try:
-                    parsed = json.loads(_repair_json(text))
-                except json.JSONDecodeError as je:
-                    last_err = je
-                    if attempt == 2:
-                        break
-                    time.sleep(1.5 ** attempt)
-                    continue
-
-            final_usage = resp.usage
-            break  # success
-
-        except Exception as exc:
-            last_err = exc
-            print(f"[eksplikacija_reader] attempt {attempt + 1} failed: {exc}")
-            if attempt == 2:
-                break
-            time.sleep(1.5 ** attempt)
-
-    elapsed = round(time.time() - t0, 2)
-
-    if parsed is None:
-        return {
-            **_empty_payload(),
-            "_error": f"vision_call_failed: {last_err}",
-            "_meta": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_read_tokens": 0,
-                "elapsed_s": elapsed,
-                "attempts": final_attempt,
-            },
-        }
-
-    # Step 3: Normalize into locked shape.
-    result = _normalize_payload(parsed)
-
-    # Step 4: Attach _meta with token usage.
-    result["_meta"] = {
-        "input_tokens": getattr(final_usage, "input_tokens", 0) or 0,
-        "output_tokens": getattr(final_usage, "output_tokens", 0) or 0,
-        "cache_read_tokens": getattr(final_usage, "cache_read_input_tokens", 0) or 0,
-        "cache_write_tokens": getattr(final_usage, "cache_creation_input_tokens", 0) or 0,
-        "elapsed_s": elapsed,
-        "attempts": final_attempt,
-        "pages_sent": len(pages),
-        "model": model,
+        fb = _schema_fallback(pdf_bytes, client)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[eksplikacija_reader] text schema fallback failed (non-fatal): {exc}")
+        fb = None
+    if fb and (fb.get("patalpos") or fb["schedule_tables"]["durys"] or fb["schedule_tables"]["langai"]):
+        fb["_meta"]["elapsed_s"] = round(time.time() - t0, 2)
+        return fb
+    return {
+        **_empty_payload(),
+        "_error": "no table in the drawing's text",
+        "_meta": {"input_tokens": int(((fb or {}).get("_meta") or {}).get("input_tokens") or 0),
+                  "output_tokens": int(((fb or {}).get("_meta") or {}).get("output_tokens") or 0),
+                  "cache_read_tokens": 0, "elapsed_s": round(time.time() - t0, 2), "saltinis": "tekstas"},
     }
-    return result
 
 
 # =============================================================================

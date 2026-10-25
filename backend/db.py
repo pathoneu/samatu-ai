@@ -1745,14 +1745,28 @@ def add_page_scale(project_id: str, page: int, m_per_pt: float, source: str,
     return row
 
 
+SCALE_TOMBSTONE_SOURCE = "atsaukta"   # page_scales.source of a row that withdraws his line (m_per_pt 0)
+
+
+def withdraw_page_scale(project_id: str, page: int, user_id: str | None = None) -> dict:
+    """„Atšaukti" on the scale line: append a tombstone row (the table stays append-only, the withdrawn lines stay
+    as history); `get_page_scales` then reports no line of his for the page until he draws a new one."""
+    return add_page_scale(project_id, page, 0.0, SCALE_TOMBSTONE_SOURCE, None, {"atsaukta": True}, user_id)
+
+
 def get_page_scales(project_id: str) -> dict[int, dict]:
-    """{page: the newest row} — the person's scales in force for the project."""
+    """{page: the newest row} — the person's scales in force for the project. A page whose newest row is a
+    tombstone (`withdraw_page_scale`) has no line of his."""
     with _conn() as c:
         rows = c.execute(
             "SELECT * FROM page_scales WHERE project_id = ? ORDER BY page, id DESC", (project_id,)).fetchall()
     out: dict[int, dict] = {}
+    withdrawn: set[int] = set()
     for r in rows:
-        if int(r["page"]) in out:
+        if int(r["page"]) in out or int(r["page"]) in withdrawn:
+            continue
+        if r["source"] == SCALE_TOMBSTONE_SOURCE:
+            withdrawn.add(int(r["page"]))
             continue
         d = dict(r)
         try:

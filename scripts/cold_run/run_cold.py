@@ -249,6 +249,16 @@ def samata(lane_parsed: dict, blob: dict | None, scan: dict, pdf_bytes: bytes) -
     meta = (blob or {}).get("_meta") or {}
     parsed["_meta"] = {k: meta.get(k) for k in ("fixtures_status", "fixtures_counts", "fixtures_raised") if k in meta}
     parsed["_autoriaus_kiekiai"] = scan.get("figures") or []
+    # v4 3c-2: the reading's own text steps — every sheet's kind from its title text, what the legends count
+    # (proposals), the door types and the wall finishes from the text (a model's readings of images come off)
+    from extractor import vision_call as _vc
+    from extractor.legend_counts import SIULYMAI_KEY, auto_legend_counts
+    from text.page_kind import apply_text_page_kinds
+    apply_text_page_kinds(parsed, pdf_bytes)
+    legend = auto_legend_counts(pdf_bytes)
+    parsed["_meta"][SIULYMAI_KEY] = legend
+    _vc.apply_door_types(parsed, pdf_bytes)
+    _vc.apply_apdailos(parsed, pdf_bytes)
     try:
         from extractor.symbol_legend import scan_symbol_legend
         parsed["_symbol_legend"] = scan_symbol_legend(pdf_bytes)
@@ -297,7 +307,12 @@ def samata(lane_parsed: dict, blob: dict | None, scan: dict, pdf_bytes: bytes) -
         counts[str(r["kilme"])] = counts.get(str(r["kilme"]), 0) + 1
     return {"rows": rows, "kilme": counts, "illegal": [r["aprasymas"] for r in rows
                                                       if r["kilme"] in rp.ILLEGAL and r["kiekis"] is not None],
-            "heights": {k: v for k, v in heights.items() if k != "patalpos"}, "room_heights": room_heights}
+            "heights": {k: v for k, v in heights.items() if k != "patalpos"}, "room_heights": room_heights,
+            "legendos": {"status": legend.get("status"), "lapai_su_legenda": legend.get("lapai_su_legenda"),
+                         "seimos": {k: {"kiekis": v.get("kiekis"), "saltinis": v.get("saltinis"), "lapai": v.get("lapai"),
+                                        "tekstas": v.get("tekstas")} for k, v in (legend.get("seimos") or {}).items()},
+                         "be_kiekio": legend.get("eilutes_be_kiekio"), "sekundes": legend.get("sekundes")},
+            "lapu_rusys": (parsed.get("_meta") or {}).get("lapu_rusys_is_teksto")}
 
 
 def project_run(codename: str, pid: str, pdf_path: Path, blob: dict | None) -> dict:

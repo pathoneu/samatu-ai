@@ -98,7 +98,8 @@ def test_a_stored_zoom_answer_never_overrules_a_value_a_lane_read(eh):
     parsed = {"patalpos": [read, unread], "_meta": {}}
     assert eh._reapply_stored_zoom(parsed) == 1
     assert (read["plotas_m2"], read["perimetras_m"]) == (7.25, 11.0)
-    assert (read["_plotas_zoom_m2"], read["_perimetras_zoom_m"]) == (5.0, 9.0)
+    # v4 3c-2: production no longer zooms a room the drawing measures (vision_call.zoom_wanted) — no evidence either
+    assert "_plotas_zoom_m2" not in read and "_perimetras_zoom_m" not in read
     assert (unread["plotas_m2"], unread["perimetras_m"], unread["perimetras_saltinis"]) == (5.0, 9.0, "zoom")
     assert parsed["bendras_plotas_m2"] == 12.25
 

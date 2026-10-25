@@ -369,11 +369,10 @@ def objektas_h_answers(frozen: dict, meta_log: dict) -> dict[str, Any]:
                        note="stored enumeration + the voted counts of the run's event log")
                 for i in range(3)]
 
+    # v4 3c-2 (2026-10-25): the doors, door-type and fixture readers make no model call any more (deleted, or read
+    # the text layer) — their stored answers are kept above for the record, not offered to the stub
+    del door_type, fixtures
     return {
         "pass1": pass1,
         "zoom": zoom,
-        "doors": [Answer(_doors_answer(frozen), "derived",
-                         usage=(_extra_calls(frozen, "doors") or [{}])[0], note="the doors the merge placed")],
-        "door_type": door_type,
-        "fixtures": fixtures,
     }

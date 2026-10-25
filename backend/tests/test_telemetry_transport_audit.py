@@ -163,39 +163,6 @@ def test_every_sub_reader_constructor_bounds_sdk_retries():
 
 # ═════════════ T5b/T5c — eksplikacija: deterministic stop reasons ══════════
 
-def test_eksplikacija_does_not_retry_deterministic_stop_reasons():
-    """`refusal` and `max_tokens` are deterministic for an unchanged payload —
-    retrying re-sends byte-identical input and re-pays for the same answer."""
-    src = inspect.getsource(eksplikacija_reader)
-    block = src.split('if resp.stop_reason in ("refusal", "max_tokens"):')[1][:400]
-    assert "break" in block.split("\n")[3] or "break" in block[:200], (
-        "refusal/max_tokens must break immediately, not sleep-and-continue")
-    assert "continue" not in block[:200], (
-        "found a `continue` in the deterministic stop-reason branch — that is "
-        "the retry-and-re-pay path this fix removed")
-
-
-def test_eksplikacija_user_content_has_a_cache_breakpoint():
-    """The system prompt was cached but the heavy image payload was not, so a
-    genuine transient retry re-sent every page at full price."""
-    content = eksplikacija_reader._build_user_content(_pages(3))
-    breakpoints = [b for b in content if b.get("cache_control")]
-    assert len(breakpoints) == 1, "expected exactly one breakpoint"
-    assert breakpoints[0]["type"] == "image", "breakpoint belongs on the image prefix"
-    assert breakpoints[0] is content[-1], "breakpoint must close the stable prefix"
-
-
-def test_eksplikacija_breakpoint_is_stable_across_identical_payloads():
-    """Cache hits require byte-identical content — the builder must be pure."""
-    assert eksplikacija_reader._build_user_content(_pages(3)) == \
-        eksplikacija_reader._build_user_content(_pages(3))
-
-
-def test_eksplikacija_no_pages_does_not_crash_the_breakpoint():
-    content = eksplikacija_reader._build_user_content([])
-    assert not [b for b in content if b.get("cache_control")]
-
-
 # ══════════════════════ T1 — cache TTL / pricing honesty ═══════════════════
 
 def test_pricing_defaults_to_the_ttl_the_live_path_actually_sends():
@@ -354,52 +321,6 @@ class _OptionsRecordingClient:
     def stream(self, **_kw):
         self.calls += 1
         raise RuntimeError("boom")
-
-
-def test_eksplikacija_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
-    monkeypatch.setattr(eksplikacija_reader, "pdf_to_b64_images",
-                        lambda *a, **kw: [{"page_index": 0, "image_b64": "x"}])
-    c = _OptionsRecordingClient()
-    out = eksplikacija_reader.read_eksplikacija(b"%PDF-1.4 not really", c)
-    assert out.get("_error"), out                      # every attempt failed
-    assert c.with_options_kwargs, "read_eksplikacija never called with_options"
-    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
-    assert c.calls == 3, f"expected exactly 3 attempts, got {c.calls}"
-
-
-def test_wall_elevation_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
-    from extractor import wall_elevation as we
-    monkeypatch.setattr(we.time, "sleep", lambda *_a, **_k: None)
-    c = _OptionsRecordingClient()
-    assert we._extract_one_page("fakeb64", 0, c) is None    # all attempts failed
-    assert c.with_options_kwargs, "_extract_one_page never called with_options"
-    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
-    assert c.calls == 3, f"expected exactly 3 attempts, got {c.calls}"
-
-
-def test_material_specs_disables_the_sdk_retry_inside_its_own_loop(monkeypatch):
-    from extractor import material_specs as ms
-    monkeypatch.setattr(ms.time, "sleep", lambda *_a, **_k: None)
-    # Stub the renderer: this test is about the transport policy, not poppler.
-    import pdf2image
-
-    class _Img:
-        size = (100, 100)
-
-        def resize(self, *_a):
-            return self
-
-        def save(self, buf, **_kw):
-            buf.write(b"jpegbytes")
-    monkeypatch.setattr(pdf2image, "convert_from_bytes",
-                        lambda *a, **kw: [_Img()])
-
-    c = _OptionsRecordingClient()
-    out = ms.extract_room_material_specs(
-        b"%PDF-1.4 fake", [3], "Vonia", client=c)
-    assert out.get("_error"), out
-    assert c.with_options_kwargs[0].get("max_retries") == 0, c.with_options_kwargs
-    assert c.calls == 2, f"expected exactly 2 attempts, got {c.calls}"
 
 
 def test_with_options_preserves_transport_settings_in_this_sdk():

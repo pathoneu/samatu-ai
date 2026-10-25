@@ -7,7 +7,7 @@ reconcile against the glyph-detected count, SURFACING disagreement as a
 confidence flag — never silently overwriting. Council 5/5 + research.
 """
 from extractor.door_type_reader import (
-    reconcile_frameless, _find_door_pages, build_user_text,
+    reconcile_frameless, _find_door_pages,
     _safe_count, _mode_int, read_door_types,
 )
 
@@ -28,41 +28,6 @@ def test_safe_count_coerces_or_defaults():
 def test_mode_int_survives_non_numeric_reads():
     # a hallucinated "3+" among numeric reads is dropped, not crash-inducing
     assert _mode_int([3, 3, "3+"]) == 3
-
-
-def test_read_door_types_survives_non_numeric_vision_count(monkeypatch):
-    """The exact crash the audit flagged: Vision returns beapvadines_count='3+'.
-    Before the fix, int('3+') raised ValueError and aborted the whole read."""
-    import extractor.door_type_reader as m
-
-    class _Block:
-        text = ('{"doors": [], "beapvadines_count": "3+", '
-                '"standartines_count": 2, "stumdomos_count": null, '
-                '"bendras_tipas": null, "pastabos": "x"}')
-
-    class _Usage:
-        input_tokens = 10
-        output_tokens = 5
-
-    class _Resp:
-        content = [_Block()]
-        usage = _Usage()
-
-    class _Client:
-        class messages:
-            @staticmethod
-            def create(**_k):
-                return _Resp()
-
-    monkeypatch.setattr(m, "_find_door_pages", lambda *_a, **_k: [2])
-    monkeypatch.setattr(m, "_render_page_b64", lambda *_a, **_k: "b64stub")
-    monkeypatch.setattr(m, "model_for", lambda *_a, **_k: "test-model")
-
-    out = read_door_types(b"pdf", [{"nr": "1", "pavadinimas": "Koridorius"}],
-                          client=_Client())
-    assert out["status"] == "ok"
-    assert out["beapvadines_count"] == 0     # '3+' safely coerced to default
-    assert out["standartines_count"] == 2    # numeric value preserved
 
 
 # ── reconcile-and-surface (the merge discipline) ─────────────────────────
@@ -134,11 +99,6 @@ def test_find_door_pages_prefers_tag_and_annotation_pages(monkeypatch):
     assert 2 in pp and 3 in pp and 1 not in pp and 4 not in pp
 
 
-def test_build_user_text_lists_rooms():
-    txt = build_user_text([{"nr": "101", "pavadinimas": "Koridorius", "plotas_m2": 9.6}])
-    assert "Koridorius" in txt and "beapvad" in txt.lower()
-
-
 # ── wiring: reconciled count flows into the durų angų pozicija ────────────
 def test_door_types_raises_and_flags_pozicija():
     from extractor.universal_rules import calc_room_quantities
@@ -153,7 +113,7 @@ def test_door_types_raises_and_flags_pozicija():
     parsed = {"patalpos": [room], "santrauka": {},
               # the count is one the reader READ in the text (2026-09-23: a count made of the plan's own
               # symbols, reader 0, no longer raises anything)
-              "_door_types": {"count": 7, "reader_beapvadines": 7, "confidence": "geltona",
+              "_door_types": {"count": 7, "reader_beapvadines": 7, "confidence": "geltona", "saltinis": "tekstas",
                               "reason": "Anotacijose rasta 7, pradinis rado 2 — patikrink"}}
     out = _build_pozicijos_from_rooms(parsed)
     line = [p for p in out["pozicijos"] if "beapvadinėms durims" in p["aprasymas"]]

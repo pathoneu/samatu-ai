@@ -18,6 +18,7 @@ from extractor.vision_call import (
     _recompute_santrauka,
 )
 from extractor.universal_rules import calc_room_quantities
+from legend_counts_fixture import legend_meta  # noqa: E402  (v4 3c-2: plumbing counts are the legend's)
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -492,8 +493,8 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
 
     # His number per shower × the showers the plumbing plan counts
     parsed["_overrides"] = {"lentyneliu_per_vonia": 1}
-    parsed["_meta"] = {"fixtures_status": "ok"}
     parsed["detected_symbols_summary"] = {"dusai": 1, "klozetai": 1}
+    parsed["_meta"] = legend_meta(parsed["detected_symbols_summary"])
     out2 = _run_full_pipeline(parsed)
     line2 = [p for p in out2["pozicijos"] if "lentynė" in p["aprasymas"].lower()]
     assert len(line2) == 1
@@ -546,7 +547,7 @@ def test_pozicijos_p3_skyliu_grezimas_symbol_driven():
             "vonios": 1,
             "wc_remai": 1,
         },
-        "_meta": {"fixtures_status": "ok"},     # the plumbing reader's counts (v4 3b: Pass-1 glyphs are blank)
+        "_meta": legend_meta({"klozetai": 1, "praustuves": 1, "vonios_kubilai": 1, "wc_remai": 1}),  # the legend's
     }
     out = _run_full_pipeline(parsed)
     line = [p for p in out["pozicijos"] if "skylių gręžimas" in p["aprasymas"].lower()]

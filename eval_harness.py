@@ -2174,6 +2174,11 @@ def _reapply_stored_zoom(parsed: dict) -> int:
     Returns how many rooms changed."""
     vc = importlib.import_module("extractor.vision_call")
     rooms = [r for r in parsed.get("patalpos") or [] if isinstance(r, dict)]
+    # v4 3c-2: only the rooms production zooms now (vc.zoom_wanted — the area unread by the text and the lane); a
+    # room it would not zoom keeps no zoom answer, as in production
+    for r in rooms:
+        if isinstance(r.get("_zoom"), dict) and not vc.zoom_wanted(r):
+            r.pop("_zoom", None)
     applied = sum(1 for r in rooms if isinstance(r.get("_zoom"), dict)
                   and vc._apply_zoom_refinements(r, r["_zoom"]))
     if applied:
@@ -2344,6 +2349,25 @@ def _rerun_deterministic_tail(parsed: dict, slug: str | None = None) -> dict:
         # room table's height column), exactly as no height would be read on it.
         from text.heights import apply_text_heights
         apply_text_heights(parsed, None)
+
+    # Wall finishes from the finish sheets' text (production Step 2.85, v4 3c-2): a frozen breakdown read off the
+    # sheet images by a model comes off, the text reader's lands — exactly as a fresh reading does.
+    try:
+        _apd = vc.apply_apdailos(parsed, pdf_path.read_bytes() if (pdf_path is not None and pdf_path.is_file()) else None)
+        print(f"  ⤴ apdailos (text): {_apd.get('status')} — rooms "
+              f"{(parsed.get('_meta') or {}).get('apdailos_rooms_updated')}, model breakdowns taken off "
+              f"{(parsed.get('_meta') or {}).get('apdailos_modelio_nuimta')}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠ apdailos failed during rescore: {exc}")
+
+    # Door types from the drawing's text (production Step 2.865, v4 3c-2): the frozen `_door_types` was a model
+    # reading of the sheet images — re-read from the text layer exactly as a fresh reading does.
+    if pdf_path is not None and pdf_path.is_file():
+        try:
+            vc.apply_door_types(parsed, pdf_path.read_bytes())
+            print(f"  ⤴ door types (text): {(parsed.get('_door_types') or {}).get('reader_beapvadines')} frameless")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ⚠ door types failed during rescore: {exc}")
 
     # The shower attribution (Step 2.866 in production, 2026-10-03): which rooms
     # the plumbing plan shows a shower in, settled from the plumbing reader's own
