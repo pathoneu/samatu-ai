@@ -221,8 +221,9 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
   await expect(page.getByTestId('detect-run-summary')).toHaveText(
     '11 kontūrų, 24 angos, 6 perimetrai iš matmenų, danga 11 iš 11. Jūsų pataisyti kontūrai (4) palikti.');
   const stages = page.getByTestId('detect-run-stages');
+  // langų 10, not 9: since the windows merge (97f8a9d5 — a thin outlined frame along a wall is glazing) the lane reads 10
   for (const line of ['Mastelis iš matmenų: 1:115 (8 lap.)', '7 kontūrai iš sienų, jūsų pataisytų palikta: 4.',
-    '24 angos (langų: 9, durų: 9).', '6 perimetrai iš matmenų.', 'Danga perskaityta 11 iš 11 patalpų.']) {
+    '24 angos (langų: 10, durų: 9).', '6 perimetrai iš matmenų.', 'Danga perskaityta 11 iš 11 patalpų.']) {
     await expect(stages).toContainText(line);
   }
   // the one-line re-read chip (W1-C; „Kas pasikeitė" since W4-A): nothing moved; „Peržiūrėti" opens today's

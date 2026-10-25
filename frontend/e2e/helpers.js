@@ -155,6 +155,20 @@ async function stableBox(locator) {
  * scroller, and return their screen points. Each point must land on the page itself (no panel over it).
  */
 export async function sheetPoints(page, pageNr, pts) {
+  // A view that moves AFTER the scroll (deselecting a room puts the view back ~300 ms later — WebKit, 2026-10-25:
+  // room-click „Esc ×5" failed 2 runs in 4 with the page box jumping from (-200, -604) to (112, 97) between two
+  // reads) lands the points off the page: scroll again once it has settled, up to three times.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await sheetPointsOnce(page, pageNr, pts);
+    } catch (e) {
+      if (attempt >= 3 || !/is not visible on the page/.test(e.message)) throw e;
+      await page.waitForTimeout(400);
+    }
+  }
+}
+
+async function sheetPointsOnce(page, pageNr, pts) {
   const pg = page.locator(`div[data-page-number="${pageNr}"]`);
   await pg.waitFor({ state: 'attached' });
   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
