@@ -37,13 +37,26 @@ SNAPSHOT = (Path(__file__).resolve().parents[2]
 
 # ── fixtures ────────────────────────────────────────────────────────────────
 
+def _drawn(blob: dict) -> dict:
+    """v4 3b: the snapshot predates the geometry lane — its perimeters and heights are the reading model's, so every
+    row resting on them would be blank. These tests are about rows, prices and the ledger, not about where a wall
+    length comes from: the rooms' walls are taken as the lane writes summed strings, the heights as altitudes printed
+    in the rooms."""
+    for r in blob.get("patalpos") or []:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "matmenu_eilutes"
+        if r.get("lubu_aukstis_m"):
+            r["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
+    return blob
+
+
 @pytest.fixture(scope="module")
 def blob() -> dict:
     """The shipped demo snapshot: 11 rooms, 73 pozicijos, 73 priced
     darbu_sarasas rows — i.e. exactly the production shape."""
     if not SNAPSHOT.exists():  # backend/data/ is gitignored: absent in a fresh checkout (CI)
         pytest.skip(f"{SNAPSHOT.name} is not in this checkout (backend/data/ is gitignored)")
-    return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    return _drawn(json.loads(SNAPSHOT.read_text(encoding="utf-8")))
 
 
 def _priced_darbu_sarasas(blob: dict) -> list[dict]:
@@ -160,10 +173,17 @@ def test_round_trip_preserves_darbu_sarasas_rows_and_money(blob):
             continue
         assert prices_after.get(label) == row["kaina"], label
 
-    # Money never silently decreases. (It may move: a quantity legitimately
-    # recomputed under new assumptions is BY DESIGN — rows and prices are not.)
-    assert _money(down["darbu_sarasas"]) >= money0 * 0.999, (
-        f"{_money(down['darbu_sarasas'])} < {money0}")
+    # Money never silently decreases through the detour: the round trip costs what going straight to 2,8 m
+    # costs. (v4 3b: measured against the one-leg rebuild, not against the snapshot's money — the snapshot's
+    # quantities were the reading model's, and a row whose number had no legal source is now „—" with its
+    # price kept, so the money it carried is not the round trip's to keep.)
+    straight = _post(blob, [dict(p) for p in blob["pozicijos"]], dict(blob.get("_overrides") or {}), 2.8,
+                     darbu_sarasas=_priced_darbu_sarasas(blob))
+    assert _money(down["darbu_sarasas"]) >= _money(straight["darbu_sarasas"]) * 0.999, (
+        f"{_money(down['darbu_sarasas'])} < {_money(straight['darbu_sarasas'])}")
+    # …and every blank row kept its price
+    assert all(r.get("kaina") is not None for r in down["darbu_sarasas"]
+               if r.get("kiekis") is None and r.get("aprasymas") in prices_after and r["aprasymas"] in set(_labels(ds0)))
 
 
 def test_second_round_trip_is_byte_stable(blob):

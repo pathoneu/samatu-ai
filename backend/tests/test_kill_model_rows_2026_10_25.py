@@ -153,7 +153,8 @@ def test_gkp_ceilings_only_where_the_ceiling_plan_marks_the_room():
     unmarked = _built({"patalpos": [_room(lubu_aukstis_saltinis="plano_uzrasas", **base)], "santrauka": {}})
     row = next(r for r in unmarked["pozicijos"] if r["aprasymas"].startswith("GKP lubų montavimas"))
     assert row["kiekis"] is None and "20,00 m²" in row["_tuscia_priezastis"]
-    assert not [r for r in unmarked["pozicijos"] if r["aprasymas"].startswith("GKP lapai luboms")]
+    sheets = [r for r in unmarked["pozicijos"] if r["aprasymas"].startswith("GKP lapai luboms")]
+    assert sheets and all(r["kiekis"] is None for r in sheets)        # the goods stay, blank, with their place
     marked = _built({"patalpos": [_room(lubu_aukstis_saltinis="ceiling_plan_marker", **base)], "santrauka": {}})
     row = next(r for r in marked["pozicijos"] if r["aprasymas"].startswith("GKP lubų montavimas"))
     assert row["kiekis"] == 20.0 and row["_kilme"] == rp.DRAWING

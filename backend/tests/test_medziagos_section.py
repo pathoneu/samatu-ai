@@ -63,7 +63,9 @@ def _built(rooms=None, overrides=None):
 
 
 def _mats(out):
-    return [p for p in out["pozicijos"] if p["skyrius"] == SK_MEDZIAGOS]
+    # v4 3b: the goods of a blank work row stay as blank rows (place, id, price) — the norms below are about
+    # the goods that carry a quantity
+    return [p for p in out["pozicijos"] if p["skyrius"] == SK_MEDZIAGOS and p.get("kiekis") is not None]
 
 
 def _works(out):
@@ -74,7 +76,7 @@ def _works(out):
 
 def test_materials_are_their_own_section_at_the_end():
     out = _built()
-    mats = _mats(out)
+    mats = [p for p in out["pozicijos"] if p["skyrius"] == SK_MEDZIAGOS]   # blank goods included
     assert mats, "no materials extracted at all"
     assert out["pozicijos"][-len(mats):] == mats, \
         "the shopping list must be the LAST thing the contractor reads"

@@ -45,6 +45,19 @@ SNAPSHOT_PARAM = pytest.param(SNAPSHOT, marks=pytest.mark.skipif(not SNAPSHOT.ex
                                                                  reason=_NO_SNAPSHOT))
 
 
+def _drawn(blob: dict) -> dict:
+    """v4 3b: the snapshot predates the geometry lane — its perimeters and heights are the reading model's, so every
+    row resting on them would be blank. These tests are about rows, prices and the ledger, not about where a wall
+    length comes from: the rooms' walls are taken as the lane writes summed strings, the heights as altitudes printed
+    in the rooms."""
+    for r in blob.get("patalpos") or []:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "matmenu_eilutes"
+        if r.get("lubu_aukstis_m"):
+            r["lubu_aukstis_saltinis"] = "ceiling_plan_marker"
+    return blob
+
+
 @pytest.fixture
 def blob() -> dict:
     """FUNCTION-scoped on purpose. `_build_pozicijos_from_rooms` mutates the
@@ -54,7 +67,7 @@ def blob() -> dict:
     over the shared dict, and failed when run alone."""
     if not SNAPSHOT.exists():
         pytest.skip(_NO_SNAPSHOT)
-    return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    return _drawn(json.loads(SNAPSHOT.read_text(encoding="utf-8")))
 
 
 def _build(source: dict) -> list[dict]:
@@ -216,7 +229,7 @@ def _skirting_terms(perimetras: float):
     """One room's skirting terms, straight out of the builder."""
     out = _build_pozicijos_from_rooms({"patalpos": [{
         "nr": "101", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-        "plotas_m2": 20.0, "perimetras_m": perimetras, "lubu_aukstis_m": 2.7,
+        "plotas_m2": 20.0, "perimetras_m": perimetras, "perimetras_saltinis": "matmenu_eilutes", "lubu_aukstis_m": 2.7,
         "walls_paintable_m2": 45.0, "ceiling_paintable_m2": 20.0,
         "grindjuosciu_m": 16.0, "_grindjuosciu_baze_m": 14.55,
         "_grindjuosciu_duru_m": 0.85, "elementai": []}], "santrauka": {}})
