@@ -1876,7 +1876,7 @@ def _undo_lane_state(parsed: dict) -> list[str]:
     import re
 
     from extractor import geometry_lane as gl
-    from extractor.niche_inference import INFERRED_SOURCE
+    INFERRED_SOURCE = "statistical_inference"   # the deleted room-type niche estimator (v4 3b)
     from extractor.plan_area_annotations import HEIGHT_SOURCE, SOURCE_LABEL
     from extractor.plan_dimensions import PROPOSAL_KEY, SOURCE as PAIR_SOURCE
     from extractor.wall_outline import SOURCE as RASTER_SOURCE
@@ -1966,10 +1966,16 @@ def _undo_lane_state(parsed: dict) -> list[str]:
     took("box polygons", n)
     n = 0
     for r in rooms:
-        kept = [e for e in r.get("elementai") or [] if not (isinstance(e, dict) and e.get("_source") == INFERRED_SOURCE)]
+        # v4 3b: the niche locator is gone too — production no longer has its elements
+        kept = [e for e in r.get("elementai") or [] if not (isinstance(e, dict)
+                and e.get("_source") in (INFERRED_SOURCE, "niche_locator"))]
         n += len(r.get("elementai") or []) - len(kept)
         if "elementai" in r:
             r["elementai"] = kept
+        # …and the adjacency pass (gone, v4 3b) marked windows in exterior walls; production no longer does
+        for e in r.get("elementai") or []:
+            if isinstance(e, dict) and (e.get("tipas") or "").lower() in ("langas", "window"):
+                e.pop("_exterior", None)
     took("inferred LED niches", n)
     # The zoom re-read runs AFTER the lanes in production and never overrules a
     # value one of them read (vision_call.READ_SOURCES). A frozen extract older
@@ -2069,7 +2075,7 @@ def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
     pdf = pdf_path.read_bytes()
     vc = importlib.import_module("extractor.vision_call")
     from extractor.geometry_lane import apply_geometry
-    from extractor.niche_inference import infer_missing_niches
+    from extractor.row_provenance import fill_heights_from_read
     from extractor.plan_area_annotations import (
         apply_height_statements, lane_warnings, most_common_page, plan_pages_from_classification,
         reconcile_rooms_with_annotations, scan_text_layer, text_pages_from_classification)
@@ -2140,7 +2146,7 @@ def _replay_geometry_lanes(parsed: dict, slug: str | None) -> dict:
                          f"{len((g.get('grindu_dangos') or {}).get('perskaityta') or {})} floors")
     parsed = vc._apply_polygon_prepass(parsed)          # returns new room dicts
     lanes["zoom applied"] = _reapply_stored_zoom(parsed)
-    lanes["inferred LED niches"] = infer_missing_niches(parsed.get("patalpos") or [])
+    lanes["heights from the drawing"] = fill_heights_from_read(parsed.get("patalpos") or [], parsed)   # production Step 2.885 (v4 3b)
     for key in ("_duru_ziniarastis", "_vector_symbols"):
         parsed.pop(key, None)                           # the tail below scans them again
 

@@ -14,7 +14,7 @@ def _parsed(rooms, **top):
 
 def _room(**kw):
     r = {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-         "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": [{"tipas": "pasleptos_duris", "kiekis": 1,
                         "plotis_mm": 900, "aukstis_mm": 2400}]}
     r.update(kw)
@@ -26,7 +26,8 @@ def _find(out, needle):
 
 
 def test_calibrated_class_is_geltona():
-    out = _parsed([_room()])
+    # v4 3b: a frame type read in the drawing's text (the door-type reader) keeps the row; symbols alone do not
+    out = _parsed([_room()], _door_types={"count": 1, "reader_beapvadines": 1})
     durys = _find(out, "beapvadinėms durims")
     assert durys["confidence"] == "geltona"
     # 2026-08-31: reasons guide, never confess — the old string quoted

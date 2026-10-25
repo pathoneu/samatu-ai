@@ -26,7 +26,7 @@ from extractor.universal_rules import calc_room_quantities
 def vonia_primitives() -> dict:
     return {
         "nr": "V01", "pavadinimas": "Vonia", "paskirtis": "vonia",
-        "plotas_m2": 6.45, "perimetras_m": 10.30, "lubu_aukstis_m": 2.65,
+        "plotas_m2": 6.45, "perimetras_m": 10.30, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
         "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
         "elementai": [
             {"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000},
@@ -45,7 +45,7 @@ def three_room_parsed(vonia_primitives) -> dict:
             vonia_primitives,
             {
                 "nr": "M01", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
-                "plotas_m2": 14.2, "perimetras_m": 15.4, "lubu_aukstis_m": 2.65,
+                "plotas_m2": 14.2, "perimetras_m": 15.4, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
                 "lubu_tipas": "gkp", "plyteles_sienos_aukstis_m": 0,
                 "elementai": [
                     {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000},
@@ -55,7 +55,7 @@ def three_room_parsed(vonia_primitives) -> dict:
             },
             {
                 "nr": "S01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-                "plotas_m2": 22.5, "perimetras_m": 19.4, "lubu_aukstis_m": 2.65,
+                "plotas_m2": 22.5, "perimetras_m": 19.4, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
                 "lubu_tipas": "gkp", "plyteles_sienos_aukstis_m": 0,
                 "elementai": [
                     {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000},
@@ -94,7 +94,7 @@ def test_calc_room_quantities_deterministic():
     """calc_room_quantities must be a pure function: same input → same output."""
     room = {
         "nr": "V01", "paskirtis": "vonia",
-        "plotas_m2": 6.45, "perimetras_m": 10.30, "lubu_aukstis_m": 2.65,
+        "plotas_m2": 6.45, "perimetras_m": 10.30, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
         "n_doors": 1, "n_windows": 1,
         "door_area_m2": 1.4, "window_area_m2": 0.72,
     }
@@ -126,8 +126,8 @@ def test_elementai_empty_returns_zeros():
 
 
 def test_hidroizoliacija_only_for_wet_rooms():
-    dry_room = {"paskirtis": "gyvenamoji", "plotas_m2": 20, "lubu_aukstis_m": 2.65}
-    wet_room = {"paskirtis": "vonia", "plotas_m2": 6.45, "lubu_aukstis_m": 2.65}
+    dry_room = {"paskirtis": "gyvenamoji", "plotas_m2": 20, "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas"}
+    wet_room = {"paskirtis": "vonia", "plotas_m2": 6.45, "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas"}
     assert _calc_hidroizoliacija_m2(dry_room, perim=18) == 0.0
     assert _calc_hidroizoliacija_m2(wet_room, perim=10.3) > 0
 
@@ -233,6 +233,12 @@ def test_pozicijos_includes_rotband_for_paintable_walls(three_room_parsed):
                and p["skyrius"] != "Medžiagos"]
     assert len(rotband) == 1, f"Rotband missing: {rotband}"
     assert rotband[0]["vnt"] == "m2"
+    assert rotband[0]["kiekis"] is None and rotband[0]["_kilme"] == "blank"   # 30 % until he chooses (v4 3b)
+    chosen = copy.deepcopy(three_room_parsed)
+    chosen["_apimtis"] = {"rotband": "dalis", "rotband_dalis": 30}
+    out = _run_full_pipeline(chosen)
+    rotband = [p for p in out["pozicijos"]
+               if "rotband" in p["aprasymas"].lower() and p["skyrius"] != "Medžiagos"]
     assert rotband[0]["kiekis"] > 0
     # …and the material it consumes is a row of its own, linked back to it.
     assert not rotband[0].get("medziagos_aprasymas"), \
@@ -256,9 +262,10 @@ def test_pozicijos_santechnika_skyrius_has_klozetas_per_wet_room(three_room_pars
     plautuvė = next((p for p in sant if "plautuvės" in p["aprasymas"].lower()), None)
 
     # Three-room fixture has 1 vonia → 1 klozetas, 1 WC rėmas, 1 gyvatukas
-    assert klozetas and klozetas["kiekis"] == 1
-    assert rėmas and rėmas["kiekis"] == 1
-    assert gyvatukas and gyvatukas["kiekis"] == 1
+    # v4 3b: counts by room type are blank rows that say what to count
+    assert klozetas and klozetas["kiekis"] is None and klozetas["_kilme"] == "blank"
+    assert rėmas and rėmas["kiekis"] is None
+    assert gyvatukas and gyvatukas["kiekis"] is None
     # No virtuvė in fixture → no plautuvė
     assert plautuvė is None
 
@@ -267,7 +274,7 @@ def test_pozicijos_pastoliu_only_when_high_ceiling():
     """Pastolių nuoma should ONLY fire when at least one room has lubu_aukstis > 3m."""
     # Low ceiling — no pastoliai
     low = {"patalpos": [{"nr": "1", "pavadinimas": "X", "paskirtis": "gyvenamoji",
-                         "plotas_m2": 20, "perimetras_m": 18, "lubu_aukstis_m": 2.65,
+                         "plotas_m2": 20, "perimetras_m": 18, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
                          "elementai": [], "confidence": "high"}]}
     out_low = _run_full_pipeline(low)
     pastoliai_low = [p for p in out_low["pozicijos"]
@@ -276,7 +283,7 @@ def test_pozicijos_pastoliu_only_when_high_ceiling():
 
     # High ceiling — pastoliai included
     high = {"patalpos": [{"nr": "1", "pavadinimas": "X", "paskirtis": "gyvenamoji",
-                          "plotas_m2": 20, "perimetras_m": 18, "lubu_aukstis_m": 4.0,
+                          "plotas_m2": 20, "perimetras_m": 18, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 4.0, "lubu_aukstis_saltinis": "plano_uzrasas",
                           "elementai": [], "confidence": "high"}]}
     out_high = _run_full_pipeline(high)
     pastoliai_high = [p for p in out_high["pozicijos"]
@@ -292,7 +299,7 @@ def test_pozicijos_elektros_skyrius_uses_symbols_when_available():
     kiekis=None (raudona) — anksčiau kategorijos dingdavo TYLIAI (truth: 15
     difūzorių / 8 termoreguliatoriai referenciniame projekte, app rodė nieko)."""
     base = {"patalpos": [{"nr": "1", "pavadinimas": "X", "paskirtis": "gyvenamoji",
-                          "plotas_m2": 20, "perimetras_m": 18, "lubu_aukstis_m": 2.65,
+                          "plotas_m2": 20, "perimetras_m": 18, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
                           "elementai": [], "confidence": "high"}]}
     # No symbols → only the two null-kiekis checklist TODO lines
     out_no = _run_full_pipeline(base)
@@ -318,7 +325,8 @@ def test_pozicijos_elektros_skyrius_uses_symbols_when_available():
     assert any("LED juostos" in a for a in aprasymai), aprasymai
     # Rozetės+jungikliai sumuojami į vieną liniją
     rozetes_line = next(p for p in el_yes if "Rozetės" in p["aprasymas"])
-    assert rozetes_line["kiekis"] == 17  # 12 + 5
+    # v4 3b: Pass-1's glyph counts are no source — the row stays, blank, and says how to count
+    assert rozetes_line["kiekis"] is None and "Ženklai" in rozetes_line["_tuscia_priezastis"]
 
 
 def test_grindjuostes_are_the_rooms_own_metres_never_capped():
@@ -331,13 +339,13 @@ def test_grindjuostes_are_the_rooms_own_metres_never_capped():
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 25.0, "perimetras_m": 25.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 25.0, "perimetras_m": 25.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [], "confidence": "high", "_grindjuosciu_capped": True},
             {"nr": "2", "pavadinimas": "Miegamasis", "paskirtis": "miegamoji",
-             "plotas_m2": 15.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 15.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [], "confidence": "high"},
             {"nr": "3", "pavadinimas": "Holas", "paskirtis": "koridorius",
-             "plotas_m2": 10.0, "perimetras_m": 16.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 10.0, "perimetras_m": 16.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [], "confidence": "high"},
         ],
         "_meta": {"grindjuosciu_pre_cap_m": 64.9, "grindjuosciu_post_cap_m": 32.5},
@@ -361,7 +369,7 @@ def test_grindjuostes_not_capped_when_within_ratio():
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Tualetas", "paskirtis": "wc",
-             "plotas_m2": 4.0, "perimetras_m": 8.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 4.0, "perimetras_m": 8.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000}],
              "confidence": "high"},
         ],
@@ -372,7 +380,7 @@ def test_grindjuostes_not_capped_when_within_ratio():
     parsed_dry = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Salonas", "paskirtis": "gyvenamoji",
-             "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}],
              "confidence": "high"},
         ],
@@ -396,7 +404,7 @@ def test_pozicijos_includes_angokrasciu_gkp_pair():
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 24.0, "perimetras_m": 20.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 24.0, "perimetras_m": 20.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000},
                  {"tipas": "langas", "kiekis": 2, "plotis_mm": 1200, "aukstis_mm": 1500},
@@ -422,7 +430,7 @@ def test_pozicijos_includes_paslepta_duru_stakta():
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Holas", "paskirtis": "koridorius",
-             "plotas_m2": 8.0, "perimetras_m": 12.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 8.0, "perimetras_m": 12.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [
                  {"tipas": "pasleptos_duris", "kiekis": 2, "plotis_mm": 800, "aukstis_mm": 2100},
              ],
@@ -433,6 +441,10 @@ def test_pozicijos_includes_paslepta_duru_stakta():
     line = [p for p in out["pozicijos"]
             if "beapvadinėms" in p["aprasymas"].lower()]
     assert len(line) == 1
+    # v4 3b: the plan's hidden-door symbols alone do not settle the frame type — blank until he answers
+    assert line[0]["kiekis"] is None and "Vidaus durys" in line[0]["_tuscia_priezastis"]
+    parsed["_overrides"] = {"vidaus_durys_beapvadines": True}
+    line = [p for p in _run_full_pipeline(parsed)["pozicijos"] if "beapvadinėms" in p["aprasymas"].lower()]
     # Per door: (2H+W)/1000 = (4.2 + 0.8) = 5.0 m × 2 doors = 10.0 m
     assert abs(line[0]["kiekis"] - 10.0) < 0.1
 
@@ -442,7 +454,7 @@ def test_pozicijos_no_paslepta_stakta_when_no_hidden_doors():
     parsed = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Salonas", "paskirtis": "gyvenamoji",
-             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2000},
              ],
@@ -466,7 +478,7 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000}],
              "confidence": "high"},
@@ -475,11 +487,13 @@ def test_pozicijos_p3_lentyneliu_in_vonia():
     out = _run_full_pipeline(parsed)
     line = [p for p in out["pozicijos"] if "lentynė" in p["aprasymas"].lower()]
     assert len(line) == 1
-    assert line[0]["kiekis"] == 2  # 2 per vonia (Objektas A calibration, c91dd3b)
+    assert line[0]["kiekis"] is None  # v4 3b: shelves per shower are not on the drawing
     assert line[0]["vnt"] == "vnt"
 
-    # Override still honored: an explicit per-vonia count wins over the default.
+    # His number per shower × the showers the plumbing plan counts
     parsed["_overrides"] = {"lentyneliu_per_vonia": 1}
+    parsed["_meta"] = {"fixtures_status": "ok"}
+    parsed["detected_symbols_summary"] = {"dusai": 1, "klozetai": 1}
     out2 = _run_full_pipeline(parsed)
     line2 = [p for p in out2["pozicijos"] if "lentynė" in p["aprasymas"].lower()]
     assert len(line2) == 1
@@ -496,10 +510,10 @@ def test_pozicijos_p3_dezuciu_gkp_per_wet_room():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
             {"nr": "W1", "pavadinimas": "WC", "paskirtis": "wc",
-             "plotas_m2": 2.0, "perimetras_m": 5.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 2.0, "perimetras_m": 5.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
         ],
     }
@@ -509,7 +523,8 @@ def test_pozicijos_p3_dezuciu_gkp_per_wet_room():
     assert len(line) == 1
     assert line[0]["aprasymas"] == (
         "Pertvaros sutvirtinimas WC mechanizmams montuoti (GKP dėžutė)")
-    assert line[0]["kiekis"] == 2  # 1 vonia + 1 wc
+    assert line[0]["kiekis"] is None  # v4 3b: 1 vonia + 1 wc by room type → blank, the sentence says 2
+    assert "2 vnt" in line[0]["_tuscia_priezastis"]
     assert line[0]["skyrius"] == "GKP montavimas"
 
 
@@ -520,7 +535,7 @@ def test_pozicijos_p3_skyliu_grezimas_symbol_driven():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000}],
              "confidence": "high"},
@@ -531,6 +546,7 @@ def test_pozicijos_p3_skyliu_grezimas_symbol_driven():
             "vonios": 1,
             "wc_remai": 1,
         },
+        "_meta": {"fixtures_status": "ok"},     # the plumbing reader's counts (v4 3b: Pass-1 glyphs are blank)
     }
     out = _run_full_pipeline(parsed)
     line = [p for p in out["pozicijos"] if "skylių gręžimas" in p["aprasymas"].lower()]
@@ -545,7 +561,7 @@ def test_pozicijos_p3_skyliu_grezimas_fallback_no_symbols():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000},
@@ -557,10 +573,8 @@ def test_pozicijos_p3_skyliu_grezimas_fallback_no_symbols():
     out = _run_full_pipeline(parsed)
     line = [p for p in out["pozicijos"] if "skylių gręžimas" in p["aprasymas"].lower()]
     assert len(line) == 1
-    # 2 openings × 4 holes = 8
-    assert line[0]["kiekis"] == 8
-    # 2026-06-11: confidence post-pass normalizes legacy "low" → "raudona"
-    # (unified LT scheme: zalia/geltona/raudona).
+    # v4 3b: openings × 4 was a guess — blank, red, and it says what to count
+    assert line[0]["kiekis"] is None
     assert line[0]["confidence"] == "raudona"
 
 
@@ -584,18 +598,18 @@ def test_rangovas_baseline_p1_style_residential_emits_all_key_skyriai():
         "patalpos": [
             # Drėgnos zonos
             {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000}],
              "confidence": "high"},
             {"nr": "2", "pavadinimas": "WC", "paskirtis": "wc",
-             "plotas_m2": 2.1, "perimetras_m": 5.8, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 2.1, "perimetras_m": 5.8, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 600, "aukstis_mm": 2000}],
              "confidence": "high"},
             # Sausosios zonos
             {"nr": "3", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-             "plotas_m2": 24.15, "perimetras_m": 19.8, "lubu_aukstis_m": 2.82,
+             "plotas_m2": 24.15, "perimetras_m": 19.8, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp",
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000},
@@ -603,12 +617,12 @@ def test_rangovas_baseline_p1_style_residential_emits_all_key_skyriai():
              ],
              "confidence": "high"},
             {"nr": "4", "pavadinimas": "Virtuvė", "paskirtis": "virtuve",
-             "plotas_m2": 11.2, "perimetras_m": 13.5, "lubu_aukstis_m": 2.82,
+             "plotas_m2": 11.2, "perimetras_m": 13.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp", "plyteles_sienos_aukstis_m": 0.6,
              "elementai": [{"tipas": "langas", "kiekis": 1, "plotis_mm": 1200, "aukstis_mm": 1500}],
              "confidence": "high"},
             {"nr": "5", "pavadinimas": "Miegamasis 1", "paskirtis": "miegamoji",
-             "plotas_m2": 14.8, "perimetras_m": 15.4, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 14.8, "perimetras_m": 15.4, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp",
              "elementai": [
                  {"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000},
@@ -616,7 +630,7 @@ def test_rangovas_baseline_p1_style_residential_emits_all_key_skyriai():
              ],
              "confidence": "high"},
             {"nr": "6", "pavadinimas": "Prieškambaris", "paskirtis": "koridorius",
-             "plotas_m2": 8.42, "perimetras_m": 12.0, "lubu_aukstis_m": 2.82,
+             "plotas_m2": 8.42, "perimetras_m": 12.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp",
              "elementai": [{"tipas": "duris", "kiekis": 2, "plotis_mm": 800, "aukstis_mm": 2000}],
              "confidence": "high"},
@@ -678,7 +692,7 @@ def test_pipeline_handles_single_garazas_no_painting():
     parsed = {
         "patalpos": [
             {"nr": "G1", "pavadinimas": "Garažas", "paskirtis": "garazas",
-             "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "elementai": [], "confidence": "high"},
         ],
     }
@@ -695,7 +709,7 @@ def test_pipeline_handles_high_ceiling_3plus_m():
     parsed = {
         "patalpos": [
             {"nr": "S1", "pavadinimas": "Salonas", "paskirtis": "gyvenamoji",
-             "plotas_m2": 50.0, "perimetras_m": 30.0, "lubu_aukstis_m": 3.5,
+             "plotas_m2": 50.0, "perimetras_m": 30.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 3.5, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "gkp",
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}],
              "confidence": "high"},
@@ -732,7 +746,7 @@ def test_pipeline_handles_50_rooms_no_perf_explosion():
         paskirtis = ["gyvenamoji", "miegamoji", "vonia", "wc", "virtuve"][i % 5]
         rooms.append({
             "nr": str(i + 1), "pavadinimas": f"Patalpa {i+1}", "paskirtis": paskirtis,
-            "plotas_m2": 10.0, "perimetras_m": 12.0, "lubu_aukstis_m": 2.65,
+            "plotas_m2": 10.0, "perimetras_m": 12.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
             "lubu_tipas": "gkp" if paskirtis not in ("vonia", "wc") else "pakabinamos",
             "plyteles_sienos_aukstis_m": 2.0 if paskirtis in ("vonia", "wc") else 0,
             "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 800, "aukstis_mm": 2000}],
@@ -751,7 +765,7 @@ def test_pipeline_byte_identical_3_runs_50_room_project():
     rooms = [
         {"nr": str(i + 1), "pavadinimas": f"Patalpa {i+1}",
          "paskirtis": "gyvenamoji" if i % 3 else "vonia",
-         "plotas_m2": 12.5, "perimetras_m": 14.0, "lubu_aukstis_m": 2.65,
+         "plotas_m2": 12.5, "perimetras_m": 14.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
          "lubu_tipas": "gkp" if i % 3 else "pakabinamos",
          "plyteles_sienos_aukstis_m": 0 if i % 3 else 2.0,
          "elementai": [], "confidence": "high"}
@@ -809,10 +823,10 @@ def test_pozicijos_p6_hidroizoliacija_collapsed_to_one_line():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 6.5, "perimetras_m": 10.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 6.5, "perimetras_m": 10.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
             {"nr": "W1", "pavadinimas": "WC", "paskirtis": "wc",
-             "plotas_m2": 2.0, "perimetras_m": 5.5, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 2.0, "perimetras_m": 5.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "elementai": [], "confidence": "high"},
         ],
     }
@@ -843,7 +857,7 @@ def test_pozicijos_p3_silikon_split_per_rangovas_audit():
     parsed = {
         "patalpos": [
             {"nr": "V1", "pavadinimas": "Vonia", "paskirtis": "vonia",
-             "plotas_m2": 10.0, "perimetras_m": 12.0, "lubu_aukstis_m": 2.65,
+             "plotas_m2": 10.0, "perimetras_m": 12.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.65, "lubu_aukstis_saltinis": "plano_uzrasas",
              "lubu_tipas": "pakabinamos", "plyteles_sienos_aukstis_m": 2.0,
              "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 700, "aukstis_mm": 2000}],
              "confidence": "high"},

@@ -1,14 +1,8 @@
-"""extractor.vision — multi-pass deterministic Vision pipeline.
+"""extractor.vision — what is left of the Vision readers after v4 Phase 3b (2026-10-25).
 
-Phase 2 architecture:
-  dimension_extractor → list[Dimension]
-  room_graph_extractor(image, dimensions) → RoomGraph
-  plan_assembler(dimensions, room_graph) → Plan          (no LLM)
-  geometry_solver(plan) → Plan                            (no LLM)
-
-The output Plan is converted to the existing ``parsed`` schema (patalpos[])
-so the downstream formula engine (`_recompute_per_room_via_python` +
-`_recompute_santrauka`) stays unchanged.
+The room-geometry passes (dimensions, room graph, adjacency, boxes, niches, elevation zones, symbols, built-ins)
+are gone: geometry comes from the drawing's vector paths and text layer (extractor/geometry_lane.py). What stays
+are the Pass-1 voting helpers and the readers Phase 3c reduces to text (heights, schedules).
 """
 
 from ._cache import VisionCache, cache_key  # noqa: F401

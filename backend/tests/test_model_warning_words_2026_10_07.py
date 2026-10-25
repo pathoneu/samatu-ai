@@ -20,7 +20,7 @@ import pytest
 
 from extractor.height_markers import salvage_heights_from_warnings
 from extractor.model_warnings import normalise_model_warnings, plain_numbers, plain_words, room_identifiers
-from extractor.niche_inference import enumerated_led_rooms
+from extractor.model_warnings import enumerated_led_rooms
 
 ROOMS = [
     {"nr": "101", "pavadinimas": "Tambūras", "paskirtis": "tamburas"},

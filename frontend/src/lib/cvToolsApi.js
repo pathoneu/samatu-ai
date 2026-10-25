@@ -33,7 +33,6 @@ export const findSymbol = ({ projectId, pageIdx, templatePageIdx = null, boxPt, 
   box_pt: boxPt,
   min_score: minScore,
 });
-export const magicWand = (body) => post('/api/cv/magic-wand', body);
 export const recordDecision = (body) => post('/api/cv/record-decision', body);
 
 /** Prime the server-side PDF cache for a session. Mirrors the

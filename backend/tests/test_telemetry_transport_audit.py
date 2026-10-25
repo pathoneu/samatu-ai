@@ -259,55 +259,17 @@ def _stub_pass1(monkeypatch, metas):
 
 
 def _stub_adjacency(monkeypatch, adj=_FakeAdj()):
-    import extractor.vision.adjacency_extractor as ax
-    monkeypatch.setattr(ax, "extract_adjacency", lambda **_k: adj)
-    monkeypatch.setattr(ax, "apply_adjacency_to_rooms",
-                        lambda *_a, **_k: {"n_rooms_matched": 1})
+    pass  # (the Vision adjacency pass is gone — v4 3b)
 
 
 _ROUND = {"model": "claude-opus-4-8", "input_tokens": 20_000, "output_tokens": 2_000,
           "cache_read_tokens": 15_000, "cache_write_tokens": 5_000}
 
 
-def test_adjacency_pass_lands_in_extra_calls(monkeypatch):
-    """It is a real, paid, once-per-extraction Vision call. Before the fix its
-    usage was captured on the result and then dropped on the floor."""
-    _stub_pass1(monkeypatch, [_ROUND])
-    _stub_adjacency(monkeypatch)
-    out = vision_call._run_pass1_voted(
-        object(), system=[], pages=_pages(1), n=1, _emit=lambda _e: None)
-
-    calls = out["_meta"]["extra_calls"]
-    adj = [c for c in calls if c.get("reader") == "adjacency"]
-    assert len(adj) == 1, f"adjacency not metered: {calls!r}"
-    assert adj[0]["input_tokens"] == 3_000 and adj[0]["output_tokens"] == 250
-    # ...and it actually moves the recorded euro figure
-    assert pricing.calc_meta_cost_usd(out["_meta"]) > pricing.calc_claude_cost_usd(
-        **{k: v for k, v in _ROUND.items() if k != "model"}, model="claude-opus-4-8")
 
 
-def test_cached_adjacency_costs_nothing_and_is_not_metered(monkeypatch):
-    """A cache HIT carries no tokens — recording it would inflate the bill."""
-    class _Hit:
-        _meta = {"cache": "hit", "model": "claude-opus-4-8"}
-
-    _stub_pass1(monkeypatch, [_ROUND])
-    _stub_adjacency(monkeypatch, _Hit())
-    out = vision_call._run_pass1_voted(
-        object(), system=[], pages=_pages(1), n=1, _emit=lambda _e: None)
-    assert not [c for c in (out["_meta"].get("extra_calls") or [])
-                if c.get("reader") == "adjacency"]
 
 
-def test_adjacency_failure_still_returns_a_usable_extraction(monkeypatch):
-    """Metering must never be able to break an extraction."""
-    import extractor.vision.adjacency_extractor as ax
-    _stub_pass1(monkeypatch, [_ROUND])
-    monkeypatch.setattr(ax, "extract_adjacency",
-                        lambda **_k: (_ for _ in ()).throw(RuntimeError("no")))
-    out = vision_call._run_pass1_voted(
-        object(), system=[], pages=_pages(1), n=1, _emit=lambda _e: None)
-    assert out.get("patalpos")
 
 
 # ═══════════════ T4 — per-round telemetry outside the experiment ═══════════

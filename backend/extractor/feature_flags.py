@@ -14,7 +14,6 @@ _FALSY = {"0", "false", "no", "off"}
 _FLAG_DEFINITIONS = {
     "per_room_ceiling":      ("ENABLE_PER_ROOM_CEILING", True),          # Sprint 0 Fix 4 → default ON 2026-05-06 (per-room aukštis virš 3m extraction)
     "paint_class_inference": ("ENABLE_PAINT_CLASS_INFERENCE", False),    # Sprint 0 Fix 5
-    "verify_pass":           ("ENABLE_VERIFY_PASS", False),              # Sprint 3
     # Sprint 4 Block B: activated default-on after wall_adjacency
     # validated on P1+P3+P5 (grindjuostės ratio drops to 0.5-0.6 m/m²
     # from 0.98 broken double-count). Override with ENABLE_POLYGON_PREPASS=0

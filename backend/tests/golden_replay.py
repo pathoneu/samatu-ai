@@ -202,11 +202,8 @@ OBJEKTAS_H_EXTRACT = REPO_ROOT / "ground_truth" / "objektas_h" / "ai_extract.jso
 OBJEKTAS_H_META = REPO_ROOT / "ground_truth" / "objektas_h" / "ai_extract_meta.json"
 # What the adjacency and niche readers cached during that run (gitignored, local).
 _CACHE = REPO_ROOT / ".vision_cache"
-OBJEKTAS_H_CACHED = {
-    "adjacency": _CACHE / "room_adjacency" / "0756cb4392f0ab3f6527fa74ba3df57bfece755670fbda2be76aaec9f7e6134e.json",
-    "niche_primary": _CACHE / "niche_locator" / "72cfb0c1b149e1dafaf4efd0722c1a81173deff5a6a6df60900f28783063ae93.json",
-    "niche_backfill": _CACHE / "niche_locator" / "8b6821a1e2c71e5a576dc9af17d4c50935a47a94dfb32259b02393721686e4c6.json",
-}
+# v4 3b (2026-10-25): the adjacency pass and the niche locator are gone; nothing of theirs is needed now
+OBJEKTAS_H_CACHED: dict[str, Path] = {}
 # Every value the stored material does not hold, and what stands in for it.
 OBJEKTAS_H_SYNTHETIC = {
     "pass1 lubu_aukstis_saltinis": "„default_fallback\" — the run's own warning says no height was read",
@@ -342,13 +339,6 @@ def objektas_h_answers(frozen: dict, meta_log: dict) -> dict[str, Any]:
                     note="voted rooms with this round's _vote values")
              for i in range(len(rounds))]
 
-    adjacency = Answer(_load(OBJEKTAS_H_CACHED["adjacency"]), "stored",
-                       usage=(_extra_calls(frozen, "adjacency") or [{}])[0])
-    niche_usage = _extra_calls(frozen, "niche") + [{}, {}]
-    niche = [Answer(_load(OBJEKTAS_H_CACHED["niche_primary"]), "stored", usage=niche_usage[0],
-                    note="ceiling plan (primary)"),
-             Answer(_load(OBJEKTAS_H_CACHED["niche_backfill"]), "stored", usage=niche_usage[1],
-                    note="lighting plan (backfill)")]
 
     zoom_by_nr = {str(r["nr"]): r["_zoom"] for r in frozen.get("patalpos") or [] if r.get("_zoom")}
     zoom_usage = list(_extra_calls(frozen, "zoom"))
@@ -381,11 +371,9 @@ def objektas_h_answers(frozen: dict, meta_log: dict) -> dict[str, Any]:
 
     return {
         "pass1": pass1,
-        "adjacency": [adjacency],
         "zoom": zoom,
         "doors": [Answer(_doors_answer(frozen), "derived",
                          usage=(_extra_calls(frozen, "doors") or [{}])[0], note="the doors the merge placed")],
         "door_type": door_type,
         "fixtures": fixtures,
-        "niche": niche,
     }

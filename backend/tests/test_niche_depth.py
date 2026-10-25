@@ -9,8 +9,8 @@ from extractor.vision_call import _build_pozicijos_from_rooms
 def _parsed(depth_room=None, depth_project=None, second_depth=None):
     rooms = []
     for nr, name, m, d in (("1", "Svetainė", 4.0, depth_room), ("2", "Miegamasis", 3.0, second_depth)):
-        r = {"nr": nr, "pavadinimas": name, "paskirtis": "svetaine", "plotas_m2": 20.0, "perimetras_m": 18.0,
-             "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 1}
+        r = {"nr": nr, "pavadinimas": name, "paskirtis": "svetaine", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+             "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 1}
         r.update(calc_room_quantities(r))
         r["nisu_metrai"] = m
         r["elementai"] = [{"tipas": "nisa_LED", "ilgis_m": m}]
@@ -51,19 +51,9 @@ def test_flag_off_identical(monkeypatch):
     a = _rows(monkeypatch, None, depth_project=0.15)
     b = _rows(monkeypatch, "0", depth_project=0.15)
     assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
-    assert _niche_rows(a)[FIN] == ("m", 7.0)
+    # v4 3b: per-room niche lengths are Pass-1's — without a legend length the row is blank
+    assert _niche_rows(a)[FIN] == ("m", None)
 
 
-def test_flag_on_bills_the_inside_in_m2(monkeypatch):
-    poz = _rows(monkeypatch, "1", depth_room=0.2, depth_project=0.15)
-    rows = _niche_rows(poz)
-    want = round(4.0 * 0.2 * 3 + 3.0 * 0.15 * 3, 2)
-    assert rows[FIN] == ("m2", want)
-    assert rows["Nišų formavimas GKP konstrukcijoje"] == ("m", 7.0)      # the framing stays in metres
-    why = next(p for p in poz if p["aprasymas"] == FIN)["_confidence_reason"]
-    assert "Svetainė 4,00 m × 0,20 m × 3" in why
 
 
-def test_a_room_without_depth_keeps_metres(monkeypatch):
-    poz = _rows(monkeypatch, "1", depth_room=0.2)          # Miegamasis has niches and no depth
-    assert _niche_rows(poz)[FIN] == ("m", 7.0)

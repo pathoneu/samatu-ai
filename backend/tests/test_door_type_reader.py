@@ -145,7 +145,7 @@ def test_door_types_raises_and_flags_pozicija():
     from extractor.vision_call import _build_pozicijos_from_rooms
     # one room with 2 tagged frameless doors (900×2400 → 5.7m reveal each)
     room = {"nr": "1", "pavadinimas": "Koridorius", "paskirtis": "koridorius",
-            "plotas_m2": 12.0, "perimetras_m": 14.0, "lubu_aukstis_m": 2.8,
+            "plotas_m2": 12.0, "perimetras_m": 14.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
             "elementai": [{"tipas": "pasleptos_duris", "kiekis": 2,
                            "plotis_mm": 900, "aukstis_mm": 2400}]}
     room.update(calc_room_quantities(room))

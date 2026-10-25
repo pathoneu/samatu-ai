@@ -54,11 +54,22 @@ def _built(source: dict) -> dict:
     return {**parsed, "darbu_sarasas": built["darbu_sarasas"]}
 
 
+def _as_his_entries(blob: dict) -> dict:
+    """v4 3b: a frozen extract's perimeters and heights are Pass-1's — every wall row would be blank. Tests of the
+    arithmetic take them as the person's own entries."""
+    for r in blob.get("patalpos") or []:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "user_override"
+        if r.get("lubu_aukstis_m"):
+            r["lubu_aukstis_saltinis"] = "user_override"
+    return blob
+
+
 @pytest.fixture(scope="module")
 def objektas_a() -> dict:
-    return _built(json.loads(
+    return _built(_as_his_entries(json.loads(
         (ROOT.parent / "ground_truth" / "objektas_a" / "ai_extract.json")
-        .read_text(encoding="utf-8")))
+        .read_text(encoding="utf-8"))))
 
 
 def _fact(payload: dict, key: str) -> dict:

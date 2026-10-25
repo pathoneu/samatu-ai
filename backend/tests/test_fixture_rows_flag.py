@@ -7,8 +7,8 @@ from extractor.vision_call import _build_pozicijos_from_rooms
 
 
 def _parsed(**extra):
-    room = {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
-            "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0}
+    room = {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys",
+            "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0}
     room.update(calc_room_quantities(room))
     blob = {"patalpos": [room], "santrauka": {}}
     blob.update(extra)
@@ -78,8 +78,8 @@ class _Req:
 def _recompute_with_context(monkeypatch, context):
     import main
     monkeypatch.setattr(main, "_billable_user", lambda request: {"id": "u1"})
-    room = {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
-            "lubu_aukstis_m": 2.7}
+    room = {"nr": "1", "pavadinimas": "Vonia", "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys",
+            "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas"}
     payload = main.RecomputePayload(patalpos=[room], bendras_plotas_m2=6.0, context=context)
     return main.recompute_interior(payload=payload, request=_Req())
 

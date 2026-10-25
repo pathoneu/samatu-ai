@@ -1,5 +1,5 @@
 """End-to-end integration: real LT PDF → CV layer returns sensible
-results. Acceptance gate — a regression in cv_match / cv_wand /
+results. Acceptance gate — a regression in cv_match /
 cv_render_cache should break this test.
 
 Marked `integration` so a regular `pytest` run skips it; CI invokes
@@ -19,7 +19,6 @@ import pytest  # noqa: E402
 
 from extractor.cv_match import find_similar_symbols  # noqa: E402
 from extractor.cv_render_cache import render_page  # noqa: E402
-from extractor.cv_wand import suggest_room_polygon  # noqa: E402
 
 _ENV_PDF = os.environ.get("SAMATU_TEST_PDF", "").strip()
 _PDF_CANDIDATES = [
@@ -60,22 +59,3 @@ def test_match_template_finds_self_on_real_pdf():
     assert len(matches) >= 1
     # The self-match should always be present at near-perfect confidence
     assert max(m["confidence"] for m in matches) >= 0.99
-
-
-@pytest.mark.integration
-def test_magic_wand_does_not_explode_on_real_pdf():
-    """Wand can legitimately return None (click on a wall) but must
-    NEVER produce a polygon spanning the full page (a sign that
-    morphology + flood-fill leaked across the whole drawing)."""
-    page = render_page(PDF.read_bytes(), page_idx=0, dpi=100)
-    h, w = page.shape
-    polygon = suggest_room_polygon(
-        page, click_x=w // 2, click_y=h // 2, close_kernel=11,
-    )
-    if polygon is not None:
-        import cv2
-        import numpy as np
-        area = cv2.contourArea(np.array(polygon, dtype=np.int32))
-        assert area < (w * h * 0.9), (
-            f"polygon area {area} ≥ 90% of page {w * h} — flood-fill leaked"
-        )

@@ -24,7 +24,7 @@ A, B = 0.5, 0.4          # the hole: a 0,5 × 0,4 m column
 def _room(sienos=None):
     r = {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 12.0,
          "plotas_saltinis": "eksplikacija", "perimetras_m": 14.0, "perimetras_saltinis": "matmenu_eilutes",
-         "lubu_aukstis_m": H, "n_doors": 1, "n_windows": 1}
+         "lubu_aukstis_m": H, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 1}
     if sienos is not None:
         r["_konturas"] = {"page": 1, "saltinis": "nubrezta", "perimetras_m": 14.0, "skyliu_perimetras_m": 2 * (A + B),
                           "skyles": [{"perimetras_m": 2 * (A + B), "plotas_m2": A * B, "kampai": 4, "sienos": sienos}]}

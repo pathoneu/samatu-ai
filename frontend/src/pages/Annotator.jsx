@@ -186,30 +186,7 @@ export default function Annotator() {
   const confirmRoom = (nr) => setVerificationState((p) => ({ ...p, [nr]: 'confirmed' }));
   const markCorrected = (nr) => setVerificationState((p) => ({ ...p, [nr]: 'corrected' }));
 
-  // ── Symbol auto-detection ────────────────────────────────────────────────
-  const [detecting, setDetecting] = useState(false);
-  const handleDetectSymbols = async () => {
-    setDetecting(true);
-    try {
-      const url = fixture
-        ? `/api/projects/${projectId}/detect-symbols?fixture=${fixture}&page=5`
-        : `/api/projects/${projectId}/detect-symbols?page=5`;
-      const r = await fetch(url, { method: 'POST', credentials: 'include' });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      const newSyms = (j.symbols || []).map((s) => ({
-        id: `det-${s.id || Math.random().toString(36).slice(2, 7)}`,
-        type: SYMBOL_ICONS[s.type] ? s.type : 'socket',
-        pos_pct: { x_pct: s.x_pct, y_pct: s.y_pct },
-      }));
-      setSymbols((prev) => [...prev, ...newSyms]);
-    } catch (err) {
-      console.error(err);
-      toast.error('Simbolių aptikimas nepavyko');
-    } finally {
-      setDetecting(false);
-    }
-  };
+  // (Vision symbol auto-detection — POST …/detect-symbols — is gone, v4 3b 2026-10-25.)
 
   // ── Persistence ──────────────────────────────────────────────────────────
   const annotationsUrl = `/api/projects/${projectId}/annotations`;
@@ -320,14 +297,6 @@ export default function Annotator() {
         {toolBtn(TOOLS.NONE,      'Pasirinkti', '🖱')}
         {toolBtn(TOOLS.CALIBRATE, 'Kalibruoti', '🔍')}
         {toolBtn(TOOLS.MEASURE,   'Matuoti',    '📏')}
-        <button
-          type="button"
-          onClick={handleDetectSymbols}
-          disabled={detecting}
-          className="flex items-center gap-1.5 rounded border border-purple-300 bg-card px-3 py-1.5 text-sm text-purple-300 hover:border-purple-500"
-        >
-          <span>💡</span><span>{detecting ? 'Aptinkama…' : 'Aptikti simbolius'}</span>
-        </button>
         <span className="mx-2 text-muted-foreground/70">|</span>
         <button
           type="button"

@@ -41,15 +41,15 @@ def _rooms_with_openings():
     1 window, a bathroom with 1 door and NO window, a room with no elementai."""
     return [
         {"nr": "01", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 37.86,
-         "perimetras_m": 27.5, "lubu_aukstis_m": 2.82,
+         "perimetras_m": 27.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": [{"tipas": "langas", "plotis_mm": 2850, "aukstis_mm": 2200, "kiekis": 1},
                        {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2400, "kiekis": 2},
                        {"tipas": "pasleptos_duris", "plotis_mm": 900, "aukstis_mm": 2400, "kiekis": 1}]},
         {"nr": "06", "pavadinimas": "Vonios kambarys", "paskirtis": "vonia", "plotas_m2": 7.25,
-         "perimetras_m": 11.2, "lubu_aukstis_m": 2.82, "plyteles_sienos_aukstis_m": 2.4,
+         "perimetras_m": 11.2, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas", "plyteles_sienos_aukstis_m": 2.4,
          "elementai": [{"tipas": "duris", "plotis_mm": 800, "aukstis_mm": 2100, "kiekis": 1}]},
         {"nr": "09", "pavadinimas": "Techninė patalpa", "paskirtis": "katiline", "plotas_m2": 6.78,
-         "perimetras_m": 10.6, "lubu_aukstis_m": 2.82, "elementai": []},
+         "perimetras_m": 10.6, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.82, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []},
     ]
 
 

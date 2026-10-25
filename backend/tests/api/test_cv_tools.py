@@ -113,27 +113,8 @@ def test_match_template_404_when_pdf_not_cached():
     assert resp.status_code in (404, 409)
 
 
-def test_magic_wand_returns_polygon_or_none():
-    _preload_pdf()
-    resp = client.post("/api/cv/magic-wand", json={
-        "project_id": "test-cv",
-        "page_idx": 0,
-        "click": [400, 400],
-        "dpi": 100,
-    })
-    assert resp.status_code == 200
-    body = resp.json()
-    assert "polygon" in body  # may be null if click landed on wall
-    assert "page_size" in body
 
 
-def test_magic_wand_rejects_out_of_bounds_click():
-    _preload_pdf()
-    resp = client.post("/api/cv/magic-wand", json={
-        "project_id": "test-cv", "page_idx": 0, "click": [-10, -10],
-        "dpi": 100,
-    })
-    assert resp.status_code == 400
 
 
 def test_record_decision_writes_training_label(tmp_path, monkeypatch):

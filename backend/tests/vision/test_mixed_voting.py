@@ -12,7 +12,6 @@ from __future__ import annotations
 import pytest
 
 import extractor.vision_call as vc
-import extractor.vision.adjacency_extractor as adj_mod
 from pricing import RATES, calc_claude_cost_usd, calc_meta_cost_usd
 
 
@@ -53,8 +52,7 @@ def _fake_run(model: str) -> dict:
 
 @pytest.fixture
 def no_adjacency(monkeypatch):
-    monkeypatch.setattr(adj_mod, "extract_adjacency",
-                        lambda **k: (_ for _ in ()).throw(RuntimeError("offline")))
+    pass  # (the Vision adjacency pass is gone — v4 3b)
 
 
 def test_voted_mixed_resolves_model_per_round(monkeypatch, no_adjacency):

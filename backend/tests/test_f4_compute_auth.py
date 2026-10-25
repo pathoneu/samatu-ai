@@ -55,11 +55,6 @@ def test_f4_cv_match_template_rejects_anonymous():
     assert r.status_code == 401, r.text
 
 
-def test_f4_cv_magic_wand_rejects_anonymous():
-    r = TestClient(app).post("/api/cv/magic-wand", json={
-        "project_id": "x", "page_idx": 0, "click": [10, 10], "dpi": 100,
-    })
-    assert r.status_code == 401, r.text
 
 
 def test_f4_cv_record_decision_rejects_anonymous():

@@ -20,7 +20,7 @@ from typing import Any
 
 from ._cache import VisionCache, cache_key
 from ..response_text import ModelStopped, read_answer, usage_meta
-from .dimension_extractor import _detect_image_media_type, _decode_response_json
+from ._image_json import _detect_image_media_type, _decode_response_json
 
 from models_config import model_for
 

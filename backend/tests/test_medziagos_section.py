@@ -35,7 +35,7 @@ from extractor.vision_call import (
 
 def _room(nr="101", **kw):
     r = {"nr": nr, "pavadinimas": f"Kambarys {nr}", "paskirtis": "gyvenamoji",
-         "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": [{"tipas": "duris", "kiekis": 1,
                         "plotis_mm": 900, "aukstis_mm": 2100}]}
     r.update(kw)
@@ -55,7 +55,7 @@ def _room(nr="101", **kw):
 def _built(rooms=None, overrides=None):
     parsed = {"patalpos": rooms or [_room("101"),
                                     _room("102", paskirtis="vonia",
-                                          plotas_m2=6.0, perimetras_m=10.0)],
+                                          plotas_m2=6.0, perimetras_m=10.0, perimetras_saltinis="plano_matmenys")],
               "santrauka": {}}
     if overrides is not None:
         parsed["_overrides"] = overrides
@@ -103,15 +103,15 @@ def test_the_materials_the_builder_computes_all_land_in_the_section():
     labels now. Their old clone names are asserted GONE below."""
     out = _built()
     labels = " | ".join(m["aprasymas"] for m in _mats(out))
-    for needle in ("Rotband", "Glaistas sienoms", "Gruntas sienoms",
+    # v4 3b: Rotband (until he chooses a share), the GKP ceiling goods (until the drawing marks the ceilings)
+    # and the thresholds (a count the drawing does not give) are blank work rows — no goods are bought for them
+    for needle in ("Glaistas sienoms", "Gruntas sienoms",
                    "Dažai sienoms", "Glaistas luboms", "Gruntas luboms",
                    "Dažai luboms", "PVC kampuotės", "Grindjuostės",
-                   "GKP lapai luboms", "CD profiliai", "UW profiliai",
-                   "Savisriegiai GKP", "plytelių klijai", "Vonios sienų plytelės",
+                   "plytelių klijai", "Vonios sienų plytelės",
                    "fugavimo masė", "Hidroizoliacinė medžiaga",
                    "Savaime išsilyginantis", "Grindų danga",
-                   "Grindų dangos pamušalas", "Slenksniai",
-                   "Reviziniai dureliai"):
+                   "Grindų dangos pamušalas"):
         assert needle in labels, f"{needle!r} missing from Medžiagos: {labels}"
 
 
@@ -137,9 +137,9 @@ def test_a_purchase_is_never_billed_on_two_rows():
         return " ".join((label or "").lower().split()[:2])
 
     for rooms in (None,
-                  [_room("201", paskirtis="vonia", plotas_m2=8.0, perimetras_m=12.0),
-                   _room("202", paskirtis="virtuve", plotas_m2=14.0, perimetras_m=15.0),
-                   _room("203", lubu_aukstis_m=3.4)]):
+                  [_room("201", paskirtis="vonia", plotas_m2=8.0, perimetras_m=12.0, perimetras_saltinis="plano_matmenys"),
+                   _room("202", paskirtis="virtuve", plotas_m2=14.0, perimetras_m=15.0, perimetras_saltinis="plano_matmenys"),
+                   _room("203", lubu_aukstis_m=3.4, lubu_aukstis_saltinis="plano_uzrasas")]):
         out = _built(rooms=rooms)
         works = {p["aprasymas"]: p for p in _works(out)}
         for m in _mats(out):
@@ -162,8 +162,8 @@ def test_the_old_self_clone_labels_are_gone():
     purchase the sąmata already carried."""
     out = _built(rooms=[_room("101"),
                         _room("102", paskirtis="vonia", plotas_m2=6.0,
-                              perimetras_m=10.0),
-                        _room("103", lubu_aukstis_m=3.4)])
+                              perimetras_m=10.0, perimetras_saltinis="plano_matmenys"),
+                        _room("103", lubu_aukstis_m=3.4, lubu_aukstis_saltinis="plano_uzrasas")])
     labels = " | ".join(p["aprasymas"] for p in out["pozicijos"])
     for gone in ("GKP lapas luboms", "GKP lapas sienoms", "CD 60×27",
                  "UW 28×27", "plytelės (m² + 8% atliekų)", "Pamušalo membrana",
@@ -179,7 +179,7 @@ def test_a_moved_purchase_keeps_its_label_so_an_old_price_still_lands():
     priced project loses the money on it."""
     out = _built(rooms=[_room("101"),
                         _room("102", paskirtis="vonia", plotas_m2=6.0,
-                              perimetras_m=10.0)])
+                              perimetras_m=10.0, perimetras_saltinis="plano_matmenys")])
     mats = {m["aprasymas"]: m for m in _mats(out)}
     tiles = mats.get("Vonios sienų plytelės")
     assert tiles is not None, sorted(mats)
@@ -218,9 +218,9 @@ def test_material_labels_are_unique_because_a_label_is_a_price_key():
     project: paint (walls + ceilings) and tiles (up to six locations)."""
     out = _built(rooms=[_room("101"),
                         _room("102", paskirtis="vonia", plotas_m2=6.0,
-                              perimetras_m=10.0),
+                              perimetras_m=10.0, perimetras_saltinis="plano_matmenys"),
                         _room("103", paskirtis="virtuve", plotas_m2=12.0,
-                              perimetras_m=14.0)])
+                              perimetras_m=14.0, perimetras_saltinis="plano_matmenys")])
     labels = [m["aprasymas"] for m in _mats(out)]
     assert len(labels) == len(set(labels)), \
         f"duplicate material labels: {[l for l in labels if labels.count(l) > 1]}"

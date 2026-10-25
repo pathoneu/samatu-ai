@@ -30,11 +30,11 @@ def client(monkeypatch):
 
 def _rooms():
     a = {"nr": "01", "pavadinimas": "Virtuvė", "paskirtis": "gyvenamoji", "plotas_m2": 12.0, "plotas_saltinis": "eksplikacija",
-         "perimetras_m": 14.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H,
+         "perimetras_m": 14.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": [{"tipas": "langas", "plotis_mm": 1200, "aukstis_mm": 1500, "kiekis": 1},
                        {"tipas": "duris", "plotis_mm": 900, "aukstis_mm": 2100, "kiekis": 1}]}
     b = {"nr": "02", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji", "plotas_m2": 9.0, "plotas_saltinis": "eksplikacija",
-         "perimetras_m": 12.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H,
+         "perimetras_m": 12.0, "perimetras_saltinis": "user_override", "lubu_aukstis_m": H, "lubu_aukstis_saltinis": "plano_uzrasas",
          "elementai": [{"tipas": "langas", "plotis_mm": 1500, "aukstis_mm": 1500, "kiekis": 1}]}
     return a, b
 
@@ -72,8 +72,7 @@ def test_a_merge_bills_what_the_two_rooms_billed_less_only_the_wall_between_them
     assert _row(before, "Grindjuosčių sumontavimas") - _row(after, "Grindjuosčių sumontavimas") == pytest.approx(2 * SHARED * 1.1, abs=0.02)
     # its run along the ceiling line and its four inner corners in the corner bead
     assert _row(before, "Dažymo kampų montavimas") - _row(after, "Dažymo kampų montavimas") == pytest.approx(2 * SHARED + 4 * H, abs=0.02)
-    # one room, no threshold between two
-    assert _row(before, "Slenksniai") == 1 and not any("Slenksniai" in k and after[k] for k in after)
+    # (thresholds: a count the drawing does not give — a blank row since v4 3b)
     wall_rows = ("Sien", "sienoms", "Grindjuos", "kampų", "kampuotės", "Rotband", "Slenksniai")
     unchanged = {k: v for k, v in before.items() if not any(w.lower() in k.lower() for w in wall_rows)}
     assert unchanged, "the corpus of untouched rows is not empty"
@@ -206,9 +205,9 @@ def test_objektas_h_merge_05_into_04_keeps_the_ceiling_at_the_table_total_and_th
 def _with_garage():
     a, b = _rooms()
     g = {"nr": "03", "pavadinimas": "Garažas", "paskirtis": "garažas", "plotas_m2": 20.0, "perimetras_m": 18.0,
-         "lubu_aukstis_m": H, "elementai": []}
+         "lubu_aukstis_m": H, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     t = {"nr": "04", "pavadinimas": "Tambūras", "paskirtis": "tambūras", "plotas_m2": 3.0, "perimetras_m": 7.0,
-         "lubu_aukstis_m": H, "elementai": []}
+         "lubu_aukstis_m": H, "lubu_aukstis_saltinis": "plano_uzrasas", "elementai": []}
     return [a, b, g, t]
 
 

@@ -292,6 +292,8 @@ def blank_followers(pozicijos: list[dict], skip_prefixes: tuple[str, ...] = ()) 
         if not isinstance(p, dict) or p.get(KILME_KEY) == BLANK:
             continue
         if skip_prefixes and str(p.get("aprasymas") or "").startswith(skip_prefixes):
+            if str(p.get("susijes_darbas") or "").strip() in gone:
+                p.pop("susijes_darbas", None)       # its own count stays where he reads it, not under a blank row
             continue
         parent = str(p.get("susijes_darbas") or "").strip()
         if parent and parent in gone and isinstance(p.get("kiekis"), (int, float)):

@@ -1,16 +1,19 @@
-"""HTTP API for the CV layer. Five endpoints:
+"""HTTP API for the CV layer. Four endpoints:
 
   POST /api/cv/upload-pdf     — prime the PDF cache for a session
   POST /api/cv/match-template — click → count similar symbols on a page
   POST /api/cv/find-symbol    — box in PDF points → similar symbols on a page
                                 (the viewer's „Rasti panašius"; shape score)
-  POST /api/cv/magic-wand     — click → suggest room polygon
   POST /api/cv/record-decision — append accept/reject as training data
 
 Each compute endpoint is thin: parse → load page from the in-memory
 PDF cache → call CV layer → return. Heavy multi-page jobs (run match
 across every floor plan) belong in a future RQ-backed batch route;
 out of MVP scope.
+
+The pixel flood fill („magic wand", click → room polygon) is gone — v4 3b, 2026-10-25: a room outline
+comes from the drawing's vector walls or his own polygon. The symbol search stays: it is deterministic
+template matching on a glyph HE chose, and he confirms every count.
 
 PDFs come from `page_raster_cache._PDF_CACHE` (1h LRU). The frontend
 primes the cache once via `/upload-pdf`; subsequent JSON calls reuse
@@ -38,7 +41,6 @@ from extractor.cv_match import (
 )
 from extractor.pdfium_guard import PDFIUM_LOCK
 from extractor.cv_render_cache import render_page
-from extractor.cv_wand import suggest_room_polygon
 from extractor.training_data import KLASS_PATTERN, record_label
 
 router = APIRouter(prefix="/api/cv", tags=["cv-tools"])
@@ -133,14 +135,6 @@ class FindSymbolBody(BaseModel):
     box_pt: list[float] = Field(min_length=4, max_length=4)
     min_score: float = Field(default=0.70, ge=0.5, le=0.99)
     max_results: int = Field(default=300, ge=1, le=500)
-
-
-class MagicWandBody(BaseModel):
-    project_id: str
-    page_idx: int = Field(ge=0)
-    click: list[int] = Field(min_length=2, max_length=2)
-    close_kernel: int = 7
-    dpi: int = 200
 
 
 class RecordDecisionBody(BaseModel):
@@ -364,25 +358,6 @@ def _px_iou(a, b) -> float:
     inter = ix * iy
     union = aw * ah + bw * bh - inter
     return inter / union if union > 0 else 0.0
-
-
-@router.post("/magic-wand")
-def magic_wand(
-    body: MagicWandBody,
-    request: Request,
-    user: dict = Depends(_auth.require_user),  # OpenCV only, no Anthropic call
-) -> dict:
-    _rate_limit(request, "magic-wand")
-    _require_owned_project(user, body.project_id)  # N6: ownership BEFORE compute
-    pdf = _load_project_pdf(body.project_id)
-    page = render_page(pdf, body.page_idx, body.dpi)
-    cx, cy = body.click
-    if cx < 0 or cy < 0 or cy >= page.shape[0] or cx >= page.shape[1]:
-        raise HTTPException(400, "click out of page bounds")
-    polygon = suggest_room_polygon(
-        page, cx, cy, close_kernel=body.close_kernel,
-    )
-    return {"polygon": polygon, "page_size": list(page.shape[::-1])}
 
 
 @router.post("/record-decision")

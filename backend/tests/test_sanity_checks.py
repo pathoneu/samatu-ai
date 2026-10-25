@@ -51,7 +51,7 @@ def test_ceiling_to_floor_fires_when_far_off():
 
 def test_baseboard_perimeter_passes_when_close():
     rooms = [{
-        "perimetras_m": 40,
+        "perimetras_m": 40, "perimetras_saltinis": "plano_matmenys",
         "elementai": [{"type": "durys"}, {"type": "durys"}],
         "derived": {"grindjuostes_m": 38},  # 40 - 2*0.8 = 38.4
     }]
@@ -61,7 +61,7 @@ def test_baseboard_perimeter_passes_when_close():
 def test_baseboard_perimeter_fires_when_double_counted():
     # Double-counted grindjuostės is the bug Block B fixes
     rooms = [{
-        "perimetras_m": 40,
+        "perimetras_m": 40, "perimetras_saltinis": "plano_matmenys",
         "elementai": [{"type": "durys"}, {"type": "durys"}],
         "derived": {"grindjuostes_m": 76},  # 2x expected
     }]
@@ -102,7 +102,7 @@ def test_window_reveals_fires_when_zero():
 
 
 def test_run_all_checks_returns_list_of_dicts():
-    rooms = [{"plotas_m2": 100, "walls_paintable_m2": 150, "ceiling_paintable_m2": 100, "perimetras_m": 40}]
+    rooms = [{"plotas_m2": 100, "walls_paintable_m2": 150, "ceiling_paintable_m2": 100, "perimetras_m": 40, "perimetras_saltinis": "plano_matmenys"}]
     warnings = run_all_checks({"patalpos": rooms})
     assert isinstance(warnings, list)
     assert all(isinstance(w, dict) for w in warnings)
@@ -193,9 +193,12 @@ def test_gk_sheets_check_agrees_with_the_real_builder_on_two_heights():
     run_all_checks, raises nothing — the row and the check share one area and one
     formula (universal_rules.gkp_ceiling_areas_m2 / gkp_sheet_count)."""
     from extractor.vision_call import _build_pozicijos_from_rooms
+    # v4 3b: GKP ceilings only where the ceiling plan prints an altitude in the room
     parsed = _build_pozicijos_from_rooms({"patalpos": [
-        {"nr": "101", "pavadinimas": "Svetainė", "plotas_m2": 93.39, "gkp_lubu_standart_m2": 93.39},
-        {"nr": "102", "pavadinimas": "Antresolė", "plotas_m2": 61.55, "gkp_lubu_virs_3m_m2": 61.55},
+        {"nr": "101", "pavadinimas": "Svetainė", "plotas_m2": 93.39, "gkp_lubu_standart_m2": 93.39,
+         "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "ceiling_plan_marker"},
+        {"nr": "102", "pavadinimas": "Antresolė", "plotas_m2": 61.55, "gkp_lubu_virs_3m_m2": 61.55,
+         "lubu_aukstis_m": 3.4, "lubu_aukstis_saltinis": "ceiling_plan_marker"},
     ]})
     sheets = [p for p in parsed["pozicijos"] if p["aprasymas"].startswith("GKP lapai luboms")]
     assert [p["kiekis"] for p in sheets] == [57]
@@ -209,9 +212,9 @@ def test_baseboard_check_counts_pipeline_doors_and_skips_tiled_floors():
     „− 0 durys" and warned against every room's perimeter (2026-09-10)."""
     from extractor.sanity_checks import check_baseboard_perimeter
     rooms = [
-        {"nr": "01", "perimetras_m": 20.0, "grindjuosciu_m": 18.4,
+        {"nr": "01", "perimetras_m": 20.0, "perimetras_saltinis": "plano_matmenys", "grindjuosciu_m": 18.4,
          "elementai": [{"tipas": "duris", "kiekis": 2}]},
-        {"nr": "03", "perimetras_m": 8.0, "grindjuosciu_m": 0.0, "plyteles_grindys_m2": 3.5,
+        {"nr": "03", "perimetras_m": 8.0, "perimetras_saltinis": "plano_matmenys", "grindjuosciu_m": 0.0, "plyteles_grindys_m2": 3.5,
          "elementai": [{"tipas": "duris", "kiekis": 1}]},
     ]
     # 18,4 against 20 − 2 × 0,8 = 18,4 → no warning (the bathroom is not expected)
@@ -223,12 +226,12 @@ def test_baseboard_check_counts_pipeline_doors_and_skips_tiled_floors():
 
 def test_a_perimeter_below_the_square_of_its_area_is_impossible():
     # 4·√3,52 = 7,50 — Vision's 7,08 m around a 3,52 m² WC cannot exist
-    rooms = [{"nr": "03", "pavadinimas": "Vonia", "plotas_m2": 3.52, "perimetras_m": 7.08},
-             {"nr": "04", "pavadinimas": "Kambarys", "plotas_m2": 10.05, "perimetras_m": 12.68}]
+    rooms = [{"nr": "03", "pavadinimas": "Vonia", "plotas_m2": 3.52, "perimetras_m": 7.08, "perimetras_saltinis": "plano_matmenys"},
+             {"nr": "04", "pavadinimas": "Kambarys", "plotas_m2": 10.05, "perimetras_m": 12.68, "perimetras_saltinis": "plano_matmenys"}]
     w = check_perimeter_geometric_minimum(rooms)
     assert w is not None and w.code == "perimeter_below_geometric_minimum"
     assert "1 patalpos" in w.message and "03 Vonia" in w.message and "7,08 m" in w.actual and "7,50" in w.actual
     assert "04" not in w.actual, "a square-ish room at exactly the minimum passes"
-    assert check_perimeter_geometric_minimum([{"plotas_m2": 10.05, "perimetras_m": 12.68}]) is None
+    assert check_perimeter_geometric_minimum([{"plotas_m2": 10.05, "perimetras_m": 12.68, "perimetras_saltinis": "plano_matmenys"}]) is None
     codes = {x["code"] for x in run_all_checks({"patalpos": rooms})}
     assert "perimeter_below_geometric_minimum" in codes

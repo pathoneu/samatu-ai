@@ -5,7 +5,6 @@ call, so this runs offline ($0). Verifies the median wins and a single
 outlier/adjacency-bail run can't tank the consensus.
 """
 import extractor.vision_call as vc
-import extractor.vision.adjacency_extractor as adj_mod
 
 
 def _jittered_runs():
@@ -29,9 +28,6 @@ def test_run_pass1_voted_medians(monkeypatch):
     monkeypatch.setattr(vc, "_run_pass1_once", lambda *a, **k: next(seq))
     # Force the adjacency extract to fail → adj=None → each run keeps its own
     # n_partition_walls, which then gets voted (median of 3,3,0 → 3).
-    def _boom(**kwargs):
-        raise RuntimeError("no network in test")
-    monkeypatch.setattr(adj_mod, "extract_adjacency", _boom)
 
     out = vc._run_pass1_voted(
         client=None, system=None,
@@ -54,8 +50,7 @@ def test_run_pass1_voted_degrades_to_single_good_run(monkeypatch):
         {"status": "error", "_error": "vision_call_failed: y"},
     ])
     monkeypatch.setattr(vc, "_run_pass1_once", lambda *a, **k: next(runs))
-    monkeypatch.setattr(adj_mod, "extract_adjacency",
-                        lambda **k: (_ for _ in ()).throw(RuntimeError("x")))
+    pass  # (the Vision adjacency pass is gone — v4 3b)
     out = vc._run_pass1_voted(client=None, system=None,
                               pages=[{"image_b64": "x"}], n=3, _emit=lambda e: None)
     assert out["_voting"]["degraded"] is True
@@ -65,8 +60,7 @@ def test_run_pass1_voted_degrades_to_single_good_run(monkeypatch):
 def test_run_pass1_voted_all_fail(monkeypatch):
     monkeypatch.setattr(vc, "_run_pass1_once",
                         lambda *a, **k: {"status": "error", "_error": "boom"})
-    monkeypatch.setattr(adj_mod, "extract_adjacency",
-                        lambda **k: (_ for _ in ()).throw(RuntimeError("x")))
+    pass  # (the Vision adjacency pass is gone — v4 3b)
     out = vc._run_pass1_voted(client=None, system=None,
                               pages=[{"image_b64": "x"}], n=3, _emit=lambda e: None)
     assert out["status"] == "error"

@@ -64,7 +64,7 @@ def test_a_merged_room_counts_its_outline_corners_and_the_six_terms_add_up(mode)
 
 def test_a_room_that_was_not_merged_keeps_the_four_corner_default():
     out = calc_room_quantities(_room(polygon_pct=[[0, 0], [0.5, 0], [0.5, 0.2], [0.3, 0.2], [0.3, 0.4], [0, 0.4]],
-                                     polygon_source="corrected", _konturas={"perimetras_m": 20.0}))
+                                     polygon_source="corrected", _konturas={"perimetras_m": 20.0, "perimetras_saltinis": "plano_matmenys"}))
     assert out["kampai_inner_m"] == pytest.approx(4 * H, abs=0.01) and out["kampai_isoriniai_m"] == 0.0
     assert out == calc_room_quantities(_room())          # an outline alone changes nothing outside the experiment
 
@@ -77,7 +77,7 @@ def test_the_experiment_flag_is_off_by_default(monkeypatch):
     monkeypatch.setattr(ur, "_experiment_corners", None)
     assert ur.experiment_corners_from_outline() is True
     ring = [[0, 0], [0.6, 0], [0.6, 0.3], [0.3, 0.3], [0.3, 0.5], [0, 0.5]]           # an L, 2,2 page units round
-    out = calc_room_quantities(_room(polygon_pct=ring, polygon_source="corrected", _konturas={"perimetras_m": 22.0}))
+    out = calc_room_quantities(_room(polygon_pct=ring, polygon_source="corrected", _konturas={"perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys"}))
     assert (out["kampai_inner_m"], out["kampai_isoriniai_m"]) == (pytest.approx(5 * H), pytest.approx(1 * H))
     monkeypatch.setattr(ur, "_experiment_corners", None)
 
@@ -122,7 +122,14 @@ def _objektas_h():
     p = ROOT / "ground_truth" / "objektas_h" / "ai_extract.json"
     if not p.is_file():
         pytest.skip("objektas_h extract not on this machine")
-    return json.loads(p.read_text(encoding="utf-8"))
+    blob = json.loads(p.read_text(encoding="utf-8"))
+    # v4 3b: the frozen extract's perimeters and heights are Pass-1's / the default, so the corner row would be
+    # blank; this test is about the merge's corner arithmetic — the walls and heights are taken as his entries
+    for r in blob["patalpos"]:
+        if r.get("perimetras_m"):
+            r["perimetras_saltinis"] = "user_override"
+        r["lubu_aukstis_saltinis"] = "user_override"
+    return blob
 
 
 def _merge_h(blob):

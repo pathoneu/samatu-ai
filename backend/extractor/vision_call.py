@@ -101,13 +101,6 @@ def _pdf_native_enabled() -> bool:
     return _pdf_native_mode()[0]
 
 
-def _zoom_agentic_enabled() -> bool:
-    """EXPERIMENT gate (SAMATU_ZOOM_AGENTIC=1): route the Pass-2 zoom re-read
-    through the model-driven crop loop (extractor.agentic_crop) instead of
-    the fixed-bbox crop. Default OFF — zero behavior change."""
-    return _env_flag("SAMATU_ZOOM_AGENTIC")
-
-
 def _mixed_voting_models() -> list[str] | None:
     """EXPERIMENT gate (SAMATU_VOTING_MODELS="m1,m2,m3"): one model PER voting
     round (list length = number of rounds). Unset/empty → None (default OFF)."""
@@ -220,21 +213,6 @@ def _note_doors_unread(parsed: dict, doors_result: dict) -> None:
                     "skaitymo durų skaičius. Patikrinkite durų skaičių šiose patalpose."),
         "_page_errors": errors,
     })
-
-
-def _meter_niche_call(parsed: dict, nl: Any) -> None:
-    """Roll ONE niche_locator.extract_niches call's tokens into
-    ``parsed["_meta"]["extra_calls"]`` (2026-07-04 — the last unmetered paid
-    sub-call). ``nl`` is the returned ``NicheList``; its ``_meta`` carries
-    ``{model, input_tokens, output_tokens, ...}`` on a cache MISS, or
-    ``{model, cache:"hit"}`` (no tokens) on a HIT.
-
-    Delegates to _append_extra_call, so a cache HIT (model present, tokens
-    absent) contributes €0 and never raises. Pure token CAPTURE — niche
-    detection output is untouched."""
-    if nl is None:
-        return
-    _append_extra_call(parsed, getattr(nl, "_meta", None), reader="niche")
 
 
 # Anthropic hard request limit is 32 MB; leave headroom for system prompt +
@@ -1080,6 +1058,9 @@ def _emit_v8_compat_fields(parsed: dict) -> dict:
             # key that starts with `_sa` (SQLAlchemy state), so that spelling
             # never reached the browser (2026-09-08, an hour of debugging).
             "_only_while": p.get("_only_while"),
+            # v4 3b: where the number comes from (row_provenance) and, for a blank row, what to check
+            "_kilme": p.get("_kilme"),
+            "_tuscia_priezastis": p.get("_tuscia_priezastis"),
             # The m² (and tape metres) behind a line billed per zone — the row
             # scorecard checks his m² row against `_detail_m2` (2026-09-10).
             "_detail_m2": p.get("_detail_m2"),
@@ -1760,6 +1741,10 @@ def _recompute_per_room_via_python(parsed: dict, rules_override: dict | None) ->
             **room,
             **counts,
         }
+        if not isinstance(room.get("_sujungimas"), dict):
+            # v4 3b: the partition-wall count the deleted Vision adjacency pass stored is a model reading — a
+            # stored project computes as a fresh read does now (only a merge he made states its partition ends)
+            calc_input.pop("n_partition_walls", None)
         # 2. Compute deterministic per-room quantities
         room.pop("_calc_failed", None)
         try:
@@ -2767,6 +2752,9 @@ def _extract_medziagos_section(parsed: dict) -> None:
             kept.append(p)                # already extracted (defensive)
             continue
         parent = (p.get("aprasymas") or "").strip()
+        if p.get(_IS_MATERIAL_LINE) and p.get("kiekis") is None:
+            # v4 3b: goods bought for a blank work row are unknown with it — not a shopping-list line
+            continue
         if p.get(_IS_MATERIAL_LINE):
             # This row is the goods. Drop any self-copy it still carries and
             # move it whole — never emit a second row for the same purchase.
@@ -3480,6 +3468,15 @@ def _gate_frameless(pozicijos: list[dict], parsed: dict) -> None:
             continue
         if src in _FRAMELESS_READ:
             _rp.tag(p, _rp.DRAWING)
+            continue
+        try:
+            text_read = int(((parsed.get("_door_types") or {}).get("reader_beapvadines")) or 0) > 0
+        except (TypeError, ValueError):
+            text_read = False
+        if text_read:
+            # the door-type reader found frameless doors written in the drawing's text (tags, annotations) —
+            # a reader of text from the sheet image, which Phase 3c moves onto the text layer
+            _rp.tag(p, _rp.MODEL_3C)
             continue
         said = str(prep.get("sakinys") or "").strip()
         _rp.blank(p, ((said + " ") if said else "")
@@ -5175,7 +5172,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
     # Pass-1's `ortakiai_*_m` was a model figure and the fallback „5 m of D125 per diffuser" a constant. The
     # three rows stay where the drawing shows ventilation at all (diffusers counted, or the reading saw duct
     # marks), blank, each saying what to fill in; the diameter is his to write.
-    _vent_signal = (difuzoriai_n > 0 or difuzoriai_raw > 0
+    _vent_signal = (difuzoriai_n > 0
                     or any(float(symbols.get(k) or 0) > 0 for k in ("ortakiai_d100_m", "ortakiai_d125_m", "ortakiai_d160_m")))
     ortakiai_total = 0.0
     if _vent_signal:
@@ -5261,7 +5258,7 @@ def _build_pozicijos_from_rooms(parsed: dict) -> dict:
         # diffusers and 30 m of ducts, but they are grounds to ask the user
         # whether a duct needs boxing in. Hence `difuzoriai_raw` — the count
         # BEFORE the anchoring gate — and not the billable one.
-        if ortakiai_total > 0 or difuzoriai_raw > 0:
+        if _vent_signal or difuzoriai_raw > 0:
             pozicijos.append(_checklist(
                 SK_GKP, "Dėžutės montavimas ortakiams paslėpti — suveskite kiekį",
                 "vnt", "vėdinimo planas — ortakių trasos po lubomis (garažas, techninės patalpos)"))
@@ -5661,6 +5658,7 @@ def _cut_off_answers(meta) -> int:
 # Without it the corner metres are short by that whole term: objektas_a fell
 # from 465,58 to ~370 m (true 493,35) on 2026-10-07, when the answer was cut
 # off, and nothing on screen said so.
+ADJACENCY_REMOVED = "geometrija"   # v4 3b: no Vision adjacency pass; partition walls come from the drawing
 PARTITION_WALLS_UNREAD_CODE = "adjacency_unread"
 PARTITION_WALLS_UNREAD_MESSAGE = (
     "Kaimyninių patalpų sienų nustatyti nepavyko, todėl pertvarų kampai (sienų "
@@ -5677,7 +5675,9 @@ def _warn_partition_walls_unread(parsed: dict) -> bool:
     reader's own reason stays on the stored warning (`_reason`), off the
     screen. Returns whether it warned."""
     note = (parsed.get("_meta") or {}).get("adjacency")
-    if not isinstance(note, dict) or note.get("status") == "applied":
+    if not isinstance(note, dict) or note.get("status") == "applied" or note.get("reason") == ADJACENCY_REMOVED:
+        # v4 3b: there is no Vision pass to fail any more — partition walls come from the geometry (the rules
+        # worker's corner convention decides what an unread partition means)
         return False
     for r in parsed.get("patalpos") or []:
         try:
@@ -5904,55 +5904,9 @@ def _run_pass1_voted(client, system, pages, n, _emit, *,
             }
         return failed
 
-    # Adjacency: one shared pass on the RESOLVED floor-plan page (cached by image
-    # hash), applied to every run's rooms. Best-effort — failure leaves
-    # n_partition_walls unset, exactly the pre-voting production behaviour —
-    # but never silently: what became of the pass is recorded on the run's
-    # `_meta.adjacency`, and extract_interior warns when the rooms were left
-    # without partition walls (2026-10-07: a cut-off answer cost objektas_a
-    # ~18 % of its corner metres with no word on screen).
-    floor_b64, floor_idx = _resolve_floor_b64(pages, runs)
-    adj = None
-    adj_note: dict = {"status": "skipped", "reason": "no_floor_page"}
-    if floor_b64:
-        try:
-            from .vision.adjacency_extractor import extract_adjacency, apply_adjacency_to_rooms
-            adj = extract_adjacency(image_b64=floor_b64, client=client)
-            # T3 (2026-07-28 telemetry audit): this pass is a real, paid Vision
-            # call made once per extraction, and its usage was captured on the
-            # result but never merged into extra_calls — so every stored
-            # cost_eur silently omitted it. Appending to runs[0]["_meta"] is
-            # deliberate: the voted meta is built as {**runs[0]["_meta"], ...}
-            # below, and the 1-run path returns runs[0] itself, so a single
-            # append reaches BOTH exit paths exactly once. A cache-hit adjacency
-            # carries no tokens and _append_extra_call no-ops on it (correct —
-            # a cache hit costs nothing).
-            _append_extra_call(runs[0], getattr(adj, "_meta", None),
-                               reader="adjacency")
-            n_set = 0
-            for p in runs:
-                summary = apply_adjacency_to_rooms(p.get("patalpos") or [], adj)
-                n_set += (summary or {}).get("n_rooms_matched", 0)
-            print(f"[voting] adjacency on page {floor_idx}: matched rooms across runs={n_set}")
-            _emit({"event": "adjacency_applied", "page": floor_idx, "rooms_matched": n_set})
-            adj_note = {"status": "applied" if n_set else "no_room_matched",
-                        "page": floor_idx, "rooms_matched": n_set}
-            _n_cut = _cut_off_answers(getattr(adj, "_meta", None))
-            if _n_cut:   # it fitted only on the larger try
-                adj_note["cut_off_answers"] = _n_cut
-        except Exception as exc:
-            print(f"[voting] adjacency failed (n_partition_walls→0): {exc}")
-            # a refused / cut-off / unreadable answer was still billed — both
-            # answers when the cut-off retry ran (`_meta` on the exception)
-            _append_extra_call(runs[0], getattr(exc, "_meta", None), reader="adjacency")
-            _why = getattr(exc, "error", None)   # ModelStopped: "cut_off" / "refused:<category>"
-            adj_note = {"status": "failed", "page": floor_idx,
-                        "reason": (_why if isinstance(_why, str) and _why
-                                   else f"{type(exc).__name__}: {str(exc)[:200]}")}
-            _n_cut = _cut_off_answers(getattr(exc, "_meta", None))
-            if _n_cut:
-                adj_note["cut_off_answers"] = _n_cut
-    runs[0].setdefault("_meta", {})["adjacency"] = adj_note
+    # Adjacency (the Vision pass that counted each room's partition walls) is gone — v4 3b, 2026-10-25: which
+    # walls a room shares comes from the drawing's geometry (extractor/wall_adjacency.py, the geometry lane).
+    runs[0].setdefault("_meta", {})["adjacency"] = {"status": "skipped", "reason": ADJACENCY_REMOVED}
 
     def _attach_vote_meta(meta: dict) -> None:
         """Record per-round provenance: model/tokens/cost split (each round
@@ -7054,19 +7008,11 @@ def extract_interior(
             return False
         return True
 
-    # EXPERIMENT (SAMATU_ZOOM_AGENTIC=1): route zoom through the model-driven
-    # crop loop instead of the fixed-bbox re-read. Same inputs (room dict) and
-    # same ZoomResult output schema → _apply_zoom_refinements untouched.
-    _zoom_agentic_on = _zoom_agentic_enabled()
-    _agentic_render_cache: dict = {}   # (page, dpi) → PIL image, shared across rooms
-    _agentic_rooms_meta: list[dict] = []
-
     _zoomable = [r for r in rooms
                  if r.get("bbox_pct") and r.get("puslapio_nr")
                  and not _can_skip_zoom(r)]
     _emit({"event": "zoom_started", "total": len(_zoomable),
-           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r)),
-           "agentic": _zoom_agentic_on})
+           "skipped_via_eksplikacija": sum(1 for r in rooms if _can_skip_zoom(r))})
     for idx, room in enumerate(rooms, start=1):
         bbox = room.get("bbox_pct")
         page_nr = room.get("puslapio_nr")
@@ -7076,35 +7022,21 @@ def extract_interior(
         if _can_skip_zoom(room):
             zoom_count_skipped += 1
             continue
-        if _zoom_agentic_on:
-            from .agentic_crop import agentic_zoom_room
-            zoom_count_attempted += 1
-            _emit({
-                "event": "zoom_room_started",
-                "idx": zoom_count_attempted,
-                "total": len(_zoomable),
-                "room_nr": room.get("nr"),
-                "pavadinimas": room.get("pavadinimas"),
-            })
-            zoom_result, _zmeta = agentic_zoom_room(
-                client, pdf_bytes, room, render_cache=_agentic_render_cache)
-            _agentic_rooms_meta.append({"room_nr": room.get("nr"), **_zmeta})
-        else:
-            cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
-            if not cropped:
-                continue
-            zoom_count_attempted += 1
-            _emit({
-                "event": "zoom_room_started",
-                "idx": zoom_count_attempted,
-                "total": len(_zoomable),
-                "room_nr": room.get("nr"),
-                "pavadinimas": room.get("pavadinimas"),
-            })
-            zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
-            # Roll this zoom call's tokens into extra_calls (was discarded before
-            # 2026-07-04) — even a null/parse-fail result still billed tokens.
-            _append_extra_call(parsed, _zmeta, reader="zoom")
+        cropped = _crop_room_image(pdf_bytes, page_nr, bbox)
+        if not cropped:
+            continue
+        zoom_count_attempted += 1
+        _emit({
+            "event": "zoom_room_started",
+            "idx": zoom_count_attempted,
+            "total": len(_zoomable),
+            "room_nr": room.get("nr"),
+            "pavadinimas": room.get("pavadinimas"),
+        })
+        zoom_result, _zmeta = _vision_zoom_room(client, cropped, room)
+        # Roll this zoom call's tokens into extra_calls (was discarded before
+        # 2026-07-04) — even a null/parse-fail result still billed tokens.
+        _append_extra_call(parsed, _zmeta, reader="zoom")
         if not zoom_result:
             _emit({
                 "event": "zoom_room_completed",
@@ -7165,30 +7097,8 @@ def extract_interior(
     parsed["_meta"]["zoom_skipped_via_eksplikacija"] = zoom_count_skipped
     parsed["_meta"]["zoom_applied"] = zoom_count_applied
     parsed["_meta"]["zoom_elapsed_s"] = zoom_elapsed
-    if _zoom_agentic_on:
-        # Cost metering (2026-07-04): roll every agentic-zoom room's per-turn
-        # tokens into extra_calls so the single per-extraction usage_event prices
-        # them (each room's meta already carries its own model + summed tokens).
-        for _m in _agentic_rooms_meta:
-            _append_extra_call(parsed, _m, reader="zoom")
-        # Provenance for the agentic-zoom experiment: per-room loop stats
-        # (crops, turns, tokens, refusals/aborts) + aggregates.
-        parsed["_meta"].setdefault("experiment", {})["agentic_zoom"] = {
-            "rooms": _agentic_rooms_meta,
-            "crops_served_total": sum(m.get("crops_served", 0)
-                                      for m in _agentic_rooms_meta),
-            "api_turns_total": sum(m.get("api_turns", 0)
-                                   for m in _agentic_rooms_meta),
-            "input_tokens_total": sum(m.get("input_tokens", 0)
-                                      for m in _agentic_rooms_meta),
-            "output_tokens_total": sum(m.get("output_tokens", 0)
-                                       for m in _agentic_rooms_meta),
-            "aborted_rooms": [m["room_nr"] for m in _agentic_rooms_meta
-                              if m.get("outcome") not in ("ok",)],
-        }
     print(f"[extractor] zoom pass: {zoom_count_attempted} attempted, "
-          f"{zoom_count_applied} applied, {zoom_elapsed}s"
-          + (" [agentic]" if _zoom_agentic_on else ""))
+          f"{zoom_count_applied} applied, {zoom_elapsed}s")
 
     # Step 2.85: APDAILOS READER (2026-05-27).
     # Read IŠKLOTINIŲ IR APDAILŲ PLANAS page (typically the last finish-schedule
@@ -7805,24 +7715,6 @@ def extract_interior(
     if rules_override is not None:
         parsed["_overrides"] = rules_override
 
-    # Step 6.5: Optional verify pass (gated by ENABLE_VERIFY_PASS).
-    # Runs Opus on the Pass-1 result, asks "what would you disagree with?".
-    # Result is ADVISORY — never auto-applied; surfaced to UI as suggestions.
-    # When the flag is OFF (default), this returns empty corrections fast.
-    try:
-        from .verify_pass import run_verify_pass
-        verify = run_verify_pass(
-            rooms=parsed.get("patalpos") or [],
-            pozicijos=parsed.get("pozicijos") or [],
-        )
-        parsed["_verify_pass"] = {
-            "corrections": verify.corrections,
-            "error": verify.error,
-        }
-    except Exception as exc:
-        # Never break extraction over an advisory pass.
-        parsed["_verify_pass"] = {"corrections": [], "error": str(exc)}
-
     # Step 7: Finalize
     elapsed = round(time.time() - t0, 1)
     if "_meta" in parsed:
@@ -7834,26 +7726,3 @@ def extract_interior(
     parsed["status"] = "ok"
 
     return parsed
-
-
-def vision_polygon_at_click(project_id: str, page_idx: int,
-                            click_xy_pct: list[float]) -> dict:
-    """Sprint 2 G1 hook. Returns a stub polygon centered at click + low
-    confidence; Sprint 4 wires the real Pass-2 zoom Vision call.
-
-    The stub MUST return a valid 4-vertex CW polygon so frontend integration
-    can proceed. Mocked in tests via patch().
-    """
-    cx, cy = click_xy_pct
-    # 20% page-width square as a placeholder room outline
-    half = 0.10
-    return {
-        "polygon_pct": [
-            [max(0.0, cx - half), max(0.0, cy - half)],
-            [max(0.0, cx - half), min(1.0, cy + half)],
-            [min(1.0, cx + half), min(1.0, cy + half)],
-            [min(1.0, cx + half), max(0.0, cy - half)],
-        ],
-        "room_name_guess": None,
-        "confidence": "low",
-    }

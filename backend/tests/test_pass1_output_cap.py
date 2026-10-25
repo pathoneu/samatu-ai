@@ -182,9 +182,6 @@ def _stub_rounds(monkeypatch, seq):
     seq = list(seq)
     monkeypatch.setattr(vision_call, "_run_pass1_once",
                         lambda *a, **k: json.loads(json.dumps(seq.pop(0))))
-    import extractor.vision.adjacency_extractor as ax
-    monkeypatch.setattr(ax, "extract_adjacency", lambda **_k: None)
-    monkeypatch.setattr(ax, "apply_adjacency_to_rooms", lambda *_a, **_k: {})
 
 
 def _ok(extra_meta=None):

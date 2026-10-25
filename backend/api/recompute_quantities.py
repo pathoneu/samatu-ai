@@ -90,9 +90,9 @@ _ASSUMPTION_FIELDS = {
     # vidaus_durys: bool}; read by universal_rules.settle_reveals_scope. Scope, not a reading: the drawing
     # shows the openings, the contractor decides which reveals are his.
     "angokrasciai_apimtis",
-    # 2026-10-06: is an LED niche length estimated from the room type billed? True once he chose
-    # „Priimti įvertinimą" in Nustatymai; read by niche_inference.estimate_accepted. Every room's billed
-    # metres are rebuilt below (vision_call.refresh_led_metres), the same way the other two paths do.
+    # 2026-10-06 → 2026-10-25: his answer to the room-type LED niche estimate. The estimate is gone (v4 3b,
+    # the LED rows take the drawing's legend or stay blank); the field is still accepted from older pages
+    # and read by nothing.
     "led_nisu_ivertinimas",
 }
 _GESTURE_FIELDS = {

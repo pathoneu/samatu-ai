@@ -56,8 +56,8 @@ def test_bug2_calc_echoes_measured_door_area():
     """The Vision-measured per-door area must appear in the output dict so the
     merger persists it (it is not a PRIMITIVE_KEY and not otherwise stored)."""
     room = {
-        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-        "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0,
+        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+        "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
         "door_area_m2": 1.40,   # measured, distinct from the 1.85 default
     }
     out = calc_room_quantities(room)
@@ -70,8 +70,8 @@ def test_bug2_measured_door_area_survives_recompute_roundtrip():
     unless calc echoes it. A subsequent recompute must then reuse the measured
     1.40 m² door, not the 1.85 m² fallback."""
     primitives = {
-        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-        "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0,
+        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+        "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
     }
     calc_input = {**primitives, "door_area_m2": 1.40}  # from _elementai_to_counts
     out1 = calc_room_quantities(calc_input)
@@ -87,8 +87,8 @@ def test_bug2_measured_door_area_survives_recompute_roundtrip():
 def test_bug2_calc_echoes_measured_window_area():
     """Same latent bug for window_area_m2 (symmetric with door_area_m2)."""
     room = {
-        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0,
-        "lubu_aukstis_m": 2.7, "n_doors": 0, "n_windows": 1,
+        "paskirtis": "gyvenamoji", "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys",
+        "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 0, "n_windows": 1,
         "window_area_m2": 0.72,   # measured, distinct from the 1.80 default
     }
     out = calc_room_quantities(room)
@@ -143,8 +143,8 @@ def test_bug3_legacy_path_deducts_the_tiled_band_from_paint():
     branch agrees: paint = gross − openings − tiled zone, where the part of
     the openings that lies inside the band is not subtracted twice."""
     room = {
-        "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0,
-        "lubu_aukstis_m": 2.7, "n_doors": 1, "n_windows": 0,
+        "paskirtis": "vonia", "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys",
+        "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
         # no sienu_apdailos_breakdown, no _tile_area_from_elevation_m2 → legacy
     }
     out = calc_room_quantities(room)
@@ -171,7 +171,7 @@ def test_bug4_sub3m_room_above3m_surfaces_go_to_virs_line():
     Objektas A room-110 pattern (47.44 m² wall + 12.28 m² ceiling above 3 m)."""
     room = _computed({
         "nr": "B", "paskirtis": "koridorius", "plotas_m2": 20.0,
-        "perimetras_m": 18.0, "lubu_aukstis_m": 2.8, "n_doors": 1, "n_windows": 0,
+        "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
         "extra_walls_virs_3m_m2": 30.0, "high_ceiling_area_m2": 10.0,
     })
     split = _paint_split_lines([room])
@@ -186,7 +186,7 @@ def test_bug4_fully_high_room_still_all_virs():
     (the fix must not demote fully-high rooms to iki)."""
     room = _computed({
         "nr": "H", "paskirtis": "valgomasis", "plotas_m2": 30.0,
-        "perimetras_m": 22.0, "lubu_aukstis_m": 3.4, "n_doors": 1, "n_windows": 0,
+        "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 3.4, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
     })
     split = _paint_split_lines([room])
     total = float(room["walls_paintable_m2"]) + float(room["ceiling_paintable_m2"])
@@ -199,7 +199,7 @@ def test_bug4_plain_sub3m_room_all_iki():
     single iki line, no virš."""
     room = _computed({
         "nr": "L", "paskirtis": "miegamoji", "plotas_m2": 15.0,
-        "perimetras_m": 16.0, "lubu_aukstis_m": 2.8, "n_doors": 1, "n_windows": 0,
+        "perimetras_m": 16.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas", "n_doors": 1, "n_windows": 0,
     })
     split = _paint_split_lines([room])
     assert split["virs"] == 0.0, split

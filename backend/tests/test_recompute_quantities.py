@@ -51,7 +51,7 @@ def test_recompute_paint_formula_class_2_walls_100m2():
 def _living_room(nr="1", h=2.8):
     return {
         "nr": nr, "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-        "plotas_m2": 30.0, "perimetras_m": 22.0, "lubu_aukstis_m": h,
+        "plotas_m2": 30.0, "perimetras_m": 22.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": h,
         "elementai": [{"tipas": "duris", "kiekis": 1, "plotis_mm": 900, "aukstis_mm": 2100}],
     }
 
@@ -232,9 +232,9 @@ def test_recompute_interior_tolerates_malformed_room():
     payload = {
         "patalpos": [
             {"nr": "1", "pavadinimas": "Bloga", "paskirtis": "gyvenamoji",
-             "plotas_m2": "12,5", "perimetras_m": 14, "lubu_aukstis_m": 2.8},  # comma-decimal → calc raises
+             "plotas_m2": "12,5", "perimetras_m": 14, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas"},  # comma-decimal → calc raises
             {"nr": "2", "pavadinimas": "Gera", "paskirtis": "gyvenamoji",
-             "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.8},
+             "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas"},
         ],
     }
     r = client.post("/recompute-interior", json=payload)
@@ -264,7 +264,7 @@ def test_recompute_invalid_field_returns_400():
 def test_walls_paint_override_paints_raw_garage():
     from api.recompute_quantities import _apply_assumption_edits
     room = {"nr": "105", "pavadinimas": "Garažas", "paskirtis": "garazas",
-            "plotas_m2": 10.67, "perimetras_m": 13.5, "lubu_aukstis_m": 3.4,
+            "plotas_m2": 10.67, "perimetras_m": 13.5, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 3.4, "lubu_aukstis_saltinis": "plano_uzrasas",
             "walls_paintable_m2": 0.0}
     out = _apply_assumption_edits([dict(room)], {"walls_paint_override": {"105": 1.0}})[0]
     assert out.get("walls_paintable_m2", 0) > 20, out.get("walls_paintable_m2")
@@ -274,7 +274,7 @@ def test_walls_paint_override_paints_raw_garage():
 def test_walls_paint_override_unpaints_living_room():
     from api.recompute_quantities import _apply_assumption_edits
     room = {"nr": "1", "pavadinimas": "Svetainė", "paskirtis": "gyvenamoji",
-            "plotas_m2": 20.0, "perimetras_m": 18.0, "lubu_aukstis_m": 2.7,
+            "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas",
             "walls_paintable_m2": 45.0}
     out = _apply_assumption_edits([dict(room)], {"walls_paint_override": {"1": 0.0}})[0]
     assert out.get("walls_paintable_m2", 99) == 0.0, out.get("walls_paintable_m2")
@@ -284,7 +284,7 @@ def test_walls_paint_override_unpaints_living_room():
 def test_walls_paint_override_absent_leaves_room_untouched():
     from api.recompute_quantities import _apply_assumption_edits
     room = {"nr": "1", "paskirtis": "gyvenamoji", "plotas_m2": 20.0,
-            "perimetras_m": 18.0, "lubu_aukstis_m": 2.7, "walls_paintable_m2": 45.0}
+            "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.7, "lubu_aukstis_saltinis": "plano_uzrasas", "walls_paintable_m2": 45.0}
     out = _apply_assumption_edits([dict(room)], {})[0]
     assert out.get("walls_paintable_m2") == 45.0
     assert "_walls_paint_override" not in out
