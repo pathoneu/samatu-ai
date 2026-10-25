@@ -80,7 +80,8 @@ def test_every_parameter_is_named_documented_and_has_its_default_among_the_choic
         assert p.name == name and p.source.strip() and p.doc.strip()
         if name != "wet_room_markers":
             assert p.default in p.choices, name
-    assert LT_RANGOVAS["aperture_no_deduct_max_m2"].default == UNIVERSAL_RULES["openings_threshold_m2"]
+    assert LT_RANGOVAS["aperture_no_deduct_max_m2"].default == 3.0           # rangovo taisyklė 2026-10-25
+    assert 1.0 in LT_RANGOVAS["aperture_no_deduct_max_m2"].choices            # the older LT rule stays an option
     assert LT_RANGOVAS["hidro_rows"].default == "two"            # founder decision 2026-10-24
     assert "skalbykla" not in LT_RANGOVAS["wet_room_markers"].default
 
@@ -100,12 +101,12 @@ def test_overrides_are_validated_and_unknown_keys_ignored():
 
 def test_aperture_threshold_three_keeps_a_door_in_the_wall():
     room = _rooms()[1]                                   # one 0,8 × 2,1 = 1,68 m² door
-    base = _calc(room)
-    alt = _calc(room, {"aperture_no_deduct_max_m2": 3.0})
-    assert base["doors_deducted_m2"] > 0
-    assert alt["doors_deducted_m2"] == 0
-    assert alt["walls_paintable_m2"] > base["walls_paintable_m2"]
-    assert _calc(room, {"aperture_no_deduct_max_m2": 1.0}) == base
+    base = _calc(room)                                   # default 3,0 (rangovo taisyklė 2026-10-25)
+    old = _calc(room, {"aperture_no_deduct_max_m2": 1.0})
+    assert old["doors_deducted_m2"] > 0
+    assert base["doors_deducted_m2"] == 0
+    assert base["walls_paintable_m2"] > old["walls_paintable_m2"]
+    assert _calc(room, {"aperture_no_deduct_max_m2": 3.0}) == base
 
 
 # ── skirting_door_deduct_m / skirting_waste ───────────────────────────────────

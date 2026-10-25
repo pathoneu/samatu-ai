@@ -76,6 +76,17 @@ def _reset_pdf_page_cache():
     clear()
 
 
+@pytest.fixture
+def lt_aperture_1m2(monkeypatch):
+    """Pin the older LT opening rule (an opening of 1,0 m² or more is deducted) for tests written to check the
+    MECHANICS of deducting a door or window. The `lt_rangovas` default became 3,0 m² on 2026-10-25 (rangovo
+    taisyklė); `tests/test_rules_profile.py` covers the default itself."""
+    import dataclasses
+    from rules import conventions
+    p = conventions.LT_RANGOVAS["aperture_no_deduct_max_m2"]
+    monkeypatch.setitem(conventions.LT_RANGOVAS, "aperture_no_deduct_max_m2", dataclasses.replace(p, default=1.0))
+
+
 def pytest_configure(config):
     """Register custom marks so pytest doesn't warn on first use.
     `integration` marks real-PDF / real-API tests. Nothing deselects it: CI

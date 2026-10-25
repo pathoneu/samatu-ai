@@ -329,8 +329,10 @@ class Param:
 KAMPAI_CONVENTIONS = ("visi", "vertikalus_lubos", "vertikalus", "isoriniai_angos", "isoriniai", "tik_lubos")
 
 LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
-    Param("aperture_no_deduct_max_m2", 1.0, (1.0, 3.0),
-          "LT practice (UNIVERSAL_RULES openings_threshold_m2); 3,0 m² = founder's alternative (plan §1 rule 2)",
+    Param("aperture_no_deduct_max_m2", 3.0, (3.0, 1.0),
+          "rangovo taisyklė, 2026-10-25 (founder decision; plan §1 rule 2) — 3,0 m²; the fit (2026-10-25-conventions-fit.md "
+          "§2) never contradicts it and every leave-one-out fold chooses it. 1,0 m² = the older LT practice "
+          "(UNIVERSAL_RULES openings_threshold_m2), kept as an option",
           "An opening smaller than this is not deducted from the wall face (≥ the value is deducted)."),
     Param("skirting_door_deduct_m", 0.85, (0.85, 0.90, "drawn"),
           "engine default since 2026-04 (0,85 m per door); 0,90 = founder's rule (plan §1 rule 3); "
