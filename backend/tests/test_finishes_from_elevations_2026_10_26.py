@@ -199,6 +199,35 @@ def test_tiles_without_a_layout_use_the_standard_band_and_say_so():
     assert out["walls_paintable_m2"] > 0                       # painted above the band, not tiled to the ceiling
 
 
+def test_drawn_zone_replaces_the_kitchen_ladder_band():
+    """A painting plan (no tile line in legend) paints a kitchen; an elevation draws a backsplash zone on
+    one wall. The ladder posts a kitchen counter band (3 m × 0,6 m); the fix of 2026-10-26 keeps the drawn
+    zone and drops the band — the two were summed before, double-counting the backsplash."""
+    # a 2,0 × 0,6 m backsplash on a 4 m wall (half the kitchen's north wall)
+    zone = {"siena": "x1–x2", "klase": "plyteles", "plotis_m": 2.0, "aukstis_m": 0.6, "plotas_m2": 1.2, "page": 11}
+    rec = _record({"dazymas": 11.0}, konturas=14.0, nepazymeta=3.0, legenda=("dazymas",),
+                  sienos={"x1–x2": {"ilgis_m": 4.0, "klases": {"dazymas": 4.0}}},
+                  zonos=[zone])
+    out = calc_room_quantities(_room(rec, paskirtis="virtuve"))
+    # tile = the drawn zone only, no 3 m × 0,6 m ladder band on top
+    assert out["plyteles_sienos_m2"] == pytest.approx(1.2, abs=0.01)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "pakeista išklotinėje nubraižytais plytelių laukais" in notes
+
+
+def test_drawn_zone_replaces_the_bathroom_ladder_band_without_a_plan_tile_line():
+    """A bathroom without a plan tile line (legend keys paint only) and one drawn zone: the paskirtis
+    ladder would post a 1,2 m band × perimeter; the fix drops the band and keeps the zone."""
+    zone = {"siena": "x1–x2", "klase": "plyteles", "plotis_m": 1.5, "aukstis_m": 1.2, "plotas_m2": 1.8, "page": 11}
+    rec = _record({"dazymas": 10.0}, konturas=12.0, nepazymeta=2.0, legenda=("dazymas",),
+                  sienos={"x1–x2": {"ilgis_m": 2.0, "klases": {"dazymas": 2.0}}},
+                  zonos=[zone])
+    out = calc_room_quantities(_room(rec, paskirtis="vonia", perimetras_m=12.0))
+    assert out["plyteles_sienos_m2"] == pytest.approx(1.8, abs=0.01)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "pakeista išklotinėje nubraižytais plytelių laukais" in notes
+
+
 def test_painting_plan_without_tiles_keeps_the_tile_ladder():
     # a „sienų dažymo planas" keys paint only: a bathroom it paints along 3 m keeps its tile band from the ladder,
     # but the band does not run along the painted wall
