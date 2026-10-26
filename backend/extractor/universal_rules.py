@@ -2981,36 +2981,53 @@ def calc_room_quantities(room: dict,
     ceiling_paint_override = room.get("ceiling_paint_override")
     walls_marked_unpainted = (walls_paint_factor_override is not None
                               and float(walls_paint_factor_override) <= 0)
-    ceiling_unfinished = (
+    # "medis" = the wood lining of a pirtis — a material statement, independent
+    # of the walls. "medis" can ONLY come from ROOM_TYPE_RULES, so a ceiling
+    # actually READ off a drawing never lands here. (2026-10-26 fix: the v4
+    # wall-paint fallback flips walls_paint_factor to 1.0 for a pirtis with no
+    # finish data, which used to shut this gate and bill the wood ceiling as
+    # painted; the wood ceiling stays out of paint regardless of what the walls
+    # do.)
+    ceiling_unfinished_wood = (
+        ceiling_paint_override is None
+        and ceiling_type == "medis"
+        and not is_full_tile
+        and gkp_extra_area_m2 <= 0
+    )
+    # "betonas" = raw slab (garažas / tambūras / terasa) — follows the walls:
+    # if the walls aren't painted, neither is the slab.
+    ceiling_unfinished_betonas = (
         ceiling_paint_override is None
         and rt_rules.get("walls_paint") == 0.0
         and walls_paint_factor == 0.0
         and (walls_paint_factor_override is None or walls_marked_unpainted)
         and not is_full_tile
-        # "betonas" = raw slab (garažas / tambūras / terasa); "medis" = the
-        # wood lining of a pirtis. Both are surfaces the painter never touches,
-        # and neither is a Vision `lubu_tipas` value — "medis" can ONLY come
-        # from ROOM_TYPE_RULES, so a ceiling actually READ off a drawing can
-        # never fall into this branch by accident. (2026-08-23)
-        and ceiling_type in ("betonas", "medis")
+        and ceiling_type == "betonas"
         and gkp_extra_area_m2 <= 0
     )
+    ceiling_unfinished = ceiling_unfinished_wood or ceiling_unfinished_betonas
     if ceiling_paint_override is not None and not bool(ceiling_paint_override):
         ceiling_paintable = 0.0
         ceiling_paint_source = "override_off"
     elif ceiling_unfinished:
         ceiling_paintable = 0.0
         ceiling_paint_source = "unfinished_room_standard"
-        ceiling_is = ("lubos dengiamos medžiu" if ceiling_type == "medis"
-                      else "lubos — neapdailinta betoninė perdanga")
-        # Why the walls are bare: his own choice, or no finish on the drawing.
-        walls_why = ("o sienas pažymėjote kaip nedažomas" if walls_marked_unpainted
-                     else "o brėžinyje šios patalpos apdailos nerasta (sienos "
-                          "taip pat nedažomos)")
-        ceiling_finish_notes.append(
-            f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
-            f"{ceiling_is}, {walls_why}. Patikrinkite lubų plane; jei lubos glaistomos "
-            f"ir dažomos, pataisykite lubų dažymo kiekį sąmatoje.")
+        if ceiling_type == "medis":
+            ceiling_finish_notes.append(
+                f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+                f"lubos dengiamos medžiu — jų neglaistome ir nedažome. "
+                f"Patikrinkite lubų plane; jei lubos glaistomos ir dažomos, "
+                f"pataisykite lubų dažymo kiekį sąmatoje.")
+        else:
+            # Why the walls are bare: his own choice, or no finish on the drawing.
+            walls_why = ("o sienas pažymėjote kaip nedažomas" if walls_marked_unpainted
+                         else "o brėžinyje šios patalpos apdailos nerasta (sienos "
+                              "taip pat nedažomos)")
+            ceiling_finish_notes.append(
+                f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+                f"lubos — neapdailinta betoninė perdanga, {walls_why}. "
+                f"Patikrinkite lubų plane; jei lubos glaistomos ir dažomos, "
+                f"pataisykite lubų dažymo kiekį sąmatoje.")
     elif ceiling_paint_override is not None:
         ceiling_paint_source = "override_on"
     else:
