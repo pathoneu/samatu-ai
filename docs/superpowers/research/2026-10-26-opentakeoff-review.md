@@ -16,3 +16,13 @@ Source: github.com/Kentucky-ai/opentakeoff — browser-only takeoff canvas (pdf.
 
 ## Leave
 MCP/agent layer, feet-inches, client-only architecture, the US schedule importer (our finish-table reader covers the LT format), roll-goods seam layout, materials buy list (we have Medžiagos).
+
+## Measured 2026-10-26: named layers (OCGs) in our drawings
+| drawing | layers | examples |
+|---|---|---|
+| objektas_a (and the founder's fresh upload of it) | 387 | -BALDAI, -ISKLOTINES, -JUNGIKLIAI, -LUBOS, -ROZETES, -SVIESTUVAI, -TEKSTAS, A-DETL, G-ANNO-SCHD |
+| objektas_i (both uploads) | 102 | SIENOS, Langai, SANTECHNIKA, a_baldai, TEKSTAS, Int_linija |
+| objektas_g | 18 | Interior - Furniture, MEP - Elektros planai, Structural - Bearing, _02_Pertvarų planai, _01 Santechnikos planas, _00_LUBOS |
+| objektas_h, objektas_d | 0 | flattened exports |
+
+Consequence: on 4 of 6 corpus drawings and on the contractor's, a path's layer says wall / window / furniture / light / socket / išklotinė / text. Next engine step after finishes: a layer-roles reader in the vector lane (walls = SIENOS/Structural, furniture excluded, lights counted per layer, text layer for OCR-free labels). **License:** the listing above used pymupdf (AGPL) in a scratch venv — never in the backend; production reads layer membership through PDFium marked content (pypdfium2 raw API) or pikepdf (MPL).
