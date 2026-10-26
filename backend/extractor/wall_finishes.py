@@ -24,11 +24,10 @@ Frame: DISPLAY points (origin top-left, /Rotate applied) — the frame of `pdf_v
 """
 from __future__ import annotations
 
-import math
 import re
 from typing import Sequence
 
-from shapely.geometry import LineString, MultiLineString, Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from . import pdf_vectors
@@ -170,8 +169,8 @@ def find_finish_sheets(pdf_bytes: bytes, pages: Sequence[int]) -> dict[int, dict
     return out
 
 
-def _class_lines(pdf_bytes: bytes, page: int, legend: dict) -> dict[str, object]:
-    """{klase: MultiLineString} — every drawn piece in a legend colour, outside the legend itself."""
+def _class_lines(pdf_bytes: bytes, page: int, legend: dict) -> dict[str, list]:
+    """{klase: [LineString, …]} — every drawn piece in a legend colour, outside the legend itself."""
     paths = pdf_vectors.page_paths(pdf_bytes, page, strokes=True)
     box = legend.get("box")
     pieces: dict[str, list] = {}
