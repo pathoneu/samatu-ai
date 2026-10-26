@@ -2227,7 +2227,7 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
         tile_h = min(tile_h, H)
         tile_share = frac.get("plyteles", 0.0)
         tile_band = tile_share * perim_walls * tile_h
-        above = tile_share * perim_walls * max(0.0, H - tile_h)      # painted above a band below the ceiling
+        paint_adjust = tile_share * perim_walls * max(0.0, H - tile_h)      # painted above a band below the ceiling
         is_full_tile = tile_band > 0 and is_full_tile_walls(tile_share, tile_h, H)
     else:
         tile_h = float(tr.get("height_m") or 0)
@@ -2237,7 +2237,8 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
         tile_band = tile_share * perim_walls * tile_h
         if tile_share >= 0.99:
             tile_band = min(tile_band, max(0.0, 1.0 - paint_frac) * perim_walls * tile_h)
-        above = 0.0
+        # what of the band lies on walls the plan paints (a backsplash on a painted kitchen wall) is not painted
+        paint_adjust = -max(0.0, tile_band - max(0.0, 1.0 - paint_frac) * perim_walls * tile_h)
         is_full_tile = bool(tr.get("is_full_tile")) and paint_frac <= 0
         if tr.get("assumption"):
             notes.append(tr["assumption"])
@@ -2264,7 +2265,7 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     tile_m2 = tile_band + zone_tile
     base = max(0.0, wall_area_available - max(0.0, float(windows_m2 or 0)))
     molio_m2 = (frac.get("molio_tinkas", 0.0) + frac.get("kita_danga", 0.0)) * base
-    paint = max(0.0, paint_frac * base + above - zone_on_paint)
+    paint = max(0.0, paint_frac * base + paint_adjust - zone_on_paint)
     if is_full_tile:
         paint = 0.0
     unfinished_m = float(rec.get("nepazymeta_m") or 0)
