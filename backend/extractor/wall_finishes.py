@@ -63,7 +63,7 @@ MARKER_REACH_M = 1.0       # an elevation marker label stands this close to the 
 PARALLEL_COS = 0.5         # a line segment runs along a face when within 60° of it (a wavy line's zigzags too)
 DASH_GAP_M = 0.12          # a point in a dash gap reaches the next dash along the face no further than this
 GAP_FILL_M = 0.35           # a stretch with no line this short beside a finished one is the line stopping short
-MIN_CLASS_M = 0.3          # a finish along less of a room's outline than this is a neighbour's line round a corner
+MIN_CLASS_M = 0.6          # a finish along less of a room's outline than this is a neighbour's line overshooting a shared corner
 FACE_COVER_MIN = 0.10      # a face the lines cover less than this share of is one the plan does not finish…
 FACE_UNFINISHED_MIN_M = 0.5  # …when, without its openings, at least this much wall is left
 
@@ -211,7 +211,9 @@ def _room_segments(lines: dict[str, list], zone: Polygon) -> dict[str, tuple]:
                 if L <= 0:
                     continue
                 seg = LineString([a, b])
-                if not seg.intersects(zone):
+                # the segment's middle in the room's zone: a neighbour's line reaching round a shared corner, or a
+                # dash that crosses the corner, is not this room's
+                if not zone.contains(Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)):
                     continue
                 segs.append(seg)
                 dirs.append(((b[0] - a[0]) / L, (b[1] - a[1]) / L))
@@ -242,12 +244,12 @@ def _nearest_class(p: Point, mine: dict, reach: float, direction: tuple[float, f
     the next wall's line round a corner is no finish here: its long edges cross the face, its short end is reached
     along the face from further than a gap."""
     from shapely.ops import nearest_points
-    best, bd = None, reach
+    found: dict[str, float] = {}
     for k, (tree, segs, dirs) in mine.items():
-        for i in tree.query(p.buffer(bd)):
+        for i in tree.query(p.buffer(reach)):
             seg = segs[int(i)]
             d = seg.distance(p)
-            if d > bd:
+            if d > reach or d >= found.get(k, reach + 1):
                 continue
             if direction is not None:
                 ux, uy = dirs[int(i)]
@@ -260,8 +262,12 @@ def _nearest_class(p: Point, mine: dict, reach: float, direction: tuple[float, f
                     across = abs(vx * direction[1] - vy * direction[0])
                     if along > max(across, slack):
                         continue
-            best, bd = k, d
-    return best
+            found[k] = d
+    if not found:
+        return None
+    if "plyteles" in found:
+        return "plyteles"
+    return min(found, key=found.get)
 
 
 def _along(line: LineString, mine: dict, step: float, reach: float, debug: list | None = None,
