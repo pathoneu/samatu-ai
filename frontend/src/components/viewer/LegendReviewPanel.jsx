@@ -8,6 +8,7 @@
  * ONE „Sukurti kiekius (N)" at the bottom — nothing exists before it.
  */
 import { useState } from 'react';
+import { useTranslation } from '@/i18n/react';
 import { Check, Loader2, PenLine, RotateCcw, Ruler, Trash2, Undo2, X } from 'lucide-react';
 import { useScroll } from '@embedpdf/plugin-scroll/react';
 import { API_BASE } from '@/lib/apiBase';
@@ -191,6 +192,7 @@ function Outcome({ outcome, onRetry }) {
 }
 
 export default function LegendReviewPanel({ documentId, projectId, legend, onMeasure }) {
+  const { t } = useTranslation();
   const { provides: scrollApi, state: scrollState } = useScroll(documentId);
   const toPage = (page) => scrollApi?.scrollToPage({ pageNumber: page, behavior: 'smooth' });
   const pages = scrollState?.totalPages || null;
@@ -210,6 +212,11 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {legend.frameHint && (legend.phase === 'proposed' || legend.phase === 'box') && (
+          <p className="px-3 pt-3 text-[14px] font-medium leading-snug text-foreground" role="status" data-testid="legend-frame-hint">
+            {t('project.legendTool.frameTooSmall')}
+          </p>
+        )}
         {legend.phase === 'proposed' && (
           <p className="px-3 py-3 text-[14px] leading-snug text-ink-2">
             Brėžinyje brūkšniniu rėmeliu pažymėjau, kur, mano manymu, yra legenda. Jei tai ji — spauskite „Taip“ apačioje
@@ -218,6 +225,11 @@ export default function LegendReviewPanel({ documentId, projectId, legend, onMea
         )}
         {legend.phase === 'box' && (
           <>
+            {legend.proposals.length > 0 && (
+              <p className="px-3 pt-3 text-[14px] leading-snug text-ink-2" data-testid="legend-reference-note">
+                Brūkšninis rėmelis brėžinyje lieka kaip siūlymas — jei jis tinka, spauskite „Taip“.
+              </p>
+            )}
             {legend.outcome ? (
               <Outcome outcome={legend.outcome} onRetry={legend.retry} />
             ) : legend.notice ? (

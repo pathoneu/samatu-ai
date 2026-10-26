@@ -638,6 +638,7 @@
     }
   },
   "project": {
+    "legendTool": { "frameTooSmall": "Drag a frame around the legend — the symbols together with their names." },
     "confidence": {
       "highLabel": "accurate",
       "highMeaning": "Read directly from the drawing — sources agree.",
