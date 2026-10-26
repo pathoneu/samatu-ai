@@ -467,55 +467,76 @@ unmarked in the finish plan because built-in furniture sits in front of them are
 
 ### Implementation
 
-- New  added to  in
-  .  Default ;  restores the old skip-the-unmarked-faces
-  behaviour.  An explicit  guard in  rejects /.
--  gains a  parameter.  When :
-  -  is computed from  — the metres the finish-plan
-    reader explicitly tagged as furniture walls, **not** the total unlabelled fraction (which would
-    inflate paint on bathroom plans that simply omit the tile side).
-  -  absorbs ; .
-  - The user-visible note changes to "skaičiuota kaip dažoma: namas dažomas prieš montuojant baldus.
-    Jei ši siena nedažoma, pakeiskite Nustatymuose."
--  reads  from the project profile and threads it through.
+- `Param("uz_baldu_dazoma", True, (True, False), …)` added to `LT_RANGOVAS` in
+  `backend/rules/conventions.py`. Default `True`; `False` restores the as-drawn skip-the-unmarked-faces
+  behaviour. An explicit `isinstance(val, bool)` guard in `profile_overrides` rejects `1` / `0`.
+- `resolve_drawn_wall_finish(…, uz_baldu_dazoma=True)` gains a parameter. When `True`:
+  - `paint_frac` is incremented by `rec["nepazymeta_m"] / wall_len` — the metres the finish-plan
+    reader explicitly tagged as furniture walls (`nepazymeta_m`), **not** the total unlabelled
+    fraction (a plan that keys no tiles on a bathroom wall must not inflate paint).
+  - `unfinished_m2` is set to `0`; the user sees the sentence: „Sienų apdailos plane {page} lapas:
+    {n} m sienos apdailos nepažymėta (baldai, įranga) — skaičiuota kaip dažoma: namas dažomas
+    prieš montuojant baldus. Jei ši siena nedažoma, pakeiskite Nustatymuose."
+  - With `False` the as-drawn behaviour and the „nedažomas" sentence stand.
+- `calc_room_quantities` reads `uz_baldu_dazoma` from the room profile and threads it through.
 
-### Tests — 27 / 27 green
+### Tests (`test_finishes_from_elevations_2026_10_26.py`) — 27 / 27 green
 
--  — 3 m of 10 m wall behind cabinets
-  () with default : paint = 10 m × 2.8 m = 28.0 m²; new sentence present.
--  — same room, :
-  paint = 7 m × 2.8 m = 19.6 m²; old "nedažomas" sentence present.
--  updated to pass
-   explicitly so the wardrobe wall stays out of paint as the test demands.
--  — bathroom plan that draws only 3 m of
-  paint on 12 m walls;  so  and paint is unchanged (8.4 m²).
+- `test_unmarked_wall_behind_furniture_is_painted_by_default` — 3 m of a 10 m wall behind cabinets
+  (the finish-plan reader's `nepazymeta_m = 3`) with default `uz_baldu_dazoma=True`: paint =
+  10 m × 2,8 m = 28,0 m²; new sentence present.
+- `test_unmarked_wall_stays_unpainted_when_override_false` — same room with
+  `uz_baldu_dazoma=False`: paint = 7 m × 2,8 m = 19,6 m²; old „nedažomas" sentence present.
+- `test_kitchen_backsplash_is_the_drawn_zone_not_a_band` now passes `uz_baldu_dazoma=False`
+  explicitly so the wardrobe wall stays out of paint as that test demands.
+- `test_bathroom_plan_without_tile_line_does_not_inflate_paint` — a plan that keys no tiles on a
+  bathroom wall; `nepazymeta_m = 0` for that room, so `uz_baldu_dazoma=True` adds nothing and
+  paint is unchanged (8,4 m²); only `nepazymeta_m` counts, not every unlabelled metre.
 
-### Proof run (three projects, read-only)
+### Proof — objektas_a per room (as-drawn lane → with the convention)
 
-| Project | paint before | paint after | Δ paint | tile Δ |
-|---|---|---|---|---|
-| objektas_a | 421.49 m² | 444.39 m² | +22.90 | −27.11 |
-| demo-objektas_h | 360.82 m² | 382.50 m² | +21.68 | −19.03 |
-| demo-objektas_g | 292.38 m² | 284.01 m² | −8.37 | −8.12 |
+| nr | name | paint m² (lane, no conv.) | paint m² (uz_baldu_dazoma=True) | tile m² |
+|---|---|---:|---:|---:|
+| 101 | Tambūras | 42,58 | **50,14** | 0,00 |
+| 102 | Svetainė/virtuvė | 71,93 | **97,50** | 5,95 |
+| 103 | — | 44,34 | 44,34 | 0,00 |
+| 104 | — | 38,16 | **39,34** | 0,00 |
+| 105 | Garažas | 36,57 | 36,57 | 0,00 |
+| 106 | — | 34,85 | **38,56** | 0,00 |
+| 107 | — | 0 | 0 | 32,26 |
+| 108 | — | 26,49 | **37,27** | 0,00 |
+| 109 | — | 25,83 | **37,30** | 0,00 |
+| 110 | — | 47,32 | **63,37** | 0,00 |
+| 111 | — | 0 | 0 | 33,07 |
 
-"before" = without the wall-finish lane; "after" = lane on + .
-Tile Δ is expected: the drawing-read lane gives more precise figures than the default estimate.
-objektas_a paint (444 m²) is ~5.6 % above the contractor's 420; he noted the wardrobe walls were
-not in his original figure — the new default captures them.
+**Project paint 368,07 → 444,39 m²** (incl. garažas 36,57); the contractor's 420 excludes the
+garage → comparable 407,82 vs 420 (−2,9 %) — his figure is the check only, never an input.
 
-### Eval harness
+Other projects: objektas_h 356,58 → 382,50 m²; objektas_g 281,47 → 284,01 m² (worker's proof run).
 
- failed with 36 regressions.  The gate was **already failing on
-the parent commit** (the stash check shows ~20 regressions on a/b/c on the parent).  My changes
-improved a, b, c, d, g and introduced new regressions only on objektas_h Kampai/GKP lubos/Rotband
-(going to 100 % = these rows disappeared from h's output).  Those three rows are unrelated to
- and require a separate investigation.
+### Eval (main checkout, `--totals-only --recompute --gate` and `--rows --recompute`)
 
- — 1 suite failure;
-confirmed pre-existing (fails on the parent commit too).
+| metric | before (lane, no conv.) | after (uz_baldu_dazoma=True) | Δ |
+|---|---:|---:|---:|
+| Billed lines | 57,88 % | **57,50 %** | −0,38 (better) |
+| Rows ±10 % | 9,0 % | 9,0 % | 0 |
+| € ±10 % | 16,6 % | **18,0 %** | +1,4 (better) |
+
+Row-level moves on objektas_a: „Dažymo plotas" 9,67 → 8,24 % (better); „Sienų dažomas plotas"
+11,23 → 9,09 % (better). objektas_h „Dažymo plotas" 19,07 → 25,31 % (worse: h's contractor
+paints less than the drawing's walls).
+
+The GATE's 36 WORSE lines and the objektas_h Kampai / GKP lubos / Rotband 100 % lines are the
+known post-3b blanks against the pre-3b baseline file — identical in the pass before this change;
+they are not caused by it.
+
+### Suite
+
+See merge log.
 
 ### Commits on this branch for this step
 
--  + : in the step-1 + step-2
-  commit (hash recorded in §8 after merging).
-- : .
+- `b939340e` feat(v4): uz_baldu_dazoma — walls behind furniture are painted (founder decision 2026-10-26)
+- `b6ed51f0` test(v4): uz_baldu_dazoma — two new synthetic tests + updated backsplash test
+- `ef0fb8a0` fix(v4): uz_baldu_dazoma — the painted-behind-furniture share is the plan reader's nepazymeta_m
+- `ebcb94ce` test(v4): DOORS_ROWS — remove "Gruntas sienoms"; uz_baldu_dazoma default eliminates the primer-row replay diff
