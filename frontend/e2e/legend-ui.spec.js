@@ -168,7 +168,18 @@ test.describe('legend marking (W2-B)', () => {
     await expect(pill.getByRole('button', { name: 'Nubrėžti kitaip' })).toBeVisible({ timeout: 60_000 });
     await pill.getByRole('button', { name: 'Nubrėžti kitaip' }).click();
     await expect(page.getByTestId('legend-review-panel')).toContainText('Tempdami apveskite legendą');
-    await expect(page.locator('[data-testid="legend-proposal"]')).toHaveCount(0);
+    // the proposal stays on the drawing as a dashed reference, its „Taip" still in the pill
+    await expect(page.locator('[data-testid="legend-layer-3"] [data-testid="legend-proposal"]').first()).toBeVisible();
+    await expect(pill.getByRole('button', { name: 'Taip' })).toBeVisible();
+    // a click and a 10 px drag are not frames: one short line, nothing sent, nothing pinned on the plan
+    const [p0] = await sheetPoints(page, 3, [[0.75, 0.5]]);
+    await clickAt(page, p0);
+    await expect(page.getByTestId('legend-frame-hint')).toContainText('Tempkite rėmelį aplink legendą');
+    await dragBetween(page, p0, { x: p0.x + 10, y: p0.y + 10 });
+    await expect(page.getByTestId('legend-frame-hint')).toHaveCount(1);
+    await expect(page.getByTestId('legend-busy')).toHaveCount(0);
+    await expect(page.locator('[data-testid="legend-drawn-box"]')).toHaveCount(0);
+    await expect(page.getByText('Čia legendos nėra')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('legend-review-panel')).toHaveCount(0);
     await expect(page.getByTestId('right-tab-patalpos')).toBeVisible();

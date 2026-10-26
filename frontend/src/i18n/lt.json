@@ -672,6 +672,7 @@
     }
   },
   "project": {
+    "legendTool": { "frameTooSmall": "Tempkite rėmelį aplink legendą — ženklus kartu su pavadinimais." },
     "confidence": {
       "highLabel": "tikslus",
       "highMeaning": "Nuskaityta tiesiai iš brėžinio — šaltiniai sutampa.",

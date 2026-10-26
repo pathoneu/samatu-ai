@@ -56,6 +56,20 @@ export function boxFromPctDrag(a, b, minSide = 0.01) {
   return box;
 }
 
+/**
+ * The smallest frame he can draw round a legend, in SCREEN pixels per side. Screen, not PDF points: the frame is
+ * aimed on the screen, and a point size would depend on the zoom and the sheet (A1 vs A4). 16 px is about the
+ * smallest thing a pointer aims at on purpose; a click or a slip of the hand is below it, a real legend (the signs
+ * with their names) is hundreds of pixels at any usable zoom. Below it the frame is NOT sent to the server.
+ */
+export const MIN_FRAME_PX = 16;
+
+/** Two drag corners (fractions) on a width x height px page: is the frame too small to be a legend? (a click is) */
+export function frameTooSmall(a, b, width, height, minPx = MIN_FRAME_PX) {
+  if (!a || !b || !(width > 0) || !(height > 0)) return true;
+  return Math.abs(b.x - a.x) * width < minPx || Math.abs(b.y - a.y) * height < minPx;
+}
+
 export function pointInBox(box, x, y) {
   return Array.isArray(box) && x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3];
 }
@@ -530,13 +544,13 @@ export function countingText(elapsedS = 0) {
  * The bottom pill for the legend tool. state = {phase, proposals (n), toCreate (n), blanks (n), notice, elapsed (s),
  * outcome ({text, retry}), gotoPage} → {id, name, detail, keys, actions}
  */
-export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, notice = null, elapsed = 0, outcome = null, gotoPage = null } = {}) {
+export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, notice = null, elapsed = 0, outcome = null, gotoPage = null, frameHint = null } = {}) {
   const name = 'Pažymėti legendą';
   const exit = { id: 'legendExit', label: 'Išeiti', title: 'Išeiti iš legendos įrankio (Esc) — niekas nesukuriama' };
   const retry = { id: 'legendRetry', label: 'Bandyti dar kartą', primary: true, title: 'Paleisti dar kartą' };
   if (phase === 'proposed') {
     return {
-      id: 'legend', name, detail: proposals > 1 ? `Tai legendos? (${proposals})` : 'Tai legenda?',
+      id: 'legend', name, detail: frameHint || (proposals > 1 ? `Tai legendos? (${proposals})` : 'Tai legenda?'),
       keys: 'Enter — taip · Esc — išeiti',
       actions: [
         { id: 'legendAccept', label: 'Taip', primary: true, title: 'Taip, tai legenda — skaityti jos eilutes ir skaičiuoti ženklus (Enter)' },
@@ -552,9 +566,11 @@ export function legendPill({ phase, proposals = 0, toCreate = 0, blanks = 0, not
   }
   if (phase === 'box') {
     const actions = [];
+    // drawing by hand: the proposal he turned down stays on the drawing, its "Taip" stays reachable
+    if (proposals > 0) actions.push({ id: 'legendAccept', label: 'Taip', primary: true, title: 'Taip, pasiūlytas rėmelis yra legenda — skaityti jos eilutes ir skaičiuoti ženklus (Enter)' });
     if (outcome?.retry) actions.push(retry);
-    if (gotoPage) actions.push({ id: 'legendGoto', label: `Į ${gotoPage} lapą`, primary: !outcome?.retry, title: `Eiti į ${gotoPage} lapą — ten yra legenda` });
-    return { id: 'legend', name, detail: outcome?.short || outcome?.text || notice || null, keys: null, actions: [...actions, exit] };
+    if (gotoPage) actions.push({ id: 'legendGoto', label: `Į ${gotoPage} lapą`, primary: !outcome?.retry && !proposals, title: `Eiti į ${gotoPage} lapą — ten yra legenda` });
+    return { id: 'legend', name, detail: frameHint || outcome?.short || outcome?.text || notice || null, keys: proposals > 0 ? 'Enter — taip · Esc — išeiti' : null, actions: [...actions, exit] };
   }
   if (phase === 'review' || phase === 'creating') {
     return {

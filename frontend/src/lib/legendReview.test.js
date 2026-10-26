@@ -5,7 +5,7 @@ import {
   initialReview, journalRows, keptInstances, legendCursorHint, legendLedgerText, legendPill, legendRowsToSave,
   LEGEND_PHASES, LEGEND_SOURCE, marksWord, matchSavedLegend, MAX_ACCEPTS_PER_ROW, perPage, perPageText, proposalsFrom,
   rowName, rowsOf, rowsToCreate, syncLegendRows, blankRows, blankSamataRow, BLANK_REASON,
-  BOX_EMPTY, boxFailureText, countingText, legendGotoPage, noLegendText, onSheetsText, requestErrorText, reviewOutcome, rowsWord, summaryText,
+  BOX_EMPTY, MIN_FRAME_PX, frameTooSmall, boxFailureText, countingText, legendGotoPage, noLegendText, onSheetsText, requestErrorText, reviewOutcome, rowsWord, summaryText,
 } from './legendReview.js';
 
 const A3 = { size: { width: 1000, height: 500 }, rotation: 0 };
@@ -292,4 +292,31 @@ test('while it works the pill counts the seconds; a failure offers „Bandyti da
   const review = legendPill({ phase: 'review', toCreate: 0, outcome: { retry: true, short: 'Ženklų suskaičiuoti nepavyko' } });
   assert.deepEqual(review.actions.map((a) => a.id), ['legendRetry', 'legendCreate', 'legendRedraw', 'legendExit']);
   assert.equal(legendPill({ phase: 'review', toCreate: 2, outcome: { short: 'Rasta 2 eilutės, 3 ženklai 2 lapuose' } }).detail, 'Rasta 2 eilutės, 3 ženklai 2 lapuose');
+});
+
+test('frameTooSmall: a click or a few-pixel drag is not a legend frame; a real frame is', () => {
+  const W = 1000;
+  const H = 700;
+  const a = { x: 0.2, y: 0.2 };
+  assert.equal(MIN_FRAME_PX, 16);
+  assert.equal(frameTooSmall(a, a, W, H), true);
+  assert.equal(frameTooSmall(a, { x: 0.2 + 10 / W, y: 0.4 }, W, H), true);
+  assert.equal(frameTooSmall(a, { x: 0.5, y: 0.2 + 15 / H }, W, H), true);
+  assert.equal(frameTooSmall(a, { x: 0.2 + 17 / W, y: 0.2 + 17 / H }, W, H), false);
+  assert.equal(frameTooSmall(a, { x: 0.5, y: 0.5 }, W, H), false);
+  assert.equal(frameTooSmall({ x: 0.5, y: 0.5 }, a, W, H), false);
+  assert.equal(frameTooSmall(null, a, W, H), true);
+  assert.equal(frameTooSmall(a, a, 0, 0), true);
+});
+
+test('legendPill: drawing by hand keeps the proposal Taip reachable and shows the frame hint as one line', () => {
+  const hand = legendPill({ phase: 'box', proposals: 1 });
+  assert.equal(hand.actions[0].id, 'legendAccept');
+  assert.equal(hand.actions[0].label, 'Taip');
+  assert.ok(hand.actions.some((x) => x.id === 'legendExit'));
+  assert.equal(legendPill({ phase: 'box', proposals: 0 }).actions.some((x) => x.id === 'legendAccept'), false);
+  const hint = 'Tempkite rėmelį aplink legendą — ženklus kartu su pavadinimais.';
+  assert.equal(legendPill({ phase: 'box', proposals: 1, frameHint: hint }).detail, hint);
+  assert.equal(legendPill({ phase: 'proposed', proposals: 1, frameHint: hint }).detail, hint);
+  assert.equal(legendPill({ phase: 'box', proposals: 1, frameHint: hint }).actions.length, hand.actions.length);
 });

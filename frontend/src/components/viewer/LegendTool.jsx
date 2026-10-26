@@ -15,14 +15,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   BOX_EMPTY, boxFailureText, boxFromPctDrag, buildCreate, decisionsFor, initialReview, instanceId, journalRows, legendRowsToSave,
-  blankRows, matchSavedLegend, noLegendText, pointInBox, proposalsFrom, reviewOutcome, rowsOf, rowsToCreate,
+  blankRows, frameTooSmall, matchSavedLegend, noLegendText, pointInBox, proposalsFrom, reviewOutcome, rowsOf, rowsToCreate,
 } from '@/lib/legendReview';
 import {
   countLegendRows, fetchLegendRows, fetchLegendSheets, loadArchitectLegend, loadProjectLegend, promoteArchitectLegend, readArchitects,
   rememberArchitect, requestErrorText, saveProjectLegend, sendLegendLearning,
 } from '@/lib/legendApi';
 import { klassFor } from '@/lib/symbolSearch';
-import { flashCursorHint } from '@/lib/cursorHints';
 import { DASH, LABEL_FONT_PX, LABEL_STYLE, STROKE_PX, labelWidth, ov, paint } from '@/lib/overlayTokens';
 
 const EMPTY = {
@@ -31,6 +30,8 @@ const EMPTY = {
   // B1-B: the outcome sentence ({tone, text, short, retry}), the box he drew while it is read / when it held no
   // legend, the count's error, what „Bandyti dar kartą" repeats, the sheets that carry a legend, when work began
   outcome: null, failure: null, countError: null, retryOf: null, elsewhere: [], startedAt: null,
+  // a frame too small to be a legend was drawn: one line in the panel and the pill, nothing sent, nothing pinned
+  frameHint: false,
 };
 
 /** The earlier legend this one matches, if any: this project's own saved one first, then his architects'. */
@@ -178,7 +179,8 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   };
 
   const accept = (proposalId = null) => {
-    if (s.phase !== 'proposed') return;
+    // "Taip" also works while he draws by hand: the proposal stays on the drawing as a reference (redraw keeps it)
+    if (s.phase !== 'proposed' && !(s.phase === 'box' && s.proposals.length)) return;
     const legends = proposalId ? s.proposals.filter((p) => p.id === proposalId) : s.proposals;
     const rows = rowsOf(legends);
     if (!rows.length) return;
@@ -189,15 +191,16 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   const redraw = () => {
     abortRef.current?.abort();
     runRef.current += 1;
-    set({ phase: 'box', proposals: [], legends: [], rows: [], counts: {}, review: {}, removed: new Set(), notice: null, reuse: null,
-      outcome: null, failure: null, countError: null, retryOf: null, startedAt: null });
+    // from the proposal, the proposal stays as a dashed reference; from a review it is not his any more
+    set((cur) => ({ phase: 'box', proposals: cur.phase === 'proposed' ? cur.proposals : [], legends: [], rows: [], counts: {}, review: {}, removed: new Set(), notice: null, reuse: null,
+      outcome: null, failure: null, countError: null, retryOf: null, startedAt: null, frameHint: false }));
   };
 
   const box = async (page, bboxPct) => {
-    if (!bboxPct) { flashCursorHint('Rėmelis per mažas — apveskite visą legendą'); return; }
+    if (!bboxPct) { set({ frameHint: true }); return; }
     const { run, signal } = begin();
     // the box he drew stays on the drawing while it is read, and after, when it holds no legend
-    set({ phase: 'reading', page, proposals: [], notice: null, outcome: null, failure: { page, bbox_pct: bboxPct, reading: true },
+    set({ phase: 'reading', page, proposals: [], notice: null, outcome: null, frameHint: false, failure: { page, bbox_pct: bboxPct, reading: true },
       retryOf: null, startedAt: Date.now() });
     try {
       const res = await fetchLegendRows(projectId, { page, bboxPct, signal });
@@ -294,7 +297,7 @@ export function useLegendTool({ projectId, countTypes, pagesRef, onCreate }) {
   }, [s.rows, s.counts, s.removed, s.review]);
 
   return {
-    ...s, active: s.phase != null, elapsed, retry, toCreate, blanks, open, close, pageShown, accept, redraw, box, setKeep, rename,
+    ...s, active: s.phase != null, elapsed, retry, tooSmall: () => set({ frameHint: true }), toCreate, blanks, open, close, pageShown, accept, redraw, box, setKeep, rename,
     removeInstance, restoreRow, setHovered, setHoveredRow, setArchitect, applyReuse, dismissReuse, create, instancesOn,
   };
 }
@@ -337,18 +340,19 @@ export function LegendLayer({ page, width, height, legend }) {
     const moved = Math.abs(p.x - drag.a.x) * width + Math.abs(p.y - drag.a.y) * height;
     setDrag(null);
     if (moved < 6) {
-      // a click: on a proposal it is „Taip" for that legend
-      const hit = phase === 'proposed' && legend.page === page ? legend.proposals.find((pr) => pointInBox(pr.bbox_pct, p.x, p.y)) : null;
+      // a click: on a proposal it is „Taip" for that legend; anywhere else it is not a frame (one line, nothing sent)
+      const hit = legend.proposals.length && legend.page === page ? legend.proposals.find((pr) => pointInBox(pr.bbox_pct, p.x, p.y)) : null;
       if (hit) legend.accept(hit.id);
-      else flashCursorHint(phase === 'proposed' ? 'Čia legendos nėra — spustelėkite pasiūlytą rėmelį arba tempkite savo' : 'Tempkite — apveskite visą legendą');
+      else legend.tooSmall();
       return;
     }
+    if (frameTooSmall(drag.a, p, width, height)) { legend.tooSmall(); return; }
     legend.box(page, boxFromPctDrag(drag.a, p));
   };
 
   const PROPOSED = ov('proposed');
   const READ = ov('read');
-  const showProposals = phase === 'proposed' && legend.page === page ? legend.proposals : [];
+  const showProposals = (phase === 'proposed' || phase === 'box') && legend.page === page ? legend.proposals : [];
   const accepted = phase && phase !== 'proposed' ? legend.legends.filter((l) => l.page === page) : [];
   const instances = phase === 'review' || phase === 'counting' ? legend.instancesOn(page) : [];
   const dragBox = drag ? boxFromPctDrag(drag.a, drag.b, 0) : null;
@@ -401,7 +405,8 @@ export function LegendLayer({ page, width, height, legend }) {
           <g pointerEvents="none" data-testid="legend-drawn-box" data-state={reading ? 'reading' : 'empty'}>
             <rect x={r.x} y={r.y} width={r.w} height={r.h} style={paint({ fill: ov('editing'), stroke: ov('editing') })}
               fillOpacity={0.06} strokeWidth={STROKE_PX} strokeDasharray={DASH} />
-            {tag(r.x, r.y - 2, reading ? 'Skaitau…' : 'Čia legendos nėra', ov('editing'))}
+            {/* no "no legend here" label pinned on the plan — the panel's sentence says it */}
+            {reading && tag(r.x, r.y - 2, 'Skaitau…', ov('editing'))}
           </g>
         );
       })()}

@@ -1221,7 +1221,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     const onKey = (e) => {
       if (e.key !== 'Enter' || e.target?.closest?.('input, textarea, select, [contenteditable], button')) return;
       const l = legendKeyRef.current;
-      if (l.phase === 'proposed') { e.preventDefault(); l.accept(); }
+      if (l.phase === 'proposed' || (l.phase === 'box' && l.proposals.length)) { e.preventDefault(); l.accept(); }
       else if (l.phase === 'review' && (l.toCreate.length || l.blanks.length)) { e.preventDefault(); l.create(); }
     };
     window.addEventListener('keydown', onKey);
@@ -1694,7 +1694,7 @@ function ViewerInner({ renderToolbarAddon = null, check = null, focus = null, ro
     roomPhase: roomToolArmed ? roomTool.state.phase : null,
     legend: legend.active ? {
       phase: legend.phase, proposals: legend.proposals.length, toCreate: legend.toCreate.length, blanks: legend.blanks.length,
-      notice: legend.notice, elapsed: legend.elapsed, outcome: legend.outcome, gotoPage: legendGotoPage(legend),
+      notice: legend.notice, frameHint: legend.frameHint ? t('project.legendTool.frameTooSmall') : null, elapsed: legend.elapsed, outcome: legend.outcome, gotoPage: legendGotoPage(legend),
     } : null,
     mac,
     drawShape,
