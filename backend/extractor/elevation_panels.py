@@ -132,22 +132,31 @@ def _label_blocks(phrases: Sequence[dict]) -> list[dict]:
     return out
 
 
-def _leader_tips(paths: Sequence[dict], label: dict) -> list[tuple[float, float]]:
-    """The far ends of the black hairlines that start at this label (at its first line's left or right end)."""
-    first = label["lines"][0]
-    ys = (first["top"], first["bottom"], (first["top"] + first["bottom"]) / 2)
-    tips = []
+def _hairline_ends(paths: Sequence[dict]) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """(start, end) of every black / dark stroked open subpath longer than 15 pt — the candidates for leaders."""
+    out = []
     for q in paths:
         if q["fill"] is not None or q["stroke"] is None or max(q["stroke"]) > 0.35:
             continue
         for sub in q["subpaths"]:
             if len(sub) < 2:
                 continue
-            for a, b in ((sub[0], sub[-1]), (sub[-1], sub[0])):
-                near_x = min(abs(a[0] - first["x0"]), abs(a[0] - first["x1"])) <= LEADER_END_PT
-                near_y = min(abs(a[1] - y) for y in ys) <= LEADER_END_PT
-                if near_x and near_y and ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 > 15:
-                    tips.append(b)
+            a, b = sub[0], sub[-1]
+            if ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 > 15:
+                out.append((a, b))
+    return out
+
+
+def _leader_tips(ends: Sequence[tuple], label: dict) -> list[tuple[float, float]]:
+    """The far ends of the hairlines that start at this label (at its first line's left or right end)."""
+    first = label["lines"][0]
+    ys = (first["top"], first["bottom"], (first["top"] + first["bottom"]) / 2)
+    tips = []
+    for s0, s1 in ends:
+        for a, b in ((s0, s1), (s1, s0)):
+            near_x = min(abs(a[0] - first["x0"]), abs(a[0] - first["x1"])) <= LEADER_END_PT
+            if near_x and min(abs(a[1] - y) for y in ys) <= LEADER_END_PT:
+                tips.append(b)
     return tips
 
 
@@ -197,9 +206,10 @@ def read_sheet(pdf_bytes: bytes, page: int, m_per_pt: float | None) -> dict:
         return None
 
     rects = _rects(paths)
+    ends = _hairline_ends(paths)
     seen = set()
     for lab in _label_blocks(phrases):
-        for tip in _leader_tips(paths, lab):
+        for tip in _leader_tips(ends, lab):
             f = face_of(*tip)
             if f is None:
                 continue

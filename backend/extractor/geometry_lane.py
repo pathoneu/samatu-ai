@@ -292,6 +292,7 @@ def _read_wall_finishes(parsed, rooms, pdf_bytes, sheets, alignment, lay_over, s
     from .elevation_panels import match_faces, plan_markers, read_sheet
     from .floor_coverings import _page_text
     from .wall_finishes import TITLE_RE, _fold, find_finish_sheets
+    t0 = time.time()
     info = meta.setdefault("sienu_apdaila", {"lapai": [], "isklotines": [], "perskaityta": [], "masteliai_pasiskolinti": {}})
     kinds = {}
     for p in parsed.get("puslapiai") or []:
@@ -405,6 +406,7 @@ def _read_wall_finishes(parsed, rooms, pdf_bytes, sheets, alignment, lay_over, s
             r.pop(WALL_FINISH_KEY, None)
     from .wall_finishes import is_read
     info["perskaityta"] = sorted(nr for nr, rec in found.items() if is_read(rec))
+    info["sekundes"] = round(time.time() - t0, 2)
 
 
 def _merged(r: dict) -> bool:
