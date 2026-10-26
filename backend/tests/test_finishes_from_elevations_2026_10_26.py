@@ -218,12 +218,24 @@ def test_no_drawing_no_text_hall_is_painted_with_sentence():
 
 
 def test_his_no_paint_choice_stands():
-    room = _room(None, paskirtis="garazas")
+    # a storeroom is painted by its standard; his „not painted" differs from it — it is his answer and stands
+    room = _room(None, paskirtis="sandeliukas")
     room.pop("_sienu_apdaila")
-    rules = translate_user_prefs_to_room_rules({"garazas_painted": False})
+    rules = translate_user_prefs_to_room_rules({"sandeliukas_painted": False})
     out = calc_room_quantities(room, rules=rules)
     assert out["walls_paintable_m2"] == 0
     assert any("pažymėjote" in n for n in out["_wall_finish_assumptions"])
+
+
+def test_default_answers_are_no_choice():
+    # the wizard posts every default (default_paint_prefs): „garage not painted" equal to the standard is no answer,
+    # so a garage with no finish on the drawing is taken as painted — and told so
+    from extractor.universal_rules import default_paint_prefs
+    room = _room(None, paskirtis="garazas")
+    room.pop("_sienu_apdaila")
+    out = calc_room_quantities(room, rules=translate_user_prefs_to_room_rules(default_paint_prefs()))
+    assert out["walls_paintable_m2"] > 0
+    assert any("Išklotinės šiai patalpai nėra" in n for n in out["_wall_finish_assumptions"])
 
 
 def test_record_the_plan_barely_reaches_falls_back():

@@ -320,8 +320,9 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     bath_paint = prefs.get("bathroom_walls_painted_above_tiles")
     if bath_paint is False:
         for room_type in ("vonia", "wc", "san"):
+            if rules[room_type].get("walls_paint") != 0.0:
+                rules[room_type]["_walls_paint_chosen"] = True
             rules[room_type]["walls_paint"] = 0.0
-            rules[room_type]["_walls_paint_chosen"] = True
 
     kitchen_h = prefs.get("kitchen_backsplash_height_m")
     if kitchen_h is not None and "virtuve" in rules:
@@ -349,8 +350,12 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
         val = bool(prefs[pref_key])
         for rk in room_keys:
             if rk in rules:
+                # his answer when it differs from the purpose's standard: the wizard posts every default with the
+                # rest (default_paint_prefs), so an answer EQUAL to the standard cannot be told from no answer —
+                # v4 2026-10-26: such a room with no finish on the drawing is taken as painted, and told so
+                if bool(rules[rk].get("walls_paint")) != val:
+                    rules[rk]["_walls_paint_chosen"] = True
                 rules[rk]["walls_paint"] = 1.0 if val else 0.0
-                rules[rk]["_walls_paint_chosen"] = True      # his answer, not the purpose's standard
 
     # Sprint §2A.1: propagate opening-deduction standard via meta key.
     # Used by _resolve_deduction_standard to gate door/window deductions

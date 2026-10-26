@@ -190,7 +190,11 @@ def _forget_open_space(room: dict) -> None:
 # thermostats, fixtures — extractor/legend_counts.py, proposals he confirms) and takes every sheet's kind from its
 # title text (text/page_kind.py), both under `_meta`; the plumbing rows no longer take the plumbing reader's model
 # count, so a stored project needs the re-read to get the legend's. The geometry lane itself reads as at 16.
-LANE_VERSION = 20
+# 21 (2026-10-26, v4): the lane reads each room's WALL FINISHES as drawn — the wall-finish plan's coloured lines along
+# its outline, face by face, and the elevations' zones and tile layouts (`_sienu_apdaila`, extractor/wall_finishes.py
+# and extractor/elevation_panels.py); the calculation takes them before the finish text and the purpose rules, so
+# a stored project needs the re-read to get them.
+LANE_VERSION = 21
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
