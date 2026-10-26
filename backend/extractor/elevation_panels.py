@@ -29,7 +29,7 @@ import re
 from typing import Sequence
 
 from . import pdf_vectors
-from .wall_finishes import CLASS_LT, _fold, finish_class
+from .wall_finishes import _fold, finish_class
 
 MARKER_RE = re.compile(r"^(?:[A-Za-z]{1,2}-?\d{1,2}[a-z]?|\d{1,2}[a-z])$")
 ROW_DY_PT = 6.0            # markers of one row stand on one height
@@ -298,11 +298,16 @@ def match_faces(faces: Sequence[dict], markers: dict[str, tuple[float, float]],
         if a is None or b is None:
             continue
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        pa, pb, pmid = Point(a), Point(b), Point(mid)
         best, bd = None, None
         for nr, pg in polys.items():
-            da = pg.exterior.distance(Point(a)) if not pg.contains(Point(a)) else pg.exterior.distance(Point(a))
-            db = pg.exterior.distance(Point(b))
-            dm = pg.exterior.distance(Point(mid))
+            # A marker INSIDE the room polygon is distance 0 from it. 2026-10-26 fix:
+            # both branches of the ternary used to be pg.exterior.distance, so a label
+            # slightly inside the room polygon beyond `reach` of the exterior ring
+            # could not match that room.
+            da = 0.0 if pg.contains(pa) else pg.exterior.distance(pa)
+            db = 0.0 if pg.contains(pb) else pg.exterior.distance(pb)
+            dm = 0.0 if pg.contains(pmid) else pg.exterior.distance(pmid)
             if da > reach or db > reach or dm > reach:
                 continue
             score = da + db + dm
@@ -311,9 +316,3 @@ def match_faces(faces: Sequence[dict], markers: dict[str, tuple[float, float]],
         if best:
             out[(f["a"], f["b"])] = best
     return out
-
-
-def zone_sentence(z: dict) -> str:
-    return (f"Išklotinėje ({z.get('page')} lapas, siena {z['a'].upper()}–{z['b'].upper()}) nubraižyta "
-            f"{CLASS_LT.get(z['klase'], z['klase'])}: {z['plotis_m']:.2f} × {z['aukstis_m']:.2f} m "
-            f"= {z['plotas_m2']:.2f} m²".replace(".", ","))

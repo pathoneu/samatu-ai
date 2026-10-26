@@ -116,6 +116,20 @@ def test_label_class_furniture_vs_wall():
     assert ep.label_class("Kronosceramiche plytelės lux venna 280x120cm") == "plyteles"
 
 
+def test_face_with_markers_inside_the_room_still_matches():
+    """A marker drawn slightly INSIDE the room polygon used to be measured against the exterior ring in
+    both branches of the ternary (identical expressions, 2026-10-26 fix) — an inset marker further than
+    `reach_m` from the ring could not match its own room. The polygon-contains case now returns distance 0.
+    """
+    faces = [{"a": "x1", "b": "x2"}]
+    # markers inside ROOM_A, further than reach_m from any wall of a smaller 1-m-tolerance ring
+    inside = {"x1": (sw.display_pt(1.4, 1.4)[0], sw.display_pt(1.4, 1.4)[1]),
+              "x2": (sw.display_pt(2.6, 1.4)[0], sw.display_pt(2.6, 1.4)[1])}
+    rings = {"A": sw.room_ring(sw.ROOM_A)}
+    got = ep.match_faces(faces, inside, rings, sw.M_PER_PT, reach_m=0.3)
+    assert got == {("x1", "x2"): "A"}
+
+
 def test_faces_matched_to_the_plan_room():
     plan = sw.build_finish_plan()
     markers = ep.plan_markers(plan, 1)
@@ -197,6 +211,35 @@ def test_tiles_without_a_layout_use_the_standard_band_and_say_so():
     notes = " ".join(out["_wall_finish_assumptions"])
     assert "Plytelių aukščio išklotinėse neradau" in notes
     assert out["walls_paintable_m2"] > 0                       # painted above the band, not tiled to the ceiling
+
+
+def test_drawn_zone_replaces_the_kitchen_ladder_band():
+    """A painting plan (no tile line in legend) paints a kitchen; an elevation draws a backsplash zone on
+    one wall. The ladder posts a kitchen counter band (3 m × 0,6 m); the fix of 2026-10-26 keeps the drawn
+    zone and drops the band — the two were summed before, double-counting the backsplash."""
+    # a 2,0 × 0,6 m backsplash on a 4 m wall (half the kitchen's north wall)
+    zone = {"siena": "x1–x2", "klase": "plyteles", "plotis_m": 2.0, "aukstis_m": 0.6, "plotas_m2": 1.2, "page": 11}
+    rec = _record({"dazymas": 11.0}, konturas=14.0, nepazymeta=3.0, legenda=("dazymas",),
+                  sienos={"x1–x2": {"ilgis_m": 4.0, "klases": {"dazymas": 4.0}}},
+                  zonos=[zone])
+    out = calc_room_quantities(_room(rec, paskirtis="virtuve"))
+    # tile = the drawn zone only, no 3 m × 0,6 m ladder band on top
+    assert out["plyteles_sienos_m2"] == pytest.approx(1.2, abs=0.01)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "pakeista išklotinėje nubraižytais plytelių laukais" in notes
+
+
+def test_drawn_zone_replaces_the_bathroom_ladder_band_without_a_plan_tile_line():
+    """A bathroom without a plan tile line (legend keys paint only) and one drawn zone: the paskirtis
+    ladder would post a 1,2 m band × perimeter; the fix drops the band and keeps the zone."""
+    zone = {"siena": "x1–x2", "klase": "plyteles", "plotis_m": 1.5, "aukstis_m": 1.2, "plotas_m2": 1.8, "page": 11}
+    rec = _record({"dazymas": 10.0}, konturas=12.0, nepazymeta=2.0, legenda=("dazymas",),
+                  sienos={"x1–x2": {"ilgis_m": 2.0, "klases": {"dazymas": 2.0}}},
+                  zonos=[zone])
+    out = calc_room_quantities(_room(rec, paskirtis="vonia", perimetras_m=12.0))
+    assert out["plyteles_sienos_m2"] == pytest.approx(1.8, abs=0.01)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "pakeista išklotinėje nubraižytais plytelių laukais" in notes
 
 
 def test_painting_plan_without_tiles_keeps_the_tile_ladder():

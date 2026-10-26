@@ -354,3 +354,108 @@ Nothing pushed. Branch `v4/finishes-from-elevations`, ahead of `togal-v2` by 7 c
 3. **The lane's stage lives under the „sienos" feature.** Semantically the output is paintable-wall-area; adding a separate „apdaila" feature would reach the UI and require more decisions than the brief allows. The hook is behind one dict entry in `api/detect_run.FEATURE_STAGES` if the founder wants it later.
 4. **The „Sienos neįtrauktos į dažomą plotą" phrase is retired for the no-finish-data branch.** Its surviving use is the user-choice branch (`_walls_paint_chosen`) — the catalogue test exercises it from an explicit `walls_paint_factor_override=0` room, not from the paskirtis standard. The user string he sees for a raw garažas now reads „Išklotinės šiai patalpai nėra — sienos laikomos dažomomis; patikrinkite…".
 5. **`DOORS_ROWS` is a drift-tracking set, not a correctness constraint** — adding „Gruntas sienoms" is honest about the lane sending one more room back into paint on objektas_h; the test still enforces that nothing ELSE drifts.
+
+## 10 · Review fixes (2026-10-26)
+
+A review of the merged lane raised five findings. Each was fixed in its own commit on `v4/finishes-fixes` off `togal-v2 @ 2d81c7fa`; nothing pushed. The corpus has no room that triggers either of the two blockers (no pirtis; no kitchen with a ladder band + a drawn backsplash on the same room; no face-match near-miss on a label slightly inside its own polygon), so the three stored projects' per-room paint/tile numbers come out IDENTICAL to §4 after the fixes — the fixes close the three unexercised holes, protected now by new synthetic tests, and leave the corpus-reproducible numbers alone.
+
+### 10.1 Findings and fixes
+
+**1. BLOCKER — sauna wood ceiling disclosure lost.** `calc_room_quantities` had one `ceiling_unfinished` gate that required `walls_paint_factor == 0.0` AND `ceiling_type in {"betonas", "medis"}`. Under v4 a pirtis's walls_paint_factor flips from the purpose standard 0.0 to 1.0 (the „Išklotinės šiai patalpai nėra" sentence) → the gate closes → the wood ceiling is billed as painted and the „lubos dengiamos medžiu" disclosure never fires. The content test `test_confidence_reasons_are_for_the_user.test_rule_engine_rows_read_plain` had been weakened (the expected „lubos dengiamos medžiu" substring removed) instead of the gate being fixed.
+
+   **Fix** (commit `91f38a71`): split the gate. `ceiling_unfinished_wood` fires for `ceiling_type == "medis"` with no override, no full-tile, no gkp-extra — independent of what the walls do (wood is wood regardless of a wall-paint guess); `ceiling_unfinished_betonas` fires for raw slab only, keeping the old wall-dependent gate. Each branch writes its own note (the medis note no longer needs the walls-why fragment). Restored the „lubos dengiamos medžiu" assertion. Added `test_pirtis_with_no_finish_data_wood_ceiling_stays_unpainted`: walls painted (v4 sentence), ceiling 0, wood note fires.
+
+**2. BLOCKER — tile double-count.** In `resolve_drawn_wall_finish`, when the finish plan's legend has no tile line (`tiles_from_plan=False`) the purpose ladder's `tile_band` AND every elevation tile zone were summed: `tile_m2 = tile_band + zone_tile`. A kitchen with a drawn backsplash was billed BOTH the counter × 0,6 m assumed band AND the drawn zone on the same wall; a bathroom with no plan tile line and one drawn zone got the 1,2 m × perimeter band on top of the zone.
+
+   **Fix** (commit `116673fe`): after summing `zone_tile`, if `zone_tile > 0 AND not tiles_from_plan`, drop the band (`tile_band = 0`, `paint_adjust = 0`) and append one sentence saying the drawn zones were taken instead of the assumed band. The ladder band applies only when the room has no drawn zone. Added `test_drawn_zone_replaces_the_kitchen_ladder_band` (kitchen with a 2,0 × 0,6 m backsplash → tile = 1,20 m², no band) and `test_drawn_zone_replaces_the_bathroom_ladder_band_without_a_plan_tile_line` (bathroom with one 1,5 × 1,2 m drawn zone → tile = 1,80 m², no band).
+
+**3. `match_faces` identity-branch bug.** Both branches of the ternary read `pg.exterior.distance(Point(a))` — intent was 0.0 when the point sits inside the polygon. A label drawn slightly inside its own room beyond `reach_m` from the exterior ring could not match that room.
+
+   **Fix** (commit `6f8c11d4`): `0.0 if pg.contains(pt) else pg.exterior.distance(pt)`, applied to a, b and the face mid-point alike; the three Points are now built once outside the inner loop. Added `test_face_with_markers_inside_the_room_still_matches`.
+
+**4. Test renamed, assertion restored.** `test_single_garazas_bare_slab_gets_no_paint_at_all` had been inverted (asserted the garazas IS painted now, under the v4 fallback) but kept its old name. Renamed to `test_single_garazas_bare_slab_is_painted_under_v4_fallback` to match what it asserts; the restored „lubos dengiamos medžiu" assertion comes with the pirtis test above.
+
+**5. Clean-ups** (commit `71aecb80`): removed `import math` and the unused `MultiLineString` symbol from `wall_finishes.py`; fixed `_class_lines`'s docstring from `{klase: MultiLineString}` to `{klase: list[LineString]}` (it has always returned the list). Deleted `elevation_panels.zone_sentence` (no caller — `resolve_drawn_wall_finish` builds its own richer, inline sentence per zone) along with the now-unused `CLASS_LT` import.
+
+   **Decision (zone_sentence):** deleted rather than wired. The inline note already includes „— skaičiuotas toks, koks nubraižytas." (measured as drawn) and the page number of the elevation; replacing it with `zone_sentence` would lose both.
+
+### 10.2 Per-room proof on objektas_a / h / g (BEFORE the fixes = §4; AFTER = this head)
+
+The AFTER numbers are IDENTICAL to §4 — no room in the three stored projects triggers any of the three fixed cases. The fixes close the holes with new tests; the corpus numbers do not move.
+
+**objektas_a** (project `a1669e9a-...`, 5,61 s): paint **421,49 → 368,07 m²** (Δ −53,42), tile **98,39 → 71,28 m²** (Δ −27,11). The 11 per-room lines are byte-identical to §4.1. The two founder-named bugs (101 Tambūras 50,14 → 42,58; 102 Svetainė/virtuvė tile 33,06 → 5,95) stand. Not moved by the fixes: this project has no pirtis (fix 1 is dormant); its finish plan keys a tile line in its legend so `tiles_from_plan=True` for every room (fix 2 is dormant — the else-branch is never reached); its elevation markers sit at the corners, so fix 3 is dormant.
+
+**demo-objektas_h** (1,87 s): paint **360,82 → 356,58 m²** (Δ −4,24), tile **41,93 → 41,94 m²** (Δ +0,01). Byte-identical to §4.2 (11 rooms, 10 read, 07 unread at 26 % line coverage, 08 tuscia). No pirtis; no elevation sheet (`isklotines: []`), so neither fix 2 nor fix 3 can trigger.
+
+**demo-objektas_g** (9,45 s): paint **292,38 → 281,47 m²** (Δ −10,91), tile **63,47 → 55,35 m²** (Δ −8,12). AFTER numbers identical to §4.3; one BEFORE number moved by a small amount in room 03 Miegamojo san. mazgas (paint 4,30 → 4,11, tile 16,45 → 15,68) — the BEFORE path strips `_sienu_apdaila` and runs the regular ladder, which does NOT call `resolve_drawn_wall_finish`, so this BEFORE drift is unrelated to the five fixes. AFTER (what matters for shipping) stands.
+
+### 10.3 Eval passes (`eval_harness.py`, SAMATU_AUTH_DISABLED implicit)
+
+`--totals-only --recompute --gate` with the fixture PDFs symlinked back into the worktree (gitignored on disk) prints, grep "Billed lines|GATE":
+
+```
+Billed lines                                                                       57.88%  (n=32 family observations on 6 project(s))
+  GATE FAIL: 39 regression(s) beyond 0.25 pp
+```
+
+**Billed lines 57.88 % — identical to §5's post-lane figure.** The `GATE FAIL: 39` is the known replay-against-pre-lane-baselines artefact noted in §5 (the baseline file predates the merge of 2d81c7fa and so trips on every family the lane moves); none of the regressions is caused by this branch's four commits (verified: the per-project HEADLINE table — `-12,12/-10,51/+17,25/-6,42/-100/-0,66` on objektas_a, down to `+12,21/-100/+21,64/-100/-100/-` on objektas_h — reproduces §5 exactly).
+
+`--rows --recompute`, grep "Billed lines|Corpus mean" and the rows headline:
+
+```
+objektas_a    n=53   rows ±10 %  9,4 %   way off 8   missing 2   blank 38
+objektas_b    n=111  rows ±10 %  1,8 %   way off 1   missing 12  blank 80
+objektas_c    n=36   rows ±10 %  5,6 %   way off 0   missing 4   blank 24
+objektas_d    n=50   rows ±10 % 14,0 %   way off 1   missing 6   blank 30
+objektas_g    n=20   rows ±10 % 15,0 %   way off 0   missing 3   blank 14
+objektas_h    n=24   rows ±10 %  8,3 %   way off 2   missing 2   blank 18
+Corpus mean               9,0 %  (n=6 projects; € column blank — priced parse is gitignored, present on 0/6)
+```
+
+**Rows ±10 % 9,0 % — identical to §5.** The € column (reported 16,6 % in §5) prints as blank in this environment because the priced parse is gitignored and not present on 0 / 6 projects on this disk — a dataset-availability thing, not a regression caused by the fixes.
+
+### 10.4 `scripts/reading_scorecard.py` — unchanged
+
+```
+=== Skaitymo lentelė — korpusas ===
+  vidaus durų poros:        21/24 sutampa, 3 trūksta, 5 per daug
+  lauko durys per patalpą:  32/32 sutampa
+  langai per patalpą:       29/30 sutampa
+  praėjimai:                2/4
+```
+
+Byte-identical to §6 — the fixes don't touch the door / window / passage readers.
+
+### 10.5 Backend suite
+
+```
+SAMATU_AUTH_DISABLED=1 venv/bin/python -m pytest backend/tests -q --no-header -p no:cacheprovider -rs
+5313 passed, 11 skipped, 0 failed in 570.36 s
+```
+
+Baseline on `dab77eca` (§7): 5310 pass / 10 skip / 0 fail. This head: 5313 pass / 11 skip / 0 fail — +3 pass and +1 skip for a +4 net on the four tests added by these fixes (one of the four, `test_pirtis_...`, lives next to tests that read a dev-DB project; the +1 skip is `test_sudetis.py::test_sudetis_golden_matches_the_stored_project` reporting „demo-objektas_h is not in this checkout's dev DB", a pre-existing conditional skip on checkout state, not caused by the fixes). The 11 skips with their reasons:
+
+```
+SKIPPED [1] test_cv_e2e.py:41    vidaus_apdaila.pdf not found — set SAMATU_TEST_PDF or place at ~/Desktop/test_pdfs/
+SKIPPED [1] test_cv_e2e.py:48    vidaus_apdaila.pdf not found — set SAMATU_TEST_PDF or place at ~/Desktop/test_pdfs/
+SKIPPED [1] test_eksplikacija_table_tolerance.py:485  vidaus_apdaila.pdf not on disk
+SKIPPED [1] test_kill_model_rows_2026_10_25.py:63     objektas_i uploads not on this machine
+SKIPPED [1] test_no_confidential_terms_in_repo.py:130 no confidentiality denylist on disk — provide backend/.confidential-terms
+SKIPPED [1] test_no_confidential_terms_in_repo.py:183 no confidentiality denylist — see above
+SKIPPED [3] test_page_classifier_antspaudas.py:185    worktree LT PDF fixtures not present
+SKIPPED [1] test_pdf_preflight.py:382                  vidaus_apdaila.pdf not on disk
+SKIPPED [1] test_sudetis.py:82                         demo-objektas_h is not in this checkout's dev DB
+```
+
+Every skip is a worktree-state check (gitignored fixtures or dev DB entries not symlinked here), none is a disabled test added by this branch.
+
+### 10.6 Commit hashes on this branch
+
+```
+71aecb80  chore(v4): remove unused imports and the dead zone_sentence; fix the _class_lines docstring
+6f8c11d4  fix(v4): match_faces — a marker inside the room polygon is distance 0, not the ring distance
+116673fe  fix(v4): the drawn tile zone replaces the ladder band — no more double-count
+91f38a71  fix(v4): a pirtis's wood ceiling stays unpainted when the v4 wall fallback paints the walls
+```
+
+Nothing pushed. Branch `v4/finishes-fixes` off `togal-v2 @ 2d81c7fa`, 4 commits ahead.

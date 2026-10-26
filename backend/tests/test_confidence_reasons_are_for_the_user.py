@@ -440,7 +440,7 @@ def test_rule_engine_rows_read_plain():
                   "žemesnis, nei STR leidžia", "neįprastas (norma", "Perimetras 2,0 m per mažas",
                   "per didelis 80,0 m² plotui", "Išklotinės šiai patalpai nėra",
                   "Sienos dažomos pagal projekto apdailos duomenis", "Lubos neįtrauktos",
-                  "Atatvaro plytelių juosta skaičiuota 0,60 m",
+                  "lubos dengiamos medžiu", "Atatvaro plytelių juosta skaičiuota 0,60 m",
                   "3,0 m ilgio stalviršį", "Plytelių aukštis brėžinyje nerastas",
                   "Drėgnos patalpos sienų plytelių", "Išklotinėse šios patalpos sienose",
                   "Plytelių juosta (iki", "Virš 3 m kiekis skaičiuotas", "altitudė 2,80 m",

@@ -40,8 +40,8 @@ def test_empty_rooms_calc_totals():
 
 # ── Edge: single garazas (no painting, no plytelės) ────────────────────
 
-def test_single_garazas_bare_slab_gets_no_paint_at_all():
-    """Bare garažas (betonas lubos, NO apdailos): neither walls nor ceiling.
+def test_single_garazas_bare_slab_is_painted_under_v4_fallback():
+    """Bare garažas (betonas lubos, NO apdailos) under v4: walls AND ceiling painted.
 
     History, because this assertion has now flipped twice:
 
@@ -124,6 +124,34 @@ def test_single_garazas_with_finish_evidence_is_painted():
 
 
 # ── Edge: single-room project ─────────────────────────────────────────
+
+def test_pirtis_with_no_finish_data_wood_ceiling_stays_unpainted():
+    """A sauna's wooden ceiling is a MATERIAL statement — it stays out of paint
+    regardless of what the walls do.
+
+    Under v4 the wall-paint fallback flips a raw pirtis's walls_paint_factor from
+    the purpose standard 0.0 to 1.0 (so the user is told „Išklotinės šiai patalpai
+    nėra" and the walls are counted as painted). The ceiling_type „medis" is a
+    reading of the room's finishing (wood lining of a sauna), not a wall-paint
+    guess, and must not follow the walls — else the pirtis would come out of the
+    engine with its wood ceiling billed as a painted surface and the user would
+    never see the „lubos dengiamos medžiu" disclosure.
+    """
+    rooms = [{
+        "nr": "1", "pavadinimas": "Pirtis", "paskirtis": "pirtis",
+        "plotas_m2": 6.0, "perimetras_m": 10.0, "lubu_aukstis_m": 2.4,
+        "elementai": [],
+    }]
+    for r in rooms:
+        r.update(calc_room_quantities(r))
+    # the v4 wall-paint fallback: walls are TAKEN AS PAINTED with the sentence
+    assert rooms[0]["walls_paintable_m2"] > 0
+    assert any("Išklotinės šiai patalpai nėra" in n for n in rooms[0]["_wall_finish_assumptions"])
+    # the wood ceiling stays out of paint, independent of the wall fallback
+    assert rooms[0]["ceiling_paintable_m2"] == 0.0
+    assert rooms[0]["_ceiling_paint_source"] == "unfinished_room_standard"
+    assert any("lubos dengiamos medžiu" in n for n in rooms[0]["_ceiling_finish_assumptions"])
+
 
 def test_single_living_room_full_pipeline():
     rooms = [{

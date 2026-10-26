@@ -2219,6 +2219,7 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     # tiles
     heights = [float(t.get("aukstis_m") or 0) for t in el.get("plyteles") or [] if float(t.get("aukstis_m") or 0) > 0]
     tile_h_read = bool(heights)
+    band_assumption = None
     if tiles_from_plan:
         # no layout read: the room type's standard band (an assumption, said below) — never a model's height
         tile_h = max(heights) if heights else (default_tile_h if default_tile_h > 0 else H)
@@ -2240,9 +2241,7 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
         # what of the band lies on walls the plan paints (a backsplash on a painted kitchen wall) is not painted
         paint_adjust = -max(0.0, tile_band - max(0.0, 1.0 - paint_frac) * perim_walls * tile_h)
         is_full_tile = bool(tr.get("is_full_tile")) and paint_frac <= 0
-        if tr.get("assumption"):
-            notes.append(tr["assumption"])
-
+        band_assumption = tr.get("assumption")
     # elevation tile zones on faces the plan does not tile and no layout covers
     faces = el.get("sienos") or {}
     laid_out = {t.get("siena") for t in el.get("plyteles") or []}
@@ -2262,6 +2261,19 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
         notes.append(f"Išklotinėje ({z.get('page')} lapas, siena {_lt_face(z.get('siena') or '')}) nubraižytas "
                      f"plytelių laukas {lt_num(float(z.get('plotis_m') or 0))} × {lt_num(float(z.get('aukstis_m') or 0))} m "
                      f"= {lt_num(a)} m² — skaičiuotas toks, koks nubraižytas.")
+    # 2026-10-26 fix: when the plan keys no tiles AND the elevation draws tile
+    # zones, the drawn zones REPLACE the ladder band — a kitchen with a drawn
+    # backsplash is not also billed the paskirtis's 1,2 m counter band; a
+    # bathroom with one drawn zone is not also billed the ceiling-ladder band.
+    # The band applies only when the room has no drawn zone.
+    if not tiles_from_plan and zone_tile > 0:
+        tile_band = 0.0
+        paint_adjust = 0.0
+        band_assumption = None
+        notes.append("Plytelių juosta skaičiuota ne pagal paskirties standartą — "
+                     "pakeista išklotinėje nubraižytais plytelių laukais.")
+    if not tiles_from_plan and band_assumption:
+        notes.append(band_assumption)
     tile_m2 = tile_band + zone_tile
     base = max(0.0, wall_area_available - max(0.0, float(windows_m2 or 0)))
     molio_m2 = (frac.get("molio_tinkas", 0.0) + frac.get("kita_danga", 0.0)) * base
@@ -2981,36 +2993,53 @@ def calc_room_quantities(room: dict,
     ceiling_paint_override = room.get("ceiling_paint_override")
     walls_marked_unpainted = (walls_paint_factor_override is not None
                               and float(walls_paint_factor_override) <= 0)
-    ceiling_unfinished = (
+    # "medis" = the wood lining of a pirtis — a material statement, independent
+    # of the walls. "medis" can ONLY come from ROOM_TYPE_RULES, so a ceiling
+    # actually READ off a drawing never lands here. (2026-10-26 fix: the v4
+    # wall-paint fallback flips walls_paint_factor to 1.0 for a pirtis with no
+    # finish data, which used to shut this gate and bill the wood ceiling as
+    # painted; the wood ceiling stays out of paint regardless of what the walls
+    # do.)
+    ceiling_unfinished_wood = (
+        ceiling_paint_override is None
+        and ceiling_type == "medis"
+        and not is_full_tile
+        and gkp_extra_area_m2 <= 0
+    )
+    # "betonas" = raw slab (garažas / tambūras / terasa) — follows the walls:
+    # if the walls aren't painted, neither is the slab.
+    ceiling_unfinished_betonas = (
         ceiling_paint_override is None
         and rt_rules.get("walls_paint") == 0.0
         and walls_paint_factor == 0.0
         and (walls_paint_factor_override is None or walls_marked_unpainted)
         and not is_full_tile
-        # "betonas" = raw slab (garažas / tambūras / terasa); "medis" = the
-        # wood lining of a pirtis. Both are surfaces the painter never touches,
-        # and neither is a Vision `lubu_tipas` value — "medis" can ONLY come
-        # from ROOM_TYPE_RULES, so a ceiling actually READ off a drawing can
-        # never fall into this branch by accident. (2026-08-23)
-        and ceiling_type in ("betonas", "medis")
+        and ceiling_type == "betonas"
         and gkp_extra_area_m2 <= 0
     )
+    ceiling_unfinished = ceiling_unfinished_wood or ceiling_unfinished_betonas
     if ceiling_paint_override is not None and not bool(ceiling_paint_override):
         ceiling_paintable = 0.0
         ceiling_paint_source = "override_off"
     elif ceiling_unfinished:
         ceiling_paintable = 0.0
         ceiling_paint_source = "unfinished_room_standard"
-        ceiling_is = ("lubos dengiamos medžiu" if ceiling_type == "medis"
-                      else "lubos — neapdailinta betoninė perdanga")
-        # Why the walls are bare: his own choice, or no finish on the drawing.
-        walls_why = ("o sienas pažymėjote kaip nedažomas" if walls_marked_unpainted
-                     else "o brėžinyje šios patalpos apdailos nerasta (sienos "
-                          "taip pat nedažomos)")
-        ceiling_finish_notes.append(
-            f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
-            f"{ceiling_is}, {walls_why}. Patikrinkite lubų plane; jei lubos glaistomos "
-            f"ir dažomos, pataisykite lubų dažymo kiekį sąmatoje.")
+        if ceiling_type == "medis":
+            ceiling_finish_notes.append(
+                f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+                f"lubos dengiamos medžiu — jų neglaistome ir nedažome. "
+                f"Patikrinkite lubų plane; jei lubos glaistomos ir dažomos, "
+                f"pataisykite lubų dažymo kiekį sąmatoje.")
+        else:
+            # Why the walls are bare: his own choice, or no finish on the drawing.
+            walls_why = ("o sienas pažymėjote kaip nedažomas" if walls_marked_unpainted
+                         else "o brėžinyje šios patalpos apdailos nerasta (sienos "
+                              "taip pat nedažomos)")
+            ceiling_finish_notes.append(
+                f"Lubos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
+                f"lubos — neapdailinta betoninė perdanga, {walls_why}. "
+                f"Patikrinkite lubų plane; jei lubos glaistomos ir dažomos, "
+                f"pataisykite lubų dažymo kiekį sąmatoje.")
     elif ceiling_paint_override is not None:
         ceiling_paint_source = "override_on"
     else:
