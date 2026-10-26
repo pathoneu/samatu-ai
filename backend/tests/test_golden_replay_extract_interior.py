@@ -99,10 +99,9 @@ DOORS_ROOM_KEYS = {"elementai", "angokrasciu_gkp_m", "door_area_m2", "doors_dedu
                    "_tile_read_source", "_walls_full_tile", "_walls_paint_factor"}
 DOORS_ROWS = {"Angokraščių glaistymas-dažymas", "Angokraščių apdirbimas GKP (struktūra)",
               "Glaistas luboms (pradinis + baigiamasis)", "Gruntas luboms", "Dažai luboms (2 sluoksniai)",
-              "GKP juostelės + savisriegiai",
-              # v4 2026-10-26: the drawn wall-finish lane can send one more room back into paint (the
-              # tambūras / bathrooms with išklotinės reading as painted) → a wall-primer row surfaces
-              "Gruntas sienoms"}
+              "GKP juostelės + savisriegiai"}
+# v4 2026-10-26: the as-drawn lane removed a room's wall paint → primer row differed;
+# the uz_baldu_dazoma default paints those walls again → no difference
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
 # nothing, and not a step the eval runs.
 # v4 3b: the Vision adjacency pass is gone — the frozen extract still carries what it wrote, the eval leaves it
