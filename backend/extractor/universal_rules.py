@@ -2216,9 +2216,11 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     wall_len = max(covered, L - float(rec.get("angos_m") or 0), 1e-9)
     frac = {k: min(1.0, float(v) / wall_len) for k, v in klases.items()}
     paint_frac = min(1.0, sum(v for k, v in frac.items() if k not in NOT_PAINTED_BY_PLAN))
-    # founder decision 2026-10-26: wall faces the finish plan leaves unmarked (behind furniture /
-    # cabinets) are painted — the house is painted before the furniture goes in.
-    unmarked_frac = max(0.0, 1.0 - sum(frac.values()))
+    # founder decision 2026-10-26: wall faces behind furniture / cabinets are painted.
+    # Use rec["nepazymeta_m"] (the furniture-wall metres flagged by the finish-plan reader)
+    # rather than the total unlabeled fraction — a painting plan that simply does not key
+    # tiles on the remaining wall must not inflate paint beyond what was drawn.
+    unmarked_frac = max(0.0, min(1.0, float(rec.get("nepazymeta_m") or 0) / wall_len))
     if uz_baldu_dazoma and unmarked_frac > 0:
         paint_frac = min(1.0, paint_frac + unmarked_frac)
 
