@@ -116,6 +116,20 @@ def test_label_class_furniture_vs_wall():
     assert ep.label_class("Kronosceramiche plytelės lux venna 280x120cm") == "plyteles"
 
 
+def test_face_with_markers_inside_the_room_still_matches():
+    """A marker drawn slightly INSIDE the room polygon used to be measured against the exterior ring in
+    both branches of the ternary (identical expressions, 2026-10-26 fix) — an inset marker further than
+    `reach_m` from the ring could not match its own room. The polygon-contains case now returns distance 0.
+    """
+    faces = [{"a": "x1", "b": "x2"}]
+    # markers inside ROOM_A, further than reach_m from any wall of a smaller 1-m-tolerance ring
+    inside = {"x1": (sw.display_pt(1.4, 1.4)[0], sw.display_pt(1.4, 1.4)[1]),
+              "x2": (sw.display_pt(2.6, 1.4)[0], sw.display_pt(2.6, 1.4)[1])}
+    rings = {"A": sw.room_ring(sw.ROOM_A)}
+    got = ep.match_faces(faces, inside, rings, sw.M_PER_PT, reach_m=0.3)
+    assert got == {("x1", "x2"): "A"}
+
+
 def test_faces_matched_to_the_plan_room():
     plan = sw.build_finish_plan()
     markers = ep.plan_markers(plan, 1)
