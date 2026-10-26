@@ -32,10 +32,11 @@ def test_merge_sets_breakdown_and_tile_height():
 
 
 def test_apdailos_restores_walls_paint_for_tamburas():
-    # Tamburas with NO breakdown → legacy path → walls_paint = 0 (the bug).
+    # v4 2026-10-26: a tamburas with no finish data is already taken as painted (the drawing is the source,
+    # not the purpose standard). The apdailos reader still rewrites the sentence to „from the finish table".
     bug = calc_room_quantities(_room("101", "tamburas"))
-    assert float(bug.get("walls_paintable_m2") or 0) == 0.0, "precondition: legacy zeros tamburas"
-    # With the apdailos breakdown (mostly paint) → apdailos path → walls_paint > 0.
+    assert float(bug.get("walls_paintable_m2") or 0) > 20.0, "the drawing-is-the-source default paints the tambūras"
+    # With the apdailos breakdown (mostly paint) → apdailos path still paints and surfaces the stronger evidence.
     rooms = [_room("101", "tamburas")]
     merge_apdailos_into_rooms(rooms, {"status": "ok", "patalpos": [
         {"nr": "101", "sienu_apdaila": {"dazymas_share": 1.0, "plyteles_share": 0.0},

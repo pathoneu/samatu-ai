@@ -69,6 +69,9 @@ STAGES: tuple[tuple[str, str, str], ...] = (
      "Kiekvienos sienos ilgis sudedamas iš plane užrašytų matmenų. Kur jų nėra, ilgis įvertinamas iš kontūro ir taip pažymimas."),
     ("grindys", "Grindys",
      "Grindų plane perskaitoma, kokia danga nubraižyta kiekvienoje patalpoje."),
+    ("sienu_apdaila", "Sienų apdaila",
+     "Sienų apdailos plane perskaitoma, kuri apdaila nubraižyta palei kiekvienos patalpos sienas, "
+     "o išklotinėse — kokie plytelių ir plokščių laukai nupiešti ant kiekvienos sienos."),
     ("kiekiai", "Kiekiai",
      "Perskaitomas durų žiniaraštis ir brėžinio simboliai, tada kiekiai perskaičiuojami pagal naujus duomenis."),
 )
@@ -82,12 +85,12 @@ FEATURES = ("plotai", "konturai", "sienos", "angos", "grindys")
 REQUIRES = {"konturai": ("plotai", "angos"), "sienos": ("konturai",), "angos": ("konturai",), "grindys": ("plotai",)}
 # The stages a feature's result comes from (mastelis and kiekiai always run)
 FEATURE_STAGES = {"plotai": ("tekstas", "planas"), "konturai": ("konturai",), "angos": ("angos",),
-                  "sienos": ("sienos",), "grindys": ("grindys",)}
+                  "sienos": ("sienos", "sienu_apdaila"), "grindys": ("grindys",)}
 # The room keys each feature writes — put back as they were when the feature is not chosen
 FEATURE_KEYS = {
     "plotai": ("_vieta",),
     "konturai": ("polygon_pct", "polygon_source", "_konturas", "_atvira_erdve", "_konturo_priezastis", "_konturo_siulymas"),
-    "sienos": tuple(_gl.PERIMETER_KEYS) + (_gl.PAIR_PROPOSAL, "_perimetras_matmenys"),
+    "sienos": tuple(_gl.PERIMETER_KEYS) + (_gl.PAIR_PROPOSAL, "_perimetras_matmenys", _gl.WALL_FINISH_KEY),
     "angos": ("_angos_sienose",),
     "grindys": tuple(_gl.FLOOR_KEYS) + ("_grindu_dangos_dvi",),
 }
@@ -484,6 +487,15 @@ def stage_notes(result: dict, in_scope: list[str], pages) -> dict[str, str]:
     floors = [r for r in rooms if str(r.get("grindu_danga_saltinis") or "") == _gl.FLOOR_PLAN_SOURCE]
     notes["grindys"] = (f"Danga perskaityta {len(floors)} {_of_rooms(n)}." if floors
                         else "Grindų plane dangų neperskaityta.")
+    # v4 2026-10-26: the wall-finish plan + the elevations' zones (geometry_lane._read_wall_finishes)
+    finish = geo.get("sienu_apdaila") or {}
+    read_nrs = [nr for nr in (finish.get("perskaityta") or []) if nr in set(in_scope)]
+    sheets = finish.get("lapai") or []
+    if sheets:
+        notes["sienu_apdaila"] = (f"Sienų apdailos planas: {_lt_list(sorted(sheets))}; "
+                                  f"apdaila perskaityta {_lt(len(read_nrs), 'patalpoje', 'patalpose', 'patalpų')}.")
+    else:
+        notes["sienu_apdaila"] = "Sienų apdailos plano šiame rinkinyje neradau — apdaila paimta iš apdailų lentelės ar paskirties."
     return notes
 
 

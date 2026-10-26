@@ -150,18 +150,18 @@ def test_read_tile_height_is_not_flagged_as_an_assumption():
 # 3. Garažas / tambūras follow ONE documented default
 # ══════════════════════════════════════════════════════════════════════════
 @pytest.mark.parametrize("paskirtis", ["garazas", "tamburas"])
-def test_no_finish_data_means_room_type_standard_and_says_so(paskirtis):
-    """Standard (ROOM_TYPE_RULES, mirrored by the Setup Wizard default):
-    garages and entry lobbies are NOT painted. With no project finish data we
-    apply that standard — and disclose it, because Objektas A proves it can be
-    wrong by 31.45 m²."""
+def test_no_finish_data_takes_walls_as_painted_and_says_so(paskirtis):
+    """v4 2026-10-26 (founder: the drawing is the source): the standard
+    „garažas / tambūras not painted" is a GUESS, not a reading. With no
+    elevation, no finish-plan line and no finish text, the walls are TAKEN AS
+    PAINTED — and he is told to check. Objektas A proves the old rule was
+    wrong by 31,45 m² (garažas) and 52 m² (tambūras)."""
     q = calc_room_quantities(_room(nr="105", pavadinimas="Garažas",
                                    paskirtis=paskirtis, plotas_m2=10.67,
                                    perimetras_m=13.6, lubu_aukstis_m=3.0))
     assert ROOM_TYPE_RULES[paskirtis]["walls_paint"] == 0.0
-    assert q["walls_paintable_m2"] == 0.0
-    assert q["dazymo_plotas_m2"] == pytest.approx(q["ceiling_paintable_m2"])
-    assert any("neįtrauktos į dažomą plotą" in n
+    assert q["walls_paintable_m2"] > 0
+    assert any("Išklotinės šiai patalpai nėra" in n
                for n in q["_wall_finish_assumptions"])
 
 

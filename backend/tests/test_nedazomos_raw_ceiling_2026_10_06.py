@@ -101,24 +101,20 @@ def _rows(body):
 @pytest.mark.parametrize("path", sorted(PATHS))
 @pytest.mark.parametrize("raw", [_raw(), _raw("02", "tamburas", "Tambūras", 7.36, 11.4)],
                          ids=["garazas", "tamburas"])
-def test_nedazomos_on_a_raw_room_is_the_room_the_extraction_gives(client, path, raw):
+def test_nedazomos_on_a_raw_room_matches_an_explicit_zero_override(client, path, raw):
+    """v4 2026-10-26 (founder: the drawing is the source): a raw garažas / tambūras is TAKEN AS PAINTED by
+    the extraction (the purpose standard is not a reading). His „Nedažomos" is now a real choice — it
+    overrides the fresh extraction to walls 0 + ceiling 0, with the explicit sentence."""
     parsed = _extracted([raw, _living()])
     fresh = _by_nr(parsed["patalpos"])[raw["nr"]]
-    assert fresh["walls_paintable_m2"] == 0 and fresh["ceiling_paintable_m2"] == 0   # the drawing's default
+    assert fresh["walls_paintable_m2"] > 0 and fresh["ceiling_paintable_m2"] > 0   # the v4 default
 
     rooms, body = PATHS[path](client, parsed, {raw["nr"]: 0})
     out = _by_nr(rooms)[raw["nr"]]
-    for k in ROOM_KEYS:
-        assert out.get(k) == pytest.approx(fresh.get(k), abs=0.011), \
-            f"{path} {k}: extraction {fresh.get(k)} vs after „Nedažomos“ {out.get(k)}"
-    assert _paint_litres(out) == pytest.approx(_paint_litres(fresh), abs=0.02)
+    assert out["walls_paintable_m2"] == 0 and out["ceiling_paintable_m2"] == 0
     assert out["_ceiling_paint_source"] == "unfinished_room_standard"
     assert out["_walls_unpainted_reason"] == "override"
     assert any("pažymėjote kaip nedažomas" in n for n in out["_ceiling_finish_assumptions"])
-    # and the sąmata he sees is the extraction's, row for row
-    fresh_rows, rows = _rows(parsed), _rows(body)
-    assert rows == fresh_rows, {k: (fresh_rows.get(k), rows.get(k))
-                                for k in set(rows) | set(fresh_rows) if rows.get(k) != fresh_rows.get(k)}
 
 
 def test_dazomos_finishes_the_garage_and_both_paths_agree(client):

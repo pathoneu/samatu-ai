@@ -304,7 +304,9 @@ def _read_wall_finishes(parsed, rooms, pdf_bytes, sheets, alignment, lay_over, s
     if not n_pages:
         try:
             import pypdfium2 as pdfium
-            n_pages = len(pdfium.PdfDocument(pdf_bytes))
+            from .pdfium_guard import PDFIUM_LOCK
+            with PDFIUM_LOCK:
+                n_pages = len(pdfium.PdfDocument(pdf_bytes))
         except Exception:  # noqa: BLE001
             n_pages = 0
     # candidate sheets: a finish-plan title in the text, or the sheet kind (no legend is read on every sheet — a
