@@ -55,6 +55,7 @@ GEOMETRY_ROOM_KEYS = (
     "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis", "_perimetras_pries_geometrija",
     "_angos_sienose", "grindu_danga", "grindu_danga_saltinis", "_grindu_danga", "_grindu_dangos_dvi",
     "polygon_holes_pct",
+    "_sienu_apdaila",          # the wall finishes as drawn, face by face (v4 2026-10-26, geometry_lane._read_wall_finishes)
 )
 
 
