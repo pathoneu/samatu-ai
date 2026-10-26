@@ -388,6 +388,12 @@ def _rule_rooms():
         # a sauna: wood-lined ceiling, left out
         {"nr": "P9", "pavadinimas": "Pirtis", "paskirtis": "pirtis",
          "plotas_m2": 6.0, "perimetras_m": 10.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.4, "lubu_aukstis_saltinis": "plano_uzrasas"},
+        # v4 2026-10-26: the ceiling-off disclosure fires only when he explicitly says the walls are
+        # not painted (walls_paint_factor_override = 0): the raw-slab gate stays shut without a user
+        # choice.
+        {"nr": "G11", "pavadinimas": "Garažas", "paskirtis": "garazas",
+         "plotas_m2": 20.0, "perimetras_m": 18.0, "perimetras_saltinis": "plano_matmenys", "lubu_aukstis_m": 2.8, "lubu_aukstis_saltinis": "plano_uzrasas",
+         "lubu_tipas": "betonas", "walls_paint_factor_override": 0.0},
     ]
     rooms = []
     for spec in specs:
@@ -432,9 +438,9 @@ def test_rule_engine_rows_read_plain():
     joined = " | ".join(t for _, t in rows)
     for fired in ("per mažas paskirčiai „Tambūras“", "per didelis paskirčiai „Garažas“",
                   "žemesnis, nei STR leidžia", "neįprastas (norma", "Perimetras 2,0 m per mažas",
-                  "per didelis 80,0 m² plotui", "Sienos neįtrauktos į dažomą plotą",
+                  "per didelis 80,0 m² plotui", "Išklotinės šiai patalpai nėra",
                   "Sienos dažomos pagal projekto apdailos duomenis", "Lubos neįtrauktos",
-                  "lubos dengiamos medžiu", "Atatvaro plytelių juosta skaičiuota 0,60 m",
+                  "Atatvaro plytelių juosta skaičiuota 0,60 m",
                   "3,0 m ilgio stalviršį", "Plytelių aukštis brėžinyje nerastas",
                   "Drėgnos patalpos sienų plytelių", "Išklotinėse šios patalpos sienose",
                   "Plytelių juosta (iki", "Virš 3 m kiekis skaičiuotas", "altitudė 2,80 m",

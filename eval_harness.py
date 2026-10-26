@@ -1954,7 +1954,26 @@ def _record_gaps(slug: str | None, parsed: dict, answers_report: dict | None) ->
                           "cause": gap_cause(reason), "reason": reason})
     ANSWER_REPORT[slug] = {"supplied": (answers_report or {}).get("supplied", 0),
                            "answers_file": answers_report is not None,
-                           "blank": blank}
+                           "blank": blank,
+                           "apdaila": finish_sources(parsed)}
+
+
+def finish_sources(parsed: dict) -> dict[str, list[str]]:
+    """Where each room's WALL finish came from (v4 2026-10-26): `brezinys` — the wall-finish plan's lines / the
+    elevations (`_sienu_apdaila_skaiciavimas`), `tekstas` — a finish sheet's text (apdailos_reader), `prielaida` —
+    neither (the purpose / „no elevation → painted" rules)."""
+    out: dict[str, list[str]] = {"brezinys": [], "tekstas": [], "prielaida": []}
+    for r in parsed.get("patalpos") or []:
+        if not isinstance(r, dict):
+            continue
+        nr = str(r.get("nr") or "?")
+        if isinstance(r.get("_sienu_apdaila_skaiciavimas"), dict):
+            out["brezinys"].append(nr)
+        elif r.get("sienu_apdailos_breakdown") and r.get("_apdailos_saltinis") == "tekstas":
+            out["tekstas"].append(nr)
+        else:
+            out["prielaida"].append(nr)
+    return out
 
 
 def his_missing_by_reason(scored: list[tuple[str, Any]]) -> dict[str, dict[str, int]]:
@@ -1996,6 +2015,12 @@ def print_answers_block(*, his_missing: dict[str, dict[str, int]] | None = None)
             causes[b["cause"]] = causes.get(b["cause"], 0) + 1
         txt = "; ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1])) or "—"
         print(f"  {slug:<14} {rep['supplied']:>8} {len(rep['blank']):>11}  {txt}")
+        ap = rep.get("apdaila") or {}
+        if ap:
+            print(f"  {'':<14} {'':>8} {'':>11}  sienų apdaila: iš brėžinio {len(ap.get('brezinys') or [])} "
+                  f"({', '.join(ap.get('brezinys') or []) or '—'}); iš teksto {len(ap.get('tekstas') or [])} "
+                  f"({', '.join(ap.get('tekstas') or []) or '—'}); prielaida {len(ap.get('prielaida') or [])} "
+                  f"({', '.join(ap.get('prielaida') or []) or '—'})")
         if his_missing and slug in his_missing:
             m = his_missing[slug]
             print(f"  {'':<14} {'':>8} {'':>11}  his rows `missing`: "

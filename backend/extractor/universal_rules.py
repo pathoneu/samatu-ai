@@ -320,6 +320,8 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
     bath_paint = prefs.get("bathroom_walls_painted_above_tiles")
     if bath_paint is False:
         for room_type in ("vonia", "wc", "san"):
+            if rules[room_type].get("walls_paint") != 0.0:
+                rules[room_type]["_walls_paint_chosen"] = True
             rules[room_type]["walls_paint"] = 0.0
 
     kitchen_h = prefs.get("kitchen_backsplash_height_m")
@@ -348,6 +350,11 @@ def translate_user_prefs_to_room_rules(prefs: dict | None) -> dict | None:
         val = bool(prefs[pref_key])
         for rk in room_keys:
             if rk in rules:
+                # his answer when it differs from the purpose's standard: the wizard posts every default with the
+                # rest (default_paint_prefs), so an answer EQUAL to the standard cannot be told from no answer —
+                # v4 2026-10-26: such a room with no finish on the drawing is taken as painted, and told so
+                if bool(rules[rk].get("walls_paint")) != val:
+                    rules[rk]["_walls_paint_chosen"] = True
                 rules[rk]["walls_paint"] = 1.0 if val else 0.0
 
     # Sprint §2A.1: propagate opening-deduction standard via meta key.
@@ -2154,6 +2161,139 @@ def resolve_wall_tile_read(room: dict, rt_rules: dict, ceiling_height_m: float,
     return out
 
 
+# ═════════════════════════════════════════════════════════════════════════
+# WALL FINISH AS DRAWN (v4, 2026-10-26) — the wall-finish plan's lines + the elevations' zones
+# ═════════════════════════════════════════════════════════════════════════
+DRAWN_FINISH_SOURCE = "brezinys"          # tile_read["source"] / `_tile_read_source` of a room read off the drawing
+TILE_LAYOUT_TO_CEILING = 0.9             # a tile layout this high reaches the ceiling (its top course meets the ceiling band)
+FACE_UNFINISHED_NOTE_M = 0.5             # wall length no line covers, from which he is told
+FACE_ZONE_ON_PAINT = 0.5                  # an elevation zone takes paint off its face when the plan paints ≥ this share
+NOT_PAINTED_BY_PLAN = ("plyteles", "molio_tinkas", "kita_danga")     # what no paint goes under; the rest stays in the
+#                                          glaistymas/dažymas base by the engine's convention (tapetai, plokštė and a
+#                                          mirror go on a skimmed wall — the „Objektas A" calibration of 2026-05-27)
+
+
+def _lt_face(label: str) -> str:
+    return label.upper()
+
+
+def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gross: float,
+                              wall_area_available: float, doors_deduction: float,
+                              tile_read: dict | None = None, windows_m2: float = 0.0,
+                              default_tile_h: float = 0.0) -> dict | None:
+    """The room's walls as the drawing finishes them, or None when the drawing does not (no record, or the plan's
+    lines barely reach the outline) — then the text / purpose ladder applies as before.
+
+    From `room["_sienu_apdaila"]` (geometry_lane._read_wall_finishes), on the room's WALL length (its outline
+    without the openings and without a line dividing an open space):
+      · paint: the share of that length the plan's paint lines cover — with the finishes the engine keeps in the
+        glaistymas/dažymas base (tapetai, plokštė, veidrodis) — of the wall area left after the doors and the
+        windows (the plan's lines stop at the glazing as they stop at a door); what no line covers is not painted,
+        and a sentence says how much;
+      · tiles, when the plan's legend has a tile line: the tile lines' share × the walls × the tile height the
+        elevation's tile layout draws (the ceiling when the layout reaches it; without a layout the ceiling, said
+        in a sentence); a band below the ceiling leaves the strip above it painted. A plan that keys no tiles (a
+        painting plan) says nothing about them — the tile ladder (`tile_read`) stands;
+      · an elevation tile zone on a face the plan does not tile and no layout covers (the kitchen backsplash) is
+        its own width × height, never a band × the perimeter; it takes paint off only where the plan paints;
+      · decorative plaster / microcement leave the paint base as their own m² (the text path's rule).
+    Returns {paint_m2, tile_m2, tile_share, tile_h, tile_deducted, molio_m2, unfinished_m2, is_full_tile,
+    tile_h_read, tiles_from_plan, notes, zonos}."""
+    from .wall_finishes import CLASS_LT, is_read
+    rec = room.get("_sienu_apdaila")
+    if not is_read(rec) or H <= 0 or perim_walls <= 0:
+        return None
+    L = float(rec["konturas_m"])
+    page = rec.get("page")
+    el = rec.get("isklotines") or {}
+    legend = {x.get("klase") for x in rec.get("legenda") or []}
+    tiles_from_plan = "plyteles" in legend
+    tr = tile_read or {}
+    notes: list[str] = []
+    klases = rec.get("klases_m") or {}
+    covered = float(rec.get("padengta_m") or 0)
+    wall_len = max(covered, L - float(rec.get("angos_m") or 0), 1e-9)
+    frac = {k: min(1.0, float(v) / wall_len) for k, v in klases.items()}
+    paint_frac = min(1.0, sum(v for k, v in frac.items() if k not in NOT_PAINTED_BY_PLAN))
+
+    # tiles
+    heights = [float(t.get("aukstis_m") or 0) for t in el.get("plyteles") or [] if float(t.get("aukstis_m") or 0) > 0]
+    tile_h_read = bool(heights)
+    if tiles_from_plan:
+        # no layout read: the room type's standard band (an assumption, said below) — never a model's height
+        tile_h = max(heights) if heights else (default_tile_h if default_tile_h > 0 else H)
+        if heights and tile_h >= TILE_LAYOUT_TO_CEILING * H:
+            tile_h = H                     # the layout reaches the ceiling (its top course meets the ceiling band)
+        tile_h = min(tile_h, H)
+        tile_share = frac.get("plyteles", 0.0)
+        tile_band = tile_share * perim_walls * tile_h
+        paint_adjust = tile_share * perim_walls * max(0.0, H - tile_h)      # painted above a band below the ceiling
+        is_full_tile = tile_band > 0 and is_full_tile_walls(tile_share, tile_h, H)
+    else:
+        tile_h = float(tr.get("height_m") or 0)
+        tile_share = float(tr.get("share") or 0)
+        # a ladder band round the whole room (a bathroom's) does not run along the walls the plan paints; a
+        # kitchen's band along the counter (an assumption, said in its sentence) is left as it is
+        tile_band = tile_share * perim_walls * tile_h
+        if tile_share >= 0.99:
+            tile_band = min(tile_band, max(0.0, 1.0 - paint_frac) * perim_walls * tile_h)
+        # what of the band lies on walls the plan paints (a backsplash on a painted kitchen wall) is not painted
+        paint_adjust = -max(0.0, tile_band - max(0.0, 1.0 - paint_frac) * perim_walls * tile_h)
+        is_full_tile = bool(tr.get("is_full_tile")) and paint_frac <= 0
+        if tr.get("assumption"):
+            notes.append(tr["assumption"])
+
+    # elevation tile zones on faces the plan does not tile and no layout covers
+    faces = el.get("sienos") or {}
+    laid_out = {t.get("siena") for t in el.get("plyteles") or []}
+    zone_tile, zone_on_paint, zonos = 0.0, 0.0, []
+    for z in el.get("zonos") or []:
+        face = faces.get(z.get("siena")) or {}
+        fl = float(face.get("ilgis_m") or 0)
+        fk = face.get("klases") or {}
+        tiled_by_plan = fl > 0 and float(fk.get("plyteles") or 0) >= 0.1 * fl
+        if z.get("klase") != "plyteles" or tiled_by_plan or z.get("siena") in laid_out:
+            continue
+        a = float(z.get("plotas_m2") or 0)
+        zone_tile += a
+        if fl > 0 and float(fk.get("dazymas") or 0) >= FACE_ZONE_ON_PAINT * fl:
+            zone_on_paint += a
+        zonos.append(z)
+        notes.append(f"Išklotinėje ({z.get('page')} lapas, siena {_lt_face(z.get('siena') or '')}) nubraižytas "
+                     f"plytelių laukas {lt_num(float(z.get('plotis_m') or 0))} × {lt_num(float(z.get('aukstis_m') or 0))} m "
+                     f"= {lt_num(a)} m² — skaičiuotas toks, koks nubraižytas.")
+    tile_m2 = tile_band + zone_tile
+    base = max(0.0, wall_area_available - max(0.0, float(windows_m2 or 0)))
+    molio_m2 = (frac.get("molio_tinkas", 0.0) + frac.get("kita_danga", 0.0)) * base
+    paint = max(0.0, paint_frac * base + paint_adjust - zone_on_paint)
+    if is_full_tile:
+        paint = 0.0
+    unfinished_m = float(rec.get("nepazymeta_m") or 0)
+    unfinished_m2 = max(0.0, (1.0 - paint_frac - frac.get("plyteles", 0.0) * tiles_from_plan
+                              - frac.get("molio_tinkas", 0.0) - frac.get("kita_danga", 0.0))) * base
+
+    if rec.get("tuscia"):
+        notes.insert(0, f"Sienų apdailos plane ({page} lapas) šios patalpos sienose apdailos nepažymėta — sienos "
+                        f"nedažomos. Patikrinkite plane; jei sienos dažomos, pažymėkite tai per mygtuką "
+                        f"„Nustatymai“ (Sienų apdaila).")
+    else:
+        parts = ", ".join(f"{CLASS_LT.get(k, k)} {lt_num(float(v))} m"
+                          for k, v in sorted(klases.items(), key=lambda kv: -kv[1]))
+        notes.insert(0, f"Sienų apdaila — iš sienų apdailos plano ({page} lapas), kaip nubraižyta palei sienas: "
+                        f"{parts} iš {lt_num(wall_len)} m sienų (be angų).")
+        if unfinished_m >= FACE_UNFINISHED_NOTE_M:
+            notes.append(f"Sienų apdailos plane apie {lt_num(unfinished_m)} m šios patalpos sienų jokia apdaila "
+                         f"nepažymėta (baldai, įranga ar neapdailinama siena) — jų plotas nedažomas. Patikrinkite plane.")
+    if tiles_from_plan and tile_band > 0 and not tile_h_read:
+        upto = "iki lubų" if tile_h >= H else f"iki {lt_num(tile_h)} m (įprastas aukštis), sienos virš jų dažomos"
+        notes.append(f"Plytelių aukščio išklotinėse neradau — plytelės ({lt_num(tile_band)} m²) skaičiuotos {upto}. "
+                     f"Patikrinkite išklotinėse; jei aukštis kitas, pataisykite plytelių ir dažymo kiekius sąmatoje.")
+    return {"paint_m2": round(paint, 4), "tile_m2": round(tile_m2, 4), "tile_share": round(tile_share, 4),
+            "tile_h": round(tile_h, 3), "tile_deducted": round(zone_on_paint, 4),
+            "molio_m2": round(molio_m2, 4), "unfinished_m2": round(unfinished_m2, 4), "is_full_tile": is_full_tile,
+            "tile_h_read": tile_h_read, "tiles_from_plan": tiles_from_plan, "notes": notes, "zonos": zonos}
+
+
 def _perimeter_floor_enabled() -> bool:
     """Feature-flag gate for the synthetic-perimeter wall floor (default ON)."""
     try:
@@ -2484,7 +2624,26 @@ def calc_room_quantities(room: dict,
     # drop the area.
     ceiling_finish_notes: list[str] = []
 
-    if elevation_tile_area > 0 and is_full_tile:
+    # v4 2026-10-26: the wall finish AS DRAWN (the wall-finish plan's lines per face + the elevations' zones) comes
+    # first; the text / purpose ladder below is for a room the drawing does not finish (resolve_drawn_wall_finish).
+    drawn = resolve_drawn_wall_finish(room, H, perim_walls, walls_gross, wall_area_available, doors_deduction,
+                                      tile_read=tile_read, windows_m2=windows_total,
+                                      default_tile_h=float(rt_rules.get("tile_walls_to_m") or 0))
+    if drawn is not None:
+        is_full_tile = drawn["is_full_tile"]
+        if drawn["tiles_from_plan"]:
+            tile_read = {**tile_read, "share": drawn["tile_share"], "height_m": drawn["tile_h"],
+                         "source": DRAWN_FINISH_SOURCE, "is_full_tile": is_full_tile, "missing": False,
+                         "assumption": None}
+        wall_finish_notes = list(drawn["notes"])
+        walls_paint_factor = (float(walls_paint_factor_override)
+                              if walls_paint_factor_override is not None else 1.0)
+        walls_paintable = drawn["paint_m2"] * walls_paint_factor
+        walls_net = walls_paintable
+        tile_walls_area = drawn["tile_m2"]
+        tile_zone_deducted = drawn["tile_deducted"]
+        molio_tinko_m2 = round(drawn["molio_m2"], 2)
+    elif elevation_tile_area > 0 and is_full_tile:
         # 2026-07-28: the elevation read itself says tile covers ≥95% of the
         # available wall (often MORE than 100%, because the extractor sums
         # overlapping išklotinė strips). That is the strongest possible
@@ -2635,18 +2794,21 @@ def calc_room_quantities(room: dict,
         else:
             walls_paint_factor = rt_rules.get("walls_paint")
             walls_paint_factor = float(walls_paint_factor) if walls_paint_factor is not None else 1.0
-            if walls_paint_factor == 0.0:
-                # Mirror image of the apdailos-override note above: with NO
-                # project finish data we fall back to the room-type standard
-                # and quote ZERO wall paint. Objektas A shows what that costs
-                # when it is wrong — the contractor bills 31.45 m² of garage
-                # wall paint the standard says doesn't exist.
+            if walls_paint_factor == 0.0 and rt_rules.get("_walls_paint_chosen"):
+                # his own „Nedažomos" for this kind of room (Setup Wizard / Nustatymai) — it stands
                 wall_finish_notes.append(
-                    f"Sienos neįtrauktos į dažomą plotą: {_purpose_phrase(paskirtis)} "
-                    f"jos įprastai nedažomos, o brėžinyje šios patalpos sienų "
-                    f"apdailos nerasta. Patikrinkite išklotinėse ar apdailų "
-                    f"lentelėje; jei sienos dažomos, pažymėkite tai per mygtuką "
+                    f"Sienos neįtrauktos į dažomą plotą: pažymėjote, kad {_purpose_phrase(paskirtis)} "
+                    f"sienos nedažomos. Jei šios patalpos sienos dažomos, pakeiskite tai per mygtuką "
                     f"„Nustatymai“ (Sienų apdaila).")
+            elif walls_paint_factor == 0.0:
+                # v4 2026-10-26 (founder: the drawing is the source): the purpose standard „a hall / a garage is not
+                # painted" is no reading. With no elevation, no finish plan line and no finish text for this room,
+                # its walls are taken as painted — and he is told so (objektas_a's hall: 52 m² of wall painted 0,
+                # while the finish plan draws every wall of it painted).
+                walls_paint_factor = 1.0
+                wall_finish_notes.append(
+                    "Išklotinės šiai patalpai nėra — sienos laikomos dažomomis; patikrinkite. Jei sienos "
+                    "nedažomos, pažymėkite tai per mygtuką „Nustatymai“ (Sienų apdaila).")
         # The glaistymas/dažymas base is gross − openings − the TILED zone
         # (2026-09-05, `_tile_zone_in_paint_base`). The 2026-07-05 „bug 3" fix
         # had put the band back INTO the base („glaistymas under tile"); the
@@ -3194,6 +3356,10 @@ def calc_room_quantities(room: dict,
         # or an ASSUMPTION, and the LT text explaining it. Surfaced by
         # lt_rules.apply_lt_sanity and available to the Prielaidos panel.
         "_tile_read_source": tile_read["source"],
+        # v4 2026-10-26: what the drawn wall finish gave (None when the drawing does not finish the room)
+        "_sienu_apdaila_skaiciavimas": ({k: drawn[k] for k in (
+            "paint_m2", "tile_m2", "tile_share", "tile_h", "tile_h_read", "unfinished_m2", "molio_m2")}
+            if drawn is not None else None),
         "_tile_read_missing": bool(tile_read["missing"]),
         "_walls_full_tile": bool(is_full_tile),
         "_walls_paint_factor": round(float(walls_paint_factor), 4),

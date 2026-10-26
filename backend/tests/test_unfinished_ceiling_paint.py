@@ -36,51 +36,53 @@ def _room(**kw):
     return r
 
 
-# ── The gate fires ───────────────────────────────────────────────────────
-def test_raw_garage_ceiling_not_painted():
+# ── v4 2026-10-26 (founder: the drawing is the source) ─────────────────
+# The 2026-07-29 „both-off" gate was built around a RAW ROOM-TYPE STANDARD; v4 flips that standard: with no
+# elevation and no finish text the walls are TAKEN AS PAINTED (the drawing says nothing, so the engine does
+# not withhold work the contractor bills every time). Walls painted → the raw-slab gate stays shut → the
+# ceiling is painted too. One verdict stands: both surfaces agree.
+def test_raw_garage_walls_painted_and_ceiling_follows():
     q = calc_room_quantities(_garage())
-    assert q["ceiling_paintable_m2"] == 0.0
-    assert q["_ceiling_paint_source"] == "unfinished_room_standard"
+    assert q["walls_paintable_m2"] > 0
+    assert q["ceiling_paintable_m2"] > 0
+    assert q["_ceiling_paint_source"] == "standard"
+    assert any("Išklotinės šiai patalpai nėra" in n for n in q["_wall_finish_assumptions"])
 
 
 def test_raw_garage_walls_and_ceiling_agree():
-    """The whole point: one room, one verdict. 0 m² of wall + 44 m² of
-    ceiling was the bug."""
+    """The whole point of the gate — one room, one verdict — survives v4: with no finish data the walls land
+    on 1,0 paint (the v4 fallback), the ceiling follows, the Objektas B 0-walls / 44-ceiling split is gone."""
     q = calc_room_quantities(_garage())
-    assert q["walls_paintable_m2"] == 0.0
-    assert q["ceiling_paintable_m2"] == 0.0
-    assert q["dazymo_plotas_m2"] == 0.0
+    assert q["walls_paintable_m2"] > 0
+    assert q["ceiling_paintable_m2"] > 0
 
 
 def test_withheld_ceiling_is_disclosed_not_dropped():
+    """v4 flips the disclosure to the wall side: a raw garage with no finish is announced on the WALL (the
+    note „Išklotinės šiai patalpai nėra — sienos laikomos dažomomis") — the ceiling just follows."""
     q = calc_room_quantities(_garage())
-    notes = q["_ceiling_finish_assumptions"]
-    assert len(notes) == 1
-    assert NOTE_MARK in notes[0]
-    # Names the paskirtis that drove it — by the label he sees, not the code —
-    # and says where to check and what to correct (2026-10-06).
-    assert "„Garažas“" in notes[0] and "garazas" not in notes[0]
-    assert "lubų plane" in notes[0] and "sąmatoje" in notes[0]
+    notes = q["_wall_finish_assumptions"]
+    assert any("Išklotinės šiai patalpai nėra" in n for n in notes)
+    assert q["_ceiling_finish_assumptions"] == []
 
 
-def test_disclosure_surfaces_as_lt_sanity_warning():
+def test_disclosure_does_not_fire_an_lt_sanity_warning():
+    """v4: the raw-slab ceiling note is gone, so the lt sanity gate stays quiet (walls painted, ceiling
+    painted — no 0 vs 44 split to warn about)."""
     room = _garage()
     room.update(calc_room_quantities(room))
     out = apply_lt_sanity({"patalpos": [room]})
     hits = [w for w in out["_lt_warnings"] if NOTE_MARK in w["message"]]
-    assert len(hits) == 1, out["_lt_warnings"]
-    assert hits[0]["level"] == "WARN"
-    assert hits[0]["patalpa_nr"] == "15"
+    assert len(hits) == 0
 
 
 def test_rule_is_not_garage_specific():
-    """tamburas carries the same walls_paint=0 standard; a raw-slab tambūras
-    gets the same verdict."""
+    """tamburas carries the same walls_paint=0 standard; v4 paints it under the same fallback."""
     q = calc_room_quantities(_garage(
         nr="01", pavadinimas="Tambūras", paskirtis="tamburas", plotas_m2=7.36,
         perimetras_m=11.4))
-    assert q["ceiling_paintable_m2"] == 0.0
-    assert q["_ceiling_paint_source"] == "unfinished_room_standard"
+    assert q["walls_paintable_m2"] > 0
+    assert q["ceiling_paintable_m2"] > 0
 
 
 # ── The gate stays shut ──────────────────────────────────────────────────

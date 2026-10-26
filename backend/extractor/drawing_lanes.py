@@ -17,7 +17,8 @@ lanes below need the reading's fresh room list, which a stored project no longer
          („rooms whose ceilings differ are not shared by floor area") reads the drawing's heights, never the
          reading model's;
   2.44d  the geometry lane (vector outlines, scale with provenance, perimeters added from the strings, openings
-         as drawn, floor coverings);
+         as drawn, floor coverings, and — v4 2026-10-26 — the wall finishes as drawn: the wall-finish plan's coloured
+         lines along each outline and the elevations' zones, `_sienu_apdaila`);
   2.44h  the heights again, now with the lane's outlines (an altitude is placed by the outline that holds it);
   2.44l  the legend counts (extractor/legend_counts.py, v4 3c-2) — proposals for the per-piece rows.
 

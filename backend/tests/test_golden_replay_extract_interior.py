@@ -92,10 +92,17 @@ DOORS_READER_GONE = {"angokrasciu_m", "kampu_metrai_m", "dazymo_walls_plus_ceili
 DOORS_ROOM_KEYS = {"elementai", "angokrasciu_gkp_m", "door_area_m2", "doors_deducted_m2", "pasleptu_duru_staktu_m",
                    "_n_windows", "calculation_trace", "dazai_l", "dazymo_plotas_m2", "glaistas_kg", "gruntas_l",
                    "kampai_m", "kampai_opening_reveals_m", "kampu_metrai", "walls_paintable_m2", "window_area_m2",
-                   "windows_deducted_m2"}
+                   "windows_deducted_m2",
+                   # v4 2026-10-26: the drawn wall-finish calculation summary (resolve_drawn_wall_finish)
+                   "_sienu_apdaila", "_sienu_apdaila_skaiciavimas", "_wall_finish_assumptions",
+                   "plyteles_sienos_m2", "_tile_zone_deducted_m2", "molio_tinko_sienos_m2",
+                   "_tile_read_source", "_walls_full_tile", "_walls_paint_factor"}
 DOORS_ROWS = {"Angokraščių glaistymas-dažymas", "Angokraščių apdirbimas GKP (struktūra)",
               "Glaistas luboms (pradinis + baigiamasis)", "Gruntas luboms", "Dažai luboms (2 sluoksniai)",
-              "GKP juostelės + savisriegiai"}
+              "GKP juostelės + savisriegiai",
+              # v4 2026-10-26: the drawn wall-finish lane can send one more room back into paint (the
+              # tambūras / bathrooms with išklotinės reading as painted) → a wall-primer row surfaces
+              "Gruntas sienoms"}
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
 # nothing, and not a step the eval runs.
 # v4 3b: the Vision adjacency pass is gone — the frozen extract still carries what it wrote, the eval leaves it

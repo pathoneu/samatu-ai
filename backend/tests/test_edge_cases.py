@@ -83,18 +83,19 @@ def test_single_garazas_bare_slab_gets_no_paint_at_all():
     # Apply calc to each room first
     for r in rooms:
         r.update(calc_room_quantities(r))
-    assert rooms[0]["walls_paintable_m2"] == 0.0
-    assert rooms[0]["ceiling_paintable_m2"] == 0.0
-    # Withheld, not silently dropped.
-    assert rooms[0]["_ceiling_paint_source"] == "unfinished_room_standard"
-    assert rooms[0]["_ceiling_finish_assumptions"]
+    # v4 2026-10-26 (founder: the drawing is the source): a raw garažas with no finish data no longer counts
+    # as „not painted" — the walls are TAKEN AS PAINTED with a sentence, and the ceiling follows.
+    assert rooms[0]["walls_paintable_m2"] > 0
+    assert rooms[0]["ceiling_paintable_m2"] > 0
+    assert rooms[0]["_ceiling_paint_source"] == "standard"
+    assert any("Išklotinės šiai patalpai nėra" in n for n in rooms[0]["_wall_finish_assumptions"])
 
     out = _build_pozicijos_from_rooms(parsed)
     pozicijos = out.get("pozicijos", [])
     paint_lines = [p for p in pozicijos if "dažymas" in p.get("aprasymas", "").lower()
                    or "glaistymas" in p.get("aprasymas", "").lower()]
-    assert not paint_lines, \
-        f"A bare betonas garažas should carry no paint line at all, got {paint_lines}"
+    assert paint_lines, \
+        f"A raw garažas with no finish data is painted under the v4 fallback — expected paint lines, got none"
 
 
 def test_single_garazas_with_finish_evidence_is_painted():

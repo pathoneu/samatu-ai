@@ -190,7 +190,11 @@ def _forget_open_space(room: dict) -> None:
 # thermostats, fixtures — extractor/legend_counts.py, proposals he confirms) and takes every sheet's kind from its
 # title text (text/page_kind.py), both under `_meta`; the plumbing rows no longer take the plumbing reader's model
 # count, so a stored project needs the re-read to get the legend's. The geometry lane itself reads as at 16.
-LANE_VERSION = 20
+# 21 (2026-10-26, v4): the lane reads each room's WALL FINISHES as drawn — the wall-finish plan's coloured lines along
+# its outline, face by face, and the elevations' zones and tile layouts (`_sienu_apdaila`, extractor/wall_finishes.py
+# and extractor/elevation_panels.py); the calculation takes them before the finish text and the purpose rules, so
+# a stored project needs the re-read to get them.
+LANE_VERSION = 21
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
@@ -274,6 +278,137 @@ def _read_wall_openings(rooms, pdf_bytes, alignment, scale, sizes, meta) -> None
             if a.get("be_tarpo"):
                 drawn["be_tarpo"] += 1
     meta["nupiesta"] = drawn
+
+
+WALL_FINISH_KEY = "_sienu_apdaila"
+
+
+def _read_wall_finishes(parsed, rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta) -> None:
+    """Which finish each room's walls get, face by face, from the WALL-FINISH PLAN's coloured lines and the
+    ELEVATIONS' zones (extractor/wall_finishes.py, extractor/elevation_panels.py; v4 2026-10-26). The rooms are laid
+    onto the finish sheet like onto the floor sheet (`_read_floor_coverings`): a trusted outline only — a line is
+    measured ALONG the outline. What is written is evidence the calculation reads (`_sienu_apdaila`); a room the plan
+    does not reach loses a record of an earlier run."""
+    from .elevation_panels import match_faces, plan_markers, read_sheet
+    from .floor_coverings import _page_text
+    from .wall_finishes import TITLE_RE, _fold, find_finish_sheets
+    t0 = time.time()
+    info = meta.setdefault("sienu_apdaila", {"lapai": [], "isklotines": [], "perskaityta": [], "masteliai_pasiskolinti": {}})
+    kinds = {}
+    for p in parsed.get("puslapiai") or []:
+        try:
+            kinds[int(p.get("nr"))] = str(p.get("tipas") or "")
+        except (TypeError, ValueError):
+            continue
+    n_pages = max(kinds) if kinds else 0
+    if not n_pages:
+        try:
+            import pypdfium2 as pdfium
+            from .pdfium_guard import PDFIUM_LOCK
+            with PDFIUM_LOCK:
+                n_pages = len(pdfium.PdfDocument(pdf_bytes))
+        except Exception:  # noqa: BLE001
+            n_pages = 0
+    # candidate sheets: a finish-plan title in the text, or the sheet kind (no legend is read on every sheet — a
+    # 65-sheet set carries millions of paths)
+    titled, elev_pages = [], []
+    for pn in range(1, n_pages + 1):
+        _w, _h, plain, _c = _page_text(pdf_bytes, pn)
+        f = _fold(plain)
+        if kinds.get(pn) == "finish_schedule" or TITLE_RE.search(f):
+            titled.append(pn)
+        if kinds.get(pn) == "wall_elevation" or (not kinds and "ISKLOTIN" in f):
+            elev_pages.append(pn)        # the sheet's kind from its title (text/page_kind.py): a plumbing plan's
+            #                              note „žr. išklotines" makes no elevation
+    finish = find_finish_sheets(pdf_bytes, titled)
+    info["lapai"] = sorted(finish)
+    found: dict[str, dict] = {}
+    if finish:
+        al = alignment
+        if any(p not in (al.get("transform") or {}) for p in finish):
+            al = lay_over(sorted(set(al.get("transform") or {}) | set(finish)))
+        group_of = {p: i for i, g in enumerate(al["groups"]) for p in g}
+        # the elevations' own scales (their dimension lines); a sheet without one borrows its siblings' when they
+        # agree within 5 % — said in `_meta`
+        own = sorted(scale[p] for p in elev_pages if p in scale and p not in finish)
+        borrowed = own[len(own) // 2] if own and (own[-1] - own[0]) / own[0] <= 0.05 else None
+        sheets_read = []
+        for ep in elev_pages:
+            if ep in finish:
+                continue
+            m = scale.get(ep)
+            if m is None and borrowed:
+                m = borrowed
+                info["masteliai_pasiskolinti"][str(ep)] = round(borrowed, 6)
+            if m:
+                res = read_sheet(pdf_bytes, ep, m)
+                if res["faces"]:
+                    sheets_read.append(res)
+        info["isklotines"] = [s["page"] for s in sheets_read]
+        for fp, legend in finish.items():
+            if fp not in sizes:
+                W, H, _ = page_geometry(pdf_bytes, fp)
+                if W <= 0:
+                    continue
+                sizes[fp] = (W, H)
+            if fp not in scale or fp not in group_of:
+                continue
+            W, H = sizes[fp]
+
+            def onto(page: int, x_pct: float, y_pct: float):
+                if page == fp:
+                    return x_pct * W, y_pct * H
+                if page not in sizes or group_of.get(page) != group_of[fp]:
+                    return None
+                bx, by = to_base(al, page, x_pct * sizes[page][0], y_pct * sizes[page][1])
+                return from_base(al, fp, bx, by)
+
+            rings, openings, imaginary = {}, {}, {}
+            for r in rooms:
+                nr = _nr(r)
+                if nr in found or _merged(r):
+                    continue
+                poly = r.get("polygon_pct")
+                if not (str(r.get("polygon_source") or "") in KEEP_POLYGONS and isinstance(poly, list) and len(poly) >= 3):
+                    continue
+                page = int((r.get("_konturas") or {}).get("page") or r.get("puslapio_nr") or 0)
+                pts = [onto(page, float(x), float(y)) for x, y in poly]
+                if any(q is None for q in pts):
+                    continue
+                rings[nr] = pts
+                for cut in (r.get("_konturas") or {}).get("menamos") or []:
+                    if len(cut) == 2:
+                        c1, c2 = onto(page, *cut[0]), onto(page, *cut[1])
+                        if c1 is not None and c2 is not None:
+                            imaginary.setdefault(nr, []).append((c1, c2))
+                ang = r.get("_angos_sienose") if isinstance(r.get("_angos_sienose"), dict) else {}
+                apage = int(ang.get("page") or page)
+                for a in ang.get("angos") or []:
+                    line = a.get("line_pct") or []
+                    if len(line) == 2:
+                        p1, p2 = onto(apage, *line[0]), onto(apage, *line[1])
+                        if p1 is not None and p2 is not None:
+                            openings.setdefault(nr, []).append((p1, p2, a.get("plotis_m")))
+            markers = plan_markers(pdf_bytes, fp)
+            faces = [f for s in sheets_read for f in s["faces"]]
+            face_rooms = match_faces(faces, markers, rings, scale[fp]) if faces and markers else {}
+            from .wall_finishes import read_rooms
+            got = read_rooms(pdf_bytes, fp, legend, scale[fp], rings, openings=openings, markers=markers,
+                             elevation=sheets_read, face_rooms=face_rooms, imaginary=imaginary)
+            for nr, rec in got.items():
+                rec["legenda"] = [{"klase": x["klase"], "tekstas": x["tekstas"]} for x in legend["rows"]]
+                found[nr] = rec
+    for r in rooms:
+        nr = _nr(r)
+        if _merged(r):
+            continue
+        if nr in found:
+            r[WALL_FINISH_KEY] = found[nr]
+        else:
+            r.pop(WALL_FINISH_KEY, None)
+    from .wall_finishes import is_read
+    info["perskaityta"] = sorted(nr for nr, rec in found.items() if is_read(rec))
+    info["sekundes"] = round(time.time() - t0, 2)
 
 
 def _merged(r: dict) -> bool:
@@ -857,6 +992,11 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
                     r.setdefault("_perimetras_pries_geometrija", old)
         _stage(on_stage, "grindys")
         _read_floor_coverings(rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
+        _stage(on_stage, "sienu_apdaila")
+        try:
+            _read_wall_finishes(parsed, rooms, pdf_bytes, sheets, alignment, lay_over, scale, sizes, meta)
+        except Exception:  # noqa: BLE001 — the finishes never sink the lane: the rooms keep the text / purpose rules
+            _log.exception("wall finishes failed")
         if meta["konturai"] or done["stated"] or meta["grindu_dangos"]["perskaityta"]:
             status = "applied"
         elif rooms:
