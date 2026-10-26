@@ -59,6 +59,9 @@ INSIDE_M = 0.04            # a finish line is drawn on or just inside the room's
 REACH_M = 0.30             # a point of the outline is finished by a line this close to it
 STEP_M = 0.05              # the outline is looked at every this many metres
 MIN_SHARE_READ = 0.25      # a room whose outline the plan's lines cover less than this is not read
+MARKER_REACH_M = 1.0       # an elevation marker label stands this close to the room corner it marks
+PARALLEL_COS = 0.5         # a line segment runs along a face when within 60° of it (a wavy line's zigzags too)
+DASH_GAP_M = 0.12          # a point in a dash gap reaches the next dash along the face no further than this
 GAP_FILL_M = 0.35           # a stretch with no line this short beside a finished one is the line stopping short
 MIN_CLASS_M = 0.3          # a finish along less of a room's outline than this is a neighbour's line round a corner
 FACE_COVER_MIN = 0.10      # a face the lines cover less than this share of is one the plan does not finish…
@@ -189,7 +192,32 @@ def _class_lines(pdf_bytes: bytes, page: int, legend: dict) -> dict[str, object]
                 pieces.setdefault(row["klase"], []).append(LineString(sub))
             except Exception:  # noqa: BLE001 — a degenerate piece
                 continue
-    return {k: unary_union(v) for k, v in pieces.items() if v}
+    return {k: v for k, v in pieces.items() if v}
+
+
+def _room_segments(lines: dict[str, list], zone: Polygon) -> dict[str, tuple]:
+    """{klase: (STRtree, segments, unit directions)} — every straight segment of the class's pieces that lies in the
+    room's zone (a dash's four edges, a wavy line's zigzags, a polyline's runs)."""
+    from shapely.strtree import STRtree
+    out = {}
+    for k, pieces in lines.items():
+        segs, dirs = [], []
+        for piece in pieces:
+            if not piece.intersects(zone):
+                continue
+            pts = list(piece.coords)
+            for a, b in zip(pts, pts[1:]):
+                L = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+                if L <= 0:
+                    continue
+                seg = LineString([a, b])
+                if not seg.intersects(zone):
+                    continue
+                segs.append(seg)
+                dirs.append(((b[0] - a[0]) / L, (b[1] - a[1]) / L))
+        if segs:
+            out[k] = (STRtree(segs), segs, dirs)
+    return out
 
 
 def _faces(poly: Polygon) -> list[tuple[tuple[float, float], tuple[float, float]]]:
@@ -207,21 +235,49 @@ def _poly(ring) -> Polygon | None:
     return poly
 
 
-def _nearest_class(p: Point, mine: dict, reach: float) -> str | None:
+def _nearest_class(p: Point, mine: dict, reach: float, direction: tuple[float, float] | None = None,
+                   slack: float = 0.0) -> str | None:
+    """The class of the nearest line segment within `reach` of `p` that runs ALONG the face (within PARALLEL_COS of
+    its direction) and is reached across the face — or along it no further than a dash gap (`slack`). The end of
+    the next wall's line round a corner is no finish here: its long edges cross the face, its short end is reached
+    along the face from further than a gap."""
+    from shapely.ops import nearest_points
     best, bd = None, reach
-    for k, g in mine.items():
-        d = g.distance(p)
-        if d <= bd:
+    for k, (tree, segs, dirs) in mine.items():
+        for i in tree.query(p.buffer(bd)):
+            seg = segs[int(i)]
+            d = seg.distance(p)
+            if d > bd:
+                continue
+            if direction is not None:
+                ux, uy = dirs[int(i)]
+                if abs(ux * direction[0] + uy * direction[1]) < PARALLEL_COS:
+                    continue
+                if d > 0:
+                    q = nearest_points(p, seg)[1]
+                    vx, vy = q.x - p.x, q.y - p.y
+                    along = abs(vx * direction[0] + vy * direction[1])
+                    across = abs(vx * direction[1] - vy * direction[0])
+                    if along > max(across, slack):
+                        continue
             best, bd = k, d
     return best
 
 
-def _along(line: LineString, mine: dict, step: float, reach: float, debug: list | None = None) -> dict[str, float]:
+def _along(line: LineString, mine: dict, step: float, reach: float, debug: list | None = None,
+           gap: float = 0.0) -> dict[str, float]:
     """{klase: length} — how much of `line` (in its own units) each class covers."""
     L = line.length
     n = max(1, int(round(L / step)))
-    pts = [line.interpolate((i + 0.5) / n, normalized=True) for i in range(n)]
-    cls = [_nearest_class(p, mine, reach) for p in pts]
+    pts, cls = [], []
+    for i in range(n):
+        p = line.interpolate((i + 0.5) / n, normalized=True)
+        q = line.interpolate(min(L, (i + 1.0) / n * L))
+        o = line.interpolate(max(0.0, i / n * L))
+        dx, dy = q.x - o.x, q.y - o.y
+        norm = (dx * dx + dy * dy) ** 0.5 or 1.0
+        pts.append(p)
+        cls.append(_nearest_class(p, mine, reach, (dx / norm, dy / norm), slack=gap))
     # a short run with no line next to a finished stretch is where the designer's line stops short of a corner or
     # a dash ends — not a wall without finish (an opening is wider than GAP_FILL_M)
     fill = max(1, int(GAP_FILL_M / step))
@@ -248,16 +304,27 @@ def _along(line: LineString, mine: dict, step: float, reach: float, debug: list 
     return got
 
 
-def _arc(ext: LineString, a: tuple[float, float], b: tuple[float, float]) -> LineString | None:
-    """The shorter piece of the room's outline between the points nearest `a` and `b`."""
+def _corner(ext: LineString, p: tuple[float, float], reach: float) -> Point:
+    """An elevation marker stands at a corner of the room: the outline's corner nearest it (within `reach`), else
+    the nearest point of the outline."""
+    pt = Point(p)
+    corners = [Point(c) for c in list(ext.coords)[:-1]]
+    best = min(corners, key=lambda c: c.distance(pt)) if corners else None
+    return best if best is not None and best.distance(pt) <= reach else ext.interpolate(ext.project(pt))
+
+
+def _arc(ext: LineString, a: tuple[float, float], b: tuple[float, float], reach: float = 0.0) -> LineString | None:
+    """The shorter piece of the room's outline between the corners `a` and `b` stand at (`_corner`)."""
     from shapely.ops import linemerge, substring
-    s1, s2 = ext.project(Point(a)), ext.project(Point(b))
+    s1, s2 = ext.project(_corner(ext, a, reach)), ext.project(_corner(ext, b, reach))
     L = ext.length
     lo, hi = sorted((s1, s2))
     if hi - lo <= L / 2:
         piece = substring(ext, lo, hi)
     else:
-        piece = linemerge(unary_union([substring(ext, hi, L), substring(ext, 0, lo)]))
+        parts = [g for g in (substring(ext, hi, L), substring(ext, 0, lo)) if g.length > 0]
+        joined = unary_union(parts) if parts else None
+        piece = joined if joined is None or isinstance(joined, LineString) else linemerge(joined)
     return piece if isinstance(piece, LineString) and piece.length > 0 else None
 
 
@@ -283,11 +350,7 @@ def read_rooms(pdf_bytes: bytes, page: int, legend: dict, m_per_pt: float, rings
     polys = {nr: p for nr, p in ((nr, _poly(r)) for nr, r in rings.items()) if p is not None}
     for nr, poly in polys.items():
         zone = poly.buffer(INSIDE_M / m_per_pt)
-        mine = {}
-        for k, g in lines.items():
-            inside = g.intersection(zone)
-            if not inside.is_empty:
-                mine[k] = inside
+        mine = _room_segments(lines, zone)
         faces, totals, unfinished, open_m = [], {}, 0.0, 0.0
         cuts = [LineString([p1, p2]) for p1, p2 in (imaginary or {}).get(nr) or []]
         for a, b in _faces(poly):
@@ -298,7 +361,7 @@ def read_rooms(pdf_bytes: bytes, page: int, legend: dict, m_per_pt: float, rings
                 faces.append({"ilgis_m": round(Lm, 3), "klases": {}, "menama": True})
                 open_m += Lm
                 continue
-            got = _along(seg, mine, step, reach, debug)
+            got = _along(seg, mine, step, reach, debug, gap=DASH_GAP_M / m_per_pt)
             cov = sum(got.values()) * m_per_pt
             face = {"ilgis_m": round(Lm, 3), "klases": {k: round(v * m_per_pt, 3) for k, v in got.items()}}
             if cov < FACE_COVER_MIN * Lm:
@@ -332,10 +395,10 @@ def read_rooms(pdf_bytes: bytes, page: int, legend: dict, m_per_pt: float, rings
             for (fa, fb), owner in face_rooms.items():
                 if owner != nr or fa not in markers or fb not in markers:
                     continue
-                arc = _arc(ext, markers[fa], markers[fb])
+                arc = _arc(ext, markers[fa], markers[fb], MARKER_REACH_M / m_per_pt)
                 if arc is None:
                     continue
-                got = _along(arc, mine, step, reach)
+                got = _along(arc, mine, step, reach, gap=DASH_GAP_M / m_per_pt)
                 sienos[f"{fa}–{fb}"] = {"ilgis_m": round(arc.length * m_per_pt, 3),
                                         "klases": {k: round(v * m_per_pt, 3) for k, v in got.items()}}
             if sienos:

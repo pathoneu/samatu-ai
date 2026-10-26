@@ -2174,7 +2174,8 @@ def _lt_face(label: str) -> str:
 
 def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gross: float,
                               wall_area_available: float, doors_deduction: float,
-                              tile_read: dict | None = None, windows_m2: float = 0.0) -> dict | None:
+                              tile_read: dict | None = None, windows_m2: float = 0.0,
+                              default_tile_h: float = 0.0) -> dict | None:
     """The room's walls as the drawing finishes them, or None when the drawing does not (no record, or the plan's
     lines barely reach the outline) — then the text / purpose ladder applies as before.
 
@@ -2214,8 +2215,9 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     heights = [float(t.get("aukstis_m") or 0) for t in el.get("plyteles") or [] if float(t.get("aukstis_m") or 0) > 0]
     tile_h_read = bool(heights)
     if tiles_from_plan:
-        tile_h = max(heights) if heights else H
-        if tile_h >= TILE_LAYOUT_TO_CEILING * H:
+        # no layout read: the room type's standard band (an assumption, said below) — never a model's height
+        tile_h = max(heights) if heights else (default_tile_h if default_tile_h > 0 else H)
+        if heights and tile_h >= TILE_LAYOUT_TO_CEILING * H:
             tile_h = H                     # the layout reaches the ceiling (its top course meets the ceiling band)
         tile_h = min(tile_h, H)
         tile_share = frac.get("plyteles", 0.0)
@@ -2277,7 +2279,8 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
             notes.append(f"Sienų apdailos plane apie {lt_num(unfinished_m)} m šios patalpos sienų jokia apdaila "
                          f"nepažymėta (baldai, įranga ar neapdailinama siena) — jų plotas nedažomas. Patikrinkite plane.")
     if tiles_from_plan and tile_band > 0 and not tile_h_read:
-        notes.append(f"Plytelių aukščio išklotinėse neradau — plytelės ({lt_num(tile_band)} m²) skaičiuotos iki lubų. "
+        upto = "iki lubų" if tile_h >= H else f"iki {lt_num(tile_h)} m (įprastas aukštis), sienos virš jų dažomos"
+        notes.append(f"Plytelių aukščio išklotinėse neradau — plytelės ({lt_num(tile_band)} m²) skaičiuotos {upto}. "
                      f"Patikrinkite išklotinėse; jei aukštis kitas, pataisykite plytelių ir dažymo kiekius sąmatoje.")
     return {"paint_m2": round(paint, 4), "tile_m2": round(tile_m2, 4), "tile_share": round(tile_share, 4),
             "tile_h": round(tile_h, 3), "tile_deducted": round(zone_on_paint, 4),
@@ -2618,7 +2621,8 @@ def calc_room_quantities(room: dict,
     # v4 2026-10-26: the wall finish AS DRAWN (the wall-finish plan's lines per face + the elevations' zones) comes
     # first; the text / purpose ladder below is for a room the drawing does not finish (resolve_drawn_wall_finish).
     drawn = resolve_drawn_wall_finish(room, H, perim_walls, walls_gross, wall_area_available, doors_deduction,
-                                      tile_read=tile_read, windows_m2=windows_total)
+                                      tile_read=tile_read, windows_m2=windows_total,
+                                      default_tile_h=float(rt_rules.get("tile_walls_to_m") or 0))
     if drawn is not None:
         is_full_tile = drawn["is_full_tile"]
         if drawn["tiles_from_plan"]:
