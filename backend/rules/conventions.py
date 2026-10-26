@@ -418,6 +418,10 @@ LT_RANGOVAS: dict[str, Param] = {p.name: p for p in (
           "phase-0 §2: he leaves out floors / tiles / plumbing / electrical on some jobs by choice",
           "Default scope choices in the `_apimtis` shape (darbai_ne, patalpos_ne, patalpu_sritys_ne, lubos, "
           "sienos_angos, rotband, rotband_dalis, kampai); a project's own choice of the same key wins."),
+    Param("uz_baldu_dazoma", True, (True, False),
+          "founder decision 2026-10-26 (the house is painted before the furniture)",
+          "Whether a wall face the finish plan leaves unmarked behind built-in furniture is painted like "
+          "the rest of the room (True) or left out of paint (False)."),
 )}
 
 
@@ -460,6 +464,10 @@ def profile_overrides(overrides) -> dict:
             v = _float_in(val, 1.0, 1.5)
             if v is not None:
                 out[name] = v
+        elif name == "uz_baldu_dazoma":
+            # only exact bool — reject 1 / 0 which Python's `in (True, False)` would accept
+            if isinstance(val, bool):
+                out[name] = val
         elif val in p.choices:
             out[name] = val
     return out

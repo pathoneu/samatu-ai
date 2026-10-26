@@ -2180,7 +2180,8 @@ def _lt_face(label: str) -> str:
 def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gross: float,
                               wall_area_available: float, doors_deduction: float,
                               tile_read: dict | None = None, windows_m2: float = 0.0,
-                              default_tile_h: float = 0.0) -> dict | None:
+                              default_tile_h: float = 0.0,
+                              uz_baldu_dazoma: bool = True) -> dict | None:
     """The room's walls as the drawing finishes them, or None when the drawing does not (no record, or the plan's
     lines barely reach the outline) — then the text / purpose ladder applies as before.
 
@@ -2215,6 +2216,11 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     wall_len = max(covered, L - float(rec.get("angos_m") or 0), 1e-9)
     frac = {k: min(1.0, float(v) / wall_len) for k, v in klases.items()}
     paint_frac = min(1.0, sum(v for k, v in frac.items() if k not in NOT_PAINTED_BY_PLAN))
+    # founder decision 2026-10-26: wall faces the finish plan leaves unmarked (behind furniture /
+    # cabinets) are painted — the house is painted before the furniture goes in.
+    unmarked_frac = max(0.0, 1.0 - sum(frac.values()))
+    if uz_baldu_dazoma and unmarked_frac > 0:
+        paint_frac = min(1.0, paint_frac + unmarked_frac)
 
     # tiles
     heights = [float(t.get("aukstis_m") or 0) for t in el.get("plyteles") or [] if float(t.get("aukstis_m") or 0) > 0]
@@ -2281,8 +2287,12 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
     if is_full_tile:
         paint = 0.0
     unfinished_m = float(rec.get("nepazymeta_m") or 0)
-    unfinished_m2 = max(0.0, (1.0 - paint_frac - frac.get("plyteles", 0.0) * tiles_from_plan
-                              - frac.get("molio_tinkas", 0.0) - frac.get("kita_danga", 0.0))) * base
+    if uz_baldu_dazoma:
+        # unmarked length is already folded into paint_frac above; nothing is left unfinished
+        unfinished_m2 = 0.0
+    else:
+        unfinished_m2 = max(0.0, (1.0 - paint_frac - frac.get("plyteles", 0.0) * tiles_from_plan
+                                  - frac.get("molio_tinkas", 0.0) - frac.get("kita_danga", 0.0))) * base
 
     if rec.get("tuscia"):
         notes.insert(0, f"Sienų apdailos plane ({page} lapas) šios patalpos sienose apdailos nepažymėta — sienos "
@@ -2294,8 +2304,13 @@ def resolve_drawn_wall_finish(room: dict, H: float, perim_walls: float, walls_gr
         notes.insert(0, f"Sienų apdaila — iš sienų apdailos plano ({page} lapas), kaip nubraižyta palei sienas: "
                         f"{parts} iš {lt_num(wall_len)} m sienų (be angų).")
         if unfinished_m >= FACE_UNFINISHED_NOTE_M:
-            notes.append(f"Sienų apdailos plane apie {lt_num(unfinished_m)} m šios patalpos sienų jokia apdaila "
-                         f"nepažymėta (baldai, įranga ar neapdailinama siena) — jų plotas nedažomas. Patikrinkite plane.")
+            if uz_baldu_dazoma:
+                notes.append(f"Sienų apdailos plane {page} lapas: {lt_num(unfinished_m)} m sienos apdailos "
+                              f"nepažymėta (baldai, įranga) — skaičiuota kaip dažoma: namas dažomas "
+                              f"prieš montuojant baldus. Jei ši siena nedažoma, pakeiskite Nustatymuose.")
+            else:
+                notes.append(f"Sienų apdailos plane apie {lt_num(unfinished_m)} m šios patalpos sienų jokia apdaila "
+                              f"nepažymėta (baldai, įranga ar neapdailinama siena) — jų plotas nedažomas. Patikrinkite plane.")
     if tiles_from_plan and tile_band > 0 and not tile_h_read:
         upto = "iki lubų" if tile_h >= H else f"iki {lt_num(tile_h)} m (įprastas aukštis), sienos virš jų dažomos"
         notes.append(f"Plytelių aukščio išklotinėse neradau — plytelės ({lt_num(tile_band)} m²) skaičiuotos {upto}. "
@@ -2536,6 +2551,7 @@ def calc_room_quantities(room: dict,
     # the profile's threshold: the project's own choice, else the `lt_rangovas` default (3,0 m², rangovo taisyklė
     # 2026-10-25). Only the LT standard reads it; NRM2 / VOB keep their own 0,5 m² rule.
     aperture_thr = prof.get("aperture_no_deduct_max_m2", LT_RANGOVAS["aperture_no_deduct_max_m2"].default)
+    uz_baldu_dazoma = prof.get("uz_baldu_dazoma", LT_RANGOVAS["uz_baldu_dazoma"].default)
     doors_total = n_doors * door_area if _opening_should_deduct(door_area, standard, aperture_thr) else 0
     windows_total = n_windows * window_area if _opening_should_deduct(window_area, standard, aperture_thr) else 0
     # Apimtis (2026-09-06): „sienų plotas be angų" — the contractor measures
@@ -2640,7 +2656,8 @@ def calc_room_quantities(room: dict,
     # first; the text / purpose ladder below is for a room the drawing does not finish (resolve_drawn_wall_finish).
     drawn = resolve_drawn_wall_finish(room, H, perim_walls, walls_gross, wall_area_available, doors_deduction,
                                       tile_read=tile_read, windows_m2=windows_total,
-                                      default_tile_h=float(rt_rules.get("tile_walls_to_m") or 0))
+                                      default_tile_h=float(rt_rules.get("tile_walls_to_m") or 0),
+                                      uz_baldu_dazoma=uz_baldu_dazoma)
     if drawn is not None:
         is_full_tile = drawn["is_full_tile"]
         if drawn["tiles_from_plan"]:
