@@ -183,7 +183,9 @@ def test_hall_painted_as_drawn_not_by_purpose():
 def test_kitchen_backsplash_is_the_drawn_zone_not_a_band():
     zone = {"siena": "x1–x2", "klase": "plyteles", "plotis_m": 2.6, "aukstis_m": 0.6, "plotas_m2": 1.56, "page": 11}
     rec = _record({"dazymas": 11.0}, nepazymeta=3.0, sienos={"x1–x2": {"ilgis_m": 4.0, "klases": {}}}, zonos=[zone])
-    out = calc_room_quantities(_room(rec, paskirtis="virtuve"))
+    # uz_baldu_dazoma=False: test documents the pre-2026-10-26 behaviour where the wall behind
+    # the cabinet was left out of paint; with the default True the 3 m would be folded into paint.
+    out = calc_room_quantities(_room(rec, paskirtis="virtuve"), rules={"_profilis": {"uz_baldu_dazoma": False}})
     assert out["plyteles_sienos_m2"] == pytest.approx(1.56, abs=0.01)
     # 3 m of wall the plan does not finish (behind the cabinets) is not painted: 11/14 of the walls
     assert out["walls_paintable_m2"] == pytest.approx(11.0 / 14.0 * 14.0 * 2.8, abs=0.2)
@@ -290,3 +292,28 @@ def test_free_reread_returns_the_record():
     from api.room_outline import GEOMETRY_ROOM_KEYS
     from api.room_recalc import _recalc_room  # noqa: F401 — the allowlist module imports
     assert "_sienu_apdaila" in GEOMETRY_ROOM_KEYS
+
+
+# ── uz_baldu_dazoma — founder decision 2026-10-26 ─────────────────────────────
+
+def test_uz_baldu_dazoma_default_true_paints_unmarked_wall():
+    """3 m of a 10 m wall is unmarked (behind a wardrobe). With the default uz_baldu_dazoma=True
+    (founder decision 2026-10-26) the unmarked fraction is folded into paint: all 10 m → painted.
+    The sentence says the unmarked length was counted as painted and refers to Nustatymai."""
+    rec = _record({"dazymas": 7.0}, konturas=10.0, nepazymeta=3.0, legenda=("dazymas",))
+    out = calc_room_quantities(_room(rec, perimetras_m=10.0))
+    # full 10 m painted → 10 * 2.8 = 28 m²
+    assert out["walls_paintable_m2"] == pytest.approx(10.0 * 2.8, abs=0.3)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "prieš montuojant baldus" in notes, f"Expected new sentence, got: {notes[:200]}"
+
+
+def test_uz_baldu_dazoma_false_leaves_unmarked_wall_out():
+    """Same room with uz_baldu_dazoma=False: the old behaviour — the 3 m behind the wardrobe is
+    not painted, and the sentence says so."""
+    rec = _record({"dazymas": 7.0}, konturas=10.0, nepazymeta=3.0, legenda=("dazymas",))
+    out = calc_room_quantities(_room(rec, perimetras_m=10.0), rules={"_profilis": {"uz_baldu_dazoma": False}})
+    # only 7 m painted → 7/10 * 10 * 2.8 = 19.6 m²
+    assert out["walls_paintable_m2"] == pytest.approx(7.0 * 2.8, abs=0.3)
+    notes = " ".join(out["_wall_finish_assumptions"])
+    assert "nedažomas" in notes, f"Expected old sentence, got: {notes[:200]}"
