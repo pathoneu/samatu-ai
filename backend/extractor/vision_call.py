@@ -6055,6 +6055,22 @@ def extract_interior(
                                           route_sentence=_route_sentence)
     print(f"[extractor] route: vision — {_route_sentence}")
 
+    # ── v4 (2026-10-27, founder decision): `SAMATU_PASS1_NARROW=1` ⇒ narrow Pass-1. The room list
+    # comes from the drawing's own text table; Pass-1 is asked only for the fields the lanes
+    # cannot read (per-room openings, hidden doors, LED niches, built-in furniture, ceiling
+    # type, bbox). Fail-open: no text room table or no floor_plan sheet ⇒ today's full Pass-1
+    # runs unchanged and the reason is stamped on `_meta.pass1_narrow`. Flag unset ⇒ this block
+    # is a two-line boolean + guarded import, zero behaviour change. See extractor/pass1_narrow.py.
+    _pass1_narrow_fallopen: dict | None = None
+    from .pass1_narrow import narrow_enabled as _narrow_enabled
+    if _narrow_enabled():
+        from .pass1_narrow import extract_interior_narrow as _narrow_extract, NarrowFallOpen
+        _narrow_out = _narrow_extract(pdf_bytes, rules_override, progress_cb)
+        if not isinstance(_narrow_out, NarrowFallOpen):
+            return _narrow_out
+        _pass1_narrow_fallopen = _narrow_out.meta
+        print(f"[extractor] pass1 narrow fell open: {_narrow_out.reason}")
+
     # max_retries=1 (T5a, 2026-07-28): the SDK default is 2, which multiplies
     # with the app-level retry loop in _run_pass1_once (3 attempts) and every
     # sub-reader that shares this client. One SDK-level retry still absorbs a
@@ -7244,6 +7260,11 @@ def extract_interior(
         parsed["_meta"]["elapsed_s"] = elapsed
     else:
         parsed["_meta"] = {"elapsed_s": elapsed}
+
+    # Narrow Pass-1 was asked for but neither gate cleared → stamp the reason so the gate reader
+    # can tell today's full run from one that tried narrow and fell open.
+    if _pass1_narrow_fallopen is not None:
+        parsed["_meta"]["pass1_narrow"] = _pass1_narrow_fallopen
 
     parsed["_elapsed_s"] = elapsed
     parsed["status"] = "ok"

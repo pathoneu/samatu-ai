@@ -205,6 +205,13 @@ def _eksplikacija_from_text_schema(pdf_bytes: bytes, client) -> dict | None:
     return best
 
 
+# Public aliases of the two helpers above so `pass1_narrow.py` reuses the same bodies rather than
+# copying them (v4, 2026-10-27). The underscore names stay for the module's own call sites and the
+# existing tests that import them.
+eksplikacija_from_text_schema = _eksplikacija_from_text_schema
+"""Public alias — the eksplikacija page's TEXT handed to text.schema_llm, substring-guarded."""
+
+
 # ── room list from the drawing's text table ───────────────────────────────────
 
 def _rooms_from_table(eks: dict) -> list[dict]:
@@ -254,6 +261,10 @@ def _rooms_from_table(eks: dict) -> list[dict]:
             room["_paskirtis_source"] = "inferred_from_name"
         out.append(room)
     return out
+
+
+rooms_from_table = _rooms_from_table
+"""Public alias — see v4 2026-10-27 note above the eksplikacija_from_text_schema alias."""
 
 
 def _no_table_warning(sentence: str) -> dict:
