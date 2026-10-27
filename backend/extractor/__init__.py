@@ -9,6 +9,11 @@ Architektūra (po Phase 1 baseline validation 2026-04-26):
 
 from .vision_call import extract_interior  # noqa: F401
 from .stream import extract_interior_stream  # noqa: F401
+from .no_vision_route import (  # noqa: F401
+    is_vector_pdf,
+    should_use_no_vision,
+    extract_interior_no_vision,
+)
 from .eksplikacija_reader import read_eksplikacija  # noqa: F401
 from .plyteliu_specifikacija import extract_plyteliu_specifikacija  # noqa: F401
 from .cross_page_validator import validate_consistency  # noqa: F401

@@ -6041,6 +6041,19 @@ def extract_interior(
              On success returns {..., "status": "ok", "_meta": {...}}.
     """
     t0 = time.time()
+    # ── v4 (2026-10-26, founder decision): a VECTOR PDF goes through the no-vision route (walls as paths,
+    # text layer in place, every quantity recoverable from the deterministic lanes). The Pass-1 Vision pass
+    # (8 pages, voting, ~430 s, ~1,16 USD on objektas_h) and the per-room zoom are skipped. Raster /
+    # flattened PDFs stay on this route (the decision reads the drawing itself). `SAMATU_FORCE_VISION=1`
+    # forces this (old) route for comparison. See backend/extractor/no_vision_route.py.
+    from .no_vision_route import should_use_no_vision, extract_interior_no_vision
+    _no_vision, _route_sentence = should_use_no_vision(pdf_bytes)
+    if _no_vision:
+        print(f"[extractor] route: no_vision_vector — {_route_sentence}")
+        return extract_interior_no_vision(pdf_bytes, rules_override, progress_cb,
+                                          route_sentence=_route_sentence)
+    print(f"[extractor] route: vision — {_route_sentence}")
+
     # max_retries=1 (T5a, 2026-07-28): the SDK default is 2, which multiplies
     # with the app-level retry loop in _run_pass1_once (3 attempts) and every
     # sub-reader that shares this client. One SDK-level retry still absorbs a
@@ -6054,6 +6067,8 @@ def extract_interior(
             progress_cb(ev)
         except Exception as exc:
             print(f"[extractor] progress_cb raised: {exc}")
+    _emit({"event": "route_selected", "route": "vision",
+           "sentence": _route_sentence})
 
     system = [
         {"type": "text", "text": SYSTEM_TEXT, "cache_control": {"type": "ephemeral"}}
