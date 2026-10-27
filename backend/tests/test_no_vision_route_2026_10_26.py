@@ -202,3 +202,24 @@ def test_route_wiring_in_extract_interior_prefers_no_vision_on_vector(monkeypatc
     assert out["_meta"]["route"] == "no_vision_vector"
     assert out["_meta"]["vision_pass"] == "none"
     assert [c[0] for c in calls] == ["predicate", "route"]
+
+
+# ── NameError fix: is_vector_pdf must not reference median_chars ─────────────────────────────────────────────
+
+def test_is_vector_pdf_text_but_no_walls_returns_false_without_nameerror(monkeypatch):
+    """A PDF with text but no wall-shaped filled rectangles → is_vector_pdf returns (False, s) with
+    'vektorinių sienų nerasta' in s and does NOT raise NameError (the predecessor referenced `median_chars`
+    which no longer exists after the text-gate refactor)."""
+    pytest.importorskip("reportlab")
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(300, 300))
+    # text only — no filled rectangle → wall_fills returns [] on every page
+    c.drawString(60, 130, "PATALPŲ EKSPLIKACIJA — a short line of plain text")
+    c.showPage()
+    c.save()
+    pdf = buf.getvalue()
+    from extractor.no_vision_route import is_vector_pdf
+    ok, sentence = is_vector_pdf(pdf)
+    assert ok is False
+    assert "vektorinių sienų nerasta" in sentence

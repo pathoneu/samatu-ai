@@ -89,7 +89,7 @@ def is_vector_pdf(pdf_bytes: bytes) -> tuple[bool, str]:
             log.debug("is_vector_pdf: wall_fills failed on p%s: %r", nr, exc)
             continue
     return False, (
-        f"Brėžinyje tekstas yra ({median_chars:.0f} ženklai/psl.), bet vektorinių sienų nerasta "
+        f"Brėžinyje tekstas yra ({n_with_text}/{len(chars)} psl.), bet vektorinių sienų nerasta "
         "— paliekamas vaizdo modelio skaitymui")
 
 
