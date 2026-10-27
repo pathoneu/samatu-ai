@@ -6041,11 +6041,12 @@ def extract_interior(
              On success returns {..., "status": "ok", "_meta": {...}}.
     """
     t0 = time.time()
-    # ── v4 (2026-10-26, founder decision): a VECTOR PDF goes through the no-vision route (walls as paths,
-    # text layer in place, every quantity recoverable from the deterministic lanes). The Pass-1 Vision pass
-    # (8 pages, voting, ~430 s, ~1,16 USD on objektas_h) and the per-room zoom are skipped. Raster /
-    # flattened PDFs stay on this route (the decision reads the drawing itself). `SAMATU_FORCE_VISION=1`
-    # forces this (old) route for comparison. See backend/extractor/no_vision_route.py.
+    # ── v4 (2026-10-26, founder decision): when `SAMATU_NO_VISION_ROUTE=1` and the PDF is vector, the
+    # no-vision route replaces Pass-1 Vision. The route is OFF by default — the 2026-10-27 gate failed
+    # (billed lines +8,4 pp) because the route has no deterministic source yet for per-room LED niches,
+    # hidden doors, built-in furniture, ceiling type, and openings on plans without wall outlines.
+    # `SAMATU_FORCE_VISION=1` forces this Vision route even when the no-vision flag is on. See
+    # backend/extractor/no_vision_route.py.
     from .no_vision_route import should_use_no_vision, extract_interior_no_vision
     _no_vision, _route_sentence = should_use_no_vision(pdf_bytes)
     if _no_vision:

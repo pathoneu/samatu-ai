@@ -1,4 +1,7 @@
-"""Run the no-vision route on the corpus and write ground_truth/<slug>/ai_extract_novision.json."""
+"""Run the no-vision route on the corpus and write ground_truth/<slug>/ai_extract_novision.json.
+
+Calls extract_interior_no_vision directly — SAMATU_NO_VISION_ROUTE is not needed here.
+"""
 import json, os, sys, time
 from pathlib import Path
 

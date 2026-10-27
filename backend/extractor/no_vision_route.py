@@ -1,11 +1,16 @@
 """No-vision route for a vector PDF (v4, 2026-10-26 — founder decision).
 
-A vector PDF — walls as paths, dimensions and labels in the text layer — carries every quantity the Pass-1
-Vision read used to recover from pixels. The Vision pass costs ~1,16 USD and ~430 s on a 10-page project
-(objektas_h fresh read, 2026-10-26); the deterministic lanes already in place (`extractor/geometry_lane.py`,
+OFF by default — set `SAMATU_NO_VISION_ROUTE=1` to enable. The gate measured on 2026-10-27 failed (billed
+lines +8,4 pp vs baseline) because the route has no deterministic source yet for per-room LED niches, hidden /
+sliding doors, built-in furniture, ceiling type, and openings on plans without wall outlines. The route lands
+here so today's behaviour is byte-identical when the flag is unset, and the founder can switch it on locally.
+
+When enabled: a vector PDF — walls as paths, dimensions and labels in the text layer — goes through this route
+instead of Pass-1 Vision. The Vision pass costs ~1,16 USD and ~430 s on a 10-page project (objektas_h fresh
+read, 2026-10-26); the deterministic lanes already in place (`extractor/geometry_lane.py`,
 `extractor/room_identity.py`, `extractor/wall_finishes.py`, `extractor/legend_counts.py`, `text/page_kind.py`,
-`text/heights.py`, `text/schema_llm.py`) do the same work in seconds and 0 USD. For vector PDFs the paid reading
-is replaced by this route; raster / flattened PDFs keep the Vision route (the decision reads the drawing).
+`text/heights.py`, `text/schema_llm.py`) do the same work in seconds and 0 USD. Raster / flattened PDFs keep
+the Vision route (the decision reads the drawing).
 
 Shape: the same `patalpos` / `puslapiai` / `warnings` / `pozicijos` / `santrauka` / `_meta` keys the Vision
 route returns; `_meta.vision_pass = "none"` and `_meta.route = "no_vision_vector"` say so.
@@ -19,7 +24,8 @@ Where a field has no deterministic source yet on a vector PDF (a room with no ta
 description only a picture shows), the field is BLANK with a `_kilme` reason sentence — never a guess, never a
 model reading pixels.
 
-`SAMATU_FORCE_VISION=1` forces the old Vision route for comparison.
+`SAMATU_FORCE_VISION=1` forces the old Vision route even when `SAMATU_NO_VISION_ROUTE=1` is set (stronger
+off switch; keeps the golden replay pin working).
 """
 from __future__ import annotations
 
@@ -37,6 +43,7 @@ MISSING_TABLE_SENTENCE = (
     "vaizdo modelio. Patalpų sąrašą įveskite rankomis."
 )
 FORCE_VISION_ENV = "SAMATU_FORCE_VISION"
+NO_VISION_ROUTE_ENV = "SAMATU_NO_VISION_ROUTE"
 NO_VISION_NOTE = "be vaizdo skaitymo"
 ROUTE_LABEL = "no_vision_vector"
 
@@ -87,9 +94,16 @@ def is_vector_pdf(pdf_bytes: bytes) -> tuple[bool, str]:
 
 
 def should_use_no_vision(pdf_bytes: bytes) -> tuple[bool, str]:
-    """`(True, sentence)` when the no-vision route takes this PDF; honours `SAMATU_FORCE_VISION=1`."""
+    """`(True, sentence)` when the no-vision route takes this PDF.
+
+    OFF by default — `SAMATU_NO_VISION_ROUTE=1` must be set to enable it. When off, returns (False, sentence)
+    without reading `pdf_bytes` at all. `SAMATU_FORCE_VISION=1` is a stronger off switch checked first, so the
+    golden replay pin keeps working.
+    """
     if os.environ.get(FORCE_VISION_ENV) == "1":
         return False, f"{FORCE_VISION_ENV}=1 — paliekamas vaizdo modelio skaitymui (palyginimui)"
+    if os.environ.get(NO_VISION_ROUTE_ENV) != "1":
+        return False, f"Vektorinis kelias išjungtas ({NO_VISION_ROUTE_ENV}≠1) — vaizdo modelio skaitymas"
     return is_vector_pdf(pdf_bytes)
 
 

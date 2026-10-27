@@ -61,15 +61,33 @@ def test_is_vector_pdf_false_on_empty_raster():
     assert "nenustatyta" not in sentence.lower()        # the message says what's missing, not „could not decide"
 
 
+def test_route_is_off_by_default(monkeypatch):
+    """With no env vars set, should_use_no_vision returns False without reading the PDF at all."""
+    pytest.importorskip("reportlab")
+    import extractor.no_vision_route as _nvr
+    monkeypatch.delenv("SAMATU_NO_VISION_ROUTE", raising=False)
+    monkeypatch.delenv("SAMATU_FORCE_VISION", raising=False)
+
+    def _boom(_bytes):
+        raise AssertionError("is_vector_pdf must not be called when the flag is off")
+
+    monkeypatch.setattr(_nvr, "is_vector_pdf", _boom)
+    from extractor.no_vision_route import should_use_no_vision, NO_VISION_ROUTE_ENV
+    ok, sentence = should_use_no_vision(_vector_pdf_bytes())
+    assert ok is False
+    assert NO_VISION_ROUTE_ENV in sentence
+
+
 def test_should_use_no_vision_honours_force_vision_env(monkeypatch):
     pytest.importorskip("reportlab")
-    from extractor.no_vision_route import should_use_no_vision, FORCE_VISION_ENV
+    from extractor.no_vision_route import should_use_no_vision, FORCE_VISION_ENV, NO_VISION_ROUTE_ENV
+    monkeypatch.setenv(NO_VISION_ROUTE_ENV, "1")   # route enabled — test only the force-vision override
     monkeypatch.setenv(FORCE_VISION_ENV, "1")
     ok, sentence = should_use_no_vision(_vector_pdf_bytes())
     assert ok is False
     assert FORCE_VISION_ENV in sentence
     monkeypatch.delenv(FORCE_VISION_ENV, raising=False)
-    ok2, _ = should_use_no_vision(_vector_pdf_bytes())
+    ok2, _ = should_use_no_vision(_vector_pdf_bytes())   # route enabled, no force-vision → is_vector_pdf runs
     assert ok2 is True
 
 
@@ -165,6 +183,7 @@ def test_route_wiring_in_extract_interior_prefers_no_vision_on_vector(monkeypatc
     """`extract_interior` dispatches a vector PDF to the no-vision route BEFORE any Vision call. We assert the
     dispatch by stubbing `should_use_no_vision` and `extract_interior_no_vision`."""
     pytest.importorskip("reportlab")
+    monkeypatch.setenv("SAMATU_NO_VISION_ROUTE", "1")
     from extractor import vision_call as _vc
     calls: list[tuple] = []
 
