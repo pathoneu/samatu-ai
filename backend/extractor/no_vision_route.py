@@ -63,12 +63,15 @@ def is_vector_pdf(pdf_bytes: bytes) -> tuple[bool, str]:
         return False, "Brėžinio puslapių nepavyko perskaityti"
     if not sigs:
         return False, "Brėžinys be puslapių — negalime perskaityti"
-    # Median chars/page over the whole document — the text-layer gate.
-    import statistics
+    # Text layer gate: at least some sheets must carry readable text. A big TP ties interior sheets (text layer
+    # in place) to many single-image diagrams (0 chars); the whole-document median goes to 0 on objektas_b
+    # (65 sheets, text on ~20, blanks on ~45) even though every interior sheet has text and the paid reading
+    # reads them. Rule: at least max(5, 20 %) of pages carry ≥ 10 chars (the native-PDF gate's own threshold).
     chars = [len(str(s.get("text") or "").strip()) for s in sigs]
-    median_chars = round(float(statistics.median(chars)), 1) if chars else 0.0
-    if median_chars < 10:
-        return False, (f"Brėžinys be teksto sluoksnio (vidurkis {median_chars:.0f} ženklai/psl.) "
+    n_with_text = sum(1 for c in chars if c >= 10)
+    threshold = max(5, int(0.20 * len(chars)))
+    if n_with_text < min(threshold, len(chars)):
+        return False, (f"Brėžinys be teksto sluoksnio ({n_with_text}/{len(chars)} psl. su tekstu) "
                        "— paliekamas vaizdo modelio skaitymui")
     # At least one page must show wall-shaped vector fills.
     for nr in range(1, len(sigs) + 1):
@@ -133,8 +136,10 @@ def _eksplikacija_from_text_schema(pdf_bytes: bytes, client) -> dict | None:
         log.warning("no_vision_route: text.schema_llm unavailable: %r", exc)
         return None
     best: dict | None = None
+    MIN_ENOUGH = 5                                      # a page that produced this many rooms IS the table — stop here
+    MAX_PAGES = 2                                       # at most this many model calls (one per page): the first page that reads is almost always the only one — a second page is a continuation; four pages before cost 100+ s on objektas_a with 11 rooms
     TOTALS = ("bendras", "iš viso", "is viso", "viso", "total", "patalpų plotas", "patalpu plotas")
-    for page_nr, text in cands[:4]:
+    for page_nr, text in cands[:MAX_PAGES]:
         low = text.lower()
         start = min((low.find(m) for m in EKSPL_MARKERS if m in low), default=0)
         snippet = text[max(start - 40, 0): max(start - 40, 0) + 3500]
@@ -181,6 +186,8 @@ def _eksplikacija_from_text_schema(pdf_bytes: bytes, client) -> dict | None:
         }
         if best is None or len(rooms) > len(best["patalpos"]):
             best = answer
+        if len(rooms) >= MIN_ENOUGH:                    # a page with this many rooms IS the table — no need to compare
+            break
     return best
 
 
