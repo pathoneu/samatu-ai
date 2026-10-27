@@ -349,7 +349,17 @@ def extract_interior_no_vision(
     _emit({"event": "pass1_started", "page_count": n_pdf_pages,
            "voting": False, "skipped": True, "note": NO_VISION_NOTE})
 
+    # Timing probes — one row per step, written to _meta.sekundes for the runtime table.
+    timings: dict[str, float] = {}
+
+    def _tic():
+        return time.time()
+
+    def _toc(key: str, t: float) -> None:
+        timings[key] = round(time.time() - t, 2)
+
     # Step 2 — the room table from the drawing's text layer.
+    t_eks = _tic()
     _emit({"event": "eksplikacija_started"})
     try:
         from .pdfplumber_eksplikacija import extract_eksplikacija_pdfplumber
@@ -412,6 +422,7 @@ def extract_interior_no_vision(
             "saltinis": "nera_lenteles", "sakinys": MISSING_TABLE_SENTENCE,
         }
 
+    _toc("eksplikacija", t_eks)
     _emit({"event": "eksplikacija_merged",
            "merged_rooms": len(rooms),
            "total_rows": len(eks.get("patalpos", []))})
@@ -432,6 +443,7 @@ def extract_interior_no_vision(
     # Step 3 — the drawing's €0 lanes (page kinds, text scan + anchors, dimension pairs, raster outlines,
     # heights, vector geometry, legend counts). ONE function, same as the paid reading calls (and the eval tail).
     from .drawing_lanes import run_drawing_lanes
+    t_lanes = _tic()
     try:
         run_drawing_lanes(parsed, pdf_bytes, emit=_emit)
     except Exception as exc:  # noqa: BLE001 — a lane must never sink the extraction
@@ -453,8 +465,11 @@ def extract_interior_no_vision(
     parsed["_meta"]["zoom_elapsed_s"] = 0.0
     parsed["_meta"]["zoom_skipped_via_eksplikacija"] = 0
 
+    _toc("lanes", t_lanes)
+
     # Step 4 — wall finishes from the finish sheets' TEXT (apply_apdailos: text layer / OCR, a model only on
     # the extracted text through text/schema_llm.py). The ONLY model call this route may make.
+    t_ap = _tic()
     try:
         from .vision_call import apply_apdailos
         _emit({"event": "apdailos_started"})
@@ -475,7 +490,10 @@ def extract_interior_no_vision(
         log.warning("no_vision_route: apdailos failed: %r", exc)
         _emit({"event": "apdailos_error", "message": str(exc)})
 
+    _toc("apdailos", t_ap)
+
     # Step 5 — door types from the drawing's TEXT (apply_door_types — no model).
+    t_dt = _tic()
     try:
         from .vision_call import apply_door_types
         _emit({"event": "door_types_started"})
@@ -491,7 +509,10 @@ def extract_interior_no_vision(
         log.warning("no_vision_route: door types failed: %r", exc)
         _emit({"event": "door_types_error", "message": str(exc)})
 
+    _toc("door_types", t_dt)
+
     # Step 6 — ceiling heights filled across rooms (same helper the Vision route and the free re-read use).
+    t_h = _tic()
     try:
         from . import row_provenance as _rp
         n_h = _rp.fill_heights_from_read(parsed.get("patalpos") or [], parsed)
@@ -501,7 +522,10 @@ def extract_interior_no_vision(
     except Exception as exc:  # noqa: BLE001
         log.warning("no_vision_route: height fill failed: %r", exc)
 
+    _toc("heights", t_h)
+
     # Step 7 — tile size mentions on finish / elevation pages (deterministic, $0).
+    t_scans = _tic()
     try:
         from .plyteliu_specifikacija import extract_plyteliu_specifikacija, RELEVANT_PAGE_TYPES
         relevant = [p["nr"] for p in (parsed.get("puslapiai") or [])
@@ -527,10 +551,12 @@ def extract_interior_no_vision(
         parsed["_vector_symbols"] = scan_vector_symbols(pdf_bytes)
     except Exception as exc:  # noqa: BLE001
         log.warning("no_vision_route: vector symbol scan failed: %r", exc)
+    _toc("skenavimai", t_scans)
 
     # Step 9 — the per-room Python math and the sąmata rows (same functions the Vision route runs). This is
     # where `calc_room_quantities` reads every field the earlier steps wrote.
     _emit({"event": "post_processing"})
+    t_math = _tic()
     try:
         from .vision_call import _recompute_per_room_via_python, _build_pozicijos_from_rooms, _recompute_santrauka, _emit_v8_compat_fields
     except Exception as exc:  # noqa: BLE001
@@ -616,12 +642,15 @@ def extract_interior_no_vision(
     if rules_override is not None:
         parsed["_overrides"] = rules_override
 
+    _toc("math_sanity", t_math)
+
     # Step 11 — finalize.
     elapsed = round(time.time() - t0, 1)
     parsed.setdefault("_meta", {})["elapsed_s"] = elapsed
     parsed["_meta"]["vision_pass"] = "none"
     parsed["_meta"]["route"] = ROUTE_LABEL
     parsed["_meta"]["route_sakinys"] = sentence
+    parsed["_meta"]["no_vision_sekundes"] = timings
     parsed["_elapsed_s"] = elapsed
     parsed["status"] = "ok"
     return parsed
