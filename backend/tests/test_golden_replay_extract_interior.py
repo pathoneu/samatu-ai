@@ -161,6 +161,10 @@ def run(tmp_path_factory):
                     "SAMATU_VOTING_MODELS", "MODEL_OVERRIDE", "VOTING_N", "PARALLEL_VOTING_WARM",
                     "WALL_ELEVATION_EXTRACT", "ENABLE_LEGACY_HALF_SUBTRACT"):
             mp.delenv(env, raising=False)
+        # The replay tests PRECOMMIT the Vision pipeline's reader-by-reader behaviour (adjacency, zoom, doors,
+        # door types, fixtures, apdailos). Force the Vision route so v4's no-vision-vector routing does not
+        # take over on this vector PDF (`backend/extractor/no_vision_route.py`).
+        mp.setenv("SAMATU_FORCE_VISION", "1")
         gr.install(mp, client, tmp_path_factory.mktemp("vision_cache"))
         pdf_page_cache.clear()
         logging.getLogger().addHandler(logs)
