@@ -543,9 +543,9 @@ def _mark_room_not_found(parsed, room, nr):
     pavadinimas = room.get('pavadinimas') or nr
     room['_kilme'] = (
         'Patalpa „' + pavadinimas + '“ (' + nr + ') '
-        'neatpażinta brėžinio aukšto plane — '
+        'neatpažinta brėžinio aukšto plane — '
         'patikrinkite brėžinio puslapį su šios patalpos vieta, '
-        'kad atpażintų langus, duris ir nišas.'
+        'kad atpažintų langus, duris ir nišas.'
     )
     parsed.setdefault('warnings', []).append({
         'level': 'WARN',
