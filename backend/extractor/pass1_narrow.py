@@ -144,7 +144,8 @@ Atsakyk **TIK** JSON pagal pateiktą schemą. Jokio paaiškinimo, jokio markdown
 - **RAUDONA stačiakampė linija lubų plane** = LED juosta (LT industry konvencija, labai stabili).
 - B&W brėžiniuose: ploni dvigubi stačiakampiai + žymėjimas "LED juosta" / "LED nišelė" / "el. nišelė".
 - Gylis 80–120mm; aukštis 50–80mm.
-- Tipas `nisa_LED`, `ilgis_m` = atkarpos ilgis metrais (NE mm).
+- Tipas `nisa_LED`, `ilgis_m` = bendras nišų ilgis šioje patalpoje metrais, visų atkarpų suma
+  (NE vienos atkarpos; NE mm) — susumuok ilgį visų atkarpų.
 
 **Built-in spintos (baldų plane):**
 - Užbrūkšniuotas / užpildytas stačiakampis prie sienos su žymėjimu "DRABUŽINĖ" / "SPINTA" /
@@ -199,7 +200,7 @@ type Element = {
   kiekis: number;
   plotis_mm?: number;
   aukstis_mm?: number;
-  ilgis_m?: number;        // TIK `nisa_LED` — ilgis metrais, ne mm
+  ilgis_m?: number;        // TIK `nisa_LED` — bendras nišų ilgis šioje patalpoje metrais, visų atkarpų suma, NE vienos atkarpos
 };
 ```
 
@@ -532,12 +533,37 @@ def _clean_bbox(bb: Any) -> dict | None:
         return None
 
 
+def _mark_room_not_found(parsed, room, nr):
+    '''Mark a table room as not found on the floor plan.
+
+    Shared by the rasta-false path and the omitted-room path (rooms the model
+    did not mention at all).
+    '''
+    room['_pass1_narrow_rasta'] = False
+    pavadinimas = room.get('pavadinimas') or nr
+    room['_kilme'] = (
+        'Patalpa „' + pavadinimas + '“ (' + nr + ') '
+        'neatpażinta brėžinio aukšto plane — '
+        'patikrinkite brėžinio puslapį su šios patalpos vieta, '
+        'kad atpażintų langus, duris ir nišas.'
+    )
+    parsed.setdefault('warnings', []).append({
+        'level': 'WARN',
+        'code': 'pass1_narrow_room_not_on_plan',
+        'patalpa_nr': nr,
+        'message': (
+            'Patalpos „' + pavadinimas + '“ (' + nr + ') '
+            'brėžinio aukšto plane rasti nepavyko — langai, durys ir '
+            'lubų nišos liko neperskaityti. Patikrinkite patalpą Patikros žingsnyje.'
+        ),
+    })
+
 def merge_narrow(parsed: dict, model_result: dict, table_rooms: list[dict]) -> int:
     """Build `parsed["patalpos"]` from table rooms and apply the model's narrow answer per nr.
 
     Returns the number of rooms the model MARKED as found on the plan (`rasta: true`). Rooms
-    the model marked `rasta: false` keep their table row and carry an LT sentence in `_kilme` and
-    a WARN in `parsed["warnings"]` so the user is told what to check.
+    the model marked `rasta: false`, and rooms the model did not mention at all, keep their table
+    row and carry an LT sentence in `_kilme` and a WARN so the user is told what to check.
     """
     parsed["patalpos"] = list(table_rooms)
     by_nr = {str(r.get("nr") or "").strip(): r for r in parsed["patalpos"]}
@@ -551,26 +577,11 @@ def merge_narrow(parsed: dict, model_result: dict, table_rooms: list[dict]) -> i
         if not nr or nr not in by_nr:
             continue
         room = by_nr[nr]
-        rasta = bool(m.get("rasta"))
-        room["_pass1_narrow_rasta"] = rasta
+        rasta = bool(m.get('rasta'))
         if not rasta:
-            kilme = (
-                f"Patalpa „{room.get('pavadinimas') or nr}" + f" ({nr})" +
-                "" + "“ neatpažinta brėžinio aukšto plane — patikrinkite brėžinio puslapį su "
-                "šios patalpos vieta, kad atpažintų langus, duris ir nišas."
-            )
-            room["_kilme"] = kilme
-            parsed.setdefault("warnings", []).append({
-                "level": "WARN",
-                "code": "pass1_narrow_room_not_on_plan",
-                "patalpa_nr": nr,
-                "message": (
-                    f"Patalpos „{room.get('pavadinimas') or nr}" + f" ({nr})" +
-                    "“ brėžinio aukšto plane rasti nepavyko — langai, durys ir "
-                    "lubų nišos liko neperskaityti. Patikrinkite patalpą Patikros žingsnyje."
-                ),
-            })
+            _mark_room_not_found(parsed, room, nr)
             continue
+        room['_pass1_narrow_rasta'] = True
         found += 1
         # The model's own placement on the floor plan — reused by Patikra (click-to-pan) and by
         # the geometry lane as a hint when the drawn outline needs a bbox anchor.
@@ -588,6 +599,12 @@ def merge_narrow(parsed: dict, model_result: dict, table_rooms: list[dict]) -> i
         elems = [e for e in (_clean_element(e) for e in (m.get("elementai") or [])) if e]
         if elems:
             room["elementai"] = elems
+
+    # Rooms the model did not mention at all are treated the same as rasta: false.
+    for nr, room in by_nr.items():
+        if "_pass1_narrow_rasta" not in room:
+            _mark_room_not_found(parsed, room, nr)
+
     return found
 
 

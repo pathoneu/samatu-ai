@@ -306,3 +306,46 @@ def test_merge_narrow_drops_elements_with_unknown_tipas():
     kept = parsed["patalpos"][0]["elementai"]
     tipai = [e["tipas"] for e in kept]
     assert tipai == ["langas"]
+
+def test_merge_narrow_omitted_room_gets_warn_and_rasta_false():
+    """A table room the model did not mention at all (not even rasta: false) is treated
+    identically to rasta: false: it gets _pass1_narrow_rasta=False, _kilme, and a WARN.
+    merge_narrow returns 2 for the two rooms the model did mention."""
+    from extractor.pass1_narrow import merge_narrow
+    parsed = {"warnings": []}
+    table_rooms = [
+        {"nr": "01", "pavadinimas": "Miegamasis", "plotas_m2": 14.0,
+         "plotas_saltinis": "eksplikacija", "elementai": []},
+        {"nr": "02", "pavadinimas": "Vonia", "plotas_m2": 3.5,
+         "plotas_saltinis": "eksplikacija", "elementai": []},
+        {"nr": "03", "pavadinimas": "Sandelijukas", "plotas_m2": 2.0,
+         "plotas_saltinis": "eksplikacija", "elementai": []},
+    ]
+    # model answers only for 01 and 02; 03 is completely absent
+    model_result = {
+        "patalpos": [
+            {"nr": "01", "rasta": True, "puslapio_nr": 1,
+             "bbox_pct": {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3},
+             "lubu_tipas": "gkp", "elementai": []},
+            {"nr": "02", "rasta": True, "puslapio_nr": 1,
+             "bbox_pct": {"x": 0.5, "y": 0.5, "w": 0.2, "h": 0.2},
+             "lubu_tipas": None, "elementai": []},
+        ]
+    }
+    found = merge_narrow(parsed, model_result, table_rooms)
+    assert found == 2
+    # room 03 was not mentioned -- must carry the same signals as rasta: false
+    room03 = next(r for r in parsed["patalpos"] if r["nr"] == "03")
+    assert room03["_pass1_narrow_rasta"] is False
+    assert "_kilme" in room03
+    warns = [w for w in parsed["warnings"]
+             if isinstance(w, dict) and w.get("code") == "pass1_narrow_room_not_on_plan"
+             and w.get("patalpa_nr") == "03"]
+    assert len(warns) == 1
+    msg = warns[0]["message"]
+    assert "Patikros" in msg or "patikrink" in msg.lower()
+    # rooms 01 and 02 must NOT have a warning
+    other_warns = [w for w in parsed["warnings"]
+                   if isinstance(w, dict) and w.get("code") == "pass1_narrow_room_not_on_plan"
+                   and w.get("patalpa_nr") in ("01", "02")]
+    assert len(other_warns) == 0
