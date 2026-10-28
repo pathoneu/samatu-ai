@@ -29,11 +29,18 @@ H_PDF = REPO / "docs/superpowers/fixtures/2026-09-05-batch-2/objektas_h/project.
 
 _BLOCK = re.compile(r"[\"']type[\"']\s*:\s*[\"'](image|document)[\"']")
 _CALL = re.compile(r"\.messages\.(create|stream)\b")
-# the marked paths: (file, innermost function) — Pass-1 and the zoom, and the roof module (hidden, not interior)
+# the marked paths: (file, innermost function) — Pass-1 and the zoom, and the roof module (hidden, not interior).
+# `_run_narrow_once` is the Pass-1 narrow (v4, 2026-10-27) behind SAMATU_PASS1_NARROW=1 — a Pass-1 call that asks
+# only for the fields the deterministic lanes cannot read; it is a marked path for the same reason _run_pass1_once
+# is (sends sheet images to the model).
 ALLOWED_CALLS = {("extractor/vision_call.py", "_run_pass1_once"), ("extractor/vision_call.py", "_vision_zoom_room"),
+                 ("extractor/pass1_narrow.py", "_run_narrow_once"),
                  ("text/schema_llm.py", "structure")}
 ALLOWED_BLOCKS = {("extractor/prompt.py", "build_user_content"), ("extractor/prompt.py", "build_zoom_user_content"),
-                  ("extractor/prompt.py", "build_user_content_pdf_native")}
+                  ("extractor/prompt.py", "build_user_content_pdf_native"),
+                  # Pass-1 narrow builds its own image-first user content so voting rounds hit the prompt cache
+                  # the same way the full Pass-1 does. Same marked-path reason as `_run_narrow_once` above.
+                  ("extractor/pass1_narrow.py", "build_narrow_user_content")}
 HIDDEN_MODULES = {"extractor/roof/vision_extractor.py"}   # facade / roof: hidden from the launch UI (CLAUDE.md)
 
 
