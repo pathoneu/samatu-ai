@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# pass1_narrow_gate.sh — v4 (2026-10-27). Reads a fresh extract with SAMATU_PASS1_NARROW=1 for
+# pass1_narrow_gate.sh -- v4 (2026-10-28). Reads a fresh extract with SAMATU_PASS1_NARROW=1 for
 # every corpus project and scores it against the samata (eval_harness --totals-only --recompute
 # and --rows --recompute) and the reading scorecard. The script DOES NOT overwrite
-# ground_truth/<slug>/ai_extract.json — it writes ai_extract_narrow.json alongside, swaps it in
-# for scoring, and restores the file with `git checkout --` afterwards.
+# ground_truth/<slug>/ai_extract.json -- it writes ai_extract_narrow.json alongside, swaps it in
+# for scoring, and restores BOTH ai_extract.json and ai_extract_meta.json with `git checkout --`
+# afterwards.
 #
 # NOT run from this task (no credit for paid runs). The founder funds the reads from this script.
 #
@@ -48,47 +49,50 @@ echo
 OUT_DIR="docs/superpowers/fixtures/pass1_narrow_$(date -u +%Y-%m-%d)"
 mkdir -p "$OUT_DIR"
 
-# ── Phase 1: read every project ───────────────────────────────────────────────
+# ---- Phase 1: read every project -----------------------------------------------
+# Uses pass1_fast_measure.py with --tag narrow and SAMATU_PASS1_NARROW=1 exported.
+# That runner writes ground_truth/<slug>/ai_extract_narrow.json and NEVER overwrites
+# ai_extract.json or ai_extract_meta.json, so no mv/restore is needed here.
+#
+# defect (a) fixed (2026-10-28): the old code called run_vision_on_truth_set.py --only,
+# which reads registry projects with has_cached_extract: false and skips a/g/h silently.
+# Those three have has_cached_extract: true and were "0 project(s) to process" on
+# every gate run, so their narrow files were baseline copies. The runner handles ALL
+# corpus slugs regardless of that registry flag.
+
 SWAPPED_SLUGS=""
 
-for SLUG in $PROJECTS; do
-  BASE="ground_truth/$SLUG/ai_extract.json"
-  if [[ ! -f "$BASE" ]]; then
-    echo "  $SLUG -- SKIP: no baseline ai_extract.json"
-    continue
-  fi
-  NARROW="ground_truth/$SLUG/ai_extract_narrow.json"
-  BASELINE_ELAPSED=$("$PY" -c "import json; d=json.load(open('$BASE')); print((d.get('_meta') or {}).get('elapsed_s',''))")
-  echo "--- $SLUG (baseline ${BASELINE_ELAPSED}s) ---"
-
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "  (dry run -- would call extract_interior with SAMATU_PASS1_NARROW=1 and VOTES=$VOTES)"
-    continue
-  fi
-
-  # Fresh read with narrow enabled. run_vision_on_truth_set.py writes ai_extract.json; move it
-  # to the _narrow sidecar, then restore the baseline with git checkout.
-  SAMATU_PASS1_NARROW=1 SAMATU_PASS1_NARROW_VOTES=$VOTES \
-    "$PY" scripts/run_vision_on_truth_set.py --only "$SLUG" --budget "$BUDGET_USD" || {
-      echo "  $SLUG -- FAIL (vision run exited non-zero)"
-      continue
-    }
-  mv "$BASE" "$NARROW"
-  git checkout -- "$BASE"
-  SWAPPED_SLUGS="$SWAPPED_SLUGS $SLUG"
-done
-
 if [[ "$DRY_RUN" == "1" ]]; then
+  echo "(dry run -- would call pass1_fast_measure.py with SAMATU_PASS1_NARROW=1"
+  echo " SAMATU_PASS1_NARROW_VOTES=$VOTES for each of: $PROJECTS)"
+  SAMATU_PASS1_NARROW=1 SAMATU_PASS1_NARROW_VOTES=$VOTES \
+    "$PY" scripts/pass1_fast_measure.py $PROJECTS --tag narrow --dry-run
   echo "(dry run complete -- no API calls made)"
   exit 0
 fi
+
+SAMATU_PASS1_NARROW=1 SAMATU_PASS1_NARROW_VOTES=$VOTES \
+  "$PY" scripts/pass1_fast_measure.py $PROJECTS --tag narrow || {
+    echo "pass1_fast_measure.py exited non-zero -- aborting gate"
+    exit 1
+  }
+
+# Collect which slugs produced a narrow file.
+for SLUG in $PROJECTS; do
+  NARROW="ground_truth/$SLUG/ai_extract_narrow.json"
+  if [[ -f "$NARROW" ]]; then
+    SWAPPED_SLUGS="$SWAPPED_SLUGS $SLUG"
+  else
+    echo "  $SLUG -- no ai_extract_narrow.json produced; skipping scoring for this slug"
+  fi
+done
 
 if [[ -z "$SWAPPED_SLUGS" ]]; then
   echo "No narrow extracts produced -- nothing to score."
   exit 1
 fi
 
-# ── Phase 2: corpus-wide scoring (one pass after all projects are read) ───────
+# ---- Phase 2: corpus-wide scoring (one pass after all projects are read) -------
 # Swap every narrow extract in for scoring, score once across the whole corpus,
 # then restore with git checkout.
 
@@ -105,13 +109,29 @@ done
 "$PY" eval_harness.py --rows --recompute        2>&1 | tee "$OUT_DIR/narrow_rows.log"
 "$PY" scripts/reading_scorecard.py              2>&1 | tee "$OUT_DIR/narrow_scorecard.log"
 
-# Restore all swapped files.
-git checkout -- ground_truth/*/ai_extract.json 2>/dev/null || true
+# defect (b) fixed (2026-10-28): restore BOTH ai_extract.json AND ai_extract_meta.json
+# for every swapped slug explicitly, then check git status for any remaining tracked
+# modifications and fail loudly.
+
+echo
+echo "=== Restoring baseline files ==="
+for SLUG in $SWAPPED_SLUGS; do
+  git checkout -- "ground_truth/$SLUG/ai_extract.json" 2>/dev/null || true
+  git checkout -- "ground_truth/$SLUG/ai_extract_meta.json" 2>/dev/null || true
+  echo "  $SLUG: restored ai_extract.json + ai_extract_meta.json"
+done
+
 echo
 echo "=== git status check (nothing tracked should stay modified) ==="
-git status --short ground_truth
+DIRTY="$(git status --short ground_truth)"
+if [[ -n "$DIRTY" ]]; then
+  echo "ERROR: tracked ground_truth files are still modified after restore:" >&2
+  echo "$DIRTY" >&2
+  exit 1
+fi
+echo "(clean)"
 
-# ── Phase 3: print gate-decision headlines ────────────────────────────────────
+# ---- Phase 3: print gate-decision headlines ------------------------------------
 echo
 echo "=== Totals headline ==="
 grep -n "Billed lines\|Corpus mean" "$OUT_DIR/narrow_totals.log" || echo "(no match)"
@@ -129,7 +149,7 @@ echo "=== Per-project rows table ==="
 awk '/Project.*rows.*within10/{p=1} p{print} /Corpus mean/{p=0}' "$OUT_DIR/narrow_rows.log" \
   || echo "(rows table not found)"
 
-# ── Phase 4: runtime comparison TSV ─────────────────────────────────────────
+# ---- Phase 4: runtime comparison TSV ------------------------------------------
 RUNTIME_TSV="$OUT_DIR/narrow_runtime.tsv"
 printf "slug\tbaseline_elapsed_s\tnarrow_elapsed_s\tnarrow_rounds\toutput_tokens\tcost_usd\n" \
   > "$RUNTIME_TSV"
