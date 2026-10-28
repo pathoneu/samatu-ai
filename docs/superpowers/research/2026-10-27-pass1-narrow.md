@@ -14,11 +14,19 @@ Built, local only, awaiting the paid gate. Everything below is €0 — no reads
 - `backend/extractor/no_vision_route.py` — the two helpers Pass-1 narrow reuses
   (`eksplikacija_from_text_schema`, `rooms_from_table`) are now exposed as public aliases of the
   underscore-prefixed originals; no behaviour change.
-- `backend/tests/test_pass1_narrow_2026_10_27.py` — 11 unit tests (flag off, env parsing, page
+- `backend/tests/test_pass1_narrow_2026_10_27.py` — 12 unit tests (flag off, env parsing, page
   selection by kind, both fall-open paths, prompt shape, schema shape, merge invariants, element
-  enum guard).
+  enum guard, omitted-room handling).
 - `scripts/pass1_narrow_gate.sh` — the gate script. **NOT run** — needs purchased credit.
-- Suite: 5343 passed, 0 failed, 4 skipped (today's baseline 5332 + the 11 new tests, same 4 skips).
+- Suite (builder full run, 2026-10-27, under CPU contention): **5336 passed, 2 failed, 9 skipped
+  in 6985 s (1:56 h)**. The two failures were timing assertions only —
+  `test_geometry_gate[objektas_a]` (`out['seconds'] < 20` failed; objektas_a ran 1930 s,
+  objektas_g 421 s) and `test_parallel_voting::test_parallel_actually_overlaps` (overlap < 0.5 s).
+  Manager re-ran those two files plus the narrow and golden-replay tests on an idle CPU: 26 passed,
+  2 failed in 1:01 h — the same two timing assertions failed again. The same test files on the
+  main checkout earlier that day passed inside the 20 s limit, so the failures reflect machine
+  load or the worktree's missing gitignored caches, not the branch. The final verdict is the
+  manager's full suite on the merged head in the main checkout, recorded in the merge log.
 
 Flag:
 
@@ -30,7 +38,9 @@ How the gate will run (not from this task):
     bash scripts/pass1_narrow_gate.sh                     # one round, every project
     VOTES=3 bash scripts/pass1_narrow_gate.sh objektas_h  # one project, 3 rounds
 
-Commits (local): see `git log v4/pass1-narrow`.
+Commits: see `git log v4/pass1-narrow`. Review-fix commits (Sonnet 5.5, 2026-10-28):
+`56461475` fix(v4): LED niche wording + omitted-room handling in merge_narrow (12 narrow tests);
+`fe239056` fix(v4): gate script — corpus-wide scoring after all projects are read.
 
 ## §1 Why
 
