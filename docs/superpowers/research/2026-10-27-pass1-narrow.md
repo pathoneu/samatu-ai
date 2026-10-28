@@ -4,7 +4,7 @@ Author: Opus 5.5 worker on branch `v4/pass1-narrow` (off `togal-v2` @ `59f691a0`
 
 ## §0 Resume point
 
-Built, local only, awaiting the paid gate. Everything below is €0 — no reads were purchased.
+Gate run on 2026-10-28; see §10 for measured numbers.
 
 - `backend/extractor/pass1_narrow.py` — the new module (flag, probe, prompt, schema, one-round
   + voter Vision call, merge, end-to-end extract).
@@ -17,7 +17,7 @@ Built, local only, awaiting the paid gate. Everything below is €0 — no reads
 - `backend/tests/test_pass1_narrow_2026_10_27.py` — 12 unit tests (flag off, env parsing, page
   selection by kind, both fall-open paths, prompt shape, schema shape, merge invariants, element
   enum guard, omitted-room handling).
-- `scripts/pass1_narrow_gate.sh` — the gate script. **NOT run** — needs purchased credit.
+- `scripts/pass1_narrow_gate.sh` — the gate script. Fixed on 2026-10-28 (see §10 defects).
 - Suite (builder full run, 2026-10-27, under CPU contention): **5336 passed, 2 failed, 9 skipped
   in 6985 s (1:56 h)**. The two failures were timing assertions only —
   `test_geometry_gate[objektas_a]` (`out['seconds'] < 20` failed; objektas_a ran 1930 s,
@@ -33,7 +33,7 @@ Flag:
     SAMATU_PASS1_NARROW=1              # enable
     SAMATU_PASS1_NARROW_VOTES=3        # bring back the voter (default 1)
 
-How the gate will run (not from this task):
+How the gate ran (2026-10-28):
 
     bash scripts/pass1_narrow_gate.sh                     # one round, every project
     VOTES=3 bash scripts/pass1_narrow_gate.sh objektas_h  # one project, 3 rounds
@@ -226,33 +226,22 @@ error dict that `extract_interior` returns directly (same shape today's Vision e
 Golden replay (`test_golden_replay_extract_interior.py`) PASSES with the flag unset — no pin
 needed, `SAMATU_PASS1_NARROW` is simply absent in that test's environment.
 
-## §5 The gate script and the expected runtime arithmetic
+## §5 The gate script and the runtime arithmetic — MEASURED (2026-10-28)
 
-`scripts/pass1_narrow_gate.sh` runs one narrow extraction per project, moves it to
-`ground_truth/<slug>/ai_extract_narrow.json`, swaps it in for scoring with `eval_harness.py
---totals-only --recompute` / `--rows --recompute` and `scripts/reading_scorecard.py`, then
-restores the baseline with `git checkout --`.
+See §10 for the full measured numbers. Summary:
 
-Modes: `VOTES=1` (default) and `VOTES=3` compare one round against three. `DRY_RUN=1` prints
-the plan without calling Vision.
+- `objektas_d`: 212,4 s → 80,7 s (one round; zoom 0 s).
+- `objektas_b`: 468,3 s → 372,4 s (b's full Pass-1 sends 8 pages; the time is NOT dominated
+  by Pass-1 output tokens, so a narrow prompt saves little on b).
+- `objektas_c`: fell open — `no_floor_plan_kind` (three A3 sheets carry no floor-plan title
+  in their text layer). Cost to read c from scratch: 5,56 USD by the sprint's meter
+  (70k output tokens incl. zoom). This makes a corpus-wide fresh re-read ~15–25 USD, not 7.
+- `objektas_a`, `objektas_g`, `objektas_h`: skipped by the old gate script (defect (a), see §10).
+- Accuracy on b and d: WORSE — see §10.
+- Verdict: narrow mode stays OFF. Founder chose parallel voting + zoom skip on the full
+  Pass-1 (branch `v4/pass1-fast`).
 
-Expected runtime arithmetic (ESTIMATE — mark it so, the actual numbers come from the gate):
-
-- One narrow round at the measured output-token-per-second rate (~170 s / 10 000 output tokens
-  on today's full prompt ⇒ ~17 ms / token): a narrow round emitting ~3 000 output tokens is
-  ~50–60 s per call.
-- Zoom: 0 s.
-- The remaining Vision readers on `objektas_h`: ~70 s (doors 37,87 + fixtures 20,87 + door_types
-  11,37, measured on 2026-10-26).
-- So `objektas_h` end-to-end ⇒ ~150 s vs 735 s today — ~5× faster, ESTIMATE.
-- `objektas_a` and `objektas_d` are already short runs (208 / 212 s today), so the absolute
-  saving is smaller but the ratio is similar.
-- `objektas_g` runs 1510 s today (the big project) and should see the largest absolute win.
-
-Expected cost per project per round: ~0,3–0,5 USD at Opus 4.7 rates
-(input/output 15 / 75 USD per million; input is cached across rounds).
-
-Gate PASSES when, vs the baseline:
+Gate criteria (for reference — narrow FAILED):
 
 - totals ±1 pp of 57,50 %
 - rows ±10 % within 1 pp of 9,0 %
@@ -274,3 +263,75 @@ Gate PASSES when, vs the baseline:
   recorded both as rooms_from_table-sparse). If pdfplumber + text-schema still return no rows
   there, narrow mode falls open to today's full Pass-1 on those two — gate script records that
   under `pass1_narrow.reason`.
+
+## §10 Gate run 2026-10-28
+
+### Gate script defects (found on first run)
+
+**(a) `run_vision_on_truth_set.py --only` silently skipped a, g, h.** That helper reads the
+registry and only processes projects with `has_cached_extract: false`. Three of the six corpus
+projects have `has_cached_extract: true` (a, g, h) and were "0 project(s) to process" on every
+gate run — their `ai_extract_narrow.json` files were simply copies of the baseline.
+Fixed 2026-10-28: `pass1_narrow_gate.sh` now calls `pass1_fast_measure.py --tag narrow` which
+handles all corpus slugs regardless of the registry flag.
+
+**(b) `git checkout -- ground_truth/*/ai_extract.json` left `ai_extract_meta.json` modified.**
+The sprint helper writes a sidecar `ai_extract_meta.json` alongside the main file; the broad
+wildcard restore did not touch it. Fixed: the gate script now explicitly restores both files
+per slug and fails loudly if `git status --short ground_truth` is non-empty after restore.
+
+### Projects that ran
+
+Only b and d ran narrow (a/g/h skipped by defect (a); c fell open).
+
+**`objektas_c`** fell open with `reason: "no_floor_plan_kind"` — the three A3 sheets carry no
+floor-plan title in the text layer (page-kind returns no `floor_plan` entries). A full Pass-1
+read of c (including zoom) cost 5,56 USD by the sprint's meter (~70k output tokens incl. zoom).
+This anchors a corpus-wide fresh re-read at ~15–25 USD (six projects × ~3–5 USD each), not the
+~7 USD the §5 estimate assumed before the gate.
+
+### Runtime
+
+| slug         | baseline (s) | narrow (s) | delta  |
+|--------------|:------------:|:----------:|:------:|
+| objektas_d   |   212,4      |    80,7    | -62 %  |
+| objektas_b   |   468,3      |   372,4    | -21 %  |
+
+`objektas_b`'s full Pass-1 already sends 8 pages (the largest page-count in the corpus after
+the page-filter). The time is not Pass-1 output-token-dominated; narrow mode saves the token
+tail but not the image transfer or the apdailos / doors readers — hence the modest win.
+
+### Accuracy: WORSE on both projects
+
+**`objektas_b`** (narrow vs stored baseline):
+- Rows ±10 %: 1,8 % → 0,9 % (halved)
+- Reveals family: −10,6 % → −36,9 %
+
+**`objektas_d`** (narrow vs stored baseline):
+- Rows ±10 %: 14,0 % → 12,0 %
+- € ±10 %: 15,0 % → 6,1 %
+- Reveals: −6,4 % → −41,5 %
+- Scorecard exterior doors: 4/4 → 3/4 (room 04's 1370-wide exterior door read as a 900 interior door)
+
+### Root cause: invented sizes and missed niches
+
+The narrow prompt asks the model for per-room `elementai` (openings, niches, ceiling type) only —
+the room list and areas come from the table. Without the full schema's dimensional context, the
+model fills in standard-ish sizes that are wrong:
+
+- `objektas_d` actual: 2650×1500 / 2940×1500 / 3405×2100 (read from annotations in stored read).
+  Narrow produced: 1500×1500 × 3, plus a 910×2100 hidden door and a 1510×2390 wardrobe in every
+  room. Every size is a plausible default — not what the drawing shows.
+- `objektas_b` (11 rooms with LED niches): 11 → 4 niches found. The ceiling plan carries the
+  niche lengths in text annotations the narrow prompt did not route to.
+
+These are not prompt-tuning problems. They reflect that opening sizes and niche lengths require
+the full multi-page context the narrow prompt strips.
+
+### Verdict
+
+Narrow mode FAILED the gate. The founder chose the zero-accuracy-risk lever instead:
+keep the full Pass-1 and (1) run its voting rounds in parallel (`ENABLE_PARALLEL_VOTING=1`),
+(2) skip the zoom pass when the room list came from the drawing's table (the 2026-10-25 rule
+already handles this — see `docs/superpowers/research/2026-10-28-pass1-fast.md`).
+`SAMATU_PASS1_NARROW` stays OFF (default).
