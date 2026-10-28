@@ -10,7 +10,7 @@
 
 ## 1. Kaip paleisti
 
-**Pagrindinėje kopijoje** (`/Users/ignasgaldikas/samatu-ai`) turi būti šaka `togal-v2` (`git status` → „On branch togal-v2"). Kodo viršūnė — `756e76e9` arba vėlesnė.
+**Pagrindinėje kopijoje** (`/Users/ignasgaldikas/samatu-ai`) turi būti šaka `togal-v2` (`git status` → „On branch togal-v2"). Kodo viršūnė — `422c6b36` arba vėlesnė.
 
 Du terminalai:
 
@@ -280,9 +280,20 @@ Kiekvienas: kontekstas vienu sakiniu · galimybės · ką siūlo vadovas (jei si
 
 7. **Siauras Pass-1 (2026-10-27/28).** Pasirinkote siaurinti Pass-1, o ne nuimti. Kas pastatyta: prieš paveikslėlio skaitymą vaizdo modeliui perduodamas patalpų sąrašas iš teksto lentelės; modelio prašoma tik tų laukų, kurių takeliai neskaito — langų, durų, paslėptų durų, LED nišų, įmontuotų baldų ir lubų tipo; lapai atrenkami pagal tekstinį lapo tipą (aukšto planas, lubų planas, baldų lapai, durų ir langų žiniaraštis); vienas skaitymas be balsavimo (`SAMATU_PASS1_NARROW_VOTES=3` grąžina balsavimą); be zoom; ta pati apdorojimo eilutė toliau; c ir g (be teksto lentelės arba be aukšto plano lapo) lieka su šiandieniniu pilnuoju Pass-1. Kodėl turėtų būti greičiau: objektas_h — trys nuoseklūs balsavimo ratai po ~10 000 išvesties žetonų ≈ 510 s iš 735 s; zoom 87 s be pakeitimų; vienas siauras ratas ≈ 50–60 s — įvertis, nematuota. Kas laukia: ~7 USD mokamų skaitymų vartams (6 projektai × 1 ratas ≈ 3 USD, plius 3 ratų palyginimas ≈ 3 USD) — kai bus kredito, paleidžiamas `scripts/pass1_narrow_gate.sh`.
 
+8. **Greitesnis pilnas Pass-1 (2026-10-28).** Išmatuota su `ENABLE_PARALLEL_VOTING=1` (≈ 1,9 USD iš viso):
+
+   - **objektas_h: 735 → 295 s** (visa procedūra). Pass-1 277 s: pirmas ratas vienas ≈ 138 s (įrašo spartintuvą), antras ir trečias kartu ≈ 139 s (abu skaito spartintuvą — 35 420 žetonų/ratas); kaina 1,15 USD.
+   - **objektas_d: 261 s** (Pass-1 230 s; kaina 0,78 USD; palyginimas nebetiesinis — saugota versija buvo kitu modeliu).
+   - **Balsavimo ratai yra lygiagrečiai**: vienas ratas pirmiau (rašo spartintuvą), kiti du kartu (skaito). Papildomos kainos nėra — spartintuvo ratai moka 0,1× įvesties kainą.
+   - **Zoom jau nulis** lentelę turintiems projektams (a, b, d, h — pagal 2026-10-25 taisyklę). c ir g (be lentelės) zoomina toliau.
+
+   Kas **nesikeičia**: rezultatai tie patys pagal konstrukciją — tie patys užklausai, tas pats modelis, ratai suteikiami vidurkiui tokia pačia tvarka. Matuojant iš naujo skaičiai svyruoja ±1–2 pp vien dėl pakartotinio skaitymo — tai verta žinoti vertinant bet kokius „vartus" ar palyginimo skaičius.
+
+   Kas **lieka**: 277 s — trys pilni balsavimo ratai po ≈ 12 000 išvesties žetonų kiekvienam. Trumpinti Pass-1 išvestį nemokamai nepavyko — žr. 7 punktą.
+
 **Jūsų sprendimai, jau priimti ir įgyvendinti:** sienos už įmontuotų baldų dažomos (2026-10-26), hidroizoliacija dviem eilutėmis (jūsų taisyklė; rangovas rašo vieną), angų užskaita 3,0 m², rastro kelias nukeltas, 3b sujungtas žinant metrikos kritimą, Sonnet darbams be inžinerinio sprendimo.
 
-**Laukia jūsų (nauja, 2026-10-28):** (e) **plytelių klojimas iki lubų** — nubraižytas klojimas ≥ 90 % patalpos aukščio laikomas iki lubų (objektas_a 107/111: 2,64–2,72 m prie 2,80 m → dažomos juostos nėra; rangovas ją skaičiuoja): palikti 0,9 ir rodyti juostą kaip klausimą Patikroje, kai tarpas 5–15 cm (siūlau), ar 1,0; (f) **siauro Pass-1 kelias** — pasirinkta (1): siauras Pass-1 pastatytas ir sulietas, išjungtas (`SAMATU_PASS1_NARROW=1`). Laukia tik API kredito vartams.
+**Laukia jūsų (nauja, 2026-10-28):** (e) **plytelių klojimas iki lubų** — nubraižytas klojimas ≥ 90 % patalpos aukščio laikomas iki lubų (objektas_a 107/111: 2,64–2,72 m prie 2,80 m → dažomos juostos nėra; rangovas ją skaičiuoja): palikti 0,9 ir rodyti juostą kaip klausimą Patikroje, kai tarpas 5–15 cm (siūlau), ar 1,0; (f) **siauro Pass-1 kelias** — pasirinkta (1): siauras Pass-1 pastatytas ir sulietas, išjungtas (`SAMATU_PASS1_NARROW=1`). Laukia tik API kredito vartams; (g) **lygiagretus balsavimas gamyboje** — įjungti `ENABLE_PARALLEL_VOTING=1` Railway aplinkoje (vienas kintamasis, be kodo keitimo; siūlau įjungti).
 
 **Laukia jūsų:** (a) santechnikos prietaisai be legendos — tuščia ar modelio skaičius; (b) medžiagų specifikacijos skaitymas nebekainuoja — ar nustoti skaičiuoti veiksmą; (c) objektas_b vėdinimo eilutės (tiekėjo specifikacija, be plano) — ar jas skaičiuoti į vardiklį; (d) kada stumti į `main`.
 
