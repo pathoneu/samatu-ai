@@ -61,7 +61,7 @@ cd frontend && npm run dev
 2. Po pažymėtu kambariu — juosta su veiksmais (ikona ir žodis): **Taisyti kontūrą · Sujungti · Atimti · Neskaičiuoti · Rodyti įrodymus**. Klavišai: **E** taisyti, **M** sujungti, **X** atimti, **Shift+F** arba **.** — parodyti visą kambarį.
 3. **R + vienas spustelėjimas** kambaryje 06: pasiūlomas kontūras (punktyras) ir viena eilutė, ką jis pakeis. **Enter** įrašo. Toste 10 s — **Atšaukti** (grąžina, kas buvo).
 4. **R kambaryje 04** — programa sako, kad jo nuo kaimynų neskiria siena, ir nieko neįrašo.
-5. **Sujungti 04 → 05**: 04 = 26,31 + 35,50 = 61,81 m²; antraštėje **„Patalpos 11 143,27 m²"**, „Patalpų suvestinė" 143,27 m², jokio klaidingo „0,80×" ar „1,72×" įspėjimo (W1-F). Kampai 475,66 → 489,76.
+5. **Sujungti 04 → 05**: 04 = 26,31 + 35,50 = 61,81 m²; antraštėje **„Patalpos 11 143,27 m²"**, „Patalpų suvestinė" 143,27 m², jokio klaidingo „0,80×" ar „1,72×" įspėjimo (W1-F). Kampai 475,66 → 528,53; **Atimti** 2,06 m² koloną → 539,81 (+11,28 = 4 kampai × 2,82 m). *Pastaba v4 2026-10-29:* kampai bazės postūmį nulemia konvencijų derinimas (10-25) + sienų apdailos skaitymas iš fasadų (10-26); perskaičiavus merge, sanitarinis „2,40× grindų ploto" įspėjimas nebefiguruoja (bendrų 04↔05 sienų nebedubliuoja).
 6. Tada **Atšaukti** — 04 vėl 26,31 m², 05 vėl atskiras kambarys.
 7. **Atimti** kolonėlę kambaryje 06 → **Atšaukti** — skylės nebėra.
 8. **Mastelio ženkliukas** apačioje kairėje: **„1:115 · spėjamas"**. Vienas spustelėjimas — patvirtinta. Kortelėje: šiam lapui / visiems lapams / **Kalibruoti** / **Patikrinti**.
