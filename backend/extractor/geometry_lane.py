@@ -194,7 +194,11 @@ def _forget_open_space(room: dict) -> None:
 # its outline, face by face, and the elevations' zones and tile layouts (`_sienu_apdaila`, extractor/wall_finishes.py
 # and extractor/elevation_panels.py); the calculation takes them before the finish text and the purpose rules, so
 # a stored project needs the re-read to get them.
-LANE_VERSION = 21
+# 22 (2026-10-29, v4): perimeters are READ from the plan's dimension strings even when the outline's area is off the
+# table's — the strings decide (as before: sum against each wall's control length and the whole against the outline),
+# the area mismatch is said once on the room as `_plotas_pastaba` and the floor row keeps billing the table's area.
+# Stored projects whose perimeters were blocked only by the area mismatch get them from the re-read.
+LANE_VERSION = 22
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
