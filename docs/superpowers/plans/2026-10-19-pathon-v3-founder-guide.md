@@ -116,7 +116,7 @@ Spustelėjimų skaičiai (W5-A): pataisyti kampą 2 + n; atimti kolonėlę 3; n 
 4. Eilutė su matavimais rodo žymą „iš matavimų" ir jų sąrašą; aiškinime — „matavimas 4,20 m (lapas 1)". Jūsų ranka įrašytas kiekis visada viršesnis.
 5. „Kiekiai" apačioje — sumos atskirai pagal vienetą ir darbų šeimą (nebe viena suma per skirtingus darbus).
 6. **„+ Pastaba brėžinyje"** — pastaba P1, P2… ant brėžinio; Keisti / Ištrinti su Atšaukti; matyti „Matavimuose", CSV ir „PDF su žymėjimais".
-7. **„Kas pasikeitė"**: po „Perskaityti iš naujo" — „Kas pasikeitė · N eilučių · …"; **Peržiūrėti** atidaro eilutes ir kambarius; **Atšaukti** grąžina projektą į būseną prieš skaitymą, o perskaitytas variantas lieka kaip „Prieš grąžinant".
+7. **„Kas pasikeitė"**: po apmokamo pakartotinio skaitymo — „Kas pasikeitė · N eilučių · …"; **Peržiūrėti** atidaro eilutes ir kambarius; **Atšaukti** grąžina projektą į būseną prieš skaitymą, o perskaitytas variantas lieka kaip „Prieš grąžinant".
 
 ### 2.8 Patikra: klausimai, Enter / Esc, kambarių pavadinimai, kambarių sąrašas, priminimai, pranešimai, lentelių klausimai (W5-C, W5-E, W6-A, W2-B, W5-D)
 
@@ -156,14 +156,15 @@ Spustelėjimų skaičiai (W5-A): pataisyti kampą 2 + n; atimti kolonėlę 3; n 
 4. **Riba**: lape daugiau nei 1500 matavimų — įspėjimas.
 5. Mokėjimai lieka išjungti (`BILLING_ENABLED`). Kreditas ir sąskaita dabar išrašomi tik tada, kai mokėjimas tikrai įvykęs.
 
-### 2.12 Ką naujo perskaito nemokamas skaitymas „Perskaityti iš naujo" (W3-A, W5-D)
+### 2.12 Pašalinta: nemokamas „Perskaityti iš naujo" (jūsų sprendimas 2026-10-29)
 
-1. **„Perskaityti iš naujo" → „Perskaityti visus lapus (8)"** — €0, kaip anksčiau; eigoje atsirado etapas **„lentelės"** (durų, langų, apdailos, plytelių, kambarių lentelės su vieta brėžinyje). Demo-objektas_h: kambarių lentelė 11 iš 11 + suma.
-2. Grindų legenda išsaugoma ir rodoma prie grindų fakto (2.8, 9 punktas).
-3. Sienų tipai (GK pertvarų tipai iš legendos) — projekto faktas su iškarpa; objektas_h 8 lape šriftas neperskaitomas, todėl ten tuščia.
-4. Lapas, kurio vienintelė sritis — legenda, gauna tipą „Legenda".
-5. Lapai, pažymėti „Neskaityti šio lapo", praleidžiami.
-6. Keli PDF ar nuotraukos (PNG / JPEG / TIFF) į vieną projektą — per „Naujas projektas"; lapai pavadinami pagal failą. DWG nepriimamas (tik tyrimas: `docs/superpowers/research/2026-10-19-dwg-intake-spike.md`). Šio kelio naršyklėje nevaikščiojome (patikrinti).
+Sąmata yra DATUOTAS dokumentas: brėžinys skaitomas vieną kartą įkeliant, rezultatas lieka, pataisymai jūsų; variklio pagerinimai pasiekia NAUJUS įkėlimus. Jei norite naujausio variklio ant seno projekto — įkelkite tą patį PDF kaip naują projektą. Lape pateiktą „Perskaityti visus lapus (N)" mygtuką ir „Tiksliau, nemokamai — Perskaityti" juostą pašalinome iš produkto. Vieno lapo nemokamą skaitymą brėžinyje (lentelės, sienos, angos, grindys) — paliekame: jis maitina lango / durų skaitytuvą, kontūro taisymą, mastelio liniją, legendos skaičiavimą ir pan., bet nebera visos sąmatos „perskaityti iš naujo nemokamai" veiksmo. Serverio kelias liko už `SAMATU_DEV_TOOLS=1` scenarijams ir testams.
+
+1. Grindų legenda išsaugoma ir rodoma prie grindų fakto (2.8, 9 punktas) — ir toliau skaitoma per lapo lygmens „Perskaityti lapą".
+2. Sienų tipai (GK pertvarų tipai iš legendos) — projekto faktas su iškarpa; objektas_h 8 lape šriftas neperskaitomas, todėl ten tuščia.
+3. Lapas, kurio vienintelė sritis — legenda, gauna tipą „Legenda".
+4. Lapai, pažymėti „Neskaityti šio lapo", praleidžiami.
+5. Keli PDF ar nuotraukos (PNG / JPEG / TIFF) į vieną projektą — per „Naujas projektas"; lapai pavadinami pagal failą. DWG nepriimamas (tik tyrimas: `docs/superpowers/research/2026-10-19-dwg-intake-spike.md`). Šio kelio naršyklėje nevaikščiojome (patikrinti).
 
 ---
 
@@ -290,6 +291,8 @@ Kiekvienas: kontekstas vienu sakiniu · galimybės · ką siūlo vadovas (jei si
    Kas **nesikeičia**: rezultatai tie patys pagal konstrukciją — tie patys užklausai, tas pats modelis, ratai suteikiami vidurkiui tokia pačia tvarka. Matuojant iš naujo skaičiai svyruoja ±1–2 pp vien dėl pakartotinio skaitymo — tai verta žinoti vertinant bet kokius „vartus" ar palyginimo skaičius.
 
    Kas **lieka**: 277 s — trys pilni balsavimo ratai po ≈ 12 000 išvesties žetonų kiekvienam. Trumpinti Pass-1 išvestį nemokamai nepavyko — žr. 7 punktą. Gamyboje įjungta 2026-10-28.
+
+9. **Nemokamas perskaitymas pašalintas (jūsų sprendimas 2026-10-29):** sąmata yra datuotas dokumentas — brėžinys skaitomas vieną kartą, rezultatas lieka; naujesnis variklis — naujam įkėlimui. Pašalinta: „Tiksliau, nemokamai — Perskaityti" juosta ir viso brėžinio „Perskaityti visus lapus (N)" veiksmas. Palikta: viso brėžinio apmokamas pakartotinis skaitymas (ReextractButton) ir lapo lygmens „Perskaityti lapą" (jį naudoja langų / durų skaitytuvas, kontūro taisymas, mastelio linija, legendos skaičiavimas ir kitos vieno lapo priemonės). Serverio kelias liko už `SAMATU_DEV_TOOLS=1` scenarijams ir testams.
 
 **Jūsų sprendimai, jau priimti ir įgyvendinti:** sienos už įmontuotų baldų dažomos (2026-10-26), hidroizoliacija dviem eilutėmis (jūsų taisyklė; rangovas rašo vieną), angų užskaita 3,0 m², rastro kelias nukeltas, 3b sujungtas žinant metrikos kritimą, Sonnet darbams be inžinerinio sprendimo.
 
