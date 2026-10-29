@@ -81,14 +81,14 @@ def test_perimeters_the_plan_does_not_state_come_as_one_list_with_the_numbers_in
     q = _q(out, "perimetras")
     assert (q["answer"], q["unit"]) == ("numbers", "m")
     assert [(i["room_nr"], i["proposed"], i["field"]) for i in q["items"]] == [("03", 21.23, "perimetras_m"), ("07", 8.6, "perimetras_m")]
-    assert q["title"] == "2 patalpų sienų ilgiai plane neužrašyti"
+    assert q["title"] == "Sienų ilgių iš plano nepavyko perskaityti: 2 patalpos"
     assert all(i["sentence"] for i in q["items"])
 
 
 def test_one_room_is_named_in_the_title():
     rooms = [_quiet("03", pavadinimas="Koridorius", perimetras_m=21.23, perimetras_saltinis="konturo_ivertis",
                     _perimetras_ivertis_m=21.23)]
-    assert _q(build_questions({"patalpos": rooms}), "perimetras")["title"] == "Patalpos 03 Koridorius sienų ilgiai plane neužrašyti"
+    assert _q(build_questions({"patalpos": rooms}), "perimetras")["title"] == "Patalpos 03 Koridorius sienų ilgių iš plano nepavyko perskaityti"
 
 
 def test_a_room_the_walls_gave_no_outline_is_pointed_at_and_a_shared_space_is_divided():

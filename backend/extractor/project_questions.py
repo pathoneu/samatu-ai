@@ -694,8 +694,8 @@ def build_questions(project: dict, *, lenteles: bool = False) -> dict:
         # question about OUR evidence, not about his estimate
         _ask_konturas(waiting),
         *_ask_erdves(waiting, by_nr),
-        _ask_numbers("perimetras", waiting, "Patalpos {room} sienų ilgiai plane neužrašyti",
-                     "{n} patalpų sienų ilgiai plane neužrašyti",
+        _ask_numbers("perimetras", waiting, "Patalpos {room} sienų ilgių iš plano nepavyko perskaityti",
+                     "Sienų ilgių iš plano nepavyko perskaityti: {n} patalpos",
                      "Paėmiau juos iš sienų kontūro brėžinyje arba iš ploto. Jei žinote tiksliau — įrašykite: pagal jūsų "
                      "skaičių perskaičiuosiu dažomą sienų plotą ir grindjuostes."),
         _ask_numbers("plotas", waiting, "Patalpos {room} ploto plane neradau", "{n} patalpų ploto plane neradau",
