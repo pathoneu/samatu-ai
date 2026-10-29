@@ -100,6 +100,15 @@ OPENING_NEAR_M = 0.6        # an opening's line (the wall's axis) lies this clos
 CONTROL_TOL = 0.03
 WALL_TOL = 0.03             # a row's sum agrees with its wall's own outline length this closely…
 WALL_TOL_M = 0.06           # …or to this many metres (objektas_g: strings are to the FINISHED faces, 2–3 cm inside the fills)
+# 2026-10-29 (v4, objektas_a room 104): a chain written to the room's INNER FACE while the outline is
+# traced to the wall AXIS — the chain's ends land INSIDE the outline's corners by half a wall thickness
+# on each shared end. objektas_a room 104's wall 0 reads 1785 | 2245 = 4,03 m with s0 0,26 m past the
+# corner (two 0,13 m wall thicknesses) and the sum matching the outline's 4,14 m within WALL_TOL. The
+# second pass (`_fill_holes`) adds a 0,26 m `trumpa_m` at the start which pushes the total 0,15 m past
+# the wall and the sum check rejects. A row's own sum states the wall when it is CONTAINED in the extent
+# and the end gap at each corner is no wider than one wall thickness — the chain's label is the authority,
+# the two 0,13 m stubs are the partition's axis half, not short piers the designer forgot to dimension.
+INNER_FACE_OVERSHOOT_M = 0.3
 CORNER_DEG = 20.0
 SOURCE = "matmenu_eilutes"
 ESTIMATE_SOURCE = "konturo_ivertis"          # perimetras_m holds the outline's length: an estimate to accept, never „read"
@@ -382,6 +391,27 @@ def _stating_row(strings: Sequence[dict], horiz: bool, e0: float, e1: float, epo
         if abs(total - length_m) > max(WALL_TOL * length_m, WALL_TOL_M):
             continue
         return row, parts
+    # Third pass (2026-10-29, v4 — INNER_FACE_OVERSHOOT_M at the module constants): a chain gap-free
+    # and contained in the extent whose OWN sum is the wall's length, with ends landing inside the
+    # outline's corners by up to one wall thickness. The gap is the half-wall partition the outline
+    # includes and the designer's inner-face chain does not — not a short pier `_fill_holes` should
+    # fill with `trumpa_m` (which pushes the sum past the control).
+    overshoot = INNER_FACE_OVERSHOOT_M / m_per_pt
+    for row in ordered:
+        if any(b["s0"] < a["s1"] - tol for a, b in zip(row, row[1:])):
+            continue
+        if any(abs(b["s0"] - a["s1"]) > tol for a, b in zip(row, row[1:])):
+            continue                                           # a gap-free chain; a hole case was second-pass
+        row_sum = sum(s["value_m"] for s in row)
+        if abs(row_sum - length_m) > max(WALL_TOL * length_m, WALL_TOL_M):
+            continue
+        start_gap = row[0]["s0"] - e0
+        end_gap = e1 - row[-1]["s1"]
+        if start_gap < -tol or end_gap < -tol:                 # row extends past the wall — the cand filter prevents this
+            continue
+        if start_gap > overshoot or end_gap > overshoot:
+            continue
+        return row, None
     return None
 
 
