@@ -14,8 +14,8 @@
    "111"
   ],
   "atviros_erdves": [],
-  "perimetrai_sudeti": {"111": 11.5},
-  "min_tusti_su_iverciu": 10,
+  "perimetrai_sudeti": {"104": 13.6, "105": 12.86, "111": 11.5},
+  "min_tusti_su_iverciu": 8,
   "atviru_erdviu_iverciai": {},
   "grindu_dangos": {},
   "grindu_lapai": [],
