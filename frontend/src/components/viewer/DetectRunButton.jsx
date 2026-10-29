@@ -2,8 +2,10 @@
  * DetectRunButton — the green „Perskaityti lapą" in the viewer toolbar (Togal's
  * green button, capability A). A click opens a small picker: what to read
  * (checkboxes, all ticked; a feature ticks what it needs), then „Perskaityti
- * lapą N" or „Perskaityti visus lapus". The reading itself is €0 — the lanes on
- * the stored PDF, no Vision call — and the viewer stays usable while it runs
+ * lapą N". The reading is per-sheet (2026-10-29: the whole-drawing re-read
+ * entry was removed with the free re-read product — a sąmata is a dated
+ * document, read once at upload). The reading itself is €0 — the lanes on the
+ * stored PDF, no Vision call — and the viewer stays usable while it runs
  * (lib/useDetectRun.js; the progress is DetectRunProgress).
  *
  * The scale gate (Pathon v3 W5-B B7, coverage #25; lib/scaleGate): on a sheet with no scale in force a
@@ -20,7 +22,7 @@ import {
   FEATURES, FEATURE_HINTS, FEATURE_LABELS, allFeatures, buttonLabel, canStart, toggleFeature,
 } from '@/lib/detectRun';
 
-export default function DetectRunButton({ project, currentPage, totalPages, busy = false, onStart, scaleGate = null, onSetScale = null, compact = false }) {
+export default function DetectRunButton({ project, currentPage, busy = false, onStart, scaleGate = null, onSetScale = null, compact = false }) {
   const [open, setOpen] = useState(false);
   const [features, setFeatures] = useState(allFeatures);
   const label = buttonLabel(project, currentPage);
@@ -98,17 +100,6 @@ export default function DetectRunButton({ project, currentPage, totalPages, busy
             <ScanLine className="h-4 w-4" aria-hidden="true" />
             {label === 'Perskaityti lapą' ? `Perskaityti lapą ${currentPage}` : `Perskaityti lapą ${currentPage} iš naujo`}
           </button>
-          {(totalPages ?? 1) > 1 && (
-            <button
-              type="button"
-              disabled={!canStart(features)}
-              onClick={() => go('all')}
-              className="inline-flex min-h-[36px] items-center justify-center rounded-[2px] border border-border px-3 text-ui text-foreground hover:bg-muted disabled:opacity-50"
-              data-testid="detect-run-start-all"
-            >
-              Perskaityti visus lapus ({totalPages})
-            </button>
-          )}
         </div>
       </PopoverContent>
     </Popover>

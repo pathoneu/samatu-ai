@@ -1,16 +1,13 @@
 /**
  * noticeFold — the words of the one „Pranešimai (N)" line that folds Patikra's notices (Pathon v3 W6-A).
  *
- * Measured 2026-10-19 on demo-objektas_h: three notices (free re-read offer, read rating, reminders) stand
- * before the questions; at 1280×720 the first question starts at y 678 with the panel ending at 655 — not one
- * question on the first screen. Two or more notices fold into one line that names each, so nothing is hidden
- * without a trace; one notice shows as it is.
+ * Measured 2026-10-19 on demo-objektas_h: three notices stood before the questions; at 1280×720 the first
+ * question started below the panel. Two or more notices fold into one line that names each, so nothing is
+ * hidden without a trace; one notice shows as it is.
  */
 
 /** A notice's root `data-testid` → the name the fold line gives it. */
 export const NOTICE_NAMES = {
-  'free-reread-banner': 'nemokamas perskaitymas',
-  'free-reread-done': 'perskaityta iš naujo',
   'read-rating': 'skaitymo įvertinimas',
   'reminders-patikra': 'priminimai',
   // above the right panel on Brėžinys / Sąmata and on Siųsti (B1-D)
@@ -26,10 +23,8 @@ export function shouldFold(count) {
 }
 
 // A notice that stays on screen while the rest are folded — as the fold's first line, one line + its button.
-// 2026-10-25 walk on objektas_i: the free re-read offer sat under „Pranešimai (2)" with its button unreachable
-// until the fold was opened; the contractor would never find it. The offer is the one notice he must act on; after
-// the read its „perskaityta iš naujo" line takes the same place (only one of the two is ever mounted).
-export const LEAD_NOTICES = ['free-reread-banner', 'free-reread-done'];
+// No lead notice today (the free re-read offer, the one notice that always led, was removed 2026-10-29).
+export const LEAD_NOTICES = [];
 
 /** The notice that leads the fold (shown while it is closed), or null. */
 export function leadNotice(testIds) {

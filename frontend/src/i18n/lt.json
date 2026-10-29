@@ -1135,33 +1135,6 @@
       "undoNone": "Būsenos prieš perskaitymą nerasta — atidarykite „Versijos“ ir pasirinkite ją ten.",
       "undoFailed": "Nepavyko atšaukti — projektas nepakeistas. Bandykite dar kartą arba per „Versijos“."
     },
-    "freeReread": {
-      "title": "Šį brėžinį galima perskaityti tiksliau — nemokamai",
-      "body": "Nuo tada, kai projektas buvo nuskaitytas, programa išmoko iš paties brėžinio paimti sienų ilgius (sudeda plane užrašytus matmenis), tikslius patalpų kontūrus ir grindų dangas. Naujo nuskaitymo nereikia ir tai nieko nekainuoja. Jūsų pataisymai, kainos ir patikrintos patalpos lieka kaip yra.",
-      "titleLine": "Tiksliau, nemokamai",
-      "ctaShort": "Perskaityti",
-      "keeps": "Pataisymai, kainos ir patikrintos patalpos lieka.",
-      "ctaTitle": "Perskaityti brėžinį dar kartą — nemokamai; jūsų pataisymai, kainos ir patikrintos patalpos lieka",
-      "running": "Skaitau brėžinį…",
-      "later": "Ne dabar",
-      "done_one": "Brėžinys perskaitytas. Iš {{count}} patalpos: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
-      "done_few": "Brėžinys perskaitytas. Iš {{count}} patalpų: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
-      "done_other": "Brėžinys perskaitytas. Iš {{count}} patalpų: {{parts}}. Kas pasikeitė kiekvienoje patalpoje — parašyta jos lape.",
-      "doneRenumbered_one": "{{count}} patalpa gavo brėžinio numerį — buvęs numeris parodytas prie jos, kol ją patikrinsite.",
-      "doneRenumbered_few": "{{count}} patalpos gavo brėžinio numerius — buvę numeriai parodyti prie jų, kol jas patikrinsite.",
-      "doneRenumbered_other": "{{count}} patalpų gavo brėžinio numerius — buvę numeriai parodyti prie jų, kol jas patikrinsite.",
-      "donePart": {
-        "konturai": "tikslus kontūras — {{n}}",
-        "perimetrai": "sienų ilgiai iš plano matmenų — {{n}}",
-        "jusu": "sienų ilgiai, kuriuos nustatėte patys — {{n}}",
-        "dangos": "grindų danga iš grindų plano — {{n}}"
-      },
-      "doneTyped": " (dar {{n}} nustatėte patys)",
-      "doneNothing": "Brėžinys perskaitytas, bet jame nerasta nei tikslių patalpų kontūrų, nei sienų ilgių iš plano matmenų, nei grindų dangų iš grindų plano. Perimetrus ir grindų dangas patikrinkite patalpų lapuose.",
-      "alreadyRunning": "Šis projektas jau skaitomas — palaukite, kol baigs.",
-      "nothingRead": "Šį kartą brėžinio perskaityti nepavyko — projektas nepakeistas.",
-      "failed": "Nepavyko perskaityti: {{msg}}"
-    },
     "reextract": {
       "loadingPdf": "Įkeliamas PDF iš atminties...",
       "pdfNotFound": "PDF nerastas. Perskaityti iš naujo negalime. Sukurkite naują projektą su PDF.",

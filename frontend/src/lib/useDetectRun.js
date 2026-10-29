@@ -31,14 +31,13 @@ export function useDetectRun(project, onProjectChange) {
     try {
       const base = getProject(id) || latest.current.project;
       const { project: merged } = await landFreeRereadResult(base, snapshot.result);
-      // the whole drawing read again → „perskaityta“; one sheet's landing → „lapas“ (Istorija)
-      updateProject(id, merged, { versionSource: pages === 'all' ? 'perskaityta' : 'lapas' });
+      // per-sheet reading only (2026-10-29): the version row says 'lapas' (Istorija)
+      updateProject(id, merged, { versionSource: 'lapas' });
       await flushProjectSaves();
       latest.current.onProjectChange?.(merged);
       const note = summaryText(scopeCounts(merged, snapshot.result?.taikymas?.patalpos), features);
       if (alive.current) setRun((r) => r && { ...r, client: { status: 'done', note } });
-      const where = pages === 'all' ? '' : `, pritaikyta ${appliedTo(pages, merged?._meta?.geometrija?.grupes)}`;
-      toast.success(`Perskaitytas visas brėžinys${where}: ${note}`);
+      toast.success(`Perskaitytas lapas, pritaikyta ${appliedTo(pages, merged?._meta?.geometrija?.grupes)}: ${note}`);
     } catch (err) {
       console.error('[detectRun] landing failed:', err);
       const note = err?.code === 'lane_failed'

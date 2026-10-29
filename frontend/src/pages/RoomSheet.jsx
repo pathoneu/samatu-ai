@@ -65,7 +65,6 @@ import YourRowsPanel from '@/components/roomsheet/YourRowsPanel';
 import { StepBar } from '@/components/project/StepRail';
 import { useWorkspaceHost } from '@/components/project/workspaceHost';
 import { RereadRoomNote } from '@/components/project/RereadDiffBanner';
-import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import RoomNameChips from '@/components/roomsheet/RoomNameChips';
 import { namePatch } from '@/lib/roomNames';
 import { roomPickerItems, typedDigit } from '@/lib/roomSheetNav';
@@ -545,12 +544,6 @@ export default function RoomSheet() {
           ))}
         </div>
       )}
-      <FreeRereadBanner
-        project={project}
-        className="mx-4 mt-3"
-        widthClass="self-stretch"
-        onComplete={(next) => { setProject(next); setLastFix(null); setRipple(null); loadFacts(); }}
-      />
       <RereadRoomNote project={project} roomNr={roomNr} />
 
       <div className={`flex flex-1 flex-col gap-4 p-4 ${embedded ? '' : 'lg:flex-row lg:items-start'}`}>

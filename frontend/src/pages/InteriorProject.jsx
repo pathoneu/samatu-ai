@@ -21,7 +21,6 @@ import InteriorWorkspace from '@/components/project/InteriorWorkspace';
 import { STEPS, StepBar } from '@/components/project/StepRail';
 import ProjectMainView from '@/components/project/ProjectMainView';
 import RereadDiffBanner from '@/components/project/RereadDiffBanner';
-import FreeRereadBanner from '@/components/project/FreeRereadBanner';
 import ServerRefreshNotice from '@/components/project/ServerRefreshNotice';
 import ReextractButton from '@/components/project/ReextractButton';
 import ProjectHistoryPanel from '@/components/project/ProjectHistoryPanel';
@@ -1111,7 +1110,6 @@ export default function InteriorProject({ project: projectProp, onDelete }) {
         notices={step === 'patikra' ? null : (
           <>
             <ServerRefreshNotice projectId={project?.id} />
-            <FreeRereadBanner project={project} className="mt-3" onComplete={(next) => setProject(next)} />
             <RereadDiffBanner project={project} onProjectChange={(next) => setProject(next)} />
           </>
         )}

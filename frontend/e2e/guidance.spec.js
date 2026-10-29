@@ -128,14 +128,15 @@ test('run pill: a lost status call says so with „Bandyti dar kartą", which pi
     return route.continue();
   });
   await page.getByTestId('detect-run-button').click();
-  await page.getByTestId('detect-run-start-all').click();
+  await page.getByTestId('detect-run-start-page').click();
   const pill = page.getByTestId('detect-run-progress');
   await expect(pill).toHaveAttribute('data-shape', 'pill');
   await expect(page.getByTestId('detect-run-lost')).toContainText('Ryšys nutrūko', { timeout: 30_000 });
   await shot(page, 'w5c-run-lost');
   await page.getByTestId('detect-run-retry').click();
   await expect(page.getByTestId('detect-run-lost')).toHaveCount(0);
-  await expect(page.getByTestId('detect-run-headline')).toHaveText('Perskaityta · pritaikoma visam brėžiniui', { timeout: 120_000 });
+  // v4 2026-10-29: whole-drawing read gone — one-sheet landing hits planui (lapai 1-7) on objektas_h sheet 1
+  await expect(page.getByTestId('detect-run-headline')).toContainText('Perskaityta · pritaikoma', { timeout: 120_000 });
   // the pill stands at the bottom of the drawing, clear of the top row of tool cards
   const box = await pill.boundingBox();
   const canvas = await page.getByTestId('viewer-root').boundingBox();

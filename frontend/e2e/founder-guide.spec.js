@@ -215,55 +215,6 @@ test('2 sheet rail: strip, groups, rename + undo, restore auto name, search LED'
   await shot(page, '02-sheet-rail');
 });
 
-test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
-  await openProject(page);
-  const startedAt = new Date();
-  const before = await api(`/api/projects/${PROJECT}/versions`);
-  await page.getByTestId('detect-run-button').click();
-  await expect(page.getByTestId('detect-run-start-all')).toHaveText('Perskaityti visus lapus (8)');
-  await page.getByTestId('detect-run-start-all').click();
-  await expect(page.getByTestId('detect-run-headline')).toHaveText('Perskaityta · pritaikoma visam brėžiniui', { timeout: 120_000 });
-  await expect(page.getByTestId('detect-run-summary')).toHaveText(
-    '11 kontūrų, 24 angos, 6 perimetrai iš matmenų, danga 11 iš 11. Jūsų pataisyti kontūrai (4) palikti.');
-  const stages = page.getByTestId('detect-run-stages');
-  // langų 10, not 9: since the windows merge (97f8a9d5 — a thin outlined frame along a wall is glazing) the lane reads 10
-  for (const line of ['Mastelis iš matmenų: 1:115 (8 lap.)', '7 kontūrai iš sienų, jūsų pataisytų palikta: 4.',
-    '24 angos (langų: 10, durų: 9).', '6 perimetrai iš matmenų.', 'Danga perskaityta 11 iš 11 patalpų.']) {
-    await expect(stages).toContainText(line);
-  }
-  // the one-line re-read chip (W1-C; „Kas pasikeitė" since W4-A): nothing moved; „Peržiūrėti" opens today's
-  // read (writes nothing)
-  const chipNotice = page.getByTestId('reread-diff-banner');
-  await expect(chipNotice).toContainText('Kas pasikeitė');
-  // Phase 3b/3c (blank rows by rule, legend counts): no room moved, but the quote's rows are read again and the
-  // chip says how many changed. v4 2026-10-29 re-pin: 63 → 69. Cause: finishes-from-elevations (2026-10-26) adds
-  // paint behind built-in furniture to the walls, which in turn moves per-room rows for Rotband / corners /
-  // skirting / cornice / wall-tile reconciliation, plus table-side rows the reader now cross-reads (langų žiniaraštis,
-  // apdailos lentelė, lentelės brėžinyje, lapų sritys).
-  await expect(chipNotice).toContainText('69 eilutės');
-  await page.getByTestId('reread-diff-toggle').click();
-  await expect(chipNotice).toContainText('Sąmatos eilutės (69)');
-  // blank by rule: the drawing does not answer these rows (Phase 3b), so the re-read blanks them instead of keeping the model's guess
-  await expect(chipNotice).toContainText('Sienų lyginimas Knauf Rotband 92,50 → — m²');
-  await expect(chipNotice).toContainText('Skylių gręžimas plytelėse (vamzdžiams, kaiščiams) 48,00 → — vnt');
-  // a number that moved on the current head (Phase 3b/3c re-read + finishes-from-elevations). v4 2026-10-29:
-  // 308,32 → 360,82 (was 344,28 before finishes-from-elevations added behind-the-furniture paint area).
-  await expect(chipNotice).toContainText('Sienų glaistymas/dažymas 308,32 → 360,82 m²');
-  await expect(chipNotice).toContainText(startedAt.toLocaleDateString('lt-LT', { timeZone: 'Europe/Vilnius' }));
-  await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 15_000 }).toBe(true);
-  await expect.poll(async () => (await api(`/api/projects/${PROJECT}/versions`)).versions[0].id, { timeout: 30_000 })
-    .toBeGreaterThan(before.versions[0].id);
-  const after = await api(`/api/projects/${PROJECT}/versions`);
-  expect(after.versions.some((v) => v.saltinis === 'perskaityta' && v.id > before.versions[0].id)).toBe(true);
-  const fp = fingerprint(await getProject());
-  // v4 2026-10-29 re-pin: the reread recomputes kampai with the new conventions-fit §4 (default `visi`) and
-  // the finishes-from-elevations lane, so the stored 475,66 moves to 514,43 after the free re-read even
-  // without any room edit. a04 and lubos stay unchanged (no polygon moved).
-  expect(fp).toMatchObject({ a04: 26.31, kampai: 514.43, lubos: 143.27 });
-  note('11 kontūrų · 24 angos · 6 perimetrai · danga 11/11 · pataisyti 4 · kampai 475,66 → 514,43 (v4 reread)');
-  await shot(page, '03-reread');
-});
-
 test('4 Masteliai: confirm all, check against 996, calibration suggests 1:100', async ({ page }) => {
   await openProject(page);
   // the scale chip at the drawing's bottom-left (W1-D ScaleChip; was the status bar's sentence)

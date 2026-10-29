@@ -775,7 +775,12 @@ app.include_router(samata_templates_router)
 app.include_router(user_settings_router)
 app.include_router(room_facts_router)
 app.include_router(evidence_router)
-app.include_router(free_reread_router)
+# The product no longer offers a free re-read (2026-10-29 founder decision: a samata is a dated document, the
+# drawing is read once at upload). The route lives on for scripts/ and tests, behind SAMATU_DEV_TOOLS; the
+# module's helpers (NO_PDF, _project_for, read_drawing) are imported directly by other routers and are
+# unaffected.
+if os.environ.get("SAMATU_DEV_TOOLS") == "1":
+    app.include_router(free_reread_router)
 app.include_router(detect_run_router)
 app.include_router(room_outline_router)
 app.include_router(geometry_router)               # v4: /geometry/scale-line + /geometry/scale
