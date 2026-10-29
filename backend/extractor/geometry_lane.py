@@ -198,7 +198,7 @@ def _forget_open_space(room: dict) -> None:
 # table's — the strings decide (as before: sum against each wall's control length and the whole against the outline),
 # the area mismatch is said once on the room as `_plotas_pastaba` and the floor row keeps billing the table's area.
 # Stored projects whose perimeters were blocked only by the area mismatch get them from the re-read.
-LANE_VERSION = 22
+LANE_VERSION = 23
 
 FLOOR_PLAN_SOURCE = "grindu_planas"
 FLOOR_KEYS = ("grindu_danga", "grindu_danga_saltinis", "_grindu_danga")
