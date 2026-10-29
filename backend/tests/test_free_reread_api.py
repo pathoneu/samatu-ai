@@ -38,6 +38,9 @@ def _isolate(tmp_path, monkeypatch, *, auth_disabled=True):
     for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("LOCAL_STORAGE_DIR", str(tmp_path / "pdfs"))
+    # The /free-reread route sits behind SAMATU_DEV_TOOLS (main.py, 2026-10-29): the product no longer offers
+    # it, but scripts/ and these tests still exercise the module. The env is set in backend/conftest.py before
+    # `main` is imported, so the router is already mounted.
     storage.reset_storage_for_test()
     db.init_schema()
     db._migrate_schema()

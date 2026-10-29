@@ -6,6 +6,7 @@ When pytest is invoked with a specific test file (rather than discovering
 from cwd), it doesn't add cwd to sys.path and the imports fail. This
 conftest guarantees the backend directory is always on sys.path.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,11 @@ import pytest
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+# The free-reread route sits behind SAMATU_DEV_TOOLS (main.py, 2026-10-29): the
+# product no longer offers it, but the module remains for scripts/ and tests.
+# Set the env BEFORE `main` is imported so the router is mounted for every test.
+os.environ.setdefault("SAMATU_DEV_TOOLS", "1")
 
 
 @pytest.fixture(autouse=True)
