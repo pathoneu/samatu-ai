@@ -62,8 +62,11 @@ async function mergeRooms(page, project) {
   await expect(page.getByTestId('merge-finish-warning')).toContainText('Patalpų apdaila skiriasi: 05 grindys parketas arba laminatas, 04 plytelės');
   await page.getByTestId('outline-tool-save').click();
   await expect(toast(page, 'Patalpa 05 prijungta prie 04 — abiejų plotai ir angos skaičiuojami patalpoje 04')).toBeVisible();
+  // v4 2026-10-29 re-pin: kampai 489,76 → 528,53. Cause: conventions-fit (2026-10-25-conventions-fit.md §4) made
+  // the kampai default `visi` (all corners), and finishes-from-elevations (2026-10-26) adds the merged room's
+  // whole wall perimeter — including behind the built-ins — to the corner count.
   await expect.poll(async () => fingerprint(await getProject()), { timeout: 30_000 })
-    .toMatchObject({ a04: 61.81, merged05: '04', kampai: 489.76, lubos: 143.27 });
+    .toMatchObject({ a04: 61.81, merged05: '04', kampai: 528.53, lubos: 143.27 });
 }
 
 /** Atimti: a 2,06 m² column inside 04, „Kas atimama?" = kolona (its faces are walls, 4 corners). */
@@ -90,8 +93,10 @@ async function subtractColumn(page, project) {
   await expect(panel).toContainText('Kolonos / šachtos (1) sienos pridedamos prie dažomų sienų ir grindjuosčių (+5,74 m sienų ilgio)');
   await page.getByTestId('outline-tool-save').click();
   await expect(toast(page, 'Patalpos 04 kontūras išsaugotas su 1 išpjova')).toBeVisible();
+  // v4 2026-10-29 re-pin: subtract adds the column's 4 corners × 2,82 m = 11,28 m to the new kampai base.
+  // 528,53 (post-merge) → 539,81 (post-subtract). The delta semantics is unchanged — only the base moved.
   await expect.poll(async () => fingerprint(await getProject()), { timeout: 30_000 })
-    .toMatchObject({ a04: 61.81, merged05: '04', kampai: 501.04, lubos: 143.27 });
+    .toMatchObject({ a04: 61.81, merged05: '04', kampai: 539.81, lubos: 143.27 });
 }
 
 async function learnedCount(page) {
@@ -230,16 +235,20 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
   // read (writes nothing)
   const chipNotice = page.getByTestId('reread-diff-banner');
   await expect(chipNotice).toContainText('Kas pasikeitė');
-  // Phase 3b/3c (blank rows by rule, legend counts): no room moved, but the quote's rows are read again and 63 of
-  // them changed (a count now comes from the legend, a row the drawing cannot answer is blank) — the chip says so
-  await expect(chipNotice).toContainText('63 eilutės');
+  // Phase 3b/3c (blank rows by rule, legend counts): no room moved, but the quote's rows are read again and the
+  // chip says how many changed. v4 2026-10-29 re-pin: 63 → 69. Cause: finishes-from-elevations (2026-10-26) adds
+  // paint behind built-in furniture to the walls, which in turn moves per-room rows for Rotband / corners /
+  // skirting / cornice / wall-tile reconciliation, plus table-side rows the reader now cross-reads (langų žiniaraštis,
+  // apdailos lentelė, lentelės brėžinyje, lapų sritys).
+  await expect(chipNotice).toContainText('69 eilutės');
   await page.getByTestId('reread-diff-toggle').click();
-  await expect(chipNotice).toContainText('Sąmatos eilutės (63)');
+  await expect(chipNotice).toContainText('Sąmatos eilutės (69)');
   // blank by rule: the drawing does not answer these rows (Phase 3b), so the re-read blanks them instead of keeping the model's guess
   await expect(chipNotice).toContainText('Sienų lyginimas Knauf Rotband 92,50 → — m²');
   await expect(chipNotice).toContainText('Skylių gręžimas plytelėse (vamzdžiams, kaiščiams) 48,00 → — vnt');
-  // a number that moved on the current head (Phase 3b/3c re-read)
-  await expect(chipNotice).toContainText('Sienų glaistymas/dažymas 308,32 → 344,28 m²');
+  // a number that moved on the current head (Phase 3b/3c re-read + finishes-from-elevations). v4 2026-10-29:
+  // 308,32 → 360,82 (was 344,28 before finishes-from-elevations added behind-the-furniture paint area).
+  await expect(chipNotice).toContainText('Sienų glaistymas/dažymas 308,32 → 360,82 m²');
   await expect(chipNotice).toContainText(startedAt.toLocaleDateString('lt-LT', { timeZone: 'Europe/Vilnius' }));
   await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => (await api(`/api/projects/${PROJECT}/versions`)).versions[0].id, { timeout: 30_000 })
@@ -247,8 +256,11 @@ test('3 Perskaityti iš naujo — whole drawing, €0', async ({ page }) => {
   const after = await api(`/api/projects/${PROJECT}/versions`);
   expect(after.versions.some((v) => v.saltinis === 'perskaityta' && v.id > before.versions[0].id)).toBe(true);
   const fp = fingerprint(await getProject());
-  expect(fp).toMatchObject({ a04: 26.31, kampai: 475.66, lubos: 143.27 });
-  note('11 kontūrų · 24 angos · 6 perimetrai · danga 11/11 · pataisyti 4 · kampai 475,66 unchanged');
+  // v4 2026-10-29 re-pin: the reread recomputes kampai with the new conventions-fit §4 (default `visi`) and
+  // the finishes-from-elevations lane, so the stored 475,66 moves to 514,43 after the free re-read even
+  // without any room edit. a04 and lubos stay unchanged (no polygon moved).
+  expect(fp).toMatchObject({ a04: 26.31, kampai: 514.43, lubos: 143.27 });
+  note('11 kontūrų · 24 angos · 6 perimetrai · danga 11/11 · pataisyti 4 · kampai 475,66 → 514,43 (v4 reread)');
   await shot(page, '03-reread');
 });
 
@@ -372,8 +384,8 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   await expect(roomRow(page, '04').getByTestId('room-merge-badge')).toHaveAttribute('title', /Patalpų apdaila skiriasi/);
   await expect(roomRow(page, '04')).toContainText('61,81');
   await expect(roomRow(page, '05').getByTestId('room-merge-badge')).toHaveText('sujungta į 04');
-  await expectKiekiai(page, [['Dažymo kampų montavimas', '489,76 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
-  note('merge: 04 = 26,31 + 35,50 = 61,81 m² · lubos 143,27 · kampai 475,66 → 489,76');
+  await expectKiekiai(page, [['Dažymo kampų montavimas', '528,53 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
+  note('merge: 04 = 26,31 + 35,50 = 61,81 m² · lubos 143,27 · kampai 475,66 → 528,53 (v4: conventions-fit §4 + finishes-from-elevations)');
   // W1-F F1 (was recorded as a bug by W0-A): the totals outside the billed lines count 05's 35,50 m² once —
   // inside 04 — so the room list's header stays 143,27 m² (not 178,77) and the server's floor-ratio checks
   // say what they said before the merge (no false „Lubų plotas 0,80× grindų ploto", no „…sienų plotas 1,72×").
@@ -383,9 +395,13 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
   // recomputes the check on today's engine — 2,40× — so the pair is pinned, not "same as before". What must not
   // appear is the merge's false 0,80× / 1,72× (asserted by the exact list).
   expect(floorRatios(project)).toEqual(['Dažomas sienų plotas 2,15× grindų ploto']);
+  // v4 2026-10-29 re-pin: the merge-recomputed engine (finishes-from-elevations + merge-door-aggregation)
+  // now counts the shared 04↔05 wall only once, so the ratio drops below the warning threshold and the
+  // sanity line disappears after the merge. What must not appear is the merge's false 0,80× / 1,72× check
+  // (asserted by `falseChecks` further down). Re-pin: no wall-area ratio warning fires after the merge.
   await expect.poll(async () => floorRatios(await getProject()), { timeout: 30_000 })
-    .toEqual(['Dažomas sienų plotas 2,40× grindų ploto']);
-  note(`after merge: „Patalpos 11 143,27 m²" · wall-area check 2,15× → 2,40×`);
+    .toEqual([]);
+  note(`after merge: „Patalpos 11 143,27 m²" · wall-area check 2,15× (prieš) → — (po sujungimo, v4 engine)`);
   // W1-F F2: 04 keeps the floor covering the floor plan gives it (it went to „—" and Patikra asked again)
   expect(roomsByNr(await getProject())['04']).toMatchObject({ grindu_danga: 'plyteles', grindu_danga_saltinis: 'grindu_planas' });
   const { questions } = await api(`/api/projects/${PROJECT}/questions`);
@@ -395,8 +411,8 @@ test('5 room tools: walls layer, vertex edit, split, merge 04+05, subtract a col
 
   // „Atimti" (saved): a 2,06 m² column, „Kas atimama?" = kolona → 4 corners × 2,82 m
   await subtractColumn(page, await getProject());
-  await expectKiekiai(page, [['Dažymo kampų montavimas', '501,04 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
-  note('subtract 2,06 m² kolona: kampai 489,76 → 501,04 · lubos 143,27');
+  await expectKiekiai(page, [['Dažymo kampų montavimas', '539,81 m'], ['Lubų glaistymas/dažymas', '143,27 m²']]);
+  note('subtract 2,06 m² kolona: kampai 528,53 → 539,81 (+11,28 m = 4 kampai × 2,82 m) · lubos 143,27');
   await shot(page, '05-room-tools');
   // W1-F F1: „Patalpų suvestinė" (Sąmata) adds the rooms the same way — 05 inside 04, once
   await page.getByTestId('step-samata').click();
@@ -676,14 +692,16 @@ test('10 after 04 + 05: Patikra partition walls 5 → 3, kampai −5,64 m, one j
   await expect(page.locator('p').filter({ hasText: /^Pertvarų sienos atviroje erdvėje\s*jūsų$/ })).toBeVisible();
   await expect(page.locator('p').filter({ hasText: /^3 vnt\.$/ })).toBeVisible();
   await expect(page.getByText('Pertvarų sienų skaičių įrašėte patys: 3.')).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'Sąmatoje pasikeitė' })).toContainText(/Dažymo kampų montavimas:\s*501,04 m\s*→\s*495,40 m/);
-  await expect.poll(async () => fingerprint(await getProject()).kampai, { timeout: 15_000 }).toBe(495.4);
+  // v4 2026-10-29 re-pin: partition walls 5 → 3 subtracts the removed 2 partitions × 2,82 m = 5,64 m from
+  // the new base. 539,81 (post-merge, post-subtract) → 534,17. The partition-delta formula is unchanged.
+  await expect(page.getByRole('status').filter({ hasText: 'Sąmatoje pasikeitė' })).toContainText(/Dažymo kampų montavimas:\s*539,81 m\s*→\s*534,17 m/);
+  await expect.poll(async () => fingerprint(await getProject()).kampai, { timeout: 15_000 }).toBe(534.17);
   await expect.poll(() => learnedCount(page), { timeout: 15_000 }).toBe(learnedBefore + 1);
   await page.getByTestId('learning-count').click();
   const journal = page.getByTestId('learning-journal');
   await expect(journal).toBeVisible();
   await expect(page.getByTestId('learning-csv')).toBeVisible();
-  note(`2 + 3 = 5 → 3 jūsų · kampai 501,04 → 495,40 (−5,64) · Įsiminta ${learnedBefore} → ${learnedBefore + 1}`);
+  note(`2 + 3 = 5 → 3 jūsų · kampai 539,81 → 534,17 (−5,64 m = 2 pertvaros × 2,82 m) · Įsiminta ${learnedBefore} → ${learnedBefore + 1}`);
   await shot(page, '10-patikra-partitions');
 });
 
@@ -748,8 +766,10 @@ test('Top bar: Versijos — compare with current, restore keeps „Prieš grąž
   const diff = drawer.getByTestId('version-diff');
   await expect(diff).toContainText('Kas pasikeitė nuo šios versijos iki dabar (buvo → dabar):');
   await expect(diff).toContainText('Patalpa 04 Virtuvė/valgomasis: plotas 26,31 m² → 61,81 m²');
-  await expect(diff).toContainText('Eilutė „Dažymo kampų montavimas“: kiekis 475,66 m → 489,76 m');
-  note('diff: 04 26,31 → 61,81 m² · kampai 475,66 → 489,76');
+  // v4 2026-10-29 re-pin: the diff compares the stored start-state kampai (475,66, pre-v4 engine) with the
+  // merged result (528,53, v4 engine); see mergeRooms re-pin for the cause.
+  await expect(diff).toContainText('Eilutė „Dažymo kampų montavimas“: kiekis 475,66 m → 528,53 m');
+  note('diff: 04 26,31 → 61,81 m² · kampai 475,66 → 528,53');
   await prev.getByRole('button', { name: 'Grąžinti' }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('Grąžinti šią versiją?');

@@ -398,11 +398,21 @@ test.describe('W5-A editing gestures', () => {
     const after = await entry();
     expect(after.tipas).toBe('pasleptos_duris');
     expect(after.aukstis_mm).toBe(pick.el.aukstis_mm);
-    if (rowBefore != null) {
-      // only the width moved: the frameless-door row loses exactly 0,07 m (w + 2h per door), not the height too
-      await expect.poll(frameless, { timeout: 20_000 }).toBeCloseTo(rowBefore - 0.07, 2);
-    }
-    note(`A9 paslėptos durys ${pick.nr}: plotis ${pick.el.plotis_mm} → ${after.plotis_mm} mm, aukštis ${after.aukstis_mm} mm, tipas ${after.tipas}; beapvadinėms ${rowBefore} → ${await frameless()} m`);
+    // v4 2026-10-29 re-pin: the per-building frameless-door row used to carry 46,67 m and the width edit moved
+    // it by exactly 0,07 m. Phase 3b (kill-model-rows, 2026-10-25) now sends the row to BLANK-by-rule because
+    // its contribution model rests on vision/model-sourced hidden doors; the recompute returns kiekis = null
+    // with a plain reason sentence. The gesture itself still only moves the width — tipas + aukstis_mm are
+    // preserved (asserted above) — so this is by-design, not a regression. Assert the blank + reason.
+    const framelessRow = async () => {
+      const p = (await page.evaluate((id) => {
+        try { return (JSON.parse(localStorage.getItem('samatu_projects') || '[]')).find((x) => x?.id === id); } catch { return null; }
+      }, PROJECT)) || {};
+      return (p.darbu_sarasas || []).find((r) => /beapvad/i.test(r.aprasymas || r.pavadinimas || '')) || null;
+    };
+    await expect.poll(async () => (await framelessRow())?.kiekis, { timeout: 20_000 }).toBeNull();
+    const blanked = await framelessRow();
+    expect(blanked?._tuscia_priezastis || blanked?._assumption || '', 'row explains itself in LT').toMatch(/[A-Za-ząčęėįšųūžĄČĘĖĮŠŲŪŽ]/);
+    note(`A9 paslėptos durys ${pick.nr}: plotis ${pick.el.plotis_mm} → ${after.plotis_mm} mm, aukštis ${after.aukstis_mm} mm, tipas ${after.tipas}; beapvadinėms ${rowBefore} → — (blank by Phase 3b: ${(blanked?._tuscia_priezastis || blanked?._assumption || '').slice(0, 72)}…)`);
     await toast(page, 'durys').getByRole('button', { name: 'Atšaukti' }).first().click();
     await expect.poll(async () => (await entry())?.plotis_mm).toBe(pick.el.plotis_mm);
   });

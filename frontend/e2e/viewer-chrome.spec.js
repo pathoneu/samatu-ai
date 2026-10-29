@@ -152,6 +152,9 @@ test.describe('viewer chrome (W5-B)', () => {
 
   test('B6 the confirm box is 300 px with its consequence; Esc closes only the box; a deleted measurement comes back', async ({ page }) => {
     await openProject(page);
+    // Same 409 race as B7: the initial write-through can be in-flight when Versijos opens, which collides with
+    // the first measurement save below and leaves the toast stuck. 2026-10-29: alone this passes.
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => { /* dev builds rarely idle */ });
     await page.getByRole('button', { name: 'Versijos', exact: true }).click();
     const drawer = page.getByRole('dialog', { name: 'Projekto versijos' });
     const older = drawer.getByRole('listitem').nth(1);
@@ -192,6 +195,10 @@ test.describe('viewer chrome (W5-B)', () => {
 
   test('B7 a room focused from the list is framed, not its page', async ({ page }) => {
     await openProject(page);
+    // The initial load can still be laying out tiles when the room click fires; without a settle the zoomToArea
+    // measurement is taken against a mid-animation canvas and the ring lands far from centre. 2026-10-29 isolation:
+    // alone this test passed, in-order it failed with centre off ~1 588 px. docs/.../2026-10-29-e2e-after-v4.md §3.
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => { /* dev builds rarely idle */ });
     const z0 = await zoomPct(page);
     await roomRow(page, '06').click();
     await expect.poll(() => zoomPct(page), { timeout: 10_000 }).toBeGreaterThan(z0 * 1.5);

@@ -99,10 +99,16 @@ test('room picker: every room with its state in words; a digit typed on a focuse
 });
 
 test('sąmata: a row is deleted from its ⋯ menu and „Atšaukti" puts it back', async ({ page }) => {
-  const before = (await getProject()).darbu_sarasas.length;
   await openProject(page, { suffix: '?step=samata' });
   const menus = page.getByTestId('row-menu');
   await expect(menus.first()).toBeVisible({ timeout: 60_000 });
+  // Fresh browser contexts can race with the frontend's initial write-through (projectStore debounces 400 ms,
+  // and a 409 against a pre-flight save silently keeps the optimistic copy). Settle the network first and read
+  // the baseline AFTER the page has loaded so delete lands on the server's actual version. 2026-10-29: alone
+  // the test passed on this head, in-order it failed with „UI 116, server 117" — a stale base_updated_at. See
+  // docs/.../2026-10-29-e2e-after-v4.md §3.
+  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => { /* dev builds rarely idle */ });
+  const before = (await getProject()).darbu_sarasas.length;
   const shown = await menus.count();
   await menus.first().click();
   await page.getByTestId('row-menu-delete').click();
