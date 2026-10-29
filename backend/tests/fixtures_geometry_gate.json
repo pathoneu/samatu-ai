@@ -14,8 +14,8 @@
    "111"
   ],
   "atviros_erdves": [],
-  "perimetrai_sudeti": {},
-  "min_tusti_su_iverciu": 11,
+  "perimetrai_sudeti": {"111": 11.5},
+  "min_tusti_su_iverciu": 10,
   "atviru_erdviu_iverciai": {},
   "grindu_dangos": {},
   "grindu_lapai": [],
@@ -222,9 +222,11 @@
    "10": 7.06,
    "11": 16.41,
    "09": 16.01,
-   "04": 17.93
+   "04": 17.93,
+   "07": 8.51,
+   "08": 8.75
   },
-  "min_tusti_su_iverciu": 4,
+  "min_tusti_su_iverciu": 3,
   "atviru_erdviu_iverciai": {},
   "grindu_dangos": {
    "01": "minksta",

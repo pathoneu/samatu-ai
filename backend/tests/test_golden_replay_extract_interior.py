@@ -99,7 +99,14 @@ DOORS_ROOM_KEYS = {"elementai", "angokrasciu_gkp_m", "door_area_m2", "doors_dedu
                    "_tile_read_source", "_walls_full_tile", "_walls_paint_factor"}
 DOORS_ROWS = {"Angokraščių glaistymas-dažymas", "Angokraščių apdirbimas GKP (struktūra)",
               "Glaistas luboms (pradinis + baigiamasis)", "Gruntas luboms", "Dažai luboms (2 sluoksniai)",
-              "GKP juostelės + savisriegiai"}
+              "GKP juostelės + savisriegiai",
+              # 2026-10-29 (G1 restated): the geometry lane now READS objektas_h rooms 07 and 08
+              # (`konturo_ivertis` 9,47 / 8,33 → `matmenu_eilutes` 8,51 / 8,75 — their outline's area is
+              # off the table's, their walls' strings sum within CONTROL_TOL). walls_billed shifts a
+              # few percent → the walls' Medžiagos labels carry different kiekis in replay (frozen
+              # geometry) vs prod (fresh read). The labels are present on BOTH sides, the kiekis
+              # differs — the frozen baseline for these rows is no longer stable.
+              "Glaistas sienoms (pradinis + baigiamasis)", "Gruntas sienoms"}
 # v4 2026-10-26: the as-drawn lane removed a room's wall paint → primer row differed;
 # the uz_baldu_dazoma default paints those walls again → no difference
 # Written by production's per-room height step (Step 2.45) for the check sheet; read by
