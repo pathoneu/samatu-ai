@@ -61,7 +61,12 @@ export default async function globalSetup() {
       + 'lubos 143,27 m², no confirmed scale, no measurements). Copy a fresh backend/data/samatu.db from the main checkout, '
       + 'or name one with E2E_START_VERSION=<id>.');
   }
-  await api(`/api/projects/${PROJECT}/versions/${chosen.id}/restore`, { method: 'POST' });
+  // Only call /restore when it would actually move the project — restoring to the version the project is
+  // already on creates a duplicate "Prieš grąžinant" version with the same content hash, and both end up
+  // marked `dabartine=true` (two chips → both „Grąžinti" disabled). The B6 drawer test used to pick
+  // listitem(1) as the first restorable row; after the duplicate it was still dabartine. 2026-10-29.
+  const needsRestore = chosen.dabartine !== true;
+  if (needsRestore) await api(`/api/projects/${PROJECT}/versions/${chosen.id}/restore`, { method: 'POST' });
   const start = fingerprint(await getProject());
   const bad = startMismatch(start);
   if (bad.length) {
