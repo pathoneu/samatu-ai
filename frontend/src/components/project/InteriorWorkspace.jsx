@@ -778,7 +778,7 @@ export default function InteriorWorkspace({
         pdfBlob={pdfBlob}
         renderToolbarAddon={(page, total, ctx) => (
           <>
-            <DetectRunButton project={project} currentPage={page} totalPages={total} busy={detectRun.busy} onStart={detectRun.start} scaleGate={ctx?.scaleGate || null} onSetScale={ctx?.onSetScale || null} compact={!!ctx?.compact} />
+            <DetectRunButton project={project} currentPage={page} busy={detectRun.busy} onStart={detectRun.start} scaleGate={ctx?.scaleGate || null} onSetScale={ctx?.onSetScale || null} compact={!!ctx?.compact} />
             <RevisionCompareControl project={project} currentPage={page} overlay={revisionOverlay} onOverlayChange={setRevisionOverlay} onProjectSaved={onProjectChange} compact={!!ctx?.compact} />
           </>
         )}

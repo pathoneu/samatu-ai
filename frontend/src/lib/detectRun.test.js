@@ -31,10 +31,10 @@ test('„plotai" cannot be unticked and alone is not a run', () => {
   assert.equal(canStart(toggleFeature(only, 'grindys', true)), true);
 });
 
-test('the request body: one sheet or the set, every feature named', () => {
+test('the request body: one sheet, every feature named (per-sheet only since 2026-10-29)', () => {
   assert.deepEqual(requestBody([3, 1, 3], allFeatures()), { pages: [1, 3], features: allFeatures() });
-  const body = requestBody('all', { grindys: true });
-  assert.equal(body.pages, 'all');
+  const body = requestBody([2], { grindys: true });
+  assert.deepEqual(body.pages, [2]);
   assert.deepEqual(body.features, { plotai: true, konturai: false, sienos: false, angos: false, grindys: true });
 });
 
@@ -64,7 +64,7 @@ test('the server leaves „kiekiai" running; the browser\'s landing finishes it'
   assert.equal(landed.terminal, true);
   assert.equal(landed.progress, 1);
   assert.equal(landed.stages.at(-1).note, '8 kontūrai');
-  assert.equal(headline(landed, 'all'), 'Perskaityta · pritaikoma visam brėžiniui');
+  assert.equal(headline(landed, [3], [[1, 2, 3, 4, 5, 6, 7], [8]]), 'Perskaityta · pritaikoma planui (lapai 1–7)');
 });
 
 test('a failure is named by its stage, never a generic error', () => {
@@ -127,7 +127,6 @@ test('the button reads „iš naujo" once the sheet\'s plan has been read', () =
 
 test('a run lands on the whole plan its sheet belongs to, and says so', () => {
   const groups = [[1, 2, 3, 4, 5, 6, 7], [8]];
-  assert.equal(appliedTo('all', groups), 'visam brėžiniui');
   assert.equal(appliedTo([3], groups), 'planui (lapai 1–7)');
   assert.equal(appliedTo([8], groups), 'lapui 8', 'a plan of one sheet is that sheet');
   assert.equal(appliedTo([9], groups), 'lapui 9', 'a sheet in no plan');

@@ -75,10 +75,10 @@ export function canStart(selected) {
   return FEATURES.some((f) => f !== 'plotai' && selected?.[f]);
 }
 
-/** The POST body. `pages` = [n] for one sheet, 'all' for the set. */
+/** The POST body. `pages` = [n] for one sheet (per-sheet reading only since 2026-10-29). */
 export function requestBody(pages, selected) {
   const features = Object.fromEntries(FEATURES.map((f) => [f, Boolean(selected?.[f]) || f === 'plotai']));
-  return { pages: pages === 'all' ? 'all' : [...new Set(pages.map(Number))].filter((n) => n >= 1).sort((a, b) => a - b), features };
+  return { pages: [...new Set((pages || []).map(Number))].filter((n) => n >= 1).sort((a, b) => a - b), features };
 }
 
 /**
@@ -127,12 +127,11 @@ function sheetList(nums) {
 }
 
 /**
- * What a run lands on, in words (dative, after „pritaikyta"): the whole drawing; the chosen sheet when it is a plan
- * of its own; or the whole PLAN its sheets belong to — the lane aligns the sheets of one plan and a run on any of
- * them changes the rooms of all (`_meta.geometrija.grupes`). Never „lapui 3" for a change to sheets 1–7.
+ * What a run lands on, in words (dative, after „pritaikyta"): the chosen sheet when it is a plan of its own; or
+ * the whole PLAN its sheets belong to — the lane aligns the sheets of one plan and a run on any of them
+ * changes the rooms of all (`_meta.geometrija.grupes`). Never „lapui 3" for a change to sheets 1–7.
  */
 export function appliedTo(pages, groups) {
-  if (pages === 'all') return 'visam brėžiniui';
   const chosen = (Array.isArray(pages) ? pages : [pages]).map(Number).filter((n) => n >= 1);
   const touched = new Set(chosen);
   let plan = false;
