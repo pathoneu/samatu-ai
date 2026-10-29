@@ -166,41 +166,53 @@ def test_a_short_jog_nobody_dimensioned_is_taken_from_the_outline_and_said_so():
     assert [s["saltinis"] for s in r["_sienos"]].count("konturas") == 1
 
 
-def test_an_outline_that_disagrees_with_the_table_states_nothing():
-    """Table or outline — one of them is wrong, and a sum along the wrong walls
-    would look exact. Blank, with the estimate and the reason."""
-    r = _room("01", 0.2, 0.2, 4.2, 3.2)
-    r["_konturas"]["plotas_nesutampa"] = True
+def test_an_outline_off_the_table_still_lets_the_strings_decide():
+    """2026-10-29 (G1 restated): the plan writes the walls' lengths — an
+    outline whose area is off the table's does NOT veto reading them. The
+    strings decide (sum against each wall's control length and the whole
+    against the outline, as for any other room); the area mismatch is said
+    once on the room, and the FLOOR row keeps billing the table's area."""
+    r = _room("01", 0.2, 0.2, 4.2, 3.2)                      # 4 × 3 m — 12 m² around 14 m
+    r["plotas_m2"] = 13.5                                     # the table: 12,5 % more
+    r["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
     out = _run([two_rooms()], [r])
-    assert r["perimetras_saltinis"] == "konturo_ivertis" and "nesutampa su lentele" in r["_perimetras_priezastis"]
-    assert abs(r["_perimetras_ivertis_m"] - 14.0) < 0.2 and out["blank"] == ["01"]
-    # the cause only (2026-10-06): the sheet goes on „…sienas skaičiuoju su … m", so the reason must not say
-    # the walls are not summed („sienų ilgių nesumuoju" did)
-    assert r["_perimetras_priezastis"] == ds.AREA_MISMATCH_REASON and "nesumuoju" not in r["_perimetras_priezastis"]
+    assert r["perimetras_saltinis"] == "matmenu_eilutes" and r["perimetras_m"] == 14.0, r.get("_perimetras_priezastis")
+    assert out["stated"] == ["01"] and out["blank"] == []
+    assert "_perimetras_priezastis" not in r
+    note = r.get("_plotas_pastaba") or ""
+    assert "12,00" in note and "13,50" in note and "lentelės" in note, note
 
 
 def test_an_outline_off_the_table_offers_its_length_matched_to_the_table_area():
     """2026-10-06 (objektas_a on production): an outline the lane kept although its area is off the table's
     offered its own length — 13,98 m around a 13,51 m² room, shorter than any room of that area can be. A shape
     similar to the outline with the table's area has every length × √(table / outline); the outline's own
-    length stays beside it for the check sheet."""
+    length stays beside it for the check sheet. Since 2026-10-29 (G1 restated) the matching only applies when
+    the walls cannot be read — the strings decide whenever they do."""
+    # Room 1's 3 m walls carry no string: the walls cannot be summed, the outline's length is the estimate
+    sheet = two_rooms()
+    sheet.dims = [d for d in sheet.dims if not (d[0] == "3000" and min(abs(d[1] - x) for x in (0.35, 4.05, 4.55)) < 1e-6)]
+    sheet.dims.append(("2000", 9.0, 5.0, 9.0, 7.0))
     r = _room("01", 0.2, 0.2, 4.2, 3.2)                      # the outline: 4 × 3 m — 12 m², 14 m around
     r["plotas_m2"] = 13.5                                     # the table: 12,5 % more
     r["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
-    out = _run([two_rooms()], [r])
+    out = _run([sheet], [r])
     factor = math.sqrt(13.5 / 12.0)
     assert r["perimetras_saltinis"] == "konturo_ivertis" and out["blank"] == ["01"]
-    assert "nesutampa su lentele" in r["_perimetras_priezastis"] and r["_perimetras_ivertis_saltinis"] == "konturas"
+    assert "sienų be matmens" in r["_perimetras_priezastis"] and r["_perimetras_ivertis_saltinis"] == "konturas"
     rec = r["_perimetras_suma"]["pagal_plota"]
     assert abs(rec["konturo_m"] - 14.0) < 0.2 and rec["konturo_m"] == r["_perimetras_suma"]["kontrole_m"]
     assert rec["konturo_plotas_m2"] == 12.0 and rec["lenteles_plotas_m2"] == 13.5 and abs(rec["koeficientas"] - factor) < 1e-4
     assert r["perimetras_m"] == r["_perimetras_ivertis_m"] == rec["ivertis_m"] == round(rec["konturo_m"] * factor, 2)
     assert r["perimetras_m"] >= 4 * math.sqrt(13.5)          # no shorter than the square of the table's area
     # …and the other way: an outline larger than the table gives a shorter estimate
+    big_sheet = two_rooms()
+    big_sheet.dims = [d for d in big_sheet.dims if not (d[0] == "3000" and min(abs(d[1] - x) for x in (0.35, 4.05, 4.55)) < 1e-6)]
+    big_sheet.dims.append(("2000", 9.0, 5.0, 9.0, 7.0))
     big = _room("01", 0.2, 0.2, 4.2, 3.2)
     big["plotas_m2"] = 10.5
     big["_konturas"].update({"plotas_m2": 12.0, "plotas_nesutampa": True})
-    _run([two_rooms()], [big])
+    _run([big_sheet], [big])
     assert big["perimetras_m"] == round(big["_perimetras_suma"]["kontrole_m"] * math.sqrt(10.5 / 12.0), 2) < 14.0
 
 

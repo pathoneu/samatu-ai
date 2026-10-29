@@ -46,9 +46,15 @@ it (`_matched_to_table`, `_perimetras_suma["pagal_plota"]` keeps the outline's o
 length). Rooms whose perimeter someone STATED
 (plan pair, table, user) are left alone; rooms whose outline is only Vision's
 box or a browser flood-fill are skipped — those cannot say which strings are
-its walls; an outline
-that disagrees with the table states nothing (one of the two is wrong, and a
-sum along the wrong walls would look exact).
+its walls. An outline whose area is off the table's (`_konturas.plotas_nesutampa`
+— 2026-10-29, G1 restated) is no longer a veto on reading: the plan writes the
+walls' lengths and the strings decide, provided the sum agrees with each wall's
+own outline length (WALL_TOL) and the whole with the outline's perimeter
+(CONTROL_TOL). The table's area is still what the FLOOR row bills; a short note
+goes on the room (`_plotas_pastaba`) saying both figures so the user sees them.
+When strings do not add up to the wall (missing / control / outline share) the
+outline's length is matched to the table's area and offered as an estimate as
+before.
 """
 from __future__ import annotations
 
@@ -600,9 +606,12 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
                 "is_grandines_m": from_chain if not missing else 0.0, "papildyta": completed if not missing else [],
                 "sienu_is_matmenu": n_read, "sienu": len(sienos)}
         outline_share = (from_outline + from_piers) / total if total > 0 else 0.0
-        if kont.get("plotas_nesutampa"):
-            reason = AREA_MISMATCH_REASON
-        elif not sienos:
+        # 2026-10-29 (G1 restated): the plan writes the walls' lengths — an outline whose area is off
+        # the table's does NOT veto reading them. The sum against each wall's own control length and
+        # the whole against the outline's perimeter decide, as for any other room. The area mismatch
+        # stays recorded on `_konturas.plotas_nesutampa` and is said to the user on the room
+        # (`_plotas_pastaba`) once the strings have decided; the FLOOR row still bills the table's area.
+        if not sienos:
             reason = "kontūras be sienų"
         elif missing:
             reason = f"{len(missing)} iš {len(sienos)} sienų be matmens"
@@ -623,6 +632,21 @@ def sum_perimeters(rooms: Sequence[dict], dims: Sequence[dict], alignment: dict,
             room["perimetras_saltinis"] = SOURCE
             for key in ("_perimetras_priezastis", "_perimetras_ivertis_m", "_perimetras_ivertis_saltinis"):
                 room.pop(key, None)
+            # 2026-10-29 (G1 restated): the walls were added up, but the outline's area is off the
+            # table's — tell him both figures. The floor row keeps the table's area.
+            if kont.get("plotas_nesutampa"):
+                try:
+                    drawn = float(kont.get("plotas_m2") or 0)
+                    table_a = float(room.get("plotas_m2") or 0)
+                except (TypeError, ValueError):
+                    drawn, table_a = 0.0, 0.0
+                if drawn > 0 and table_a > 0:
+                    room["_plotas_pastaba"] = (f"Kontūro plotas {drawn:.2f} m², lentelėje {table_a:.2f} m² — "
+                                               f"grindims imamas lentelės plotas").replace(".", ",")
+                else:
+                    room.pop("_plotas_pastaba", None)
+            else:
+                room.pop("_plotas_pastaba", None)
             summary["stated"].append(nr)
         else:
             # NOT a read figure — the sheet shows a blank and offers this number. It still has to BE the
