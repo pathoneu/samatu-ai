@@ -563,6 +563,103 @@ def read_dimension_strings(pdf_bytes: bytes, pages: Iterable[int] | None = None)
     return out
 
 
+# ── v4 ocr-dimension-strings: OCR'd strings on sheets whose text layer is sparse ──
+# A plan-group sheet whose text layer gives few line-backed dimension strings on many hairlines (CAD exports that
+# wrote the dimension text as curves — objektas_a page 2: 1253 chars in the layer, 9 of them dim strings, 0 backed,
+# 349 hairlines) is read by local OCR (`text.ocr.dimension_strings`). The OCR'd strings are attached to the sheet's
+# vector hairlines the same way text-layer strings are (`attach_dimension_lines`), so they carry `span_source="line"`
+# and `scale_m_per_pt` and reach `sum_perimeters` the same way (research 2026-10-29-ocr-dimension-strings §1-2).
+# Flag `SAMATU_OCR` OFF: no engine import, no page render, no OCR call — the function returns [] immediately.
+
+OCR_SPARSE_STRINGS = 5     # ≥ 5 line-backed strings on a sheet is the text layer doing its job (scale.py:WALL_MIN_AGREE)
+OCR_MIN_HAIRLINES = 8       # fewer hairlines than two rooms would need is a title block or a blank page, not a plan
+OCR_DEDUPE_PT = 2.0         # an OCR'd string whose bbox centre is within this of a text-layer string of the same value is the same string
+
+
+def _needs_ocr_dims(pdf_bytes: bytes, page: int, backed_count: int) -> bool:
+    """Trigger for `ocr_augment_dimensions`: the text layer gives few line-backed strings on many hairlines."""
+    if backed_count >= OCR_SPARSE_STRINGS:
+        return False
+    try:
+        lines = _page_lines_pdfium(pdf_bytes, {int(page)}).get(int(page)) or {"h": [], "v": []}
+    except Exception:  # noqa: BLE001 — a page we cannot read hairlines from is not an OCR candidate
+        return False
+    return len(lines["h"]) + len(lines["v"]) >= OCR_MIN_HAIRLINES
+
+
+def _dedupe_overlap(ocr_dim: dict, layer_on_page: Sequence[dict]) -> bool:
+    """True when an existing text-layer string of the same value sits in nearly the same place on the sheet."""
+    try:
+        value = float(ocr_dim["value_m"])
+        x0, y0, x1, y1 = (float(v) for v in ocr_dim["bbox"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    for d in layer_on_page:
+        try:
+            if abs(float(d["value_m"]) - value) > 0.001:
+                continue
+            lx0, ly0, lx1, ly1 = (float(v) for v in d["bbox"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if abs((lx0 + lx1) / 2 - cx) <= OCR_DEDUPE_PT and abs((ly0 + ly1) / 2 - cy) <= OCR_DEDUPE_PT:
+            return True
+    return False
+
+
+def ocr_augment_dimensions(pdf_bytes: bytes, dims: Sequence[dict], pages: Iterable[int]) -> list[dict]:
+    """OCR'd dimension strings for `pages` whose text layer is sparse on many hairlines (section doc above). Returns
+    ONLY the newly OCR'd strings, each backed by its sheet's vector hairline where one exists (so it reaches
+    `sum_perimeters`), deduped against `dims`. Flag `SAMATU_OCR` OFF: returns [] without importing the engine."""
+    try:
+        from text.ocr import ocr_enabled
+    except Exception:  # noqa: BLE001 — the OCR module missing is „flag off" for every caller
+        return []
+    if not ocr_enabled():
+        return []
+    try:
+        from text.ocr import dimension_strings as _ocr_dimension_strings
+    except Exception:  # noqa: BLE001
+        return []
+    backed_by_page: dict[int, int] = {}
+    layer_by_page: dict[int, list[dict]] = {}
+    for d in dims:
+        try:
+            p = int(d.get("page") or 0)
+        except (TypeError, ValueError):
+            continue
+        if d.get("span_source") == "line":
+            backed_by_page[p] = backed_by_page.get(p, 0) + 1
+        layer_by_page.setdefault(p, []).append(d)
+    added: list[dict] = []
+    for p in sorted({int(q) for q in pages}):
+        if not _needs_ocr_dims(pdf_bytes, p, backed_by_page.get(p, 0)):
+            continue
+        try:
+            ocr_dims, stated = _ocr_dimension_strings(pdf_bytes, p)
+        except Exception:  # noqa: BLE001 — OCR missing or failing leaves the sheet as the text layer left it
+            continue
+        if not ocr_dims:
+            continue
+        on_page = layer_by_page.get(p, [])
+        kept: list[dict] = []
+        for d in ocr_dims:
+            if _dedupe_overlap(d, on_page):
+                continue
+            d.setdefault("source", "ocr")
+            d["saltinis"] = "ocr"       # LT key for the lane / check sheet („skaičiai perskaityti iš lapo vaizdo")
+            kept.append(d)
+        if not kept:
+            continue
+        # attach each OCR'd string to its vector hairline — same shape sum_perimeters' text-layer strings carry
+        try:
+            attach_dimension_lines(pdf_bytes, kept, {p: set(stated or ())})
+        except Exception:  # noqa: BLE001 — never at the cost of what OCR already read
+            pass
+        added.extend(kept)
+    return added
+
+
 # ── placing dimensions next to rooms ─────────────────────────────────────────
 
 def _centre_frac(bbox: Sequence[float], W: float, H: float) -> tuple[float, float]:
