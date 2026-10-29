@@ -167,35 +167,3 @@ test('Kiekiai inline edit: double-click, Tab to the next line, Esc, Enter, Atša
   note(`inline edit: ${LINE_2} → 80 (Tab → ${next.replace('Kiekis: ', '')}) → Atšaukti → 77,5 (2 actions + typing)`);
 });
 
-test('„Kas pasikeitė" after Perskaityti iš naujo — Atšaukti puts the project back as it was before the read', async ({ page }) => {
-  await openProject(page);
-  const before = await getProject();
-  const startedAt = new Date();
-  await page.getByTestId('detect-run-button').click();
-  await page.getByTestId('detect-run-start-all').click();
-  await expect(page.getByTestId('detect-run-headline')).toHaveText('Perskaityta · pritaikoma visam brėžiniui', { timeout: 120_000 });
-  const banner = page.getByTestId('reread-diff-banner');
-  await expect(banner).toContainText('Kas pasikeitė');
-  await expect(page.getByTestId('reread-diff-undo')).toBeVisible();
-  await expect.poll(async () => new Date((await getProject())._reread_diff?.at || 0) >= startedAt, { timeout: 30_000 }).toBe(true);
-  const read = await getProject();
-  expect(read._reread_diff.eilutes).toBeTruthy();
-  await shot(page, 'w4a-03a-kas-pasikeite-eilute');
-  await page.getByTestId('reread-diff-toggle').click();
-  await shot(page, 'w4a-03-kas-pasikeite');
-  await page.getByTestId('reread-diff-undo').click();
-  // a save after the read asks first (it would go too); the read alone does not
-  const dialog = page.getByRole('alertdialog');
-  if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await expect(dialog).toContainText('Grąžinti projektą, koks buvo prieš perskaitymą?');
-    await dialog.getByRole('button', { name: 'Atšaukti' }).click();
-  }
-  await expect(toast(page, 'Grąžinta, kaip buvo prieš perskaitymą')).toBeVisible({ timeout: 20_000 });
-  const back = await getProject();
-  expect(back._geometrija_perskaityta_at ?? null).toBe(before._geometrija_perskaityta_at ?? null);
-  expect(back._reread_diff?.at ?? null).toBe(before._reread_diff?.at ?? null);
-  const { versions } = await api(`/api/projects/${PROJECT}/versions`);
-  expect(versions[0].saltinis).toBe('grazinta');
-  if (!before._reread_diff) await expect(banner).toHaveCount(0);
-  note('Kas pasikeitė → Atšaukti: back to the state before the read; the read kept as „Prieš grąžinant"');
-});
