@@ -706,6 +706,25 @@ def apply_geometry(parsed: dict, pdf_bytes: bytes, dims: Sequence[dict] | None =
         traced_on = {int(r["_konturas"]["page"]) for r in rooms if isinstance(r.get("_konturas"), dict) and r["_konturas"].get("page")}
         dimensioned = {int(d["page"]) for d in dims if d.get("span_source") == "line"}
         sheets = sorted(set(plan_pages) | traced_on | dimensioned)
+        # ── v4 ocr-dimension-strings hook (SAMATU_OCR): a plan-group sheet whose text layer has few line-backed
+        # strings on many hairlines (objektas_a page 2: 9 strings, 0 backed, 349 hairlines — CAD wrote the dim text
+        # as curves) gets its dim strings from local OCR, each attached to its vector hairline the way the text-layer
+        # strings are, so they reach `sum_perimeters` (research 2026-10-29-ocr-dimension-strings).
+        try:
+            from .plan_dimensions import ocr_augment_dimensions
+            ocr_added = ocr_augment_dimensions(pdf_bytes, dims, sheets)
+        except Exception:  # noqa: BLE001 — the OCR augmentation never sinks the lane
+            print("[extractor] geometry lane: OCR dim augmentation failed")
+            ocr_added = []
+        if ocr_added:
+            dims = list(dims) + ocr_added
+            for d in ocr_added:
+                if d.get("mastelis_atmestas"):
+                    meta["masteliai_atmesti"].setdefault(str(d["page"]), d["mastelis_atmestas"])
+                if d.get("mastelis_kitas"):
+                    meta["masteliai_kiti"].setdefault(str(d["page"]), d["mastelis_kitas"])
+            dimensioned = {int(d["page"]) for d in dims if d.get("span_source") == "line"}
+            sheets = sorted(set(plan_pages) | traced_on | dimensioned)
         # ── v4 scale hook (geometry/scale.py) 1/3: the strings on their hairlines first (source 2); a person's
         # „Mastelis" line wins on its sheet, before alignment so the sheets laid over it borrow it; `line_scaled`
         # keeps which sheets their OWN lines scaled.
